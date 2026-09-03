@@ -117,13 +117,14 @@ const canvasBoundsOnRuler = computed(() => {
           :stroke="tick.isMajor ? '#38bdf8' : '#0284c7'" 
           :stroke-width="tick.isMajor ? 1.5 : 1" 
         />
+        <!-- Horizontal major tick text -->
         <text
           v-if="tick.isMajor"
           x="4"
           y="12"
           fill="#38bdf8"
-          font-size="9.5"
-          font-weight="bold"
+          font-size="9"
+          font-weight="normal"
           font-family="monospace"
           class="select-none"
         >
@@ -167,24 +168,25 @@ const canvasBoundsOnRuler = computed(() => {
         :transform="`translate(0, ${tick.pos})`"
       >
         <line 
-          :x1="tick.isMajor ? 16 : 22" 
+          :x1="tick.isMajor ? 18 : 24" 
           y1="0" 
           x2="30" 
           y2="0" 
-          :stroke="tick.isMajor ? '#38bdf8' : '#0284c7'" 
+          :stroke="tick.isMajor ? '#00f2ff' : '#0284c7'" 
           :stroke-width="tick.isMajor ? 1.5 : 1" 
         />
-        <!-- Shifted rightwards (x=7) so text has comfortable space and is completely unmasked -->
+        <!-- Shifted rightwards (x=16) so vertical numbers have generous spacing, perfectly visible and clear -->
         <text
           v-if="tick.isMajor"
-          x="7"
-          y="13"
+          x="16"
+          y="4"
           fill="#38bdf8"
           font-size="9"
-          font-weight="bold"
+          font-weight="normal"
           font-family="monospace"
           class="select-none"
-          transform="rotate(-90 7,13)"
+          text-anchor="end"
+          transform="rotate(-90 16,4)"
         >
           {{ tick.value }}
         </text>

@@ -119,12 +119,12 @@ const handleDeleteCurrent = () => {
 </script>
 
 <template>
-  <div class="h-10 bg-[#050914] border-t border-slate-800/80 flex items-center justify-between px-3 z-30 select-none font-mono">
+  <div class="h-10 bg-[#050c1c] border-t border-cyan-500/40 flex items-center justify-between px-3 z-30 select-none font-mono">
     <!-- Left: Dropdown Screen Switcher & Quick Actions -->
     <div class="flex items-center gap-2">
       <!-- Label -->
-      <div class="flex items-center gap-1.5 text-xs text-cyan-400 font-bold px-1 shrink-0">
-        <Layout class="w-3.5 h-3.5" />
+      <div class="flex items-center gap-1.5 text-xs text-cyan-300 font-normal px-1 shrink-0">
+        <Layout class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
         <span>SCADA 画面:</span>
       </div>
 
@@ -132,28 +132,28 @@ const handleDeleteCurrent = () => {
       <div class="relative">
         <button
           @click="isDropdownOpen = !isDropdownOpen"
-          class="flex items-center justify-between gap-2 px-3 py-1 bg-slate-900/90 hover:bg-slate-850 border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 rounded-md text-xs font-mono transition-all cursor-pointer min-w-[200px] shadow-sm"
+          class="flex items-center justify-between gap-2 px-3 py-1 bg-[#09152b] hover:bg-cyan-950/80 border border-cyan-400/50 hover:border-cyan-300 text-cyan-100 rounded-md text-xs font-mono transition-all cursor-pointer min-w-[200px] shadow-sm"
         >
           <div class="flex items-center gap-2 truncate">
-            <Monitor class="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-            <span class="font-bold truncate max-w-[180px]">{{ currentScreen?.name || '选择画面' }}</span>
+            <Monitor class="w-3.5 h-3.5 text-cyan-300 shrink-0 stroke-[2]" />
+            <span class="font-normal truncate max-w-[180px]">{{ currentScreen?.name || '选择画面' }}</span>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
-            <span class="text-[9px] px-1 py-0.2 rounded bg-slate-950 text-slate-400 border border-slate-800">
+            <span class="text-[9px] px-1 py-0.2 rounded bg-[#040813] text-cyan-300 border border-cyan-500/40 font-light">
               {{ currentScreen?.components?.length || 0 }}组件
             </span>
-            <ChevronDown class="w-3.5 h-3.5 text-slate-400 transition-transform" :class="{ 'rotate-180': isDropdownOpen }" />
+            <ChevronDown class="w-3.5 h-3.5 text-cyan-300 transition-transform stroke-[2]" :class="{ 'rotate-180': isDropdownOpen }" />
           </div>
         </button>
 
         <!-- Dropdown Menu Popover -->
         <div
           v-if="isDropdownOpen"
-          class="absolute bottom-full left-0 mb-1 w-72 bg-[#060c1c] border border-cyan-500/50 rounded-lg shadow-2xl overflow-hidden z-50 divide-y divide-slate-800 animate-in fade-in zoom-in-95 duration-100"
+          class="absolute bottom-full left-0 mb-1 w-72 bg-[#050c1c] border border-cyan-400/60 rounded-lg shadow-2xl overflow-hidden z-50 divide-y divide-cyan-500/30 animate-in fade-in zoom-in-95 duration-100"
         >
-          <div class="px-3 py-1.5 bg-slate-950/80 text-[10px] text-slate-400 flex items-center justify-between">
-            <span class="font-bold">切换监控画面 (共 {{ screens.length }} 画面)</span>
-            <span class="text-cyan-400">名称唯一识别</span>
+          <div class="px-3 py-1.5 bg-[#071024] text-[10px] text-cyan-300 flex items-center justify-between font-light">
+            <span>切换监控画面 (共 {{ screens.length }} 画面)</span>
+            <span class="text-cyan-200">名称唯一识别</span>
           </div>
 
           <div class="max-h-60 overflow-y-auto custom-scrollbar p-1 space-y-0.5">
@@ -163,29 +163,29 @@ const handleDeleteCurrent = () => {
               @click="handleSelectScreen(item.id)"
               class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs font-mono text-left cursor-pointer transition-colors"
               :class="item.id === activeScreenId 
-                ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/40' 
-                : 'text-slate-300 hover:bg-slate-800/80 hover:text-white border border-transparent'"
+                ? 'bg-cyan-500/25 text-cyan-200 font-normal border border-cyan-400/50 shadow-[0_0_8px_rgba(0,242,255,0.2)]' 
+                : 'text-cyan-200 hover:bg-cyan-950/60 hover:text-white border border-transparent font-light'"
             >
               <div class="flex items-center gap-2 truncate">
-                <Monitor class="w-3.5 h-3.5 shrink-0" :class="item.id === activeScreenId ? 'text-cyan-400' : 'text-slate-500'" />
+                <Monitor class="w-3.5 h-3.5 shrink-0 stroke-[2]" :class="item.id === activeScreenId ? 'text-cyan-300' : 'text-cyan-400/80'" />
                 <span class="truncate">{{ item.name }}</span>
               </div>
               <div class="flex items-center gap-2 shrink-0">
-                <span class="text-[10px] text-slate-500 font-normal">
+                <span class="text-[10px] text-cyan-300/80 font-light">
                   {{ item.components?.length || 0 }} 项
                 </span>
-                <Check v-if="item.id === activeScreenId" class="w-3.5 h-3.5 text-cyan-400" />
+                <Check v-if="item.id === activeScreenId" class="w-3.5 h-3.5 text-cyan-300 stroke-[2.5]" />
               </div>
             </button>
           </div>
 
           <!-- Bottom Action in Dropdown -->
-          <div class="p-1.5 bg-slate-950/90 flex items-center gap-1">
+          <div class="p-1.5 bg-[#071024] flex items-center gap-1">
             <button
               @click="isDropdownOpen = false; handleOpenAddModal();"
-              class="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 bg-cyan-950/80 hover:bg-cyan-900/90 text-cyan-300 border border-cyan-500/40 rounded text-xs font-bold cursor-pointer transition-colors"
+              class="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 bg-cyan-950/90 hover:bg-cyan-900 text-cyan-200 hover:text-white border border-cyan-400/50 rounded text-xs font-normal cursor-pointer transition-colors"
             >
-              <Plus class="w-3.5 h-3.5" />
+              <Plus class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
               <span>添加新画面</span>
             </button>
           </div>
@@ -193,34 +193,34 @@ const handleDeleteCurrent = () => {
       </div>
 
       <!-- Quick Action Buttons -->
-      <div class="flex items-center gap-1 pl-1 border-l border-slate-800">
+      <div class="flex items-center gap-1 pl-1 border-l border-cyan-500/30">
         <!-- Add Screen -->
         <button
           @click="handleOpenAddModal"
-          class="flex items-center gap-1 px-2 py-1 rounded bg-slate-900 hover:bg-cyan-950/70 border border-slate-800 hover:border-cyan-500/40 text-slate-300 hover:text-cyan-300 text-xs font-mono transition-all cursor-pointer shadow-xs"
+          class="flex items-center gap-1 px-2 py-1 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 hover:text-white text-xs font-mono font-light transition-all cursor-pointer shadow-xs"
           title="新建画面页面"
         >
-          <Plus class="w-3 h-3 text-cyan-400" />
+          <Plus class="w-3 h-3 text-cyan-300 stroke-[2]" />
           <span>新建</span>
         </button>
 
         <!-- Rename Current Screen -->
         <button
           @click="handleOpenRenameModal"
-          class="flex items-center gap-1 px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-mono transition-all cursor-pointer shadow-xs"
+          class="flex items-center gap-1 px-2 py-1 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 hover:text-white text-xs font-mono font-light transition-all cursor-pointer shadow-xs"
           title="重命名当前画面"
         >
-          <Edit3 class="w-3 h-3" />
+          <Edit3 class="w-3 h-3 text-cyan-300 stroke-[2]" />
           <span>重命名</span>
         </button>
 
         <!-- Duplicate Current Screen -->
         <button
           @click="handleDuplicateCurrent"
-          class="flex items-center gap-1 px-2 py-1 rounded bg-slate-900 hover:bg-emerald-950/60 border border-slate-800 hover:border-emerald-500/40 text-slate-400 hover:text-emerald-300 text-xs font-mono transition-all cursor-pointer shadow-xs"
+          class="flex items-center gap-1 px-2 py-1 rounded bg-[#09152b] hover:bg-emerald-950/70 border border-cyan-500/40 hover:border-emerald-400/60 text-cyan-200 hover:text-emerald-200 text-xs font-mono font-light transition-all cursor-pointer shadow-xs"
           title="复制当前画面"
         >
-          <Copy class="w-3 h-3" />
+          <Copy class="w-3 h-3 text-emerald-300 stroke-[2]" />
           <span>复制</span>
         </button>
 
@@ -228,79 +228,79 @@ const handleDeleteCurrent = () => {
         <button
           v-if="screens.length > 1"
           @click="handleDeleteCurrent"
-          class="flex items-center gap-1 px-2 py-1 rounded bg-slate-900 hover:bg-rose-950/60 border border-slate-800 hover:border-rose-500/40 text-slate-400 hover:text-rose-300 text-xs font-mono transition-all cursor-pointer shadow-xs"
+          class="flex items-center gap-1 px-2 py-1 rounded bg-[#09152b] hover:bg-rose-950/70 border border-cyan-500/40 hover:border-rose-400/60 text-cyan-200 hover:text-rose-200 text-xs font-mono font-light transition-all cursor-pointer shadow-xs"
           title="删除当前画面"
         >
-          <Trash2 class="w-3 h-3" />
+          <Trash2 class="w-3 h-3 text-rose-300 stroke-[2]" />
           <span>删除</span>
         </button>
       </div>
     </div>
 
     <!-- Right: Screen Resolution Info -->
-    <div class="text-[11px] text-slate-500 flex items-center gap-2 shrink-0">
-      <span>当前画面尺寸: <strong class="text-slate-300">{{ currentScreen?.screen.width || 1920 }}×{{ currentScreen?.screen.height || 1080 }}</strong></span>
+    <div class="text-[11px] text-cyan-300/90 flex items-center gap-2 shrink-0 font-light">
+      <span>当前画面尺寸: <strong class="text-cyan-100 font-normal">{{ currentScreen?.screen.width || 1920 }}×{{ currentScreen?.screen.height || 1080 }}</strong></span>
     </div>
 
     <!-- Add Screen Modal -->
     <div 
       v-if="showAddModal" 
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4"
     >
-      <div class="bg-[#080e1c] border border-cyan-500/40 rounded-xl w-full max-w-md p-5 shadow-2xl space-y-4 font-mono">
-        <h3 class="text-sm font-bold text-slate-100 flex items-center gap-2 border-b border-slate-800 pb-2">
-          <Plus class="w-4 h-4 text-cyan-400" />
-          新建画面 (名称唯一)
+      <div class="bg-[#050c1c] border border-cyan-400/60 rounded-xl w-full max-w-md p-5 shadow-2xl space-y-4 font-mono">
+        <h3 class="text-sm font-normal text-cyan-100 flex items-center gap-2 border-b border-cyan-500/30 pb-2">
+          <Plus class="w-4 h-4 text-cyan-300 stroke-[2]" />
+          <span>新建画面 (名称唯一)</span>
         </h3>
 
-        <div v-if="errorMessage" class="p-2.5 rounded-lg bg-rose-950/80 border border-rose-500/60 text-rose-200 text-xs flex items-center gap-2">
-          <AlertCircle class="w-4 h-4 text-rose-400 shrink-0" />
+        <div v-if="errorMessage" class="p-2.5 rounded-lg bg-rose-950/80 border border-rose-400/70 text-rose-200 text-xs flex items-center gap-2 font-light">
+          <AlertCircle class="w-4 h-4 text-rose-300 shrink-0 stroke-[2]" />
           <span>{{ errorMessage }}</span>
         </div>
 
         <div class="space-y-3 text-xs">
           <div>
-            <label class="block text-slate-400 mb-1">画面名称 * (不可重复)</label>
+            <label class="block text-cyan-300 mb-1 font-light">画面名称 * (不可重复)</label>
             <input 
               v-model="newScreenName"
               @input="errorMessage = ''"
               @keydown.enter="handleConfirmAdd"
               placeholder="例如：变电站二次回路与直流屏"
-              class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 focus:border-cyan-400 focus:outline-hidden font-mono"
+              class="w-full px-3 py-2 bg-[#09152b] border border-cyan-500/50 rounded-lg text-cyan-100 focus:border-cyan-300 focus:outline-hidden font-mono font-light placeholder:text-cyan-500/60"
               autofocus
             />
           </div>
 
           <div class="grid grid-cols-2 gap-3">
             <div>
-              <label class="block text-slate-400 mb-1">宽度 (px)</label>
+              <label class="block text-cyan-300 mb-1 font-light">宽度 (px)</label>
               <input 
                 type="number" 
                 v-model.number="newScreenWidth" 
-                class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 focus:border-cyan-400 focus:outline-hidden"
+                class="w-full px-3 py-2 bg-[#09152b] border border-cyan-500/50 rounded-lg text-cyan-100 focus:border-cyan-300 focus:outline-hidden font-light"
               />
             </div>
             <div>
-              <label class="block text-slate-400 mb-1">高度 (px)</label>
+              <label class="block text-cyan-300 mb-1 font-light">高度 (px)</label>
               <input 
                 type="number" 
                 v-model.number="newScreenHeight" 
-                class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 focus:border-cyan-400 focus:outline-hidden"
+                class="w-full px-3 py-2 bg-[#09152b] border border-cyan-500/50 rounded-lg text-cyan-100 focus:border-cyan-300 focus:outline-hidden font-light"
               />
             </div>
           </div>
         </div>
 
-        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-cyan-500/30">
           <button 
             @click="showAddModal = false"
-            class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs cursor-pointer"
+            class="px-3 py-1.5 rounded-lg bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-300 text-xs font-light cursor-pointer transition-colors"
           >
             取消
           </button>
           <button 
             @click="handleConfirmAdd"
-            class="px-4 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs cursor-pointer shadow-md"
+            class="px-4 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-normal text-xs cursor-pointer shadow-md transition-colors"
           >
             立即创建
           </button>
@@ -311,43 +311,43 @@ const handleDeleteCurrent = () => {
     <!-- Rename Screen Modal -->
     <div 
       v-if="showRenameModal" 
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-xs p-4"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4"
     >
-      <div class="bg-[#080e1c] border border-cyan-500/40 rounded-xl w-full max-w-md p-5 shadow-2xl space-y-4 font-mono">
-        <h3 class="text-sm font-bold text-slate-100 flex items-center gap-2 border-b border-slate-800 pb-2">
-          <Edit3 class="w-4 h-4 text-cyan-400" />
-          重命名画面 (名称唯一)
+      <div class="bg-[#050c1c] border border-cyan-400/60 rounded-xl w-full max-w-md p-5 shadow-2xl space-y-4 font-mono">
+        <h3 class="text-sm font-normal text-cyan-100 flex items-center gap-2 border-b border-cyan-500/30 pb-2">
+          <Edit3 class="w-4 h-4 text-cyan-300 stroke-[2]" />
+          <span>重命名画面 (名称唯一)</span>
         </h3>
 
-        <div v-if="errorMessage" class="p-2.5 rounded-lg bg-rose-950/80 border border-rose-500/60 text-rose-200 text-xs flex items-center gap-2">
-          <AlertCircle class="w-4 h-4 text-rose-400 shrink-0" />
+        <div v-if="errorMessage" class="p-2.5 rounded-lg bg-rose-950/80 border border-rose-400/70 text-rose-200 text-xs flex items-center gap-2 font-light">
+          <AlertCircle class="w-4 h-4 text-rose-300 shrink-0 stroke-[2]" />
           <span>{{ errorMessage }}</span>
         </div>
 
         <div class="space-y-3 text-xs">
           <div>
-            <label class="block text-slate-400 mb-1">新的画面名称 * (不可重复)</label>
+            <label class="block text-cyan-300 mb-1 font-light">新的画面名称 * (不可重复)</label>
             <input 
               v-model="renameText"
               @input="errorMessage = ''"
               @keydown.enter="handleConfirmRename"
               placeholder="请输入新的画面名称"
-              class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 focus:border-cyan-400 focus:outline-hidden font-mono"
+              class="w-full px-3 py-2 bg-[#09152b] border border-cyan-500/50 rounded-lg text-cyan-100 focus:border-cyan-300 focus:outline-hidden font-mono font-light placeholder:text-cyan-500/60"
               autofocus
             />
           </div>
         </div>
 
-        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-cyan-500/30">
           <button 
             @click="showRenameModal = false"
-            class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs cursor-pointer"
+            class="px-3 py-1.5 rounded-lg bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-300 text-xs font-light cursor-pointer transition-colors"
           >
             取消
           </button>
           <button 
             @click="handleConfirmRename"
-            class="px-4 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs cursor-pointer shadow-md"
+            class="px-4 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-normal text-xs cursor-pointer shadow-md transition-colors"
           >
             确认修改
           </button>

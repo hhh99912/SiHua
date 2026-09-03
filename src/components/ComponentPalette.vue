@@ -202,21 +202,21 @@ const handleDragStart = (e: DragEvent, def: ComponentDefinition) => {
 </script>
 
 <template>
-  <aside class="w-60 shrink-0 h-full bg-[#060b17] border-r border-cyan-500/30 flex flex-col select-none z-30 shadow-2xl overflow-hidden font-sans">
+  <aside class="w-60 shrink-0 h-full bg-[#050c1c] border-r border-cyan-400/50 flex flex-col select-none z-30 shadow-2xl overflow-hidden font-sans">
     <!-- Header -->
-    <div class="p-2.5 border-b border-cyan-500/20 bg-[#040812]">
+    <div class="p-2.5 border-b border-cyan-500/30 bg-[#071024]">
       <div class="flex items-center justify-between mb-2">
-        <div class="flex items-center gap-1.5 font-mono font-bold text-xs text-cyan-200">
-          <Sparkles class="w-3.5 h-3.5 text-cyan-400" />
-          <span>组件物料库</span>
+        <div class="flex items-center gap-1.5 font-mono font-medium text-xs text-cyan-200">
+          <Sparkles class="w-3.5 h-3.5 text-cyan-300" />
+          <span class="font-normal tracking-wide">组件物料库</span>
         </div>
         <button
           @click="emit('open:symbol-modal')"
-          class="flex items-center gap-1 text-[10px] font-mono text-cyan-200 bg-cyan-950 hover:bg-cyan-900 border border-cyan-400/60 px-2 py-0.5 rounded cursor-pointer transition-all shadow-xs"
+          class="flex items-center gap-1 text-[10px] font-mono text-cyan-200 bg-cyan-950 hover:bg-cyan-900 border border-cyan-400/80 px-2 py-0.5 rounded cursor-pointer transition-all shadow-xs"
           title="管理与制作自定义图元工坊"
         >
           <FolderOpen class="w-3 h-3 text-cyan-300" />
-          <span>图元工坊</span>
+          <span class="font-light">图元工坊</span>
         </button>
       </div>
 
@@ -226,22 +226,22 @@ const handleDragStart = (e: DragEvent, def: ComponentDefinition) => {
           v-model="searchQuery"
           type="text"
           placeholder="搜索刀闸、断路器、仪表..."
-          class="w-full pl-7 pr-3 py-1.5 bg-slate-950 border border-slate-700 focus:border-cyan-400 rounded-lg text-xs font-mono text-slate-100 placeholder:text-slate-400 outline-hidden transition-all shadow-inner"
+          class="w-full pl-7 pr-3 py-1.5 bg-[#09152b] border border-cyan-500/40 focus:border-cyan-300 rounded-lg text-xs font-mono text-cyan-100 placeholder:text-cyan-400/60 outline-hidden transition-all shadow-inner font-light"
         />
-        <Search class="w-3.5 h-3.5 text-slate-400 absolute left-2 top-2" />
+        <Search class="w-3.5 h-3.5 text-cyan-300 absolute left-2 top-2" />
       </div>
     </div>
 
     <!-- Category Tabs Filter -->
-    <div class="px-2 py-1.5 border-b border-slate-800/80 flex items-center gap-1 overflow-x-auto custom-scrollbar bg-[#050914]">
+    <div class="px-2 py-1.5 border-b border-cyan-500/25 flex items-center gap-1 overflow-x-auto custom-scrollbar bg-[#060e20]">
       <button
         v-for="cat in categories"
         :key="cat.id"
         @click="activeCategory = cat.id"
         class="px-2 py-1 rounded-md text-[11px] font-mono whitespace-nowrap transition-colors cursor-pointer"
         :class="activeCategory === cat.id 
-          ? 'bg-cyan-500/25 text-cyan-200 font-bold border border-cyan-400 shadow-xs' 
-          : 'text-slate-300 hover:text-white hover:bg-slate-800 border border-transparent'"
+          ? 'bg-cyan-500/30 text-cyan-100 font-normal border border-cyan-300 shadow-[0_0_8px_rgba(0,242,255,0.2)]' 
+          : 'text-cyan-300/90 hover:text-white hover:bg-cyan-950/60 border border-transparent font-light'"
       >
         {{ cat.label }}
       </button>
@@ -255,33 +255,33 @@ const handleDragStart = (e: DragEvent, def: ComponentDefinition) => {
         draggable="true"
         @dragstart="handleDragStart($event, item)"
         @click="emit('add:component', item)"
-        class="group p-2 rounded-xl bg-slate-900/90 hover:bg-[#0c1930] border border-slate-700/80 hover:border-cyan-400 transition-all cursor-grab active:cursor-grabbing hover:shadow-[0_0_12px_rgba(0,242,255,0.25)] flex items-start gap-2.5 relative"
+        class="group p-2 rounded-xl bg-[#081226] hover:bg-[#0c1e3d] border border-cyan-500/30 hover:border-cyan-300 transition-all cursor-grab active:cursor-grabbing hover:shadow-[0_0_14px_rgba(0,242,255,0.35)] flex items-start gap-2.5 relative"
       >
         <!-- Icon preview badge -->
-        <div class="w-9 h-9 rounded-lg bg-[#040812] border border-cyan-500/40 group-hover:border-cyan-300 flex items-center justify-center text-cyan-300 group-hover:text-cyan-200 shrink-0 shadow-inner group-hover:scale-105 transition-transform">
+        <div class="w-9 h-9 rounded-lg bg-[#040816] border border-cyan-400/60 group-hover:border-cyan-300 flex items-center justify-center text-cyan-300 group-hover:text-cyan-100 shrink-0 shadow-inner group-hover:scale-105 transition-transform">
           <component :is="getIcon(item.iconName)" class="w-4 h-4 stroke-[2]" />
         </div>
 
         <div class="flex-1 min-w-0">
           <div class="flex items-center justify-between">
-            <h4 class="text-xs font-mono font-bold text-slate-100 group-hover:text-cyan-200 transition-colors truncate">
+            <h4 class="text-xs font-mono font-light text-cyan-100 group-hover:text-cyan-200 transition-colors truncate tracking-wide">
               {{ item.name }}
             </h4>
-            <Plus class="w-3.5 h-3.5 text-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <Plus class="w-3.5 h-3.5 text-cyan-300 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
           <!-- High-contrast Dimensions Badge & Category -->
           <div class="flex items-center gap-1.5 mt-1 text-[10px] font-mono">
-            <span class="px-1.5 py-0.2 rounded bg-slate-950 text-cyan-300 font-bold border border-slate-700 text-[9px]">
+            <span class="px-1.5 py-0.2 rounded bg-[#040816] text-cyan-300 font-light border border-cyan-500/40 text-[9px]">
               {{ item.defaultWidth }} × {{ item.defaultHeight }}
             </span>
-            <span class="text-slate-400 text-[9px] uppercase font-semibold">{{ item.category }}</span>
+            <span class="text-cyan-300/80 text-[9px] uppercase font-light">{{ item.category }}</span>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Bottom Drag Hint -->
-    <div class="p-2 border-t border-slate-700/80 text-[10px] font-mono text-slate-300 text-center bg-slate-950">
+    <div class="p-2 border-t border-cyan-500/30 text-[10px] font-mono text-cyan-300 text-center bg-[#050b1a] font-light">
       💡 支持点击添加 或 拖拽放入画布
     </div>
   </aside>

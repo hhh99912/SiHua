@@ -157,20 +157,20 @@ const handleSelectTemplate = (id: string) => {
         <div class="relative">
           <button
             @click="showResolutionMenu = !showResolutionMenu"
-            class="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-900/90 border border-cyan-500/30 hover:border-cyan-400 text-[11px] font-mono text-cyan-200 transition-all cursor-pointer shadow-xs"
+            class="flex items-center gap-1.5 px-2 py-1 rounded bg-[#0b1730] border border-cyan-400 hover:border-cyan-300 text-[11px] font-mono text-cyan-100 transition-all cursor-pointer shadow-[0_0_8px_rgba(0,242,255,0.2)]"
             title="选择预设画面分辨率"
           >
-            <span class="text-slate-400">尺寸:</span>
-            <span class="font-bold text-white">{{ screen.width }}×{{ screen.height }}</span>
-            <ChevronDown class="w-3 h-3 text-cyan-400" />
+            <span class="text-cyan-300 font-light">尺寸:</span>
+            <span class="font-normal text-white">{{ screen.width }}×{{ screen.height }}</span>
+            <ChevronDown class="w-3 h-3 text-cyan-300" />
           </button>
 
           <!-- Dropdown Menu -->
           <div
             v-if="showResolutionMenu"
-            class="absolute top-full left-0 mt-1 w-60 bg-[#0a1122] border border-cyan-500/40 rounded-xl shadow-2xl p-1 z-50 backdrop-blur-md"
+            class="absolute top-full left-0 mt-1 w-60 bg-[#091326] border border-cyan-400 rounded-xl shadow-2xl p-1 z-50 backdrop-blur-md"
           >
-            <div class="text-[10px] font-mono text-slate-400 px-2 py-0.5 border-b border-slate-800">
+            <div class="text-[10px] font-mono text-cyan-300 font-light px-2 py-0.5 border-b border-cyan-500/30">
               SCADA 分辨率预设
             </div>
             <div class="space-y-0.5 mt-1">
@@ -178,15 +178,15 @@ const handleSelectTemplate = (id: string) => {
                 v-for="res in resolutionPresets"
                 :key="res.label"
                 @click="handleSelectResolution(res.w, res.h)"
-                class="w-full flex items-center justify-between px-2 py-1 rounded text-xs font-mono transition-colors text-left hover:bg-cyan-500/20 text-slate-200 cursor-pointer"
-                :class="{ 'bg-cyan-950/60 text-cyan-300 font-bold border border-cyan-500/30': screen.width === res.w && screen.height === res.h }"
+                class="w-full flex items-center justify-between px-2 py-1 rounded text-xs font-mono font-light transition-colors text-left hover:bg-cyan-500/30 text-slate-100 cursor-pointer"
+                :class="{ 'bg-cyan-950 text-cyan-200 font-normal border border-cyan-400': screen.width === res.w && screen.height === res.h }"
               >
                 <div class="flex items-center gap-1">
-                  <Check v-if="screen.width === res.w && screen.height === res.h" class="w-3 h-3 text-cyan-400" />
+                  <Check v-if="screen.width === res.w && screen.height === res.h" class="w-3 h-3 text-cyan-300" />
                   <span v-else class="w-3" />
                   <span>{{ res.w }} × {{ res.h }}</span>
                 </div>
-                <span class="text-[9px] px-1 py-0.2 rounded bg-slate-800/80 text-slate-400 font-mono">
+                <span class="text-[9px] px-1 py-0.2 rounded bg-cyan-950/80 border border-cyan-500/40 text-cyan-200 font-mono font-light">
                   {{ res.tag }}
                 </span>
               </button>
@@ -198,19 +198,19 @@ const handleSelectTemplate = (id: string) => {
         <div class="relative">
           <button
             @click="showTemplateMenu = !showTemplateMenu"
-            class="flex items-center gap-1 px-2 py-1 rounded bg-slate-900/90 border border-slate-700 hover:border-cyan-400 text-[11px] font-mono text-slate-200 transition-all cursor-pointer"
+            class="flex items-center gap-1 px-2 py-1 rounded bg-[#0b1730] border border-cyan-400 hover:border-cyan-300 text-[11px] font-mono text-cyan-100 transition-all cursor-pointer shadow-[0_0_8px_rgba(0,242,255,0.2)]"
             title="载入官方 SCADA 工程预设"
           >
-            <LayoutTemplate class="w-3 h-3 text-cyan-400" />
-            <span>模版</span>
-            <ChevronDown class="w-3 h-3 text-slate-400" />
+            <LayoutTemplate class="w-3 h-3 text-cyan-300" />
+            <span class="font-light">模版</span>
+            <ChevronDown class="w-3 h-3 text-cyan-300" />
           </button>
 
           <div
             v-if="showTemplateMenu"
-            class="absolute top-full left-0 mt-1 w-64 bg-[#0a1122] border border-cyan-500/40 rounded-xl shadow-2xl p-1 z-50 backdrop-blur-md"
+            class="absolute top-full left-0 mt-1 w-64 bg-[#091326] border border-cyan-400 rounded-xl shadow-2xl p-1 z-50 backdrop-blur-md"
           >
-            <div class="text-[10px] font-mono text-slate-400 px-2 py-0.5 border-b border-slate-800">
+            <div class="text-[10px] font-mono text-cyan-300 font-light px-2 py-0.5 border-b border-cyan-500/30">
               载入官方 SCADA 预设
             </div>
             <div class="space-y-0.5 mt-1">
@@ -218,12 +218,12 @@ const handleSelectTemplate = (id: string) => {
                 v-for="tpl in templates"
                 :key="tpl.id"
                 @click="handleSelectTemplate(tpl.id)"
-                class="w-full flex items-start gap-1.5 p-1.5 rounded text-xs font-mono transition-colors text-left hover:bg-cyan-500/20 text-slate-200 cursor-pointer"
+                class="w-full flex items-start gap-1.5 p-1.5 rounded text-xs font-mono font-light transition-colors text-left hover:bg-cyan-500/30 text-slate-100 cursor-pointer"
               >
-                <div class="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1 shrink-0" />
+                <div class="w-1.5 h-1.5 rounded-full bg-cyan-300 mt-1 shrink-0" />
                 <div>
-                  <div class="font-bold text-white">{{ tpl.name }}</div>
-                  <div class="text-[10px] text-slate-400 line-clamp-1">{{ tpl.description }}</div>
+                  <div class="font-normal text-cyan-100">{{ tpl.name }}</div>
+                  <div class="text-[10px] text-cyan-300/80 line-clamp-1 font-light">{{ tpl.description }}</div>
                 </div>
               </button>
             </div>
@@ -236,108 +236,108 @@ const handleSelectTemplate = (id: string) => {
         <!-- Real-time Simulation Switch -->
         <button
           @click="emit('toggle:streaming')"
-          class="p-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer border"
+          class="p-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer border"
           :class="isStreaming 
-            ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300 shadow-[0_0_8px_rgba(16,185,129,0.3)]' 
-            : 'bg-slate-900 border-slate-700 text-slate-400'"
+            ? 'bg-emerald-950 border-emerald-400 text-emerald-200 shadow-[0_0_10px_rgba(16,185,129,0.4)]' 
+            : 'bg-[#0b1730] border-cyan-500/60 text-cyan-200 hover:border-cyan-300 hover:text-white'"
           :title="isStreaming ? '数据流：运行中 (点击暂停)' : '数据流：已暂停 (点击运行)'"
         >
-          <Pause v-if="isStreaming" class="w-3.5 h-3.5" />
-          <Play v-else class="w-3.5 h-3.5" />
+          <Pause v-if="isStreaming" class="w-3.5 h-3.5 text-emerald-300" />
+          <Play v-else class="w-3.5 h-3.5 text-cyan-300" />
         </button>
 
         <!-- Dataset Manager -->
         <button
           @click="emit('open:datasets')"
-          class="p-1.5 rounded-lg bg-slate-900 border border-slate-700 hover:border-cyan-500 hover:text-cyan-300 text-slate-300 transition-all cursor-pointer"
+          class="p-1.5 rounded-lg bg-[#0b1730] border border-cyan-400 hover:border-cyan-300 hover:text-white text-cyan-200 transition-all cursor-pointer shadow-[0_0_6px_rgba(0,242,255,0.2)]"
           title="数据集管理：配置测点、模拟点与装置阵列"
         >
-          <Database class="w-3.5 h-3.5 text-cyan-400" />
+          <Database class="w-3.5 h-3.5 text-cyan-300" />
         </button>
 
         <!-- SCADA Tele-Control Center (遥控遥调执行) -->
         <button
           @click="emit('open:control')"
-          class="p-1.5 rounded-lg bg-amber-950/40 border border-amber-500/50 hover:border-amber-400 hover:bg-amber-950 text-amber-300 transition-all cursor-pointer shadow-[0_0_8px_rgba(245,158,11,0.15)]"
+          class="p-1.5 rounded-lg bg-amber-950/60 border border-amber-400 hover:border-amber-300 hover:bg-amber-900 text-amber-200 transition-all cursor-pointer shadow-[0_0_10px_rgba(245,158,11,0.25)]"
           title="SCADA 遥控分合闸与遥调指令中心 (YK / YT)"
         >
-          <Radio class="w-3.5 h-3.5 text-amber-400" />
+          <Radio class="w-3.5 h-3.5 text-amber-300" />
         </button>
 
         <!-- Custom Symbol Library Button -->
         <button
           @click="emit('open:symbols')"
-          class="p-1.5 rounded-lg bg-slate-900 border border-slate-700 hover:border-cyan-500 hover:text-cyan-300 text-slate-300 transition-all cursor-pointer"
+          class="p-1.5 rounded-lg bg-[#0b1730] border border-cyan-400 hover:border-cyan-300 hover:text-white text-cyan-200 transition-all cursor-pointer shadow-[0_0_6px_rgba(0,242,255,0.2)]"
           title="图元资产库与微元组装工坊"
         >
-          <FolderOpen class="w-3.5 h-3.5 text-cyan-400" />
+          <FolderOpen class="w-3.5 h-3.5 text-cyan-300" />
         </button>
 
         <!-- JSON Schema Export / Import -->
         <button
           @click="emit('open:json')"
-          class="p-1.5 rounded-lg bg-slate-900 border border-slate-700 hover:border-cyan-500 hover:text-cyan-300 text-slate-300 transition-all cursor-pointer"
+          class="p-1.5 rounded-lg bg-[#0b1730] border border-cyan-400 hover:border-cyan-300 hover:text-white text-cyan-200 transition-all cursor-pointer shadow-[0_0_6px_rgba(0,242,255,0.2)]"
           title="工程 JSON 架构导入与导出"
         >
-          <Code class="w-3.5 h-3.5 text-cyan-400" />
+          <Code class="w-3.5 h-3.5 text-cyan-300" />
         </button>
 
         <!-- Multi-Platform Desktop & Packaging Hub -->
         <button
           @click="emit('open:platform')"
-          class="p-1.5 rounded-lg bg-slate-900 border border-slate-700 hover:border-cyan-500 hover:text-cyan-300 text-slate-300 transition-all cursor-pointer relative"
+          class="p-1.5 rounded-lg bg-[#0b1730] border border-cyan-400 hover:border-cyan-300 hover:text-white text-cyan-200 transition-all cursor-pointer relative shadow-[0_0_6px_rgba(0,242,255,0.2)]"
           :title="`跨平台桌面端打包分发中心 (当前环境: ${currentPlatform.toUpperCase()})`"
         >
-          <Laptop class="w-3.5 h-3.5 text-cyan-400" />
+          <Laptop class="w-3.5 h-3.5 text-cyan-300" />
         </button>
 
         <!-- Clear Canvas -->
         <button
           @click="emit('clear:canvas')"
-          class="p-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-red-500/50 hover:bg-red-950/30 text-slate-400 hover:text-red-300 transition-colors cursor-pointer"
+          class="p-1.5 rounded-lg bg-red-950/40 border border-red-400 hover:border-red-300 hover:bg-red-900/60 text-red-200 hover:text-white transition-colors cursor-pointer shadow-[0_0_6px_rgba(239,68,68,0.2)]"
           title="清空当前画布中所有元件"
         >
-          <Trash2 class="w-3.5 h-3.5" />
+          <Trash2 class="w-3.5 h-3.5 text-red-300" />
         </button>
 
         <!-- User Auth Status / Switcher -->
         <button
           @click="emit('open:login')"
-          class="flex items-center gap-1 px-2 py-1 rounded bg-slate-900 border border-slate-700 hover:border-cyan-400 text-xs font-mono text-slate-200 transition-all cursor-pointer"
+          class="flex items-center gap-1.5 px-2 py-1 rounded bg-[#0b1730] border border-cyan-400 hover:border-cyan-300 text-xs font-mono text-cyan-100 transition-all cursor-pointer shadow-[0_0_6px_rgba(0,242,255,0.2)]"
           :title="`当前登录: ${currentUser.name} (${currentUser.roleName}) - 点击切换用户`"
         >
-          <ShieldCheck v-if="currentUser.role === 'system_admin'" class="w-3.5 h-3.5 text-cyan-400" />
-          <UserCheck v-else class="w-3.5 h-3.5 text-emerald-400" />
-          <span class="max-w-[70px] truncate text-[11px]">{{ currentUser.name }}</span>
+          <ShieldCheck v-if="currentUser.role === 'system_admin'" class="w-3.5 h-3.5 text-cyan-300" />
+          <UserCheck v-else class="w-3.5 h-3.5 text-emerald-300" />
+          <span class="max-w-[70px] truncate text-[11px] font-light">{{ currentUser.name }}</span>
         </button>
 
         <!-- SCADA Full Preview -->
         <button
           @click="emit('open:preview')"
-          class="flex items-center gap-1 px-3 py-1 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs font-mono shadow-[0_0_12px_rgba(0,242,255,0.4)] transition-all cursor-pointer"
+          class="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-cyan-400 to-sky-500 hover:from-cyan-300 hover:to-sky-400 text-slate-950 font-bold text-xs font-mono shadow-[0_0_14px_rgba(0,242,255,0.5)] transition-all cursor-pointer"
           title="全屏运行 SCADA 组态与实时动态监控"
         >
-          <Eye class="w-3.5 h-3.5" />
+          <Eye class="w-3.5 h-3.5 text-slate-950 stroke-[2.5]" />
           <span>SCADA 预览</span>
         </button>
       </div>
     </div>
 
     <!-- Row 2: Condensed Canvas Editing Toolbar (All tools consolidated with tooltips) -->
-    <div class="flex items-center justify-between bg-[#070d1c] border border-cyan-500/35 px-2 py-1 rounded-lg text-xs font-mono select-none shadow-md">
+    <div class="flex items-center justify-between bg-[#081226] border border-cyan-400/60 px-2.5 py-1 rounded-lg text-xs font-mono select-none shadow-lg">
       <!-- Left: Tools & History -->
-      <div class="flex items-center gap-1.5">
+      <div class="flex items-center gap-2">
         <!-- Interactive Tool Switcher (选择 / 折线 / 箭头) -->
-        <div class="flex items-center bg-slate-950 p-0.5 rounded-md border border-slate-700/80">
+        <div class="flex items-center bg-[#050c1c] p-0.5 rounded-md border border-cyan-500/40">
           <button
             @click="emit('update:drawTool', 'select')"
             class="p-1 rounded transition-all cursor-pointer"
             :class="drawTool === 'select' 
-              ? 'bg-cyan-400 text-slate-950 font-bold shadow-xs' 
-              : 'text-slate-300 hover:text-white hover:bg-slate-800'"
+              ? 'bg-cyan-400 text-slate-950 font-bold shadow-[0_0_8px_rgba(0,242,255,0.5)]' 
+              : 'text-cyan-300 hover:text-white hover:bg-cyan-950'"
             title="选择工具 (快捷键 V / ESC): 支持框选、多选平移、旋转与缩放"
           >
-            <MousePointer class="w-3.5 h-3.5" />
+            <MousePointer class="w-3.5 h-3.5 stroke-[2]" />
           </button>
 
           <button
@@ -345,10 +345,10 @@ const handleSelectTemplate = (id: string) => {
             class="p-1 rounded transition-all cursor-pointer"
             :class="drawTool === 'draw-polyline' 
               ? 'bg-amber-400 text-slate-950 font-bold shadow-[0_0_8px_rgba(251,191,36,0.5)]' 
-              : 'text-slate-300 hover:text-white hover:bg-slate-800'"
+              : 'text-cyan-300 hover:text-white hover:bg-cyan-950'"
             title="折线连线绘制 (单击连续添加拐点，双击或回车结束，画完自动最小裁剪)"
           >
-            <Workflow class="w-3.5 h-3.5" />
+            <Workflow class="w-3.5 h-3.5 stroke-[2]" />
           </button>
 
           <button
@@ -356,62 +356,62 @@ const handleSelectTemplate = (id: string) => {
             class="p-1 rounded transition-all cursor-pointer"
             :class="drawTool === 'draw-arrow' 
               ? 'bg-emerald-400 text-slate-950 font-bold shadow-[0_0_8px_rgba(52,211,153,0.5)]' 
-              : 'text-slate-300 hover:text-white hover:bg-slate-800'"
+              : 'text-cyan-300 hover:text-white hover:bg-cyan-950'"
             title="导向箭头绘制 (单击起点拖拽/单击终点完成绘制，画完自动最小裁剪)"
           >
-            <MoveRight class="w-3.5 h-3.5" />
+            <MoveRight class="w-3.5 h-3.5 stroke-[2]" />
           </button>
         </div>
 
-        <div class="h-3.5 w-[1px] bg-slate-700 mx-0.5" />
+        <div class="h-3.5 w-[1px] bg-cyan-500/40 mx-0.5" />
 
         <!-- Undo / Redo -->
-        <div class="flex items-center bg-slate-950 p-0.5 rounded-md border border-slate-700/80">
+        <div class="flex items-center bg-[#050c1c] p-0.5 rounded-md border border-cyan-500/40">
           <button
             @click="emit('undo')"
             :disabled="!canUndo"
-            class="p-1 rounded hover:bg-slate-800 text-slate-200 disabled:opacity-30 disabled:text-slate-500 disabled:cursor-not-allowed cursor-pointer transition-colors"
+            class="p-1 rounded hover:bg-cyan-950 text-cyan-200 disabled:opacity-40 disabled:text-cyan-500/30 disabled:cursor-not-allowed cursor-pointer transition-colors"
             title="撤销 (Ctrl+Z)"
           >
-            <Undo2 class="w-3.5 h-3.5" />
+            <Undo2 class="w-3.5 h-3.5 stroke-[2]" />
           </button>
           <button
             @click="emit('redo')"
             :disabled="!canRedo"
-            class="p-1 rounded hover:bg-slate-800 text-slate-200 disabled:opacity-30 disabled:text-slate-500 disabled:cursor-not-allowed cursor-pointer transition-colors"
+            class="p-1 rounded hover:bg-cyan-950 text-cyan-200 disabled:opacity-40 disabled:text-cyan-500/30 disabled:cursor-not-allowed cursor-pointer transition-colors"
             title="重做 (Ctrl+Y)"
           >
-            <Redo2 class="w-3.5 h-3.5" />
+            <Redo2 class="w-3.5 h-3.5 stroke-[2]" />
           </button>
         </div>
 
-        <div class="h-3.5 w-[1px] bg-slate-700 mx-0.5" />
+        <div class="h-3.5 w-[1px] bg-cyan-500/40 mx-0.5" />
 
         <!-- Grid & Snapping Controls -->
-        <div class="flex items-center bg-slate-950 p-0.5 rounded-md border border-slate-700/80 gap-1">
+        <div class="flex items-center bg-[#050c1c] p-0.5 rounded-md border border-cyan-500/40 gap-1">
           <button
             @click="emit('update:showGrid', !showGrid)"
             class="p-1 rounded cursor-pointer transition-all"
-            :class="showGrid ? 'bg-cyan-500/25 text-cyan-200 border border-cyan-400 font-bold' : 'text-slate-300 hover:text-white'"
+            :class="showGrid ? 'bg-cyan-400 text-slate-950 font-bold shadow-[0_0_8px_rgba(0,242,255,0.4)]' : 'text-cyan-300 hover:text-white hover:bg-cyan-950'"
             title="显示/隐藏网格底图"
           >
-            <Grid class="w-3.5 h-3.5" />
+            <Grid class="w-3.5 h-3.5 stroke-[2]" />
           </button>
 
           <button
             @click="emit('update:snapToGrid', !snapToGrid)"
             class="p-1 rounded cursor-pointer transition-all"
-            :class="snapToGrid ? 'bg-cyan-950 text-cyan-200 border border-cyan-400 font-bold' : 'text-slate-300 hover:text-white'"
+            :class="snapToGrid ? 'bg-cyan-400 text-slate-950 font-bold shadow-[0_0_8px_rgba(0,242,255,0.4)]' : 'text-cyan-300 hover:text-white hover:bg-cyan-950'"
             :title="snapToGrid ? '点格磁性吸附: 已开启' : '点格磁性吸附: 已关闭'"
           >
-            <Magnet class="w-3.5 h-3.5" />
+            <Magnet class="w-3.5 h-3.5 stroke-[2]" />
           </button>
 
           <!-- Grid Size Dropdown -->
           <select 
             :value="gridSize"
             @change="emit('update:gridSize', Number(($event.target as HTMLSelectElement).value))"
-            class="bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-[10px] text-cyan-200 font-bold focus:outline-hidden cursor-pointer"
+            class="bg-[#0b1730] border border-cyan-400/80 rounded px-1.5 py-0.5 text-[11px] text-cyan-200 font-normal focus:outline-hidden cursor-pointer"
             title="切换点格网格步进尺寸 (10px - 160px)"
           >
             <option :value="10">10px</option>
@@ -429,45 +429,45 @@ const handleSelectTemplate = (id: string) => {
           <!-- Re-snap All Components to Grid Nodes Button -->
           <button
             @click="emit('snap:all')"
-            class="px-1.5 py-0.5 rounded bg-cyan-950 hover:bg-cyan-900 border border-cyan-400/80 text-[10px] text-cyan-200 font-mono font-bold flex items-center gap-1 cursor-pointer transition-all shadow-xs"
+            class="px-1.5 py-0.5 rounded bg-cyan-950 hover:bg-cyan-900 border border-cyan-400 text-[10px] text-cyan-200 font-mono font-light flex items-center gap-1 cursor-pointer transition-all shadow-xs"
             title="手动重新吸附：当网格密度发生变化时，一键将当前画布所有组件重新精准吸附对齐到最近的网格点"
           >
-            <RefreshCw class="w-3 h-3 text-cyan-300" />
+            <RefreshCw class="w-3 h-3 text-cyan-300 stroke-[2]" />
             <span>重新吸附</span>
           </button>
 
           <button
             @click="emit('update:orthogonalLock', !orthogonalLock)"
             class="p-1 rounded cursor-pointer transition-all"
-            :class="orthogonalLock ? 'bg-cyan-950 text-cyan-200 border border-cyan-400 font-bold' : 'text-slate-300 hover:text-white'"
+            :class="orthogonalLock ? 'bg-cyan-400 text-slate-950 font-bold shadow-[0_0_8px_rgba(0,242,255,0.4)]' : 'text-cyan-300 hover:text-white hover:bg-cyan-950'"
             title="正交锁定：绘制连线与走线时强制锁定水平、垂直与45度角"
           >
-            <Maximize class="w-3.5 h-3.5" />
+            <Maximize class="w-3.5 h-3.5 stroke-[2]" />
           </button>
         </div>
 
-        <div class="h-3.5 w-[1px] bg-slate-700 mx-0.5" />
+        <div class="h-3.5 w-[1px] bg-cyan-500/40 mx-0.5" />
 
         <!-- Canvas Align Shortcuts -->
-        <div class="flex items-center bg-slate-950 p-0.5 rounded-md border border-slate-700/80 gap-1">
+        <div class="flex items-center bg-[#050c1c] p-0.5 rounded-md border border-cyan-500/40 gap-1">
           <button
             @click="emit('center:all')"
-            class="p-1 rounded hover:bg-slate-800 text-cyan-300 hover:text-white cursor-pointer transition-colors"
+            class="p-1 rounded hover:bg-cyan-950 text-cyan-300 hover:text-white cursor-pointer transition-colors"
             title="一键居中：从原点 (0, 0) 开始自适应铺满编辑界面"
           >
-            <Crosshair class="w-3.5 h-3.5" />
+            <Crosshair class="w-3.5 h-3.5 stroke-[2]" />
           </button>
         </div>
 
-        <div class="h-3.5 w-[1px] bg-slate-700 mx-0.5" />
+        <div class="h-3.5 w-[1px] bg-cyan-500/40 mx-0.5" />
 
         <!-- Alignment Tools (Active when multiple components selected) -->
-        <div class="flex items-center bg-slate-950 p-0.5 rounded-md border border-slate-700/80 gap-0.5">
+        <div class="flex items-center bg-[#050c1c] p-0.5 rounded-md border border-cyan-500/40 gap-0.5">
           <button
             @click="emit('align', 'left')"
             :disabled="selectedIds.length < 2"
             class="p-1 rounded transition-colors cursor-pointer"
-            :class="selectedIds.length >= 2 ? 'text-cyan-300 hover:text-white hover:bg-cyan-950' : 'text-slate-500 opacity-40 cursor-not-allowed'"
+            :class="selectedIds.length >= 2 ? 'text-cyan-200 hover:text-white hover:bg-cyan-950' : 'text-cyan-500/30 opacity-40 cursor-not-allowed'"
             title="左对齐 (需选中 ≥2 个组件)"
           >
             <AlignLeft class="w-3.5 h-3.5 stroke-[2]" />
@@ -476,7 +476,7 @@ const handleSelectTemplate = (id: string) => {
             @click="emit('align', 'center')"
             :disabled="selectedIds.length < 2"
             class="p-1 rounded transition-colors cursor-pointer"
-            :class="selectedIds.length >= 2 ? 'text-cyan-300 hover:text-white hover:bg-cyan-950' : 'text-slate-500 opacity-40 cursor-not-allowed'"
+            :class="selectedIds.length >= 2 ? 'text-cyan-200 hover:text-white hover:bg-cyan-950' : 'text-cyan-500/30 opacity-40 cursor-not-allowed'"
             title="水平居中 (需选中 ≥2 个组件)"
           >
             <AlignCenter class="w-3.5 h-3.5 stroke-[2]" />
@@ -485,7 +485,7 @@ const handleSelectTemplate = (id: string) => {
             @click="emit('align', 'right')"
             :disabled="selectedIds.length < 2"
             class="p-1 rounded transition-colors cursor-pointer"
-            :class="selectedIds.length >= 2 ? 'text-cyan-300 hover:text-white hover:bg-cyan-950' : 'text-slate-500 opacity-40 cursor-not-allowed'"
+            :class="selectedIds.length >= 2 ? 'text-cyan-200 hover:text-white hover:bg-cyan-950' : 'text-cyan-500/30 opacity-40 cursor-not-allowed'"
             title="右对齐 (需选中 ≥2 个组件)"
           >
             <AlignRight class="w-3.5 h-3.5 stroke-[2]" />
@@ -494,7 +494,7 @@ const handleSelectTemplate = (id: string) => {
             @click="emit('align', 'top')"
             :disabled="selectedIds.length < 2"
             class="p-1 rounded transition-colors cursor-pointer"
-            :class="selectedIds.length >= 2 ? 'text-cyan-300 hover:text-white hover:bg-cyan-950' : 'text-slate-500 opacity-40 cursor-not-allowed'"
+            :class="selectedIds.length >= 2 ? 'text-cyan-200 hover:text-white hover:bg-cyan-950' : 'text-cyan-500/30 opacity-40 cursor-not-allowed'"
             title="顶对齐 (需选中 ≥2 个组件)"
           >
             <AlignVerticalJustifyStart class="w-3.5 h-3.5 stroke-[2]" />
@@ -503,7 +503,7 @@ const handleSelectTemplate = (id: string) => {
             @click="emit('align', 'middle')"
             :disabled="selectedIds.length < 2"
             class="p-1 rounded transition-colors cursor-pointer"
-            :class="selectedIds.length >= 2 ? 'text-cyan-300 hover:text-white hover:bg-cyan-950' : 'text-slate-500 opacity-40 cursor-not-allowed'"
+            :class="selectedIds.length >= 2 ? 'text-cyan-200 hover:text-white hover:bg-cyan-950' : 'text-cyan-500/30 opacity-40 cursor-not-allowed'"
             title="垂直居中 (需选中 ≥2 个组件)"
           >
             <AlignVerticalJustifyCenter class="w-3.5 h-3.5 stroke-[2]" />
@@ -512,7 +512,7 @@ const handleSelectTemplate = (id: string) => {
             @click="emit('align', 'bottom')"
             :disabled="selectedIds.length < 2"
             class="p-1 rounded transition-colors cursor-pointer"
-            :class="selectedIds.length >= 2 ? 'text-cyan-300 hover:text-white hover:bg-cyan-950' : 'text-slate-500 opacity-40 cursor-not-allowed'"
+            :class="selectedIds.length >= 2 ? 'text-cyan-200 hover:text-white hover:bg-cyan-950' : 'text-cyan-500/30 opacity-40 cursor-not-allowed'"
             title="底对齐 (需选中 ≥2 个组件)"
           >
             <AlignVerticalJustifyEnd class="w-3.5 h-3.5 stroke-[2]" />
@@ -521,7 +521,7 @@ const handleSelectTemplate = (id: string) => {
             @click="emit('align', 'distribute-h')"
             :disabled="selectedIds.length < 3"
             class="p-1 rounded transition-colors cursor-pointer"
-            :class="selectedIds.length >= 3 ? 'text-cyan-300 hover:text-white hover:bg-cyan-950' : 'text-slate-500 opacity-40 cursor-not-allowed'"
+            :class="selectedIds.length >= 3 ? 'text-cyan-200 hover:text-white hover:bg-cyan-950' : 'text-cyan-500/30 opacity-40 cursor-not-allowed'"
             title="水平均匀分布 (需选中 ≥3 个组件)"
           >
             <AlignHorizontalSpaceAround class="w-3.5 h-3.5 stroke-[2]" />
@@ -530,76 +530,76 @@ const handleSelectTemplate = (id: string) => {
             @click="emit('align', 'distribute-v')"
             :disabled="selectedIds.length < 3"
             class="p-1 rounded transition-colors cursor-pointer"
-            :class="selectedIds.length >= 3 ? 'text-cyan-300 hover:text-white hover:bg-cyan-950' : 'text-slate-500 opacity-40 cursor-not-allowed'"
+            :class="selectedIds.length >= 3 ? 'text-cyan-200 hover:text-white hover:bg-cyan-950' : 'text-cyan-500/30 opacity-40 cursor-not-allowed'"
             title="垂直均匀分布 (需选中 ≥3 个组件)"
           >
             <AlignVerticalSpaceAround class="w-3.5 h-3.5 stroke-[2]" />
           </button>
         </div>
 
-        <div class="h-3.5 w-[1px] bg-slate-700 mx-0.5" />
+        <div class="h-3.5 w-[1px] bg-cyan-500/40 mx-0.5" />
 
         <!-- Group / Ungroup / Save Symbol -->
-        <div class="flex items-center bg-slate-950 p-0.5 rounded-md border border-slate-700/80 gap-0.5">
+        <div class="flex items-center bg-[#050c1c] p-0.5 rounded-md border border-cyan-500/40 gap-0.5">
           <button
             @click="emit('group')"
             :disabled="selectedIds.length < 2"
             class="p-1 rounded transition-colors cursor-pointer"
-            :class="selectedIds.length >= 2 ? 'text-cyan-300 hover:text-white hover:bg-cyan-950' : 'text-slate-500 opacity-40 cursor-not-allowed'"
+            :class="selectedIds.length >= 2 ? 'text-cyan-200 hover:text-white hover:bg-cyan-950' : 'text-cyan-500/30 opacity-40 cursor-not-allowed'"
             title="组合为群组 (Ctrl+G)"
           >
-            <Layers class="w-3.5 h-3.5" />
+            <Layers class="w-3.5 h-3.5 stroke-[2]" />
           </button>
 
           <button
             @click="emit('ungroup')"
             :disabled="selectedIds.length !== 1 || (!selectedComponents[0]?.children?.length && selectedComponents[0]?.type !== 'composite-symbol')"
             class="p-1 rounded transition-colors cursor-pointer"
-            :class="selectedIds.length === 1 && (selectedComponents[0]?.children?.length || selectedComponents[0]?.type === 'composite-symbol') ? 'text-amber-300 hover:text-white hover:bg-amber-950' : 'text-slate-500 opacity-40 cursor-not-allowed'"
+            :class="selectedIds.length === 1 && (selectedComponents[0]?.children?.length || selectedComponents[0]?.type === 'composite-symbol') ? 'text-amber-300 hover:text-white hover:bg-amber-950' : 'text-cyan-500/30 opacity-40 cursor-not-allowed'"
             title="取消群组/解构 (Ctrl+U)"
           >
-            <Unlock class="w-3.5 h-3.5" />
+            <Unlock class="w-3.5 h-3.5 stroke-[2]" />
           </button>
 
           <button
             @click="emit('save:symbol')"
             :disabled="selectedIds.length === 0"
             class="p-1 rounded transition-colors cursor-pointer"
-            :class="selectedIds.length > 0 ? 'text-emerald-300 hover:text-white hover:bg-emerald-950' : 'text-slate-500 opacity-40 cursor-not-allowed'"
+            :class="selectedIds.length > 0 ? 'text-emerald-300 hover:text-white hover:bg-emerald-950' : 'text-cyan-500/30 opacity-40 cursor-not-allowed'"
             title="将选中图元封装保存为自定义图元"
           >
-            <BookmarkPlus class="w-3.5 h-3.5" />
+            <BookmarkPlus class="w-3.5 h-3.5 stroke-[2]" />
           </button>
         </div>
       </div>
 
       <!-- Right: Zoom Controls -->
-      <div class="flex items-center gap-1">
-        <div class="flex items-center bg-slate-950 p-0.5 rounded-md border border-slate-700/80 text-xs font-mono">
+      <div class="flex items-center gap-1.5">
+        <div class="flex items-center bg-[#050c1c] p-0.5 rounded-md border border-cyan-500/40 text-xs font-mono">
           <button
             @click="emit('update:zoom', Math.max(0.1, Number((zoom - 0.1).toFixed(2))))"
-            class="p-1 rounded hover:bg-slate-800 text-slate-200 cursor-pointer transition-colors"
+            class="p-1 rounded hover:bg-cyan-950 text-cyan-200 hover:text-white cursor-pointer transition-colors"
             title="缩小"
           >
-            <ZoomOut class="w-3.5 h-3.5" />
+            <ZoomOut class="w-3.5 h-3.5 stroke-[2]" />
           </button>
-          <span class="text-[11px] font-mono font-bold text-cyan-200 bg-slate-900 border border-slate-700/80 rounded px-1.5 py-0.5 w-12 text-center">
+          <span class="text-[11px] font-mono font-light text-cyan-200 bg-[#0b1730] border border-cyan-400/80 rounded px-1.5 py-0.5 w-12 text-center">
             {{ Math.round(zoom * 100) }}%
           </span>
           <button
             @click="emit('update:zoom', Math.min(2.5, Number((zoom + 0.1).toFixed(2))))"
-            class="p-1 rounded hover:bg-slate-800 text-slate-200 cursor-pointer transition-colors"
+            class="p-1 rounded hover:bg-cyan-950 text-cyan-200 hover:text-white cursor-pointer transition-colors"
             title="放大"
           >
-            <ZoomIn class="w-3.5 h-3.5" />
+            <ZoomIn class="w-3.5 h-3.5 stroke-[2]" />
           </button>
 
           <button
             @click="emit('fit:screen')"
-            class="p-1 rounded hover:bg-cyan-500/20 text-cyan-300 hover:text-cyan-100 cursor-pointer transition-colors ml-0.5"
+            class="p-1 rounded hover:bg-cyan-500/30 text-cyan-200 hover:text-white cursor-pointer transition-colors ml-0.5"
             title="一键居中：自适应缩放并从原点 (0, 0) 铺满编辑界面"
           >
-            <Maximize2 class="w-3.5 h-3.5" />
+            <Maximize2 class="w-3.5 h-3.5 stroke-[2]" />
           </button>
         </div>
       </div>
