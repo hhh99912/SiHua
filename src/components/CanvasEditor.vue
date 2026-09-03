@@ -61,6 +61,7 @@ const emit = defineEmits<{
   (e: 'redo'): void;
   (e: 'open:control-modal', deviceId?: string): void;
   (e: 'open:property-inspector'): void;
+  (e: 'commit:history'): void;
 }>();
 
 const containerRef = ref<HTMLDivElement | null>(null);
@@ -171,6 +172,7 @@ const dragStartPositions = ref<Map<string, { x: number; y: number }>>(new Map())
 const dragStartMouse = ref({ x: 0, y: 0 });
 
 const isResizing = ref(false);
+const hasMovedResize = ref(false);
 const resizeHandle = ref<string | null>(null);
 const resizeStart = ref<{ mouseX: number; mouseY: number; x: number; y: number; width: number; height: number; fontSize?: number }>({ 
   mouseX: 0, 
@@ -183,6 +185,7 @@ const resizeStart = ref<{ mouseX: number; mouseY: number; x: number; y: number; 
 });
 
 const isRotating = ref(false);
+const hasMovedRotate = ref(false);
 const rotateStart = ref({ cx: 0, cy: 0, initialAngle: 0, startRotation: 0 });
 
 // Interactive Drawing Tool State (折线走线绘制)
@@ -285,9 +288,14 @@ const getComponentAABB = (c: ScreenComponent) => {
   };
 };
 
-// Selected Components Array
+// O(1) Selected IDs Set
+const selectedSet = computed(() => new Set(props.selectedIds));
+
+// Selected Components Array (O(N) computed only when selection changes)
 const selectedComponents = computed(() => {
-  return props.components.filter(c => props.selectedIds.includes(c.id));
+  if (!props.selectedIds || props.selectedIds.length === 0) return [];
+  const set = selectedSet.value;
+  return props.components.filter(c => set.has(c.id));
 });
 
 // Selection Order Index
@@ -299,7 +307,8 @@ const getSelectionIndex = (id: string) => {
 // Combined bounding box of all currently selected components in multi-select mode
 const selectedGroupBBox = computed(() => {
   if (props.selectedIds.length <= 1) return null;
-  const selectedList = props.components.filter(c => props.selectedIds.includes(c.id) && c.visible !== false);
+  const set = selectedSet.value;
+  const selectedList = props.components.filter(c => set.has(c.id) && c.visible !== false);
   if (selectedList.length <= 1) return null;
   return calculateComponentsBoundingBox(selectedList);
 });
@@ -307,7 +316,8 @@ const selectedGroupBBox = computed(() => {
 // Primary selected component (if 1 selected)
 const primarySelected = computed(() => {
   if (props.selectedIds.length === 1) {
-    return props.components.find(c => c.id === props.selectedIds[0]) || null;
+    const targetId = props.selectedIds[0];
+    return props.components.find(c => c.id === targetId) || null;
   }
   return null;
 });
@@ -353,6 +363,7 @@ const handleFitAndCenter = () => {
         y: Math.round((c.y || 0) + dy)
       }));
       emit('update:components', updatedComps);
+      emit('commit:history');
     }
 
     // 动态调整画面尺寸为所有组件的最小外接矩形，彻底消除扩大或缩小后的留白区域
@@ -362,6 +373,7 @@ const handleFitAndCenter = () => {
         width: bbox.width,
         height: bbox.height
       });
+      emit('commit:history');
     }
 
     fitCanvasToViewport(
@@ -391,17 +403,19 @@ const handleResetViewport = () => {
   panOffset.value = { x: 24, y: 24 };
 };
 
-// 一键定位：平移全图图元左上角至 (0, 0) 原点坐标，并复位视口及铺满自适应
+// 一键定位：平移全图图元左上角至 (0, 0) 原点坐标
 const handleAlignToOrigin = () => {
   handleFitAndCenter();
 };
 
-// Whenever screen id or dimensions change or on mounted, auto-fit and center to (0,0)
-watch(() => [props.screen.id, props.screen.width, props.screen.height], () => {
-  nextTick(() => {
-    handleFitAndCenter();
-  });
-}, { immediate: true });
+// 仅在切换画面 (screen.id 改变) 时触发自动居中，撤回/重做或修改尺寸时绝不自动触发
+watch(() => props.screen.id, (newId, oldId) => {
+  if (newId && oldId && newId !== oldId) {
+    nextTick(() => {
+      handleFitAndCenter();
+    });
+  }
+});
 
 onMounted(() => {
   nextTick(() => {
@@ -556,6 +570,10 @@ const handleMouseMoveWorkspace = (e: MouseEvent) => {
       dy = Math.round(dy / gridSize.value) * gridSize.value;
     }
 
+    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+      hasMovedResize.value = true;
+    }
+
     const handle = resizeHandle.value;
     let newX = resizeStart.value.x;
     let newY = resizeStart.value.y;
@@ -616,6 +634,10 @@ const handleMouseMoveWorkspace = (e: MouseEvent) => {
       deg = Math.round(deg / 15) * 15;
     }
 
+    if (deg !== rotateStart.value.startRotation) {
+      hasMovedRotate.value = true;
+    }
+
     emit('update:component', {
       ...primarySelected.value,
       rotation: deg
@@ -644,6 +666,7 @@ const handleMouseUpWorkspace = () => {
   if (isDragging.value) {
     if (hasMovedDrag.value) {
       suppressNextCanvasClick.value = true;
+      emit('commit:history');
       setTimeout(() => {
         suppressNextCanvasClick.value = false;
         hasMovedDrag.value = false;
@@ -654,9 +677,22 @@ const handleMouseUpWorkspace = () => {
     isDragging.value = false;
   }
 
-  isResizing.value = false;
-  resizeHandle.value = null;
-  isRotating.value = false;
+  if (isResizing.value) {
+    if (hasMovedResize.value) {
+      emit('commit:history');
+      hasMovedResize.value = false;
+    }
+    isResizing.value = false;
+    resizeHandle.value = null;
+  }
+
+  if (isRotating.value) {
+    if (hasMovedRotate.value) {
+      emit('commit:history');
+      hasMovedRotate.value = false;
+    }
+    isRotating.value = false;
+  }
 };
 
 // Component Drag Start
@@ -921,6 +957,7 @@ const handleStartResize = (e: MouseEvent, handle: string) => {
 
   const comp = primarySelected.value;
   isResizing.value = true;
+  hasMovedResize.value = false;
   resizeHandle.value = handle;
   resizeStart.value = {
     mouseX: e.clientX,
@@ -949,6 +986,7 @@ const handleStartRotate = (e: MouseEvent) => {
   const cy = comp.y + comp.height / 2;
 
   isRotating.value = true;
+  hasMovedRotate.value = false;
   rotateStart.value = {
     cx,
     cy,
@@ -1152,6 +1190,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
 
     if (updated.length > 0) {
       emit('update:components', updated);
+      emit('commit:history');
     }
     return;
   }
@@ -1369,15 +1408,33 @@ defineExpose({
 
           <!-- Locked Indicator Badge -->
           <div v-if="comp.locked" class="absolute top-1 right-1 p-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-500/40 z-30 pointer-events-auto">
-            <Lock class="w-3 h-3" />
+            <Lock class="w-3 h-3 stroke-[2]" />
           </div>
+        </div>
 
-          <!-- Selection Bounding Box & Handles (Single vs Multi-Selection) -->
-          <template v-if="drawTool === 'select' && selectedIds.includes(comp.id)">
+        <!-- High-Performance Dedicated Selection & Transform Overlay (Iterates ONLY over selectedComponents: 0, 1, or few items) -->
+        <div 
+          v-if="drawTool === 'select' && selectedComponents.length > 0"
+          class="pointer-events-none"
+        >
+          <div
+            v-for="comp in selectedComponents"
+            :key="'sel-' + comp.id"
+            class="absolute pointer-events-none"
+            :style="{
+              left: `${comp.x}px`,
+              top: `${comp.y}px`,
+              width: `${comp.width}px`,
+              height: `${comp.height}px`,
+              transform: comp.rotation ? `rotate(${comp.rotation}deg)` : 'translateZ(0)',
+              transformOrigin: 'center center',
+              zIndex: 99999
+            }"
+          >
             <!-- 1. Single Selection Active State: 4 Edge Hit Bars + 8 Resizers + Rotation Grip + Border + Tag -->
             <div 
               v-if="selectedIds.length === 1"
-              class="absolute -inset-0.5 border-2 border-cyan-400 pointer-events-none rounded-xs z-40 shadow-[0_0_14px_rgba(0,242,255,0.75)]"
+              class="absolute -inset-0.5 border-2 border-cyan-400 pointer-events-none rounded-xs shadow-[0_0_14px_rgba(0,242,255,0.75)]"
             >
               <!-- Single Selection Tag Badge -->
               <div class="absolute -top-6 left-0 flex items-center gap-1.5 bg-[#080e1c]/95 border border-cyan-400/90 text-cyan-200 px-2 py-0.5 rounded text-[10px] font-mono font-bold shadow-lg pointer-events-none whitespace-nowrap z-50">
@@ -1503,7 +1560,7 @@ defineExpose({
             <!-- 2. Multi-Selection Active State: High-contrast Cyan Outline + Area Tint + 4 Corner Accents + Numbered Tag -->
             <div 
               v-else
-              class="absolute -inset-0.5 border-2 border-cyan-400 bg-cyan-400/15 pointer-events-none rounded-xs z-40 shadow-[0_0_16px_rgba(0,242,255,0.7)]"
+              class="absolute -inset-0.5 border-2 border-cyan-400 bg-cyan-400/15 pointer-events-none rounded-xs shadow-[0_0_16px_rgba(0,242,255,0.7)]"
             >
               <!-- 4 White Corner Brackets for Maximum Visibility -->
               <div class="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-white shadow-xs" />
@@ -1520,7 +1577,7 @@ defineExpose({
                 <Lock v-if="comp.locked" class="w-2.5 h-2.5 text-amber-400 ml-0.5" />
               </div>
             </div>
-          </template>
+          </div>
         </div>
 
         <!-- Overall Multi-Selection Group Bounding Box (Visual Only, No Floating Menu) -->

@@ -40,7 +40,8 @@ import {
   BookmarkPlus,
   ShieldCheck,
   UserCheck,
-  MoveRight
+  MoveRight,
+  RefreshCw
 } from 'lucide-vue-next';
 import { ScreenConfig, ScreenComponent } from '../types';
 import { templates } from '../data/templates';

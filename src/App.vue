@@ -414,19 +414,19 @@ const handleAddCustomSymbolToCanvas = (sym: CustomSymbolDef) => {
   recordHistory();
 };
 
-const handleUpdateComponent = (comp: ScreenComponent) => {
+const handleUpdateComponent = (comp: ScreenComponent, record = false) => {
   const idx = components.value.findIndex(c => c.id === comp.id);
   if (idx !== -1) {
     components.value[idx] = comp;
-    recordHistory();
+    if (record) recordHistory();
   }
 };
 
-const handleUpdateComponents = (updatedComps: ScreenComponent[]) => {
+const handleUpdateComponents = (updatedComps: ScreenComponent[], record = false) => {
   if (!Array.isArray(updatedComps)) return;
   const map = new Map(updatedComps.map(c => [c.id, c]));
   components.value = (components.value || []).map(c => map.has(c.id) ? map.get(c.id)! : c);
-  recordHistory();
+  if (record) recordHistory();
 };
 
 // Component Clipboard Buffer
@@ -885,7 +885,9 @@ onMounted(() => {
   fitToScreen();
 
   simulationTimer = setInterval(() => {
-    if (isStreaming.value && Array.isArray(datasets.value) && datasets.value.length > 0) {
+    // Only refresh live simulation telemetry when preview mode is active!
+    // This decouples editor performance from telemetry polling loops.
+    if (showPreviewModal.value && isStreaming.value && Array.isArray(datasets.value) && datasets.value.length > 0) {
       const nextDatasets = datasets.value.map(ds => tickDataset(ds));
       syncDatasetFastIndex(nextDatasets);
       requestAnimationFrame(() => {
@@ -979,10 +981,10 @@ onBeforeUnmount(() => {
           class="w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer"
           :class="leftSidebarTab === 'palette' 
             ? 'bg-cyan-500/25 text-cyan-200 border border-cyan-400 shadow-[0_0_10px_rgba(0,242,255,0.35)]' 
-            : 'text-slate-400 hover:text-white hover:bg-slate-800'"
+            : 'text-cyan-300 hover:text-white hover:bg-cyan-950/60'"
           title="组件物料库 (含电力一次图元)"
         >
-          <Box class="w-4 h-4" />
+          <Box class="w-4 h-4 stroke-[2]" />
         </button>
 
         <button
@@ -990,10 +992,10 @@ onBeforeUnmount(() => {
           class="w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer relative"
           :class="leftSidebarTab === 'layers' 
             ? 'bg-cyan-500/25 text-cyan-200 border border-cyan-400 shadow-[0_0_10px_rgba(0,242,255,0.35)]' 
-            : 'text-slate-400 hover:text-white hover:bg-slate-800'"
+            : 'text-cyan-300 hover:text-white hover:bg-cyan-950/60'"
           title="图层层级列表"
         >
-          <Layers class="w-4 h-4" />
+          <Layers class="w-4 h-4 stroke-[2]" />
           <span 
             v-if="components.length > 0" 
             class="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-cyan-400 text-slate-950 text-[8px] font-mono font-bold flex items-center justify-center"
@@ -1014,7 +1016,7 @@ onBeforeUnmount(() => {
         :components="components"
         :selectedIds="selectedIds"
         @select="selectedIds = $event"
-        @update:component="handleUpdateComponent"
+        @update:component="c => handleUpdateComponent(c, true)"
         @duplicate="handleDuplicate"
         @delete="handleDelete"
         @bring:front="handleBringToFront"
@@ -1042,8 +1044,8 @@ onBeforeUnmount(() => {
           @update:screen="screen = $event; recordHistory();"
           @update:drawTool="drawTool = $event"
           @select="selectedIds = $event"
-          @update:component="handleUpdateComponent"
-          @update:components="handleUpdateComponents"
+          @update:component="c => handleUpdateComponent(c, false)"
+          @update:components="cs => handleUpdateComponents(cs, false)"
           @add:component:at="handleAddComponentAt"
           @copy="handleCopy"
           @cut="handleCut"
@@ -1063,6 +1065,7 @@ onBeforeUnmount(() => {
           @finish:draw="drawTool = 'select'"
           @open:property-inspector="showPropertyInspector = true"
           @open:control-modal="(devId) => { controlInitialDeviceId = devId; showControlModal = true; }"
+          @commit:history="recordHistory"
         />
 
         <!-- Bottom Multi-Screen Page Manager Bar -->
@@ -1086,8 +1089,8 @@ onBeforeUnmount(() => {
         :datasets="datasets"
         :screens="screens"
         @close="showPropertyInspector = false"
-        @update:component="handleUpdateComponent"
-        @update:components="handleUpdateComponents"
+        @update:component="c => handleUpdateComponent(c, true)"
+        @update:components="cs => handleUpdateComponents(cs, true)"
         @update:screen="screen = $event; recordHistory();"
         @align:component="handleAlignComponent"
         @group="handleGroup"
