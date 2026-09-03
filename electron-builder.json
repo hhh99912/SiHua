@@ -1,0 +1,19 @@
+{
+  "appId": "com.datav.scada.studio",
+  "productName": "datav-scada-studio",
+  "electronVersion": "33.2.1",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "dist-electron/**/*",
+    "package.json"
+  ],
+  "linux": {
+    "target": [
+      "dir"
+    ],
+    "executableName": "datav-scada-studio"
+  }
+}

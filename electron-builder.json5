@@ -1,0 +1,39 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.datav.scada.studio",
+  "productName": "datav-scada-studio",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "dist-electron/**/*",
+    "package.json"
+  ],
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "SCADA 工业大屏工作台"
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64", "ia32"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "executableName": "datav-scada-studio"
+  },
+  "linux": {
+    "target": ["dir", "AppImage", "deb"],
+    "category": "Development;Utility;Graphics",
+    "executableName": "datav-scada-studio",
+    "synopsis": "SCADA Industrial Big Screen Studio"
+  }
+}
