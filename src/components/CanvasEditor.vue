@@ -436,7 +436,22 @@ const handleCenterAllInCanvas = () => {
   emit('update:components', updated);
 };
 
+let mouseMoveRaf: number | null = null;
+let lastMouseMoveEvent: MouseEvent | null = null;
+
 const handleMouseMoveWorkspace = (e: MouseEvent) => {
+  lastMouseMoveEvent = e;
+  if (mouseMoveRaf === null) {
+    mouseMoveRaf = requestAnimationFrame(() => {
+      mouseMoveRaf = null;
+      if (lastMouseMoveEvent) {
+        processMouseMove(lastMouseMoveEvent);
+      }
+    });
+  }
+};
+
+const processMouseMove = (e: MouseEvent) => {
   // 1. Pan Workspace if panning
   if (isPanning.value) {
     updatePan(e.clientX, e.clientY);
@@ -523,7 +538,7 @@ const handleMouseMoveWorkspace = (e: MouseEvent) => {
     return;
   }
 
-  // 5. Batch Component Dragging
+  // 5. Batch Component Dragging (高性能帧级平移，过滤无效零位移更新)
   if (isDragging.value && props.selectedIds.length > 0) {
     let dx = (e.clientX - dragStartMouse.value.x) / (props.zoom || 1);
     let dy = (e.clientY - dragStartMouse.value.y) / (props.zoom || 1);
@@ -555,7 +570,14 @@ const handleMouseMoveWorkspace = (e: MouseEvent) => {
       });
 
     if (updatedComps.length > 0) {
-      emit('update:components', updatedComps);
+      // 避免当组件实际坐标未变时重复 emit 产生冗余重绘
+      const isChanged = updatedComps.some(uc => {
+        const orig = props.components.find(c => c.id === uc.id);
+        return !orig || orig.x !== uc.x || orig.y !== uc.y;
+      });
+      if (isChanged) {
+        emit('update:components', updatedComps);
+      }
     }
     return;
   }
@@ -608,18 +630,20 @@ const handleMouseMoveWorkspace = (e: MouseEvent) => {
       updatedStyle.fontSize = newFontSize;
     }
 
-    emit('update:component', {
-      ...comp,
-      x: newX,
-      y: newY,
-      width: newW,
-      height: newH,
-      style: updatedStyle
-    });
+    if (newX !== comp.x || newY !== comp.y || newW !== comp.width || newH !== comp.height) {
+      emit('update:component', {
+        ...comp,
+        x: newX,
+        y: newY,
+        width: newW,
+        height: newH,
+        style: updatedStyle
+      });
+    }
     return;
   }
 
-  // 7. Free Rotation Handle Drag (旋转功能)
+  // 7. Free Rotation Handle Drag (高性能丝滑旋转，过滤同度数更新)
   if (isRotating.value && primarySelected.value && !primarySelected.value.locked) {
     const curX = coords.rawX;
     const curY = coords.rawY;
@@ -634,18 +658,26 @@ const handleMouseMoveWorkspace = (e: MouseEvent) => {
       deg = Math.round(deg / 15) * 15;
     }
 
-    if (deg !== rotateStart.value.startRotation) {
+    if (primarySelected.value.rotation !== deg) {
       hasMovedRotate.value = true;
+      emit('update:component', {
+        ...primarySelected.value,
+        rotation: deg
+      });
     }
-
-    emit('update:component', {
-      ...primarySelected.value,
-      rotation: deg
-    });
   }
 };
 
 const handleMouseUpWorkspace = () => {
+  if (mouseMoveRaf !== null) {
+    cancelAnimationFrame(mouseMoveRaf);
+    mouseMoveRaf = null;
+  }
+  if (lastMouseMoveEvent) {
+    processMouseMove(lastMouseMoveEvent);
+    lastMouseMoveEvent = null;
+  }
+
   if (isPanning.value) {
     endPan();
   }
@@ -1069,6 +1101,54 @@ const closeContextMenu = () => {
   contextMenu.value.visible = false;
 };
 
+// Effective target IDs and components for context menu
+// Ensures immediate operation on the clicked component even before props.selectedIds syncs
+const effectiveContextMenuIds = computed(() => {
+  if (contextMenu.value.targetCompId) {
+    if (props.selectedIds && props.selectedIds.includes(contextMenu.value.targetCompId)) {
+      return props.selectedIds;
+    }
+    return [contextMenu.value.targetCompId];
+  }
+  return props.selectedIds || [];
+});
+
+const effectiveContextMenuComponents = computed(() => {
+  const ids = effectiveContextMenuIds.value;
+  if (!ids || ids.length === 0) return [];
+  const idSet = new Set(ids);
+  return props.components.filter(c => idSet.has(c.id));
+});
+
+const effectivePrimaryComponent = computed(() => {
+  if (contextMenu.value.targetCompId) {
+    return props.components.find(c => c.id === contextMenu.value.targetCompId) || effectiveContextMenuComponents.value[0];
+  }
+  return primarySelected.value || effectiveContextMenuComponents.value[0];
+});
+
+const isAnyEffectiveLocked = computed(() => {
+  return effectiveContextMenuComponents.value.some(c => c.locked);
+});
+
+// Dedicated context menu toggle lock
+const handleToggleLockContext = () => {
+  const comps = effectiveContextMenuComponents.value;
+  if (comps.length === 0) return;
+  const anyLocked = comps.some(c => c.locked);
+  const targetLocked = !anyLocked;
+
+  const updated = comps.map(c => ({
+    ...c,
+    locked: targetLocked
+  }));
+
+  // Update in parent and record history
+  emit('update:components', updated);
+  emit('commit:history');
+  closeContextMenu();
+};
+
 // Keyboard Shortcuts
 const handleKeyDown = (e: KeyboardEvent) => {
   if (e.code === 'Space' && !isSpacePressed.value) {
@@ -1263,6 +1343,10 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  if (mouseMoveRaf !== null) {
+    cancelAnimationFrame(mouseMoveRaf);
+    mouseMoveRaf = null;
+  }
   window.removeEventListener('keydown', handleKeyDown);
   window.removeEventListener('keyup', handleKeyUp);
   window.removeEventListener('blur', handleWindowBlur);
@@ -1322,8 +1406,6 @@ defineExpose({
         backgroundSize: `${gridSize * zoom}px ${gridSize * zoom}px`
       }"
       @mousedown="handleCanvasMouseDown"
-      @mousemove="handleMouseMoveWorkspace"
-      @mouseup="handleMouseUpWorkspace"
       @click="handleCanvasClick"
       @dblclick="handleCanvasDblClick"
       @contextmenu="handleCanvasContextMenu"
@@ -1364,7 +1446,8 @@ defineExpose({
             transform: comp.rotation ? `rotate(${comp.rotation}deg)` : 'translateZ(0)',
             transformOrigin: 'center center',
             zIndex: comp.zIndex || 1,
-            contain: 'layout style paint'
+            contain: 'layout style',
+            willChange: selectedIds.includes(comp.id) ? 'transform' : 'auto'
           }"
         >
           <!-- Component Content -->
@@ -1797,11 +1880,11 @@ defineExpose({
       :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
       @click.stop
     >
-      <template v-if="selectedIds.length > 0">
+      <template v-if="effectiveContextMenuIds.length > 0">
         <!-- Multi-Selection or Single Selection Header -->
         <div class="px-2.5 py-1.5 text-xs font-light text-cyan-300 border-b border-cyan-500/30 flex items-center justify-between">
-          <span class="truncate">{{ selectedIds.length === 1 ? primarySelected?.name : `已选中 ${selectedIds.length} 个元件` }}</span>
-          <span v-if="selectedIds.length === 1" class="text-[11px] text-cyan-300 font-mono">{{ primarySelected?.rotation || 0 }}°</span>
+          <span class="truncate">{{ effectiveContextMenuIds.length === 1 ? effectivePrimaryComponent?.name : `已选中 ${effectiveContextMenuIds.length} 个元件` }}</span>
+          <span v-if="effectiveContextMenuIds.length === 1" class="text-[11px] text-cyan-300 font-mono">{{ effectivePrimaryComponent?.rotation || 0 }}°</span>
         </div>
 
         <div class="py-1 space-y-0.5">
@@ -1819,7 +1902,7 @@ defineExpose({
 
           <!-- Copy (Ctrl+C) -->
           <button
-            @click="emit('copy', selectedComponents); closeContextMenu();"
+            @click="emit('copy', effectiveContextMenuComponents); closeContextMenu();"
             class="w-full text-left px-2.5 py-1.5 hover:bg-cyan-950/60 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group transition-colors"
           >
             <div class="flex items-center gap-2 font-light">
@@ -1831,7 +1914,7 @@ defineExpose({
 
           <!-- Cut (Ctrl+X) -->
           <button
-            @click="emit('cut', selectedComponents); closeContextMenu();"
+            @click="emit('cut', effectiveContextMenuComponents); closeContextMenu();"
             class="w-full text-left px-2.5 py-1.5 hover:bg-cyan-950/60 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group transition-colors"
           >
             <div class="flex items-center gap-2 font-light">
@@ -1856,7 +1939,7 @@ defineExpose({
 
           <!-- Duplicate (Ctrl+D) -->
           <button
-            @click="emit('duplicate', selectedComponents); closeContextMenu();"
+            @click="emit('duplicate', effectiveContextMenuComponents); closeContextMenu();"
             class="w-full text-left px-2.5 py-1.5 hover:bg-cyan-950/60 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group transition-colors"
           >
             <div class="flex items-center gap-2 font-light">
@@ -1873,7 +1956,7 @@ defineExpose({
           <!-- SCADA YK/YT Execution -->
           <button
             v-if="primarySelectedHasControl"
-            @click="emit('open:control-modal', primarySelected?.data?.mapping?.deviceId); closeContextMenu();"
+            @click="emit('open:control-modal', effectivePrimaryComponent?.data?.mapping?.deviceId); closeContextMenu();"
             class="w-full text-left px-2.5 py-1.5 hover:bg-amber-500/20 rounded-md hover:text-amber-200 cursor-pointer text-amber-300 font-normal flex items-center justify-between group transition-colors"
           >
             <div class="flex items-center gap-2">
@@ -1885,8 +1968,8 @@ defineExpose({
 
           <!-- Group components (Ctrl+G) -->
           <button
-            v-if="selectedIds.length >= 2"
-            @click="emit('group', selectedComponents); closeContextMenu();"
+            v-if="effectiveContextMenuIds.length >= 2"
+            @click="emit('group', effectiveContextMenuComponents); closeContextMenu();"
             class="w-full text-left px-2.5 py-1.5 hover:bg-cyan-950/60 rounded-md hover:text-cyan-100 cursor-pointer text-cyan-200 font-normal flex items-center justify-between transition-colors"
           >
             <div class="flex items-center gap-2 font-light">
@@ -1897,8 +1980,8 @@ defineExpose({
 
           <!-- Ungroup component (Ctrl+U) -->
           <button
-            v-if="selectedIds.length === 1 && (primarySelected?.children?.length || primarySelected?.type === 'composite-symbol')"
-            @click="emit('ungroup', primarySelected!); closeContextMenu();"
+            v-if="effectiveContextMenuIds.length === 1 && (effectivePrimaryComponent?.children?.length || effectivePrimaryComponent?.type === 'composite-symbol')"
+            @click="emit('ungroup', effectivePrimaryComponent!);"
             class="w-full text-left px-2.5 py-1.5 hover:bg-amber-500/20 rounded-md hover:text-amber-200 cursor-pointer text-amber-300 font-normal flex items-center justify-between transition-colors"
           >
             <div class="flex items-center gap-2 font-light">
@@ -1908,24 +1991,20 @@ defineExpose({
           </button>
 
           <button
-            @click="emit('save:symbol', selectedComponents); closeContextMenu();"
+            @click="emit('save:symbol', effectiveContextMenuComponents); closeContextMenu();"
             class="w-full text-left px-2.5 py-1.5 hover:bg-emerald-500/20 rounded-md hover:text-emerald-200 cursor-pointer text-emerald-300 font-light flex items-center gap-2 transition-colors"
           >
             <BookmarkPlus class="w-3.5 h-3.5 stroke-[2]" />
             <span>封装为自定义图元</span>
           </button>
 
+          <!-- Lock / Unlock component (锁定/解锁图元) -->
           <button
-            @click="
-              const anyLocked = selectedComponents.some(c => c.locked);
-              const updated = selectedComponents.map(c => ({ ...c, locked: !anyLocked }));
-              emit('update:components', updated);
-              closeContextMenu();
-            "
+            @click="handleToggleLockContext"
             class="w-full text-left px-2.5 py-1.5 hover:bg-cyan-950/60 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center gap-2 font-light transition-colors"
           >
             <Lock class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
-            <span>{{ selectedComponents.some(c => c.locked) ? '解锁图元' : '锁定图元' }}</span>
+            <span>{{ isAnyEffectiveLocked ? '解锁图元' : '锁定图元' }}</span>
           </button>
         </div>
 
@@ -1934,7 +2013,7 @@ defineExpose({
         <div class="px-2 py-0.5 text-[10px] text-cyan-300 font-light">图层层级</div>
         <div class="py-0.5 space-y-0.5">
           <button
-            @click="emit('bring:front', selectedIds); closeContextMenu();"
+            @click="emit('bring:front', effectiveContextMenuIds); closeContextMenu();"
             class="w-full text-left px-2.5 py-1 hover:bg-cyan-950/60 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group transition-colors"
           >
             <div class="flex items-center gap-2 font-light">
@@ -1944,7 +2023,7 @@ defineExpose({
             <span class="text-[10px] text-cyan-300 font-mono group-hover:text-cyan-100 font-light">Ctrl+Shift+]</span>
           </button>
           <button
-            @click="emit('move:up', selectedIds); closeContextMenu();"
+            @click="emit('move:up', effectiveContextMenuIds); closeContextMenu();"
             class="w-full text-left px-2.5 py-1 hover:bg-cyan-950/60 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group transition-colors"
           >
             <div class="flex items-center gap-2 font-light">
@@ -1954,7 +2033,7 @@ defineExpose({
             <span class="text-[10px] text-cyan-300 font-mono group-hover:text-cyan-100 font-light">Ctrl+]</span>
           </button>
           <button
-            @click="emit('move:down', selectedIds); closeContextMenu();"
+            @click="emit('move:down', effectiveContextMenuIds); closeContextMenu();"
             class="w-full text-left px-2.5 py-1 hover:bg-cyan-950/60 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group transition-colors"
           >
             <div class="flex items-center gap-2 font-light">
@@ -1964,7 +2043,7 @@ defineExpose({
             <span class="text-[10px] text-cyan-300 font-mono group-hover:text-cyan-100 font-light">Ctrl+[</span>
           </button>
           <button
-            @click="emit('send:back', selectedIds); closeContextMenu();"
+            @click="emit('send:back', effectiveContextMenuIds); closeContextMenu();"
             class="w-full text-left px-2.5 py-1 hover:bg-cyan-950/60 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group transition-colors"
           >
             <div class="flex items-center gap-2 font-light">
@@ -1976,7 +2055,7 @@ defineExpose({
         </div>
 
         <!-- Multi-Item Alignment Options -->
-        <template v-if="selectedIds.length > 1">
+        <template v-if="effectiveContextMenuIds.length > 1">
           <div class="h-[1px] bg-cyan-500/30 my-1" />
           <div class="px-2 py-0.5 text-[10px] text-cyan-300 font-light">对齐与等间距分布</div>
           <div class="grid grid-cols-4 gap-1 px-1 py-1">
@@ -1994,7 +2073,7 @@ defineExpose({
 
         <div class="h-[1px] bg-cyan-500/30 my-1" />
         <button
-          @click="emit('delete', selectedIds); closeContextMenu();"
+          @click="emit('delete', effectiveContextMenuIds); closeContextMenu();"
           class="w-full text-left px-2.5 py-1.5 hover:bg-red-950/80 text-rose-300 rounded-md cursor-pointer flex items-center justify-between font-light transition-colors"
         >
           <div class="flex items-center gap-2">

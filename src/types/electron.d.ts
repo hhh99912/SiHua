@@ -30,6 +30,16 @@ export interface ElectronAPI {
   close: () => Promise<void>;
   toggleFullscreen: () => Promise<boolean>;
   openExternal: (url: string) => Promise<void>;
+  screens?: {
+    loadAll: () => Promise<{ success: boolean; screens: any[]; storageDir: string; count: number; files: string[] }>;
+    saveAll: (screens: any[]) => Promise<{ success: boolean; count: number; storageDir: string; savedFiles: string[] }>;
+    saveOne: (payload: { screen?: any; screenJson?: string; oldName?: string }) => Promise<{ success: boolean; filename?: string; storageDir?: string; error?: string }>;
+    deleteOne: (name: string) => Promise<{ success: boolean; filename: string }>;
+    getConfig: () => Promise<{ storageDir: string; absolutePath: string; fileCount: number; files: any[]; indexScreen?: { indexScreenName: string; indexScreenId: string } }>;
+    getIndexScreen: () => Promise<{ indexScreenName: string; indexScreenId: string }>;
+    setIndexScreen: (payload: { indexScreenName: string; indexScreenId: string }) => Promise<{ success: boolean; error?: string }>;
+    openDir: () => Promise<{ success: boolean; dir?: string; error?: string }>;
+  };
 }
 
 declare global {

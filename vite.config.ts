@@ -1,11 +1,12 @@
 import vue from '@vitejs/plugin-vue';
 import path from 'path';
 import { defineConfig } from 'vite';
+import { scadaScreensPlugin } from './src/server/vitePluginScadaScreens';
 
 export default defineConfig(() => {
   return {
     base: './',
-    plugins: [vue()],
+    plugins: [vue(), scadaScreensPlugin()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),

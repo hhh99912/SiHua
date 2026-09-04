@@ -89,3 +89,38 @@
     box-shadow: 0 0 25px rgba(0, 242, 255, 0.8);
   }
 }
+
+/* ==========================================================================
+   Linx / Industrial Linux X11 Compatible Cursors (凝思/麒麟工控机兼容鼠标指针)
+   避免缺少 Xcursor 主题时回退为黑色十字符号 (XC_X_cursor)
+   ========================================================================== */
+
+/* 1. Grab (小手抓取) */
+.cursor-grab,
+[class*="cursor-grab"],
+[style*="cursor: grab"],
+[style*="cursor:grab"] {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v3M14 5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6M10 7a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8a6 6 0 0 0 6 6h2a6 6 0 0 0 6-6v-4' stroke='%23000000' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v3M14 5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6M10 7a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8a6 6 0 0 0 6 6h2a6 6 0 0 0 6-6v-4' stroke='%2300f2ff' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='rgba(6,14,28,0.75)'/%3E%3C/svg%3E") 10 10, grab, -webkit-grab, pointer, move !important;
+}
+
+/* 2. Grabbing (小手闭合抓取) */
+.cursor-grabbing,
+[class*="cursor-grabbing"],
+[style*="cursor: grabbing"],
+[style*="cursor:grabbing"] {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M7 11V8a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2m-2 0h4a2 2 0 0 1 2 2v3a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5v-2a2 2 0 0 1 2-2h2' stroke='%23000000' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M7 11V8a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2m-2 0h4a2 2 0 0 1 2 2v3a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5v-2a2 2 0 0 1 2-2h2' stroke='%2300f2ff' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='rgba(0,242,255,0.4)'/%3E%3C/svg%3E") 10 10, grabbing, -webkit-grabbing, move, pointer !important;
+}
+
+/* 3. Not-Allowed (禁用/禁止符号) */
+.cursor-not-allowed,
+[class*="cursor-not-allowed"],
+[style*="cursor: not-allowed"],
+[style*="cursor:not-allowed"],
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled,
+[disabled] {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Ccircle cx='12' cy='12' r='9' stroke='%23000000' stroke-width='3.5'/%3E%3Ccircle cx='12' cy='12' r='9' stroke='%23ef4444' stroke-width='2' fill='rgba(239,68,68,0.25)'/%3E%3Cline x1='5.6' y1='5.6' x2='18.4' y2='18.4' stroke='%23000000' stroke-width='3.5'/%3E%3Cline x1='5.6' y1='5.6' x2='18.4' y2='18.4' stroke='%23ef4444' stroke-width='2'/%3E%3C/svg%3E") 12 12, not-allowed, no-drop, default !important;
+}
+

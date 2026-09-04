@@ -43,24 +43,24 @@ const borderState = computed(() => {
       <div 
         class="w-full h-full rounded border relative pointer-events-none transition-colors"
         :style="{
-          borderColor: withAlpha(borderState.color, 0.5),
-          boxShadow: `0 0 12px ${withAlpha(borderState.color, 0.25)}, inset 0 0 10px ${withAlpha(borderState.color, 0.1)}`
+          borderColor: withAlpha(borderState.color, 0.55),
+          boxShadow: `0 0 14px ${withAlpha(borderState.color, 0.28)}, inset 0 0 12px ${withAlpha(borderState.color, 0.12)}`
         }"
       >
-        <!-- 4 High-tech Corner brackets -->
-        <div class="absolute -top-[1px] -left-[1px] w-3.5 h-3.5 border-t-2 border-l-2" :style="{ borderColor: borderState.color }" />
-        <div class="absolute -top-[1px] -right-[1px] w-3.5 h-3.5 border-t-2 border-r-2" :style="{ borderColor: borderState.color }" />
-        <div class="absolute -bottom-[1px] -left-[1px] w-3.5 h-3.5 border-b-2 border-l-2" :style="{ borderColor: borderState.color }" />
-        <div class="absolute -bottom-[1px] -right-[1px] w-3.5 h-3.5 border-b-2 border-r-2" :style="{ borderColor: borderState.color }" />
+        <!-- 4 High-tech Corner brackets (fixed pixel size, never stretches or distorts) -->
+        <div class="absolute -top-[1px] -left-[1px] w-6 h-6 border-t-2 border-l-2" :style="{ borderColor: borderState.color }" />
+        <div class="absolute -top-[1px] -right-[1px] w-6 h-6 border-t-2 border-r-2" :style="{ borderColor: borderState.color }" />
+        <div class="absolute -bottom-[1px] -left-[1px] w-6 h-6 border-b-2 border-l-2" :style="{ borderColor: borderState.color }" />
+        <div class="absolute -bottom-[1px] -right-[1px] w-6 h-6 border-b-2 border-r-2" :style="{ borderColor: borderState.color }" />
         
-        <!-- Center Accent Dots -->
-        <div class="absolute top-0 left-1/2 -translate-x-1/2 w-6 h-[2px]" :style="{ backgroundColor: borderState.color }" />
-        <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-[2px]" :style="{ backgroundColor: borderState.color }" />
+        <!-- Center Accent Bars -->
+        <div class="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-[2px]" :style="{ backgroundColor: borderState.color, boxShadow: `0 0 6px ${borderState.color}` }" />
+        <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-16 h-[2px]" :style="{ backgroundColor: borderState.color, boxShadow: `0 0 6px ${borderState.color}` }" />
 
         <!-- Optional Title Header -->
         <div 
           v-if="borderState.title"
-          class="flex items-center gap-1.5 px-3 py-1 bg-[#060e1c]/90 border-b text-xs font-mono font-bold tracking-wider"
+          class="flex items-center gap-2 px-3 py-1.5 bg-[#060e1c]/90 border-b text-xs font-mono font-bold tracking-wider"
           :style="{ borderColor: withAlpha(borderState.color, 0.3), color: borderState.color }"
         >
           <div class="w-1.5 h-3 rounded-[2px]" :style="{ backgroundColor: borderState.color, boxShadow: `0 0 6px ${borderState.color}` }" />
@@ -69,26 +69,25 @@ const borderState = computed(() => {
       </div>
     </div>
 
-    <!-- 2. STYLE: Tech Chamfer Armor (科技切角装甲框 - SVG 矢量切角) -->
+    <!-- 2. STYLE: Tech Chamfer Armor (科技切角装甲框 - 绝对防拉伸像素级切角) -->
     <div 
       v-else-if="borderState.borderStyle === 'deco-border-tech'"
       class="w-full h-full relative"
     >
-      <svg class="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
-        <!-- Main Chamfer Polygon -->
-        <polygon 
-          points="0,10 10,0 90,0 100,10 100,90 90,100 10,100 0,90" 
+      <svg class="w-full h-full absolute inset-0">
+        <!-- Main Chamfer Polygon (16px fixed corner cuts, perfectly 45deg, NEVER distorted) -->
+        <path 
+          :d="`M 0 16 L 16 0 L ${Math.max(16, borderState.width - 16)} 0 L ${borderState.width} 16 L ${borderState.width} ${Math.max(16, borderState.height - 16)} L ${Math.max(16, borderState.width - 16)} ${borderState.height} L 16 ${borderState.height} L 0 ${Math.max(16, borderState.height - 16)} Z`" 
           fill="none" 
           :stroke="borderState.color" 
           stroke-width="1.5" 
-          vector-effect="non-scaling-stroke"
           :style="{ filter: `drop-shadow(0 0 6px ${borderState.color})` }"
         />
         <!-- Inner Accent Lines -->
-        <line x1="20" y1="0" x2="80" y2="0" :stroke="borderState.color" stroke-width="3" vector-effect="non-scaling-stroke" />
-        <line x1="30" y1="100" x2="70" y2="100" :stroke="borderState.color" stroke-width="2" vector-effect="non-scaling-stroke" />
+        <line :x1="Math.min(40, borderState.width * 0.15)" y1="0" :x2="Math.max(borderState.width - 40, borderState.width * 0.85)" y2="0" :stroke="borderState.color" stroke-width="2.5" />
+        <line :x1="Math.min(60, borderState.width * 0.2)" :y1="borderState.height" :x2="Math.max(borderState.width - 60, borderState.width * 0.8)" :y2="borderState.height" :stroke="borderState.color" stroke-width="2" />
       </svg>
-      <div v-if="borderState.title" class="absolute top-2 left-4 text-xs font-mono font-bold" :style="{ color: borderState.color }">
+      <div v-if="borderState.title" class="absolute top-2 left-5 text-xs font-mono font-bold" :style="{ color: borderState.color }">
         {{ borderState.title }}
       </div>
     </div>
@@ -138,23 +137,18 @@ const borderState = computed(() => {
       </div>
     </div>
 
-    <!-- 5. STYLE: Cyber Corner Cuts (四角发光斜切微框) -->
+    <!-- 5. STYLE: Cyber Corner Cuts (四角发光斜切微框 - 纯绝对定位防形变) -->
     <div 
       v-else-if="borderState.borderStyle === 'deco-border-cyber-corner' || borderState.borderStyle === 'deco-corner-bracket'"
       class="w-full h-full relative"
     >
-      <svg class="w-full h-full" preserveAspectRatio="none" viewBox="0 0 100 100">
-        <!-- Top Left Corner -->
-        <path d="M 0 16 L 0 0 L 16 0" fill="none" :stroke="borderState.color" stroke-width="2.5" vector-effect="non-scaling-stroke" />
-        <!-- Top Right Corner -->
-        <path d="M 84 0 L 100 0 L 100 16" fill="none" :stroke="borderState.color" stroke-width="2.5" vector-effect="non-scaling-stroke" />
-        <!-- Bottom Left Corner -->
-        <path d="M 0 84 L 0 100 L 16 100" fill="none" :stroke="borderState.color" stroke-width="2.5" vector-effect="non-scaling-stroke" />
-        <!-- Bottom Right Corner -->
-        <path d="M 84 100 L 100 100 L 100 84" fill="none" :stroke="borderState.color" stroke-width="2.5" vector-effect="non-scaling-stroke" />
-        <!-- Subtle Perimeter Box -->
-        <rect x="1" y="1" width="98" height="98" fill="none" :stroke="borderState.color" stroke-width="0.75" stroke-dasharray="3,3" opacity="0.4" vector-effect="non-scaling-stroke" />
-      </svg>
+      <!-- 4 Corners (always 16px by 16px crisp brackets) -->
+      <div class="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2" :style="{ borderColor: borderState.color }" />
+      <div class="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2" :style="{ borderColor: borderState.color }" />
+      <div class="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2" :style="{ borderColor: borderState.color }" />
+      <div class="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2" :style="{ borderColor: borderState.color }" />
+      <!-- Subtle Perimeter Box -->
+      <div class="w-full h-full border border-dashed" :style="{ borderColor: withAlpha(borderState.color, 0.4) }" />
     </div>
 
     <!-- 6. STYLE: Gradient Pulse (渐变律动科技框) -->

@@ -41,7 +41,9 @@ import {
   ShieldCheck,
   UserCheck,
   MoveRight,
-  RefreshCw
+  RefreshCw,
+  HardDrive,
+  Save
 } from 'lucide-vue-next';
 import { ScreenConfig, ScreenComponent } from '../types';
 import { templates } from '../data/templates';
@@ -82,10 +84,12 @@ const emit = defineEmits<{
   (e: 'update:snapToGrid', value: boolean): void;
   (e: 'update:orthogonalLock', value: boolean): void;
   (e: 'toggle:streaming'): void;
+  (e: 'save:screen'): void;
   (e: 'open:preview'): void;
   (e: 'open:datasets'): void;
   (e: 'open:control'): void;
   (e: 'open:json'): void;
+  (e: 'open:disk-storage'): void;
   (e: 'open:symbols'): void;
   (e: 'open:platform'): void;
   (e: 'open:login'): void;
@@ -283,6 +287,15 @@ const handleSelectTemplate = (id: string) => {
           <Code class="w-3.5 h-3.5 text-cyan-300" />
         </button>
 
+        <!-- Disk Storage Files per Screen -->
+        <button
+          @click="emit('open:disk-storage')"
+          class="p-1.5 rounded-lg bg-[#0b1730] border border-cyan-400 hover:border-cyan-300 hover:text-white text-cyan-200 transition-all cursor-pointer shadow-[0_0_6px_rgba(0,242,255,0.2)]"
+          title="磁盘大屏存储管理 (每个大屏独立存储为同名 JSON 文件)"
+        >
+          <HardDrive class="w-3.5 h-3.5 text-cyan-300" />
+        </button>
+
         <!-- Multi-Platform Desktop & Packaging Hub -->
         <button
           @click="emit('open:platform')"
@@ -310,6 +323,16 @@ const handleSelectTemplate = (id: string) => {
           <ShieldCheck v-if="currentUser.role === 'system_admin'" class="w-3.5 h-3.5 text-cyan-300" />
           <UserCheck v-else class="w-3.5 h-3.5 text-emerald-300" />
           <span class="max-w-[70px] truncate text-[11px] font-light">{{ currentUser.name }}</span>
+        </button>
+
+        <!-- Save Current Screen to Disk (仅保存当前这一个大屏) -->
+        <button
+          @click="emit('save:screen')"
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-400 hover:border-cyan-300 text-cyan-100 font-mono text-xs shadow-[0_0_10px_rgba(0,242,255,0.25)] transition-all cursor-pointer"
+          title="仅同步保存当前这一个大屏到 graph/ 对应名称的 JSON 文件中 (快捷键 Ctrl+S)"
+        >
+          <Save class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
+          <span class="font-normal">保存</span>
         </button>
 
         <!-- SCADA Full Preview -->

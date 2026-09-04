@@ -3,12 +3,18 @@ import { ref, computed } from 'vue';
 import { ScreenItem } from '../types';
 import { 
   Plus, Copy, Trash2, Edit3, Monitor, Layers, 
-  ChevronDown, Check, AlertCircle, Layout
+  ChevronDown, Check, AlertCircle, Layout,
+  HardDrive, Save, Folder, Star
 } from 'lucide-vue-next';
 
 interface Props {
   screens: ScreenItem[];
   activeScreenId: string;
+  storageDir?: string;
+  diskFileCount?: number;
+  isSavingDisk?: boolean;
+  indexScreenId?: string;
+  indexScreenName?: string;
 }
 
 const props = defineProps<Props>();
@@ -18,6 +24,9 @@ const emit = defineEmits<{
   (e: 'duplicate:screen', screenId: string): void;
   (e: 'rename:screen', payload: { screenId: string; newName: string }): void;
   (e: 'delete:screen', screenId: string): void;
+  (e: 'open:disk-storage'): void;
+  (e: 'save:current-disk'): void;
+  (e: 'set:index-screen', screenId: string): void;
 }>();
 
 const isDropdownOpen = ref(false);
@@ -32,6 +41,14 @@ const errorMessage = ref('');
 
 const currentScreen = computed(() => {
   return props.screens.find(s => s.id === props.activeScreenId) || props.screens[0];
+});
+
+const isCurrentIndexScreen = computed(() => {
+  if (!currentScreen.value) return false;
+  return (
+    (props.indexScreenId && props.indexScreenId === currentScreen.value.id) ||
+    (props.indexScreenName && props.indexScreenName.trim().toLowerCase() === currentScreen.value.name.trim().toLowerCase())
+  );
 });
 
 // Check unique name helper
@@ -169,6 +186,13 @@ const handleDeleteCurrent = () => {
               <div class="flex items-center gap-2 truncate">
                 <Monitor class="w-3.5 h-3.5 shrink-0 stroke-[2]" :class="item.id === activeScreenId ? 'text-cyan-300' : 'text-cyan-400/80'" />
                 <span class="truncate">{{ item.name }}</span>
+                <span 
+                  v-if="item.id === indexScreenId || (indexScreenName && item.name.toLowerCase() === indexScreenName.toLowerCase())"
+                  class="text-[9px] px-1 py-0.2 rounded bg-amber-950/80 text-amber-300 border border-amber-400/70 font-mono shrink-0"
+                  title="登录成功后默认显示的主索引大屏"
+                >
+                  ★主索引
+                </span>
               </div>
               <div class="flex items-center gap-2 shrink-0">
                 <span class="text-[10px] text-cyan-300/80 font-light">
@@ -233,6 +257,53 @@ const handleDeleteCurrent = () => {
         >
           <Trash2 class="w-3 h-3 text-rose-300 stroke-[2]" />
           <span>删除</span>
+        </button>
+
+        <!-- Login Index Screen Toggle Button -->
+        <div class="h-4 w-px bg-cyan-500/30 mx-0.5"></div>
+        <button
+          v-if="!isCurrentIndexScreen && currentScreen"
+          @click="emit('set:index-screen', currentScreen.id)"
+          class="flex items-center gap-1 px-2 py-1 rounded bg-[#09152b] hover:bg-amber-950/70 border border-cyan-500/40 hover:border-amber-400 text-cyan-200 hover:text-amber-200 text-xs font-mono font-light transition-all cursor-pointer shadow-xs"
+          title="将当前画面设为用户登录成功后默认展示的主索引大屏界面"
+        >
+          <Star class="w-3 h-3 text-amber-300 stroke-[2]" />
+          <span>设为主索引</span>
+        </button>
+        <div
+          v-else
+          class="flex items-center gap-1 px-2 py-1 rounded bg-amber-950/60 border border-amber-400 text-amber-300 text-xs font-mono font-normal shadow-[0_0_8px_rgba(245,158,11,0.25)]"
+          title="此大屏为用户登录成功后直接进入的主索引界面"
+        >
+          <Star class="w-3 h-3 text-amber-300 fill-amber-300 stroke-[2]" />
+          <span>登录主索引大屏</span>
+        </div>
+
+        <!-- Divider -->
+        <div class="h-4 w-px bg-cyan-500/30 mx-0.5"></div>
+
+        <!-- Disk Storage Button -->
+        <button
+          @click="emit('open:disk-storage')"
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-400/60 hover:border-cyan-300 text-cyan-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-[0_0_8px_rgba(0,242,255,0.15)]"
+          title="系统大屏磁盘文件存储管理：位于可执行目录同级 graph/ 文件夹下"
+        >
+          <HardDrive class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
+          <span>graph大屏库</span>
+          <span class="text-[9px] px-1 py-0.2 rounded bg-[#040813] text-cyan-300 border border-cyan-500/40 font-mono">
+            {{ diskFileCount !== undefined ? diskFileCount : screens.length }}文件
+          </span>
+        </button>
+
+        <!-- Save to Disk Action (仅保存当前这一个大屏) -->
+        <button
+          @click="emit('save:current-disk')"
+          :disabled="isSavingDisk"
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-400 hover:border-cyan-300 text-cyan-200 hover:text-white text-xs font-mono transition-all cursor-pointer shadow-[0_0_10px_rgba(0,242,255,0.25)] disabled:opacity-50"
+          :title="`仅保存当前画面「${currentScreen?.name}」到 graph/${currentScreen?.name}.json`"
+        >
+          <Save class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" :class="{ 'animate-spin': isSavingDisk }" />
+          <span>{{ isSavingDisk ? '保存中...' : '保存大屏' }}</span>
         </button>
       </div>
     </div>

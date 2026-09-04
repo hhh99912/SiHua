@@ -6,7 +6,12 @@ import { ElectronSystemInfo } from '../types/electron';
  */
 
 export const isElectron = (): boolean => {
-  return typeof window !== 'undefined' && !!window.electronAPI?.isElectron;
+  if (typeof window === 'undefined') return false;
+  if (window.electronAPI?.isElectron) return true;
+  if (typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().includes('electron/')) {
+    return true;
+  }
+  return false;
 };
 
 export const getSystemInfo = async (): Promise<ElectronSystemInfo | null> => {

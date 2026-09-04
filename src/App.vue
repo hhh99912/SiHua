@@ -29,8 +29,17 @@ import ScadaControlModal from './components/ScadaControlModal.vue';
 import ScadaBatchPointModal from './components/ScadaBatchPointModal.vue';
 import LoginModal from './components/LoginModal.vue';
 import ScadaPvLogin from './components/ScadaPvLogin.vue';
+import DiskStorageModal from './components/DiskStorageModal.vue';
+import { 
+  loadScreensFromDisk, 
+  saveScreenToDisk, 
+  deleteScreenFromDisk, 
+  getDiskStorageConfig,
+  getIndexScreen,
+  setIndexScreen
+} from './utils/screenFileService';
 import { currentUser, canEditCanvas, isLoggedIn, logoutUser } from './utils/auth';
-import { Sparkles, Layers, Box, Zap } from 'lucide-vue-next';
+import { Sparkles, Layers, Box, Zap, HardDrive } from 'lucide-vue-next';
 
 // 1. Initial State: Load Multi-Screen Electrical Project
 const screens = ref<ScreenItem[]>(JSON.parse(JSON.stringify(PRESET_MULTI_SCREENS)));
@@ -80,8 +89,26 @@ const showSaveSymbolModal = ref(false);
 const showPlatformModal = ref(false);
 const showBatchPointModal = ref(false);
 const showLoginModal = ref(false);
+const showDiskStorageModal = ref(false);
 const loginNotice = ref('');
 const componentsToSave = ref<ScreenComponent[]>([]);
+
+// ---------------- Disk Storage Engine State (graph/) ----------------
+const storageDirectory = ref('graph');
+const diskFileCount = ref(PRESET_MULTI_SCREENS.length);
+const isSavingDisk = ref(false);
+const indexScreenId = ref<string>('');
+const indexScreenName = ref<string>('');
+const diskNotification = ref('');
+let diskNotificationTimer: any = null;
+
+const showDiskNotification = (msg: string) => {
+  diskNotification.value = msg;
+  if (diskNotificationTimer) clearTimeout(diskNotificationTimer);
+  diskNotificationTimer = setTimeout(() => {
+    diskNotification.value = '';
+  }, 3500);
+};
 
 // Synchronize current components & screen configuration back to screens array
 const syncActiveScreenToProject = () => {
@@ -92,13 +119,11 @@ const syncActiveScreenToProject = () => {
   }
 };
 
-// Switch active screen
-const handleSwitchScreen = (screenId: string) => {
+// Switch active screen (in-memory only; no automatic disk saving)
+const handleSwitchScreen = async (screenId: string) => {
   if (screenId === activeScreenId.value) return;
-  // 1. Save current screen state
   syncActiveScreenToProject();
 
-  // 2. Find target screen
   const target = screens.value.find(s => s.id === screenId);
   if (!target) return;
 
@@ -125,19 +150,21 @@ const getUniqueScreenName = (baseName: string, excludeId?: string): string => {
   return `${name} (${counter})`;
 };
 
-// Add new screen (names must be unique)
-const handleAddScreen = (payload: { name: string; width: number; height: number }) => {
+// Add new screen (names must be unique, persistence on manual save)
+const handleAddScreen = async (payload: { name: string; width: number; height: number }) => {
   syncActiveScreenToProject();
   const newId = `screen-${Date.now()}`;
   const uniqueName = getUniqueScreenName(payload.name);
+  const screenWidth = payload.width || 1920;
+  const screenHeight = payload.height || 1080;
   const newScreenItem: ScreenItem = {
     id: newId,
     name: uniqueName,
     screen: {
       id: newId,
       name: uniqueName,
-      width: payload.width || 1920,
-      height: payload.height || 1080,
+      width: screenWidth,
+      height: screenHeight,
       backgroundColor: '#040914',
       backgroundGrid: true,
       gridSize: 20,
@@ -148,21 +175,25 @@ const handleAddScreen = (payload: { name: string; width: number; height: number 
     },
     components: [
       {
-        id: `comp-nav-${Date.now()}`,
-        name: 'SCADA 导航条',
-        type: 'nav-tabs',
-        category: 'custom',
-        x: 60,
-        y: 20,
-        width: payload.width - 120,
-        height: 52,
+        id: `comp-border-${Date.now()}`,
+        name: '科技全屏边框',
+        type: 'deco-border-neon',
+        category: 'decoration',
+        x: 0,
+        y: 0,
+        width: screenWidth,
+        height: screenHeight,
         rotation: 0,
-        zIndex: 10,
+        zIndex: 1,
         style: {
-          fill: 'rgba(6, 14, 28, 0.92)',
+          fill: 'transparent',
           stroke: '#00f2ff',
-          strokeWidth: 1,
-          borderRadius: 10
+          strokeWidth: 2
+        },
+        customProps: {
+          borderStyle: 'deco-border-neon',
+          title: uniqueName,
+          showTitle: true
         },
         data: { mapping: {} }
       }
@@ -170,11 +201,12 @@ const handleAddScreen = (payload: { name: string; width: number; height: number 
   };
 
   screens.value.push(newScreenItem);
-  handleSwitchScreen(newId);
+  await handleSwitchScreen(newId);
+  showDiskNotification(`已新建大屏「${uniqueName}」，点击保存按钮可同步至 graph/ 目录`);
 };
 
 // Duplicate screen (names must be unique)
-const handleDuplicateScreen = (screenId: string) => {
+const handleDuplicateScreen = async (screenId: string) => {
   syncActiveScreenToProject();
   const source = screens.value.find(s => s.id === screenId);
   if (!source) return;
@@ -195,13 +227,15 @@ const handleDuplicateScreen = (screenId: string) => {
   };
 
   screens.value.push(cloned);
-  handleSwitchScreen(newId);
+  await handleSwitchScreen(newId);
+  showDiskNotification(`已克隆大屏「${uniqueName}」，点击保存按钮可同步至 graph/ 目录`);
 };
 
 // Rename screen (names must be unique)
-const handleRenameScreen = (payload: { screenId: string; newName: string }) => {
+const handleRenameScreen = async (payload: { screenId: string; newName: string }) => {
   const target = screens.value.find(s => s.id === payload.screenId);
   if (target) {
+    const oldName = target.name;
     const trimmed = payload.newName.trim();
     if (!trimmed) return;
     const isTaken = screens.value.some(s => s.id !== payload.screenId && s.name.trim().toLowerCase() === trimmed.toLowerCase());
@@ -214,18 +248,30 @@ const handleRenameScreen = (payload: { screenId: string; newName: string }) => {
     if (target.id === activeScreenId.value) {
       screen.value.name = trimmed;
     }
+    if (target.id === indexScreenId.value || oldName === indexScreenName.value) {
+      indexScreenName.value = trimmed;
+      await setIndexScreen(trimmed, target.id);
+    }
+    showDiskNotification(`已重命名画面: ${oldName} -> ${trimmed} (保存生效)`);
   }
 };
 
-// Delete screen
-const handleDeleteScreen = (screenId: string) => {
+// Delete screen and its JSON file
+const handleDeleteScreen = async (screenId: string) => {
   if (screens.value.length <= 1) {
     alert('至少需要保留一个画面。');
     return;
   }
-  if (!confirm('确定要删除该画面及其所有组件吗？')) return;
+  const toDelete = screens.value.find(s => s.id === screenId);
+  if (!confirm(`确定要删除画面「${toDelete?.name || ''}」及其磁盘 JSON 文件吗？`)) return;
+
+  if (toDelete) {
+    await deleteScreenFromDisk(toDelete.name);
+    showDiskNotification(`已删除磁盘大屏文件: ${toDelete.name}.json`);
+  }
 
   screens.value = screens.value.filter(s => s.id !== screenId);
+  diskFileCount.value = screens.value.length;
   if (activeScreenId.value === screenId) {
     const nextScreen = screens.value[0];
     activeScreenId.value = nextScreen.id;
@@ -234,6 +280,64 @@ const handleDeleteScreen = (screenId: string) => {
     selectedIds.value = [];
   }
   recordHistory();
+};
+
+// Manual Save: Save ONLY the current active screen to graph/<name>.json
+const handleSaveCurrentScreenToDisk = async () => {
+  syncActiveScreenToProject();
+  const cur = screens.value.find(s => s.id === activeScreenId.value);
+  if (!cur) return;
+  isSavingDisk.value = true;
+  try {
+    const res = await saveScreenToDisk(cur);
+    if (res.success) {
+      diskFileCount.value = screens.value.length;
+      showDiskNotification(`已保存当前大屏「${cur.name}」到 graph/${res.filename || cur.name + '.json'}`);
+    } else {
+      showDiskNotification(`保存失败: ${res.error || ''}`);
+    }
+  } catch (err: any) {
+    showDiskNotification(`保存异常: ${err?.message || ''}`);
+  } finally {
+    isSavingDisk.value = false;
+  }
+};
+
+// Set screen as main index screen for post-login display
+const handleSetIndexScreen = async (screenId: string) => {
+  const target = screens.value.find(s => s.id === screenId);
+  if (!target) return;
+  try {
+    const res = await setIndexScreen(target.name, target.id);
+    if (res.success) {
+      indexScreenId.value = target.id;
+      indexScreenName.value = target.name;
+      showDiskNotification(`已配置「${target.name}」为用户登录成功后显示的主索引大屏`);
+    } else {
+      showDiskNotification(`配置主索引失败: ${res.error || ''}`);
+    }
+  } catch (e: any) {
+    showDiskNotification(`配置异常: ${e?.message || ''}`);
+  }
+};
+
+// Reload screens from disk files
+const handleReloadScreensFromDisk = (newScreens: ScreenItem[], idxCfg?: { indexScreenName?: string; indexScreenId?: string }) => {
+  if (!newScreens || newScreens.length === 0) return;
+  screens.value = newScreens;
+  diskFileCount.value = newScreens.length;
+  if (idxCfg?.indexScreenId || idxCfg?.indexScreenName) {
+    indexScreenId.value = idxCfg.indexScreenId || '';
+    indexScreenName.value = idxCfg.indexScreenName || '';
+  }
+  const found = newScreens.find(s => s.id === activeScreenId.value) || newScreens[0];
+  activeScreenId.value = found.id;
+  screen.value = JSON.parse(JSON.stringify(found.screen));
+  components.value = JSON.parse(JSON.stringify(found.components));
+  selectedIds.value = [];
+  fitToScreen();
+  recordHistory();
+  showDiskNotification(`已从 graph/ 目录重新加载 ${newScreens.length} 个大屏文件`);
 };
 
 // 2. Undo / Redo History System
@@ -415,17 +519,31 @@ const handleAddCustomSymbolToCanvas = (sym: CustomSymbolDef) => {
 };
 
 const handleUpdateComponent = (comp: ScreenComponent, record = false) => {
-  const idx = components.value.findIndex(c => c.id === comp.id);
-  if (idx !== -1) {
-    components.value[idx] = comp;
+  const target = components.value.find(c => c.id === comp.id);
+  if (target) {
+    Object.assign(target, comp);
+    components.value = [...components.value];
     if (record) recordHistory();
   }
 };
 
 const handleUpdateComponents = (updatedComps: ScreenComponent[], record = false) => {
-  if (!Array.isArray(updatedComps)) return;
+  if (!Array.isArray(updatedComps) || updatedComps.length === 0) return;
   const map = new Map(updatedComps.map(c => [c.id, c]));
-  components.value = (components.value || []).map(c => map.has(c.id) ? map.get(c.id)! : c);
+  const currentList = components.value;
+  let hasMetaChange = false;
+  for (let i = 0; i < currentList.length; i++) {
+    const updated = map.get(currentList[i].id);
+    if (updated) {
+      if ('locked' in updated || 'visible' in updated || 'zIndex' in updated || 'name' in updated) {
+        hasMetaChange = true;
+      }
+      Object.assign(currentList[i], updated);
+    }
+  }
+  if (hasMetaChange) {
+    components.value = [...components.value];
+  }
   if (record) recordHistory();
 };
 
@@ -880,7 +998,45 @@ const handleGlobalScadaControlEvent = (e: any) => {
   showControlModal.value = true;
 };
 
-onMounted(() => {
+// Global keyboard shortcut: Ctrl+S / Cmd+S to save active screen only
+const handleKeyDown = (e: KeyboardEvent) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    handleSaveCurrentScreenToDisk();
+  }
+};
+
+onMounted(async () => {
+  // 1. 启动时自动扫描并读取 graph 目录下的所有独立大屏 JSON 文件 (确保至少有一个合规文件)
+  try {
+    const res = await loadScreensFromDisk();
+    if (res.success && res.screens && res.screens.length > 0) {
+      screens.value = res.screens;
+      storageDirectory.value = res.storageDir || 'graph';
+      diskFileCount.value = res.screens.length;
+      if (res.indexScreen?.indexScreenId || res.indexScreen?.indexScreenName) {
+        indexScreenId.value = res.indexScreen.indexScreenId || '';
+        indexScreenName.value = res.indexScreen.indexScreenName || '';
+      }
+      // 匹配已配置的主索引大屏作为初始界面，否则取首个大屏
+      let targetScreen = res.screens[0];
+      if (indexScreenId.value || indexScreenName.value) {
+        const matched = res.screens.find(s => 
+          (indexScreenId.value && s.id === indexScreenId.value) ||
+          (indexScreenName.value && s.name.trim().toLowerCase() === indexScreenName.value.trim().toLowerCase())
+        );
+        if (matched) targetScreen = matched;
+      }
+      activeScreenId.value = targetScreen.id;
+      screen.value = JSON.parse(JSON.stringify(targetScreen.screen));
+      components.value = JSON.parse(JSON.stringify(targetScreen.components));
+      selectedIds.value = [];
+      showDiskNotification(`已自动加载 graph/ 目录: 共 ${res.screens.length} 个合规 JSON 大屏`);
+    }
+  } catch (err) {
+    console.warn('[SCADA] 扫描 graph 磁盘大屏失败，回退到默认大屏:', err);
+  }
+
   recordHistory();
   fitToScreen();
 
@@ -897,14 +1053,66 @@ onMounted(() => {
   }, 1500);
 
   window.addEventListener('resize', fitToScreen);
+  window.addEventListener('keydown', handleKeyDown);
   window.addEventListener('datav:jump:screen', handleGlobalJumpEvent);
   window.addEventListener('scada:open:control', handleGlobalScadaControlEvent);
 });
 
 // Login and Logout Handlers
-const handleLoginSuccess = () => {
+// 选个json大屏作为用户登陆成功后显示的主索引大屏界面 (手动预览不触发此逻辑)
+const handleLoginSuccess = async () => {
   isLoggedIn.value = true;
+  try {
+    const idxCfg = await getIndexScreen();
+    if (idxCfg && (idxCfg.indexScreenId || idxCfg.indexScreenName)) {
+      indexScreenId.value = idxCfg.indexScreenId || '';
+      indexScreenName.value = idxCfg.indexScreenName || '';
+    }
+    if (indexScreenId.value || indexScreenName.value) {
+      const target = screens.value.find(s => 
+        (indexScreenId.value && s.id === indexScreenId.value) ||
+        (indexScreenName.value && s.name.trim().toLowerCase() === indexScreenName.value.trim().toLowerCase())
+      );
+      if (target) {
+        activeScreenId.value = target.id;
+        screen.value = JSON.parse(JSON.stringify(target.screen));
+        components.value = JSON.parse(JSON.stringify(target.components));
+        selectedIds.value = [];
+      }
+    }
+  } catch (err) {
+    console.warn('[SCADA] 登录获取主索引大屏配置失败:', err);
+  }
   showPreviewModal.value = true; // Enter Big Screen Dashboard directly on successful login
+  fitToScreen();
+};
+
+// 手动进入大屏预览：重新加载最新保存的磁盘 JSON，避免呈现未保存的画面；手动预览不触发主索引切换逻辑
+const handleOpenPreview = async () => {
+  try {
+    const res = await loadScreensFromDisk();
+    if (res.success && res.screens && res.screens.length > 0) {
+      screens.value = res.screens;
+      diskFileCount.value = res.screens.length;
+      // 保持当前查看的大屏，从磁盘重新载入其已保存数据
+      const reloaded = res.screens.find(s => s.id === activeScreenId.value || s.name.trim() === screen.value.name.trim());
+      if (reloaded) {
+        activeScreenId.value = reloaded.id;
+        screen.value = JSON.parse(JSON.stringify(reloaded.screen));
+        components.value = JSON.parse(JSON.stringify(reloaded.components));
+      } else {
+        const first = res.screens[0];
+        activeScreenId.value = first.id;
+        screen.value = JSON.parse(JSON.stringify(first.screen));
+        components.value = JSON.parse(JSON.stringify(first.components));
+      }
+      selectedIds.value = [];
+      showDiskNotification('已从 graph/ 重新加载已保存数据，确保预览画面最新');
+    }
+  } catch (err) {
+    console.warn('[SCADA] 预览前重新载入磁盘 JSON 失败:', err);
+  }
+  showPreviewModal.value = true;
   fitToScreen();
 };
 
@@ -915,7 +1123,9 @@ const handleLogout = () => {
 
 onBeforeUnmount(() => {
   if (simulationTimer) clearInterval(simulationTimer);
+  if (diskNotificationTimer) clearTimeout(diskNotificationTimer);
   window.removeEventListener('resize', fitToScreen);
+  window.removeEventListener('keydown', handleKeyDown);
   window.removeEventListener('datav:jump:screen', handleGlobalJumpEvent);
   window.removeEventListener('scada:open:control', handleGlobalScadaControlEvent);
 });
@@ -952,10 +1162,12 @@ onBeforeUnmount(() => {
       @update:snapToGrid="snapToGrid = $event"
       @update:orthogonalLock="orthogonalLock = $event"
       @toggle:streaming="isStreaming = !isStreaming"
-      @open:preview="showPreviewModal = true"
+      @save:screen="handleSaveCurrentScreenToDisk"
+      @open:preview="handleOpenPreview"
       @open:datasets="showDatasetsModal = true"
       @open:control="showControlModal = true; controlInitialDeviceId = undefined;"
       @open:json="showJsonModal = true"
+      @open:disk-storage="showDiskStorageModal = true"
       @open:symbols="showSymbolModal = true"
       @open:platform="showPlatformModal = true"
       @open:login="showLoginModal = true"
@@ -1072,11 +1284,19 @@ onBeforeUnmount(() => {
         <ScreenManagerBar
           :screens="screens"
           :activeScreenId="activeScreenId"
+          :storageDir="storageDirectory"
+          :diskFileCount="diskFileCount"
+          :isSavingDisk="isSavingDisk"
+          :indexScreenId="indexScreenId"
+          :indexScreenName="indexScreenName"
           @switch:screen="handleSwitchScreen"
           @add:screen="handleAddScreen"
           @duplicate:screen="handleDuplicateScreen"
           @rename:screen="handleRenameScreen"
           @delete:screen="handleDeleteScreen"
+          @open:disk-storage="showDiskStorageModal = true"
+          @save:current-disk="handleSaveCurrentScreenToDisk"
+          @set:index-screen="handleSetIndexScreen"
         />
       </div>
 
@@ -1188,5 +1408,36 @@ onBeforeUnmount(() => {
       @success="showLoginModal = false; loginNotice = '';"
       @logout="handleLogout"
     />
+
+    <!-- 8. System SCADA Disk Storage & File-per-Screen Manager Modal -->
+    <DiskStorageModal
+      :visible="showDiskStorageModal"
+      :screens="screens"
+      :activeScreenId="activeScreenId"
+      :indexScreenId="indexScreenId"
+      :indexScreenName="indexScreenName"
+      @close="showDiskStorageModal = false"
+      @reload:screens="handleReloadScreensFromDisk"
+      @update:index-screen="payload => { indexScreenName = payload.indexScreenName; indexScreenId = payload.indexScreenId; }"
+      @notify="showDiskNotification"
+    />
+
+    <!-- Floating Disk Sync Status Toast -->
+    <transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0 translate-y-2"
+      enter-to-class="opacity-100 translate-y-0"
+      leave-active-class="transition duration-200 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0 translate-y-2"
+    >
+      <div
+        v-if="diskNotification"
+        class="fixed bottom-12 right-6 z-50 px-3.5 py-2 rounded-lg bg-[#071328]/95 border border-cyan-400/60 shadow-[0_0_20px_rgba(0,242,255,0.25)] flex items-center gap-2.5 text-xs text-cyan-200 font-mono backdrop-blur-md"
+      >
+        <HardDrive class="w-4 h-4 text-cyan-400 shrink-0" />
+        <span>{{ diskNotification }}</span>
+      </div>
+    </transition>
   </div>
 </template>

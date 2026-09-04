@@ -70,20 +70,60 @@ fi
 
 chmod +x "$APP_EXEC"
 
-# 老凝思系统由于 Mesa/ANGLE 图形库版本老旧，默认开启硬件加速可能会产生 GL 0x0500 异常
-# 这里提供稳定纯 CPU 软件渲染与安全模式
+# 参数处理：拦截 --debug 避免 Node.js cli flags 解析异常 (node_bindings.cc 245 报错)
+FILTERED_ARGS=()
+ENABLE_DEBUG=0
+ENABLE_FORCE_SOFT_GPU=0
+
+for arg in "$@"; do
+  if [ "$arg" = "--debug" ]; then
+    ENABLE_DEBUG=1
+  elif [ "$arg" = "--disable-gpu" ] || [ "$arg" = "--soft-render" ]; then
+    ENABLE_FORCE_SOFT_GPU=1
+  else
+    FILTERED_ARGS+=("$arg")
+  fi
+done
+
+if [ "$ENABLE_DEBUG" = "1" ]; then
+  export SCADA_DEBUG=1
+  echo "[调试模式] 已通过 SCADA_DEBUG=1 激活调试与开发者工具"
+fi
+
+# 凝思系统优化渲染参数：
+# 1. --use-cmd-decoder=validating 彻底消除 Passthrough is not supported 报错
+# 2. 禁用后台节流与挂起，彻底解决最小化恢复时的卡死等待
+# 3. 启用高效复合器与双缓冲，大幅提升组件平移与旋转流畅度
+EXTRA_GPU_FLAGS=()
+if [ "$ENABLE_FORCE_SOFT_GPU" = "1" ]; then
+  echo "[运行模式] 强制纯 CPU 软件渲染模式"
+  EXTRA_GPU_FLAGS=(
+    "--disable-gpu"
+    "--disable-gpu-compositing"
+    "--disable-gpu-rasterization"
+  )
+else
+  EXTRA_GPU_FLAGS=(
+    "--use-cmd-decoder=validating"
+    "--enable-gpu-rasterization"
+    "--enable-zero-copy"
+  )
+fi
+
 exec "$APP_EXEC" \
   --no-sandbox \
-  --disable-gpu \
-  --disable-gpu-compositing \
-  --disable-gpu-rasterization \
   --disable-dev-shm-usage \
   --disable-gpu-sandbox \
+  --disable-renderer-backgrounding \
+  --disable-background-timer-throttling \
+  --disable-backgrounding-occluded-windows \
   --force-device-scale-factor=1 \
   --high-dpi-support=1 \
   --enable-font-antialiasing \
   --font-render-hinting=medium \
-  --force-color-profile=srgb "$@"
+  --force-color-profile=srgb \
+  "${EXTRA_GPU_FLAGS[@]}" \
+  "${FILTERED_ARGS[@]}"
 EOF
 
 chmod +x "${UNPACKED_DIR}/run.sh"
