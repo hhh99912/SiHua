@@ -35,9 +35,36 @@ const borderState = computed(() => {
     class="w-full h-full relative select-none pointer-events-none overflow-hidden"
     :style="{ backgroundColor: borderState.bgColor }"
   >
+    <!-- 0. STYLE: Minimalist Transparent Frame (极简透明边框 - 无任何文字特效，完全透明，精密直角卡角) -->
+    <div 
+      v-if="borderState.borderStyle === 'deco-border-minimal' || borderState.borderStyle === 'deco-border-clean'"
+      class="w-full h-full relative"
+    >
+      <svg class="w-full h-full absolute inset-0 pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Crisp outer boundary line -->
+        <rect 
+          x="1" 
+          y="1" 
+          :width="Math.max(2, borderState.width - 2)" 
+          :height="Math.max(2, borderState.height - 2)" 
+          fill="none" 
+          :stroke="borderState.color" 
+          :stroke-width="props.component.style.strokeWidth || 1.5" 
+          :stroke-opacity="props.component.style.strokeOpacity ?? 0.8"
+        />
+        <!-- 4 Precision Minimal Corner Brackets (16px length, sharp 2.5px width) -->
+        <path 
+          :d="`M 1 16 L 1 1 L 16 1 M ${borderState.width - 16} 1 L ${borderState.width - 1} 1 L ${borderState.width - 1} 16 M ${borderState.width - 1} ${borderState.height - 16} L ${borderState.width - 1} ${borderState.height - 1} L ${borderState.width - 16} ${borderState.height - 1} M 16 ${borderState.height - 1} L 1 ${borderState.height - 1} L 1 ${borderState.height - 16}`" 
+          fill="none" 
+          :stroke="borderState.color" 
+          stroke-width="2.5"
+        />
+      </svg>
+    </div>
+
     <!-- 1. STYLE: Neon Cyber Corner (霓虹发光四角标科技框) -->
     <div 
-      v-if="borderState.borderStyle === 'deco-border-neon'"
+      v-else-if="borderState.borderStyle === 'deco-border-neon'"
       class="w-full h-full relative"
     >
       <div 
@@ -272,14 +299,15 @@ const borderState = computed(() => {
           boxShadow: `0 0 8px ${withAlpha(borderState.color, 0.15)}`
         }"
       >
-        <!-- Header -->
+        <!-- Header (Only if title is configured) -->
         <div 
+          v-if="borderState.title"
           class="flex items-center justify-between px-2.5 py-1 bg-[#040816]/90 border-b text-xs font-mono font-bold"
           :style="{ borderColor: withAlpha(borderState.color, 0.3), color: borderState.color }"
         >
           <div class="flex items-center gap-1.5">
             <span class="w-1.5 h-1.5 rounded-full" :style="{ backgroundColor: borderState.color, boxShadow: `0 0 4px ${borderState.color}` }"></span>
-            <span>{{ borderState.title || 'SCADA 监控单元' }}</span>
+            <span>{{ borderState.title }}</span>
           </div>
           <span class="text-[10px] opacity-70">ONLINE</span>
         </div>

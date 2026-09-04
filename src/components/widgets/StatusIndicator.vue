@@ -354,6 +354,7 @@ const indicatorStyleType = computed(() => customProps.value.indicatorStyle || st
         viewBox="0 0 40 40" 
         class="w-full h-full max-w-full max-h-full"
         preserveAspectRatio="xMidYMid meet"
+        shape-rendering="geometricPrecision"
       >
         <defs>
           <!-- High-Contrast Metallic Outer Bezel -->

@@ -228,7 +228,7 @@ export function useCanvasEngine(options: CanvasEngineOptions = {}) {
     fitCanvasToViewport(canvasWidth, canvasHeight, containerElement, components, onZoomChange);
   };
 
-  // Fit canvas: calculates strict minimal bounding box containing all components,
+  // Fit canvas: calculates strict minimal bounding box containing all components or canvas,
   // scales to tightly fill the editing viewport from (0,0) with no wasted blank space.
   const fitCanvasToViewport = (
     canvasWidth: number,
@@ -241,13 +241,14 @@ export function useCanvasEngine(options: CanvasEngineOptions = {}) {
     const rect = containerElement.getBoundingClientRect();
     if (!rect || rect.width <= 0 || rect.height <= 0) return;
 
-    // Available viewport space (minus 24px top & left rulers and 8px margin)
-    const availableW = Math.max(100, rect.width - 24 - 8);
-    const availableH = Math.max(100, rect.height - 24 - 8);
+    // Available viewport space (minus 30px top & left rulers and 8px margin)
+    const rulerOffset = 30;
+    const availableW = Math.max(100, rect.width - rulerOffset - 8);
+    const availableH = Math.max(100, rect.height - rulerOffset - 8);
 
     const bbox = calculateComponentsBoundingBox(components);
-    let targetW = canvasWidth || 1920;
-    let targetH = canvasHeight || 1080;
+    let targetW = canvasWidth || 1980;
+    let targetH = canvasHeight || 1100;
 
     if (bbox && bbox.width > 20 && bbox.height > 20) {
       targetW = bbox.width;
@@ -265,8 +266,8 @@ export function useCanvasEngine(options: CanvasEngineOptions = {}) {
     if (onZoomChange) {
       onZoomChange(fitZoom);
     }
-    // Origin is placed strictly at (24, 24) matching the ruler's (0, 0) tick
-    panOffset.value = { x: 24, y: 24 };
+    // Origin is placed strictly at (30, 30) matching the ruler's (0, 0) tick
+    panOffset.value = { x: rulerOffset, y: rulerOffset };
   };
 
   // Calculate Content Bounding Box of all components

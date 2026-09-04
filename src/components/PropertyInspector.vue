@@ -52,7 +52,18 @@ import {
   RefreshCw,
   Play,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  MoveHorizontal,
+  MoveVertical,
+  Scaling,
+  Square,
+  Maximize,
+  Minimize,
+  ArrowUpToLine,
+  ArrowDownToLine,
+  Eye,
+  EyeOff,
+  Paintbrush
 } from 'lucide-vue-next';
 import { ScreenComponent, ScreenConfig, DatasetItem, ScreenItem, ScadaDeviceItem } from '../types';
 import {
@@ -85,7 +96,9 @@ const emit = defineEmits<{
   (e: 'update:component', comp: ScreenComponent): void;
   (e: 'update:components', comps: ScreenComponent[]): void;
   (e: 'update:screen', screen: ScreenConfig): void;
-  (e: 'align:component', type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'distribute-h' | 'distribute-v'): void;
+  (e: 'align:component', type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'distribute-h' | 'distribute-v' | 'equal-width' | 'equal-height' | 'equal-size' | 'equal-max-size' | 'equal-min-size' | 'make-square'): void;
+  (e: 'group', comps?: ScreenComponent[]): void;
+  (e: 'ungroup', comp?: ScreenComponent): void;
   (e: 'save:symbol', comps: ScreenComponent[]): void;
   (e: 'delete', ids: string[]): void;
   (e: 'open:batch:points'): void;
@@ -1045,12 +1058,220 @@ const toggleBatchLock = () => {
   }));
   emit('update:components', updated);
 };
+
+// ==========================================
+// BATCH / MULTI-SELECTION STATE & METHODS
+// ==========================================
+const batchTab = ref<'geometry' | 'style' | 'align' | 'manage'>('geometry');
+
+const isAllSameType = computed(() => {
+  if (props.selectedComponents.length <= 1) return true;
+  const firstType = props.selectedComponents[0].type;
+  return props.selectedComponents.every(c => c.type === firstType);
+});
+
+const sameTypeName = computed(() => {
+  if (!isAllSameType.value || props.selectedComponents.length === 0) return '';
+  const first = props.selectedComponents[0];
+  return first.name.replace(/\s*\d+$/, '') || first.type;
+});
+
+const distinctTypeCount = computed(() => {
+  const set = new Set(props.selectedComponents.map(c => c.type));
+  return set.size;
+});
+
+const batchPrimaryComponent = computed(() => props.selectedComponents[0] || props.component);
+
+const batchUniformWidth = computed(() => {
+  if (props.selectedComponents.length === 0) return '';
+  const firstW = Math.round(props.selectedComponents[0].width);
+  return props.selectedComponents.every(c => Math.round(c.width) === firstW) ? firstW : '';
+});
+
+const batchUniformHeight = computed(() => {
+  if (props.selectedComponents.length === 0) return '';
+  const firstH = Math.round(props.selectedComponents[0].height);
+  return props.selectedComponents.every(c => Math.round(c.height) === firstH) ? firstH : '';
+});
+
+const batchUniformRotation = computed(() => {
+  if (props.selectedComponents.length === 0) return '';
+  const firstR = props.selectedComponents[0].rotation || 0;
+  return props.selectedComponents.every(c => (c.rotation || 0) === firstR) ? firstR : '';
+});
+
+const batchUniformFill = computed(() => {
+  if (props.selectedComponents.length === 0) return '';
+  const firstF = props.selectedComponents[0].style?.fill || '';
+  return props.selectedComponents.every(c => (c.style?.fill || '') === firstF) ? firstF : '';
+});
+
+const batchUniformStroke = computed(() => {
+  if (props.selectedComponents.length === 0) return '';
+  const firstS = props.selectedComponents[0].style?.stroke || '';
+  return props.selectedComponents.every(c => (c.style?.stroke || '') === firstS) ? firstS : '';
+});
+
+const batchUniformStrokeWidth = computed(() => {
+  if (props.selectedComponents.length === 0) return '';
+  const firstSW = props.selectedComponents[0].style?.strokeWidth ?? 1;
+  return props.selectedComponents.every(c => (c.style?.strokeWidth ?? 1) === firstSW) ? firstSW : '';
+});
+
+const batchUniformStrokeDasharray = computed(() => {
+  if (props.selectedComponents.length === 0) return '';
+  const firstSD = props.selectedComponents[0].style?.strokeDasharray || 'none';
+  return props.selectedComponents.every(c => (c.style?.strokeDasharray || 'none') === firstSD) ? firstSD : '';
+});
+
+const batchUniformBorderRadius = computed(() => {
+  if (props.selectedComponents.length === 0) return '';
+  const firstBR = props.selectedComponents[0].style?.borderRadius ?? 0;
+  return props.selectedComponents.every(c => (c.style?.borderRadius ?? 0) === firstBR) ? firstBR : '';
+});
+
+const batchUniformOpacity = computed(() => {
+  if (props.selectedComponents.length === 0) return '';
+  const firstOp = props.selectedComponents[0].style?.opacity ?? 1;
+  return props.selectedComponents.every(c => (c.style?.opacity ?? 1) === firstOp) ? firstOp : '';
+});
+
+const batchUniformColor = computed(() => {
+  if (props.selectedComponents.length === 0) return '';
+  const firstCol = props.selectedComponents[0].style?.textColor || props.selectedComponents[0].style?.color || '';
+  return props.selectedComponents.every(c => (c.style?.textColor || c.style?.color || '') === firstCol) ? firstCol : '';
+});
+
+const batchUniformFontSize = computed(() => {
+  if (props.selectedComponents.length === 0) return '';
+  const firstFS = props.selectedComponents[0].style?.fontSize || 14;
+  return props.selectedComponents.every(c => (c.style?.fontSize || 14) === firstFS) ? firstFS : '';
+});
+
+// Batch Actions
+const handleBatchSetWidth = (w: number) => {
+  if (isNaN(w) || w <= 0) return;
+  const updated = props.selectedComponents.map(c => ({
+    ...c,
+    width: Math.round(w)
+  }));
+  emit('update:components', updated);
+};
+
+const handleBatchSetHeight = (h: number) => {
+  if (isNaN(h) || h <= 0) return;
+  const updated = props.selectedComponents.map(c => ({
+    ...c,
+    height: Math.round(h)
+  }));
+  emit('update:components', updated);
+};
+
+const handleBatchSetRotation = (deg: number) => {
+  if (isNaN(deg)) return;
+  const normalized = ((Math.round(deg) % 360) + 360) % 360;
+  const updated = props.selectedComponents.map(c => ({
+    ...c,
+    rotation: normalized
+  }));
+  emit('update:components', updated);
+};
+
+const handleBatchRotateDelta = (delta: number) => {
+  const updated = props.selectedComponents.map(c => ({
+    ...c,
+    rotation: (((c.rotation || 0) + delta) % 360 + 360) % 360
+  }));
+  emit('update:components', updated);
+};
+
+const handleBatchMoveDelta = (dx: number, dy: number) => {
+  const updated = props.selectedComponents.map(c => ({
+    ...c,
+    x: Math.max(0, c.x + dx),
+    y: Math.max(0, c.y + dy)
+  }));
+  emit('update:components', updated);
+};
+
+const handleBatchEqualSize = (mode: 'width' | 'height' | 'both' | 'max' | 'min' | 'square') => {
+  if (props.selectedComponents.length === 0) return;
+  const first = props.selectedComponents[0];
+  let updated: ScreenComponent[] = [];
+
+  if (mode === 'width') {
+    const baseW = first.width;
+    updated = props.selectedComponents.map(c => ({ ...c, width: baseW }));
+  } else if (mode === 'height') {
+    const baseH = first.height;
+    updated = props.selectedComponents.map(c => ({ ...c, height: baseH }));
+  } else if (mode === 'both') {
+    const baseW = first.width;
+    const baseH = first.height;
+    updated = props.selectedComponents.map(c => ({ ...c, width: baseW, height: baseH }));
+  } else if (mode === 'max') {
+    const maxW = Math.max(...props.selectedComponents.map(c => c.width));
+    const maxH = Math.max(...props.selectedComponents.map(c => c.height));
+    updated = props.selectedComponents.map(c => ({ ...c, width: maxW, height: maxH }));
+  } else if (mode === 'min') {
+    const minW = Math.min(...props.selectedComponents.map(c => c.width));
+    const minH = Math.min(...props.selectedComponents.map(c => c.height));
+    updated = props.selectedComponents.map(c => ({ ...c, width: minW, height: minH }));
+  } else if (mode === 'square') {
+    updated = props.selectedComponents.map(c => {
+      const sz = Math.max(c.width, c.height);
+      return { ...c, width: sz, height: sz };
+    });
+  }
+
+  emit('update:components', updated);
+};
+
+const handleBatchUpdateStyle = (styleUpdates: Record<string, any>, customPropsUpdates?: Record<string, any>) => {
+  const updated = props.selectedComponents.map(c => ({
+    ...c,
+    style: {
+      ...c.style,
+      ...styleUpdates
+    },
+    customProps: {
+      ...(c.customProps || {}),
+      ...(customPropsUpdates || {})
+    }
+  }));
+  emit('update:components', updated);
+};
+
+const handleBatchApplyTheme = (themeKey: 'cyan' | 'green' | 'amber' | 'red' | 'purple' | 'dark' | 'glass') => {
+  const presets: Record<string, { fill: string; stroke: string; strokeWidth: number; textColor?: string; color?: string }> = {
+    cyan: { fill: 'rgba(0, 242, 255, 0.12)', stroke: '#00f2ff', strokeWidth: 2, textColor: '#00f2ff', color: '#00f2ff' },
+    green: { fill: 'rgba(16, 185, 129, 0.12)', stroke: '#10b981', strokeWidth: 2, textColor: '#10b981', color: '#10b981' },
+    amber: { fill: 'rgba(245, 158, 11, 0.12)', stroke: '#f59e0b', strokeWidth: 2, textColor: '#f59e0b', color: '#f59e0b' },
+    red: { fill: 'rgba(239, 68, 68, 0.15)', stroke: '#ef4444', strokeWidth: 2, textColor: '#ef4444', color: '#ef4444' },
+    purple: { fill: 'rgba(168, 85, 247, 0.15)', stroke: '#a855f7', strokeWidth: 2, textColor: '#a855f7', color: '#a855f7' },
+    dark: { fill: '#081224', stroke: '#1c3560', strokeWidth: 1.5, textColor: '#93c5fd', color: '#93c5fd' },
+    glass: { fill: 'rgba(9, 21, 43, 0.65)', stroke: 'rgba(0, 242, 255, 0.4)', strokeWidth: 1, textColor: '#e0f2fe', color: '#e0f2fe' }
+  };
+  const theme = presets[themeKey];
+  if (!theme) return;
+  handleBatchUpdateStyle(theme);
+};
+
+const toggleBatchVisibility = () => {
+  const anyHidden = props.selectedComponents.some(c => c.visible === false);
+  const updated = props.selectedComponents.map(c => ({
+    ...c,
+    visible: anyHidden ? true : false
+  }));
+  emit('update:components', updated);
+};
 </script>
 
 <template>
-  <aside class="w-80 h-full bg-[#050c1c] border-l border-cyan-500/40 flex flex-col select-none z-30 shadow-xl overflow-hidden font-mono">
+  <aside class="w-80 h-full bg-[#10213b] border-l border-cyan-500/40 flex flex-col select-none z-30 shadow-xl overflow-hidden font-mono">
     <!-- Header -->
-    <div class="p-3 border-b border-cyan-500/30 bg-[#071024]">
+    <div class="p-3 border-b border-cyan-500/30 bg-[#142c4e]">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-1.5 font-mono font-normal text-xs text-cyan-200">
           <SlidersHorizontal class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
@@ -1072,7 +1293,7 @@ const toggleBatchLock = () => {
           
           <button
             @click="emit('close')"
-            class="p-1 rounded bg-[#09152b] hover:bg-rose-500/30 text-cyan-300 hover:text-rose-200 border border-cyan-500/40 hover:border-rose-400/60 cursor-pointer transition-colors"
+            class="p-1 rounded bg-[#183761] hover:bg-rose-500/30 text-cyan-300 hover:text-rose-200 border border-cyan-500/40 hover:border-rose-400/60 cursor-pointer transition-colors"
             title="关闭属性面板"
           >
             <X class="w-3.5 h-3.5 stroke-[2]" />
@@ -1083,97 +1304,651 @@ const toggleBatchLock = () => {
 
     <!-- ================= 1. MULTI-SELECTION BATCH INSPECTOR ================= -->
     <template v-if="selectedComponents.length > 1">
-      <div class="flex-1 overflow-y-auto p-4 space-y-4 font-mono text-xs custom-scrollbar">
-        <div class="p-3 rounded-xl bg-cyan-950/40 border border-cyan-400/50 space-y-2">
-          <div class="text-cyan-200 font-normal flex items-center justify-between">
-            <span>已多选 {{ selectedComponents.length }} 个元件</span>
-            <span class="text-[10px] text-cyan-300/80 font-light">批量编辑</span>
+      <!-- Batch Tabs Selector -->
+      <div class="flex items-center border-b border-cyan-500/30 bg-[#142c4e] px-1">
+        <button
+          @click="batchTab = 'geometry'"
+          class="flex-1 py-2.5 text-xs font-normal flex items-center justify-center gap-1 transition-colors cursor-pointer border-b-2"
+          :class="batchTab === 'geometry' ? 'border-cyan-400 text-cyan-200 bg-[#183761] font-normal' : 'border-transparent text-cyan-300/80 hover:text-cyan-100 font-light'"
+        >
+          <Scaling class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
+          <span>几何等大</span>
+        </button>
+        <button
+          @click="batchTab = 'style'"
+          class="flex-1 py-2.5 text-xs font-normal flex items-center justify-center gap-1 transition-colors cursor-pointer border-b-2"
+          :class="batchTab === 'style' ? 'border-cyan-400 text-cyan-200 bg-[#183761] font-normal' : 'border-transparent text-cyan-300/80 hover:text-cyan-100 font-light'"
+        >
+          <Palette class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
+          <span>批量样式</span>
+        </button>
+        <button
+          @click="batchTab = 'align'"
+          class="flex-1 py-2.5 text-xs font-normal flex items-center justify-center gap-1 transition-colors cursor-pointer border-b-2"
+          :class="batchTab === 'align' ? 'border-cyan-400 text-cyan-200 bg-[#183761] font-normal' : 'border-transparent text-cyan-300/80 hover:text-cyan-100 font-light'"
+        >
+          <AlignCenter class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
+          <span>对齐分布</span>
+        </button>
+        <button
+          @click="batchTab = 'manage'"
+          class="flex-1 py-2.5 text-xs font-normal flex items-center justify-center gap-1 transition-colors cursor-pointer border-b-2"
+          :class="batchTab === 'manage' ? 'border-cyan-400 text-cyan-200 bg-[#183761] font-normal' : 'border-transparent text-cyan-300/80 hover:text-cyan-100 font-light'"
+        >
+          <Layers class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
+          <span>管理图层</span>
+        </button>
+      </div>
+
+      <!-- Batch Content Area -->
+      <div class="flex-1 overflow-y-auto p-3 space-y-4 font-mono text-xs custom-scrollbar">
+        
+        <!-- Selection Summary Card -->
+        <div class="p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-400/40 space-y-1.5">
+          <div class="flex items-center justify-between text-xs font-normal text-cyan-200">
+            <span class="flex items-center gap-1.5">
+              <CheckCircle2 class="w-3.5 h-3.5 text-emerald-400 stroke-[2]" />
+              <span>已选中 {{ selectedComponents.length }} 个元件</span>
+            </span>
+            <span
+              v-if="isAllSameType"
+              class="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/40 text-[10px]"
+            >
+              同种类: {{ sameTypeName }}
+            </span>
+            <span
+              v-else
+              class="px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-500/40 text-[10px]"
+            >
+              混合 {{ distinctTypeCount }} 种图元
+            </span>
           </div>
-          <div class="text-[10px] text-cyan-300/80 font-light">
-            按住 Shift 点击元件或在画布拉框可进行增减选择。
+          <div class="text-[10px] text-cyan-300/70 font-light flex items-center justify-between">
+            <span class="truncate max-w-[200px]">基准: {{ batchPrimaryComponent?.name }}</span>
+            <span class="text-cyan-400/90 font-mono">{{ Math.round(batchPrimaryComponent?.width || 0) }}×{{ Math.round(batchPrimaryComponent?.height || 0) }}px</span>
           </div>
         </div>
 
-        <!-- Batch Alignment Tools -->
-        <div class="space-y-2">
+        <!-- 1. TAB: GEOMETRY & EQUAL SIZE (几何与等大小) -->
+        <div v-if="batchTab === 'geometry'" class="space-y-3.5">
+          
+          <!-- Equal Sizing Quick Buttons -->
+          <div class="p-2.5 rounded-xl bg-[#09152b] border border-cyan-500/30 space-y-2">
+            <label class="text-[11px] text-cyan-200 font-normal flex items-center justify-between">
+              <span class="flex items-center gap-1">
+                <Scaling class="w-3.5 h-3.5 text-cyan-300" />
+                <span>批量一键等大小</span>
+              </span>
+              <span class="text-[10px] text-cyan-400/70 font-light">以第1个为基准</span>
+            </label>
+
+            <div class="grid grid-cols-3 gap-1.5">
+              <button
+                @click="handleBatchEqualSize('width')"
+                class="py-1.5 px-2 rounded-lg bg-[#050e1f] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
+                title="所有选中组件宽度与首个组件相同"
+              >
+                <MoveHorizontal class="w-3.5 h-3.5 text-cyan-400 stroke-[2]" />
+                <span class="text-[10px]">统一等宽</span>
+              </button>
+
+              <button
+                @click="handleBatchEqualSize('height')"
+                class="py-1.5 px-2 rounded-lg bg-[#050e1f] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
+                title="所有选中组件高度与首个组件相同"
+              >
+                <MoveVertical class="w-3.5 h-3.5 text-cyan-400 stroke-[2]" />
+                <span class="text-[10px]">统一等高</span>
+              </button>
+
+              <button
+                @click="handleBatchEqualSize('both')"
+                class="py-1.5 px-2 rounded-lg bg-cyan-950 hover:bg-cyan-900 border border-cyan-400/60 text-cyan-100 text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors shadow-xs"
+                title="所有选中组件宽高均与首个组件相同"
+              >
+                <Scaling class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
+                <span class="text-[10px] font-normal">宽高全等</span>
+              </button>
+
+              <button
+                @click="handleBatchEqualSize('max')"
+                class="py-1.5 px-2 rounded-lg bg-[#050e1f] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
+                title="将所有组件调整为选集中的最大宽和最大高"
+              >
+                <Maximize class="w-3.5 h-3.5 text-cyan-400 stroke-[2]" />
+                <span class="text-[10px]">取最大尺寸</span>
+              </button>
+
+              <button
+                @click="handleBatchEqualSize('min')"
+                class="py-1.5 px-2 rounded-lg bg-[#050e1f] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
+                title="将所有组件调整为选集中的最小宽和最小高"
+              >
+                <Minimize class="w-3.5 h-3.5 text-cyan-400 stroke-[2]" />
+                <span class="text-[10px]">取最小尺寸</span>
+              </button>
+
+              <button
+                @click="handleBatchEqualSize('square')"
+                class="py-1.5 px-2 rounded-lg bg-[#050e1f] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 text-xs flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors"
+                title="将每个选中的组件调整为正方形"
+              >
+                <Square class="w-3.5 h-3.5 text-cyan-400 stroke-[2]" />
+                <span class="text-[10px]">转正方形</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Batch Width & Height Numeric Setting -->
+          <div class="space-y-2">
+            <label class="text-[11px] text-cyan-200 font-normal block">精确设置所有组件尺寸 (px)</label>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-[10px] text-cyan-300/80 block mb-1">统一宽度 (W)</label>
+                <input
+                  type="number"
+                  min="4"
+                  max="4000"
+                  step="1"
+                  :value="batchUniformWidth"
+                  :placeholder="batchUniformWidth !== '' ? String(batchUniformWidth) : '不同宽度'"
+                  @input="handleBatchSetWidth(Number(($event.target as HTMLInputElement).value))"
+                  class="w-full bg-[#09152b] border border-cyan-500/40 focus:border-cyan-300 rounded-lg px-2.5 py-1.5 text-cyan-200 font-mono text-xs outline-hidden"
+                />
+              </div>
+
+              <div>
+                <label class="text-[10px] text-cyan-300/80 block mb-1">统一高度 (H)</label>
+                <input
+                  type="number"
+                  min="4"
+                  max="4000"
+                  step="1"
+                  :value="batchUniformHeight"
+                  :placeholder="batchUniformHeight !== '' ? String(batchUniformHeight) : '不同高度'"
+                  @input="handleBatchSetHeight(Number(($event.target as HTMLInputElement).value))"
+                  class="w-full bg-[#09152b] border border-cyan-500/40 focus:border-cyan-300 rounded-lg px-2.5 py-1.5 text-cyan-200 font-mono text-xs outline-hidden"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Batch Rotation Setting -->
+          <div class="space-y-2 pt-1">
+            <label class="text-[11px] text-cyan-200 font-normal flex items-center justify-between">
+              <span class="flex items-center gap-1">
+                <RotateCw class="w-3.5 h-3.5 text-cyan-300" />
+                <span>批量旋转角度</span>
+              </span>
+              <span class="text-[10px] text-cyan-400 font-mono">{{ batchUniformRotation !== '' ? `${batchUniformRotation}°` : '多角度' }}</span>
+            </label>
+
+            <div class="grid grid-cols-4 gap-1.5">
+              <button
+                @click="handleBatchSetRotation(0)"
+                class="py-1 px-1.5 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 text-[10px] cursor-pointer text-center"
+              >
+                0° 正置
+              </button>
+              <button
+                @click="handleBatchSetRotation(90)"
+                class="py-1 px-1.5 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 text-[10px] cursor-pointer text-center"
+              >
+                90° 顺时
+              </button>
+              <button
+                @click="handleBatchSetRotation(180)"
+                class="py-1 px-1.5 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 text-[10px] cursor-pointer text-center"
+              >
+                180° 倒置
+              </button>
+              <button
+                @click="handleBatchSetRotation(270)"
+                class="py-1 px-1.5 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 text-[10px] cursor-pointer text-center"
+              >
+                270° 逆时
+              </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <button
+                @click="handleBatchRotateDelta(-90)"
+                class="py-1 px-2 rounded bg-[#050e1f] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 text-[10px] flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <RotateCw class="w-3 h-3 -scale-x-100" />
+                <span>逆时针 90°</span>
+              </button>
+              <button
+                @click="handleBatchRotateDelta(90)"
+                class="py-1 px-2 rounded bg-[#050e1f] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 text-[10px] flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <RotateCw class="w-3 h-3" />
+                <span>顺时针 90°</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Batch Position Fine-Tuning Offset -->
+          <div class="space-y-2 pt-1 border-t border-cyan-500/20">
+            <label class="text-[11px] text-cyan-200 font-normal block">批量位置微调 (步进移动)</label>
+            <div class="grid grid-cols-4 gap-1.5">
+              <button
+                @click="handleBatchMoveDelta(-10, 0)"
+                class="py-1.5 px-2 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-200 text-[10px] flex items-center justify-center gap-1 cursor-pointer"
+              >
+                ← 左移10
+              </button>
+              <button
+                @click="handleBatchMoveDelta(10, 0)"
+                class="py-1.5 px-2 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-200 text-[10px] flex items-center justify-center gap-1 cursor-pointer"
+              >
+                右移10 →
+              </button>
+              <button
+                @click="handleBatchMoveDelta(0, -10)"
+                class="py-1.5 px-2 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-200 text-[10px] flex items-center justify-center gap-1 cursor-pointer"
+              >
+                ↑ 上移10
+              </button>
+              <button
+                @click="handleBatchMoveDelta(0, 10)"
+                class="py-1.5 px-2 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-200 text-[10px] flex items-center justify-center gap-1 cursor-pointer"
+              >
+                下移10 ↓
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 2. TAB: STYLE & PALETTE (批量样式与颜色) -->
+        <div v-if="batchTab === 'style'" class="space-y-3.5">
+          
+          <!-- Quick SCADA Industrial Color Themes -->
+          <div class="p-2.5 rounded-xl bg-[#09152b] border border-cyan-500/30 space-y-2">
+            <label class="text-[11px] text-cyan-200 font-normal flex items-center justify-between">
+              <span class="flex items-center gap-1">
+                <Paintbrush class="w-3.5 h-3.5 text-cyan-300" />
+                <span>一键工业 SCADA 主题色系</span>
+              </span>
+              <span class="text-[10px] text-cyan-400/70 font-light">全选作用</span>
+            </label>
+
+            <div class="grid grid-cols-4 gap-1.5">
+              <button
+                @click="handleBatchApplyTheme('cyan')"
+                class="py-1 px-1.5 rounded bg-cyan-950 hover:bg-cyan-900 border border-cyan-400 text-cyan-300 text-[10px] cursor-pointer flex items-center justify-center gap-1"
+              >
+                <div class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#00f2ff]"></div>
+                <span>赛博青</span>
+              </button>
+
+              <button
+                @click="handleBatchApplyTheme('green')"
+                class="py-1 px-1.5 rounded bg-emerald-950 hover:bg-emerald-900 border border-emerald-400 text-emerald-300 text-[10px] cursor-pointer flex items-center justify-center gap-1"
+              >
+                <div class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]"></div>
+                <span>安全绿</span>
+              </button>
+
+              <button
+                @click="handleBatchApplyTheme('amber')"
+                class="py-1 px-1.5 rounded bg-amber-950 hover:bg-amber-900 border border-amber-400 text-amber-300 text-[10px] cursor-pointer flex items-center justify-center gap-1"
+              >
+                <div class="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_6px_#f59e0b]"></div>
+                <span>告警黄</span>
+              </button>
+
+              <button
+                @click="handleBatchApplyTheme('red')"
+                class="py-1 px-1.5 rounded bg-red-950 hover:bg-red-900 border border-red-400 text-red-300 text-[10px] cursor-pointer flex items-center justify-center gap-1"
+              >
+                <div class="w-2 h-2 rounded-full bg-red-400 shadow-[0_0_6px_#ef4444]"></div>
+                <span>事故红</span>
+              </button>
+
+              <button
+                @click="handleBatchApplyTheme('purple')"
+                class="py-1 px-1.5 rounded bg-purple-950 hover:bg-purple-900 border border-purple-400 text-purple-300 text-[10px] cursor-pointer flex items-center justify-center gap-1"
+              >
+                <div class="w-2 h-2 rounded-full bg-purple-400 shadow-[0_0_6px_#a855f7]"></div>
+                <span>电压紫</span>
+              </button>
+
+              <button
+                @click="handleBatchApplyTheme('glass')"
+                class="py-1 px-1.5 rounded bg-slate-900 hover:bg-slate-800 border border-cyan-500/50 text-cyan-200 text-[10px] cursor-pointer flex items-center justify-center gap-1"
+              >
+                <div class="w-2 h-2 rounded-full bg-cyan-200"></div>
+                <span>玻璃蓝</span>
+              </button>
+
+              <button
+                @click="handleBatchApplyTheme('dark')"
+                class="py-1 px-1.5 rounded bg-[#050c1a] hover:bg-[#08152e] border border-cyan-800 text-slate-300 text-[10px] cursor-pointer flex items-center justify-center gap-1"
+              >
+                <div class="w-2 h-2 rounded-full bg-slate-600"></div>
+                <span>深灰底</span>
+              </button>
+
+              <button
+                @click="handleBatchUpdateStyle({ fill: 'transparent' })"
+                class="py-1 px-1.5 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-300 text-[10px] cursor-pointer flex items-center justify-center gap-1"
+              >
+                <span>无填充</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Batch Fill Color & Opacity -->
+          <div class="space-y-2">
+            <label class="text-[11px] text-cyan-200 font-normal block">批量填充颜色与不透明度</label>
+            <div class="flex items-center gap-2">
+              <input
+                type="color"
+                :value="batchUniformFill && batchUniformFill.startsWith('#') ? batchUniformFill : '#00f2ff'"
+                @input="handleBatchUpdateStyle({ fill: ($event.target as HTMLInputElement).value })"
+                class="w-8 h-8 rounded border border-cyan-500/40 bg-transparent cursor-pointer"
+              />
+              <input
+                type="text"
+                :value="batchUniformFill"
+                :placeholder="batchUniformFill || '多个不同填充色'"
+                @change="handleBatchUpdateStyle({ fill: ($event.target as HTMLInputElement).value })"
+                class="flex-1 bg-[#09152b] border border-cyan-500/40 focus:border-cyan-300 rounded-lg px-2.5 py-1.5 text-cyan-200 text-xs outline-hidden"
+              />
+              <button
+                @click="handleBatchUpdateStyle({ fill: 'transparent' })"
+                class="px-2 py-1.5 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-300 text-[10px] cursor-pointer whitespace-nowrap"
+              >
+                透明
+              </button>
+            </div>
+
+            <!-- Quick Swatches for Fill -->
+            <div class="flex items-center gap-1 pt-1">
+              <button
+                v-for="color in themeColors"
+                :key="`fill-${color}`"
+                @click="handleBatchUpdateStyle({ fill: color })"
+                class="flex-1 h-5 rounded border border-cyan-500/30 hover:scale-110 transition-transform cursor-pointer"
+                :style="{ backgroundColor: color }"
+                :title="color"
+              />
+            </div>
+          </div>
+
+          <!-- Batch Stroke (Color, Width, Dash) -->
+          <div class="space-y-2 pt-1 border-t border-cyan-500/20">
+            <label class="text-[11px] text-cyan-200 font-normal block">批量边框描边 (Stroke)</label>
+            <div class="flex items-center gap-2">
+              <input
+                type="color"
+                :value="batchUniformStroke && batchUniformStroke.startsWith('#') ? batchUniformStroke : '#00f2ff'"
+                @input="handleBatchUpdateStyle({ stroke: ($event.target as HTMLInputElement).value })"
+                class="w-8 h-8 rounded border border-cyan-500/40 bg-transparent cursor-pointer"
+              />
+              <input
+                type="text"
+                :value="batchUniformStroke"
+                :placeholder="batchUniformStroke || '多个不同描边色'"
+                @change="handleBatchUpdateStyle({ stroke: ($event.target as HTMLInputElement).value })"
+                class="flex-1 bg-[#09152b] border border-cyan-500/40 focus:border-cyan-300 rounded-lg px-2.5 py-1.5 text-cyan-200 text-xs outline-hidden"
+              />
+            </div>
+
+            <!-- Quick Swatches for Stroke -->
+            <div class="flex items-center gap-1 pt-1">
+              <button
+                v-for="color in themeColors"
+                :key="`stroke-${color}`"
+                @click="handleBatchUpdateStyle({ stroke: color })"
+                class="flex-1 h-5 rounded border border-cyan-500/30 hover:scale-110 transition-transform cursor-pointer"
+                :style="{ backgroundColor: color }"
+                :title="color"
+              />
+            </div>
+
+            <!-- Stroke Width Buttons -->
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <div>
+                <label class="text-[10px] text-cyan-300/80 block mb-1">描边线宽 (px)</label>
+                <div class="grid grid-cols-4 gap-1">
+                  <button
+                    v-for="sw in [0, 1, 2, 4]"
+                    :key="sw"
+                    @click="handleBatchUpdateStyle({ strokeWidth: sw })"
+                    class="py-1 px-1 rounded text-[10px] border cursor-pointer text-center"
+                    :class="batchUniformStrokeWidth === sw ? 'bg-cyan-500 text-slate-950 font-normal border-cyan-400' : 'bg-[#09152b] text-cyan-300 border-cyan-500/40 hover:border-cyan-300'"
+                  >
+                    {{ sw }}px
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label class="text-[10px] text-cyan-300/80 block mb-1">虚线样式 (Dash)</label>
+                <select
+                  :value="batchUniformStrokeDasharray || 'none'"
+                  @change="handleBatchUpdateStyle({ strokeDasharray: ($event.target as HTMLSelectElement).value })"
+                  class="w-full bg-[#09152b] border border-cyan-500/40 focus:border-cyan-300 rounded-lg px-2 py-1 text-cyan-200 text-xs outline-hidden cursor-pointer"
+                >
+                  <option value="none">实线 (Solid)</option>
+                  <option value="4,4">细虚线 (4,4)</option>
+                  <option value="8,4">标准虚线 (8,4)</option>
+                  <option value="2,2">密集点线 (2,2)</option>
+                  <option value="12,6">长划线 (12,6)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Border Radius -->
+            <div class="pt-1">
+              <label class="text-[10px] text-cyan-300/80 block mb-1">圆角半径 (Border Radius)</label>
+              <div class="grid grid-cols-5 gap-1">
+                <button
+                  v-for="br in [0, 4, 8, 16, 999]"
+                  :key="br"
+                  @click="handleBatchUpdateStyle({ borderRadius: br })"
+                  class="py-1 px-1 rounded text-[10px] border cursor-pointer text-center"
+                  :class="batchUniformBorderRadius === br ? 'bg-cyan-500 text-slate-950 font-normal border-cyan-400' : 'bg-[#09152b] text-cyan-300 border-cyan-500/40 hover:border-cyan-300'"
+                >
+                  {{ br === 999 ? '全圆' : `${br}px` }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Batch Text Styling -->
+          <div class="space-y-2 pt-1 border-t border-cyan-500/20">
+            <label class="text-[11px] text-cyan-200 font-normal block">批量文字属性 (Text & Font)</label>
+            
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-[10px] text-cyan-300/80 block mb-1">字号 (Font Size)</label>
+                <select
+                  :value="batchUniformFontSize || 14"
+                  @change="handleBatchUpdateStyle({ fontSize: Number(($event.target as HTMLSelectElement).value) })"
+                  class="w-full bg-[#09152b] border border-cyan-500/40 focus:border-cyan-300 rounded-lg px-2 py-1 text-cyan-200 text-xs outline-hidden cursor-pointer"
+                >
+                  <option :value="10">10px 极小</option>
+                  <option :value="12">12px 标注</option>
+                  <option :value="14">14px 标准</option>
+                  <option :value="16">16px 标题</option>
+                  <option :value="18">18px 放大</option>
+                  <option :value="24">24px 数显</option>
+                  <option :value="32">32px 特大</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="text-[10px] text-cyan-300/80 block mb-1">字重 (Weight)</label>
+                <div class="grid grid-cols-2 gap-1">
+                  <button
+                    @click="handleBatchUpdateStyle({ fontWeight: 'normal' })"
+                    class="py-1 px-1 rounded text-[10px] bg-[#09152b] border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 text-center cursor-pointer"
+                  >
+                    常规
+                  </button>
+                  <button
+                    @click="handleBatchUpdateStyle({ fontWeight: 'bold' })"
+                    class="py-1 px-1 rounded text-[10px] bg-[#09152b] border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 text-center cursor-pointer font-bold"
+                  >
+                    加粗
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Text Color -->
+            <div class="flex items-center gap-2 pt-1">
+              <span class="text-[10px] text-cyan-300/80 whitespace-nowrap">文字颜色:</span>
+              <input
+                type="color"
+                :value="batchUniformColor && batchUniformColor.startsWith('#') ? batchUniformColor : '#ffffff'"
+                @input="handleBatchUpdateStyle({ textColor: ($event.target as HTMLInputElement).value, color: ($event.target as HTMLInputElement).value })"
+                class="w-6 h-6 rounded border border-cyan-500/40 bg-transparent cursor-pointer"
+              />
+              <input
+                type="text"
+                :value="batchUniformColor"
+                :placeholder="batchUniformColor || '保持各自文字色'"
+                @change="handleBatchUpdateStyle({ textColor: ($event.target as HTMLInputElement).value, color: ($event.target as HTMLInputElement).value })"
+                class="flex-1 bg-[#09152b] border border-cyan-500/40 focus:border-cyan-300 rounded-lg px-2 py-1 text-cyan-200 text-xs outline-hidden"
+              />
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 3. TAB: ALIGNMENT & DISTRIBUTION (对齐与等间距分布) -->
+        <div v-if="batchTab === 'align'" class="space-y-3.5">
           <label class="text-[11px] text-cyan-200 font-normal block">多选对齐与等间距分布</label>
           <div class="grid grid-cols-4 gap-1.5">
-            <button @click="emit('align:component', 'left')" class="p-1.5 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 hover:text-white flex flex-col items-center justify-center gap-1 cursor-pointer font-light transition-colors" title="左对齐">
-              <AlignLeft class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
+            <button @click="emit('align:component', 'left')" class="p-2 rounded-lg bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 hover:text-white flex flex-col items-center justify-center gap-1 cursor-pointer font-light transition-colors" title="左对齐">
+              <AlignLeft class="w-4 h-4 text-cyan-300 stroke-[2]" />
               <span class="text-[10px]">左对齐</span>
             </button>
-            <button @click="emit('align:component', 'center')" class="p-1.5 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 hover:text-white flex flex-col items-center justify-center gap-1 cursor-pointer font-light transition-colors" title="水平居中">
-              <AlignCenter class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
+            <button @click="emit('align:component', 'center')" class="p-2 rounded-lg bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 hover:text-white flex flex-col items-center justify-center gap-1 cursor-pointer font-light transition-colors" title="水平居中">
+              <AlignCenter class="w-4 h-4 text-cyan-300 stroke-[2]" />
               <span class="text-[10px]">水平居中</span>
             </button>
-            <button @click="emit('align:component', 'right')" class="p-1.5 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 hover:text-white flex flex-col items-center justify-center gap-1 cursor-pointer font-light transition-colors" title="右对齐">
-              <AlignRight class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
+            <button @click="emit('align:component', 'right')" class="p-2 rounded-lg bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 hover:text-white flex flex-col items-center justify-center gap-1 cursor-pointer font-light transition-colors" title="右对齐">
+              <AlignRight class="w-4 h-4 text-cyan-300 stroke-[2]" />
               <span class="text-[10px]">右对齐</span>
             </button>
-            <button @click="emit('align:component', 'distribute-h')" class="p-1.5 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 hover:text-white flex flex-col items-center justify-center gap-1 cursor-pointer font-light transition-colors" title="水平等间距分布">
-              <AlignHorizontalSpaceAround class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
+            <button @click="emit('align:component', 'distribute-h')" class="p-2 rounded-lg bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 hover:text-white flex flex-col items-center justify-center gap-1 cursor-pointer font-light transition-colors" title="水平等间距分布">
+              <AlignHorizontalSpaceAround class="w-4 h-4 text-cyan-300 stroke-[2]" />
               <span class="text-[10px]">水平均布</span>
             </button>
 
-            <button @click="emit('align:component', 'top')" class="p-1.5 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 hover:text-white flex flex-col items-center justify-center gap-1 cursor-pointer font-light transition-colors" title="顶对齐">
-              <AlignVerticalSpaceAround class="w-3.5 h-3.5 rotate-90 text-cyan-300 stroke-[2]" />
+            <button @click="emit('align:component', 'top')" class="p-2 rounded-lg bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 hover:text-white flex flex-col items-center justify-center gap-1 cursor-pointer font-light transition-colors" title="顶对齐">
+              <AlignVerticalSpaceAround class="w-4 h-4 rotate-90 text-cyan-300 stroke-[2]" />
               <span class="text-[10px]">顶对齐</span>
             </button>
-            <button @click="emit('align:component', 'middle')" class="p-1.5 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 hover:text-white flex flex-col items-center justify-center gap-1 cursor-pointer font-light transition-colors" title="垂直居中">
-              <AlignHorizontalSpaceAround class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
+            <button @click="emit('align:component', 'middle')" class="p-2 rounded-lg bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 hover:text-white flex flex-col items-center justify-center gap-1 cursor-pointer font-light transition-colors" title="垂直居中">
+              <AlignHorizontalSpaceAround class="w-4 h-4 text-cyan-300 stroke-[2]" />
               <span class="text-[10px]">垂直居中</span>
             </button>
-            <button @click="emit('align:component', 'bottom')" class="p-1.5 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 hover:text-white flex flex-col items-center justify-center gap-1 cursor-pointer font-light transition-colors" title="底对齐">
-              <AlignVerticalSpaceAround class="w-3.5 h-3.5 -rotate-90 text-cyan-300 stroke-[2]" />
+            <button @click="emit('align:component', 'bottom')" class="p-2 rounded-lg bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 hover:text-white flex flex-col items-center justify-center gap-1 cursor-pointer font-light transition-colors" title="底对齐">
+              <AlignVerticalSpaceAround class="w-4 h-4 -rotate-90 text-cyan-300 stroke-[2]" />
               <span class="text-[10px]">底对齐</span>
             </button>
-            <button @click="emit('align:component', 'distribute-v')" class="p-1.5 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 hover:text-white flex flex-col items-center justify-center gap-1 cursor-pointer font-light transition-colors" title="垂直等间距分布">
-              <AlignVerticalSpaceAround class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
+            <button @click="emit('align:component', 'distribute-v')" class="p-2 rounded-lg bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 hover:border-cyan-300 text-cyan-200 hover:text-white flex flex-col items-center justify-center gap-1 cursor-pointer font-light transition-colors" title="垂直等间距分布">
+              <AlignVerticalSpaceAround class="w-4 h-4 text-cyan-300 stroke-[2]" />
               <span class="text-[10px]">垂直均布</span>
             </button>
           </div>
+
+          <!-- Quick Equal Size in Align Tab as Well -->
+          <div class="p-3 rounded-xl bg-[#09152b] border border-cyan-500/30 space-y-2 mt-2">
+            <div class="text-[11px] text-cyan-200 font-normal">快速等大小与统一</div>
+            <div class="grid grid-cols-3 gap-1.5">
+              <button
+                @click="handleBatchEqualSize('width')"
+                class="py-1.5 px-2 rounded bg-[#050e1f] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-200 text-[10px] flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <MoveHorizontal class="w-3 h-3 text-cyan-400" />
+                <span>等宽</span>
+              </button>
+              <button
+                @click="handleBatchEqualSize('height')"
+                class="py-1.5 px-2 rounded bg-[#050e1f] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-200 text-[10px] flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <MoveVertical class="w-3 h-3 text-cyan-400" />
+                <span>等高</span>
+              </button>
+              <button
+                @click="handleBatchEqualSize('both')"
+                class="py-1.5 px-2 rounded bg-cyan-950 hover:bg-cyan-900 border border-cyan-400 text-cyan-100 text-[10px] flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <Scaling class="w-3 h-3 text-cyan-300" />
+                <span>宽高全等</span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        <!-- Batch Operations -->
-        <div class="space-y-2 pt-2 border-t border-cyan-500/30">
-          <label class="text-[11px] text-cyan-200 font-normal block">批量操作</label>
+        <!-- 4. TAB: LAYERS & GROUP MANAGEMENT (管理与图层) -->
+        <div v-if="batchTab === 'manage'" class="space-y-3">
+          <label class="text-[11px] text-cyan-200 font-normal block">批量图层与组件管理</label>
+          
           <div class="space-y-2">
             <button
-              @click="emit('save:symbol', selectedComponents)"
-              class="w-full py-2 px-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-normal flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all"
+              @click="emit('group', selectedComponents)"
+              class="w-full py-2 px-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-normal flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(0,242,255,0.25)] transition-all"
             >
-              <BookmarkPlus class="w-4 h-4 stroke-[2]" />
-              <span>📦 设为自定义图元 (支持多状态)</span>
+              <Layers class="w-4 h-4 stroke-[2]" />
+              <span>📦 组合为群组 (Ctrl+G)</span>
             </button>
 
             <button
-              @click="toggleBatchLock"
-              class="w-full py-2 px-3 rounded-lg bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-200 hover:text-white flex items-center justify-center gap-2 cursor-pointer font-light transition-colors"
+              @click="emit('save:symbol', selectedComponents)"
+              class="w-full py-2 px-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-normal flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.25)] transition-all"
             >
-              <Lock class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
-              <span>批量锁定 / 解锁</span>
+              <BookmarkPlus class="w-4 h-4 stroke-[2]" />
+              <span>⭐ 存为自定义图元 (支持多态)</span>
             </button>
+
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <button
+                @click="toggleBatchLock"
+                class="py-2 px-2.5 rounded-lg bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-200 hover:text-white flex items-center justify-center gap-1.5 cursor-pointer font-light transition-colors text-xs"
+              >
+                <Lock class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
+                <span>批量锁定/解锁</span>
+              </button>
+
+              <button
+                @click="toggleBatchVisibility"
+                class="py-2 px-2.5 rounded-lg bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-200 hover:text-white flex items-center justify-center gap-1.5 cursor-pointer font-light transition-colors text-xs"
+              >
+                <Eye class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
+                <span>批量显隐切换</span>
+              </button>
+            </div>
 
             <button
               @click="emit('delete', selectedComponents.map(c => c.id))"
-              class="w-full py-2 px-3 rounded-lg bg-red-950/80 hover:bg-red-900 border border-red-400/60 text-red-200 font-normal flex items-center justify-center gap-2 cursor-pointer transition-colors"
+              class="w-full py-2 px-3 rounded-lg bg-red-950/80 hover:bg-red-900 border border-red-400/60 text-red-200 font-normal flex items-center justify-center gap-2 cursor-pointer transition-colors mt-2"
             >
               <Trash2 class="w-3.5 h-3.5 text-red-300 stroke-[2]" />
               <span>批量删除选中元件 (Del)</span>
             </button>
           </div>
         </div>
+
       </div>
     </template>
 
     <!-- ================= 2. SINGLE COMPONENT INSPECTOR VIEW ================= -->
     <template v-else-if="component">
       <!-- Tabs Selector -->
-      <div class="flex items-center border-b border-cyan-500/30 bg-[#071024] px-1">
+      <div class="flex items-center border-b border-cyan-500/30 bg-[#142c4e] px-1">
         <button
           @click="activeTab = 'geometry'"
           class="flex-1 py-2.5 text-xs font-normal flex items-center justify-center gap-1 transition-colors cursor-pointer border-b-2"
-          :class="activeTab === 'geometry' ? 'border-cyan-400 text-cyan-200 bg-cyan-950/50 font-normal' : 'border-transparent text-cyan-300/80 hover:text-cyan-100 font-light'"
+          :class="activeTab === 'geometry' ? 'border-cyan-400 text-cyan-200 bg-[#183761] font-normal' : 'border-transparent text-cyan-300/80 hover:text-cyan-100 font-light'"
         >
           <Move class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
           <span>几何</span>
@@ -1181,7 +1956,7 @@ const toggleBatchLock = () => {
         <button
           @click="activeTab = 'style'"
           class="flex-1 py-2.5 text-xs font-normal flex items-center justify-center gap-1 transition-colors cursor-pointer border-b-2"
-          :class="activeTab === 'style' ? 'border-cyan-400 text-cyan-200 bg-cyan-950/50 font-normal' : 'border-transparent text-cyan-300/80 hover:text-cyan-100 font-light'"
+          :class="activeTab === 'style' ? 'border-cyan-400 text-cyan-200 bg-[#183761] font-normal' : 'border-transparent text-cyan-300/80 hover:text-cyan-100 font-light'"
         >
           <Palette class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
           <span>样式</span>
@@ -1189,7 +1964,7 @@ const toggleBatchLock = () => {
         <button
           @click="activeTab = 'data'"
           class="flex-1 py-2.5 text-xs font-normal flex items-center justify-center gap-1 transition-colors cursor-pointer border-b-2"
-          :class="activeTab === 'data' ? 'border-cyan-400 text-cyan-200 bg-cyan-950/50 font-normal' : 'border-transparent text-cyan-300/80 hover:text-cyan-100 font-light'"
+          :class="activeTab === 'data' ? 'border-cyan-400 text-cyan-200 bg-[#183761] font-normal' : 'border-transparent text-cyan-300/80 hover:text-cyan-100 font-light'"
         >
           <Database class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
           <span>数据</span>
@@ -1197,7 +1972,7 @@ const toggleBatchLock = () => {
         <button
           @click="activeTab = 'interaction'"
           class="flex-1 py-2.5 text-xs font-normal flex items-center justify-center gap-1 transition-colors cursor-pointer border-b-2"
-          :class="activeTab === 'interaction' ? 'border-cyan-400 text-cyan-200 bg-cyan-950/50 font-normal' : 'border-transparent text-cyan-300/80 hover:text-cyan-100 font-light'"
+          :class="activeTab === 'interaction' ? 'border-cyan-400 text-cyan-200 bg-[#183761] font-normal' : 'border-transparent text-cyan-300/80 hover:text-cyan-100 font-light'"
         >
           <Navigation class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
           <span>交互跳转</span>

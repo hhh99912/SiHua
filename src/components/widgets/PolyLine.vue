@@ -82,6 +82,7 @@ const svgPath = computed(() => {
     <svg 
       class="w-full h-full overflow-visible"
       :viewBox="`0 0 ${component.width} ${component.height}`"
+      shape-rendering="geometricPrecision"
     >
       <!-- Clean Polyline Path dynamically stretched to width and height -->
       <path

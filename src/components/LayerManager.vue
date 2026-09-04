@@ -113,15 +113,15 @@ const toggleLock = (comp: ScreenComponent, e: Event) => {
 </script>
 
 <template>
-  <aside class="w-60 shrink-0 h-full bg-[#050c1c] border-r border-cyan-400/50 flex flex-col select-none z-30 shadow-2xl overflow-hidden font-sans">
+  <aside class="w-60 shrink-0 h-full bg-[#10213b] border-r border-cyan-400/50 flex flex-col select-none z-30 shadow-xl overflow-hidden font-sans">
     <!-- Header -->
-    <div class="p-2.5 border-b border-cyan-500/30 bg-[#071024]">
+    <div class="p-2.5 border-b border-cyan-500/30 bg-[#142c4e]">
       <div class="flex items-center justify-between mb-2">
         <div class="flex items-center gap-1.5 font-mono text-xs text-cyan-200">
           <Layers class="w-3.5 h-3.5 text-cyan-300" />
           <span class="font-normal tracking-wide">图层与组件管理</span>
         </div>
-        <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#09152b] border border-cyan-500/40 text-cyan-300 font-light">
+        <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#183761] border border-cyan-500/40 text-cyan-300 font-light">
           {{ components.length }} 个元件
         </span>
       </div>
@@ -133,7 +133,7 @@ const toggleLock = (comp: ScreenComponent, e: Event) => {
           v-model="filterKeyword"
           type="text"
           placeholder="搜索图层名称/类型..."
-          class="w-full bg-[#09152b] border border-cyan-500/40 focus:border-cyan-300 rounded-lg pl-8 pr-2 py-1 text-xs text-cyan-100 placeholder:text-cyan-400/60 outline-hidden font-mono font-light shadow-inner"
+          class="w-full bg-[#183761] border border-cyan-500/40 focus:border-cyan-300 rounded-lg pl-8 pr-2 py-1 text-xs text-cyan-100 placeholder:text-cyan-300/60 outline-hidden font-mono font-light shadow-inner"
         />
       </div>
     </div>
@@ -153,15 +153,15 @@ const toggleLock = (comp: ScreenComponent, e: Event) => {
         @click="handleItemClick($event, comp.id)"
         class="group flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer border"
         :class="activeSelectedIds.includes(comp.id) 
-          ? 'bg-cyan-950/90 border-cyan-300 text-cyan-100 shadow-[0_0_10px_rgba(0,242,255,0.25)]' 
-          : 'bg-[#081226] border-cyan-500/30 text-cyan-200 hover:bg-[#0c1e3d] hover:text-white hover:border-cyan-400'"
+          ? 'bg-cyan-600/30 border-cyan-300 text-cyan-100 shadow-[0_0_10px_rgba(0,242,255,0.25)]' 
+          : 'bg-[#142c4e] border-cyan-500/30 text-cyan-200 hover:bg-[#183761] hover:text-white hover:border-cyan-400'"
       >
         <!-- Left: Visibility, Lock & Name -->
         <div class="flex items-center gap-1.5 min-w-0 flex-1">
           <!-- Visibility Toggle -->
           <button
             @click="toggleVisibility(comp, $event)"
-            class="p-0.5 rounded hover:bg-cyan-950 text-cyan-300 hover:text-white transition-colors"
+            class="p-0.5 rounded hover:bg-cyan-900/60 text-cyan-300 hover:text-white transition-colors"
             :title="comp.visible === false ? '显示图层' : '隐藏图层'"
           >
             <EyeOff v-if="comp.visible === false" class="w-3.5 h-3.5 text-cyan-500/40" />
@@ -171,7 +171,7 @@ const toggleLock = (comp: ScreenComponent, e: Event) => {
           <!-- Lock Toggle -->
           <button
             @click="toggleLock(comp, $event)"
-            class="p-0.5 rounded hover:bg-cyan-950 text-cyan-300 hover:text-amber-300 transition-colors"
+            class="p-0.5 rounded hover:bg-cyan-900/60 text-cyan-300 hover:text-amber-300 transition-colors"
             :title="comp.locked ? '解锁图层' : '锁定图层'"
           >
             <Lock v-if="comp.locked" class="w-3.5 h-3.5 text-amber-300 stroke-[2]" />
@@ -193,7 +193,7 @@ const toggleLock = (comp: ScreenComponent, e: Event) => {
               @keydown.enter="saveRename(comp)"
               @click.stop
               ref="nameInputRef"
-              class="w-full bg-[#040816] border border-cyan-300 rounded px-1 py-0.5 text-xs text-cyan-100 outline-hidden font-light"
+              class="w-full bg-[#10213b] border border-cyan-300 rounded px-1 py-0.5 text-xs text-cyan-100 outline-hidden font-light"
               autoFocus
             />
             <span 
@@ -212,7 +212,7 @@ const toggleLock = (comp: ScreenComponent, e: Event) => {
           <!-- Bring to Front -->
           <button
             @click.stop="emit('bring:front', comp.id)"
-            class="p-1 rounded hover:bg-cyan-950 text-cyan-300 hover:text-white"
+            class="p-1 rounded hover:bg-cyan-900/60 text-cyan-300 hover:text-white"
             title="置于顶层"
           >
             <ArrowUpToLine class="w-3 h-3 stroke-[2]" />
@@ -221,7 +221,7 @@ const toggleLock = (comp: ScreenComponent, e: Event) => {
           <!-- Move Up (Z-index +1) -->
           <button
             @click.stop="emit('move:up', comp.id)"
-            class="p-1 rounded hover:bg-cyan-950 text-cyan-300 hover:text-white"
+            class="p-1 rounded hover:bg-cyan-900/60 text-cyan-300 hover:text-white"
             title="上移一层"
           >
             <ChevronUp class="w-3 h-3 stroke-[2]" />
@@ -230,7 +230,7 @@ const toggleLock = (comp: ScreenComponent, e: Event) => {
           <!-- Move Down (Z-index -1) -->
           <button
             @click.stop="emit('move:down', comp.id)"
-            class="p-1 rounded hover:bg-cyan-950 text-cyan-300 hover:text-white"
+            class="p-1 rounded hover:bg-cyan-900/60 text-cyan-300 hover:text-white"
             title="下移一层"
           >
             <ChevronDown class="w-3 h-3 stroke-[2]" />
@@ -239,7 +239,7 @@ const toggleLock = (comp: ScreenComponent, e: Event) => {
           <!-- Send to Back -->
           <button
             @click.stop="emit('send:back', comp.id)"
-            class="p-1 rounded hover:bg-cyan-950 text-cyan-300 hover:text-white"
+            class="p-1 rounded hover:bg-cyan-900/60 text-cyan-300 hover:text-white"
             title="置于底层"
           >
             <ArrowDownToLine class="w-3 h-3 stroke-[2]" />
@@ -248,7 +248,7 @@ const toggleLock = (comp: ScreenComponent, e: Event) => {
           <!-- Duplicate -->
           <button
             @click.stop="emit('duplicate', comp)"
-            class="p-1 rounded hover:bg-cyan-950 text-cyan-300 hover:text-white"
+            class="p-1 rounded hover:bg-cyan-900/60 text-cyan-300 hover:text-white"
             title="复制"
           >
             <Copy class="w-3 h-3 stroke-[2]" />
@@ -267,7 +267,7 @@ const toggleLock = (comp: ScreenComponent, e: Event) => {
     </div>
 
     <!-- Footer Quick Actions -->
-    <div class="p-2 border-t border-cyan-500/30 bg-[#071024] flex items-center justify-between text-[10px] font-mono text-cyan-300 font-light">
+    <div class="p-2 border-t border-cyan-500/30 bg-[#142c4e] flex items-center justify-between text-[10px] font-mono text-cyan-300 font-light">
       <span>双击名称可重命名</span>
       <span class="text-cyan-200">Shift可多选</span>
     </div>

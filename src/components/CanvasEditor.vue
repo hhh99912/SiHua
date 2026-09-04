@@ -19,7 +19,8 @@ interface Props {
   selectedIds: string[];
   zoom: number;
   datasets: DatasetConfig[];
-  drawTool: 'select' | 'draw-polyline' | 'draw-arrow';
+  drawTool: string;
+  activeComponentDef?: any;
   canPaste?: boolean;
   showGrid?: boolean;
   gridSize?: number;
@@ -28,6 +29,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  drawTool: 'select',
   canPaste: false,
   showGrid: true,
   gridSize: 40,
@@ -36,7 +38,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  (e: 'update:drawTool', tool: 'select' | 'draw-polyline' | 'draw-arrow'): void;
+  (e: 'update:drawTool', tool: string): void;
   (e: 'update:zoom', zoom: number): void;
   (e: 'update:screen', screen: ScreenConfig): void;
   (e: 'select', ids: string[]): void;
@@ -102,6 +104,23 @@ const {
   initialOrthogonalLock: props.orthogonalLock ?? false
 });
 
+// Component Click-to-Place State (单机选中后在屏幕自己确定起始和终止点)
+const placeDrawing = ref<{
+  active: boolean;
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+  def?: any;
+}>({
+  active: false,
+  startX: 0,
+  startY: 0,
+  currentX: 0,
+  currentY: 0,
+  def: null
+});
+
 // Sync prop changes into canvas engine
 watch(() => props.zoom, (val) => {
   if (val !== undefined && val > 0 && val !== zoom.value) {
@@ -120,6 +139,7 @@ watch(() => props.drawTool, (newTool) => {
     isRotating.value = false;
     isSelectingMarquee.value = false;
     arrowDrawing.value.active = false;
+    placeDrawing.value.active = false;
     polylineDrawing.value = {
       active: false,
       points: [],
@@ -134,6 +154,7 @@ watch(() => props.drawTool, (newTool) => {
     isSelectingMarquee.value = false;
     polylineDrawing.value.active = false;
     polylineDrawing.value.points = [];
+    placeDrawing.value.active = false;
     arrowDrawing.value = {
       active: false,
       startX: mousePos.value.x,
@@ -141,10 +162,28 @@ watch(() => props.drawTool, (newTool) => {
       currentX: mousePos.value.x,
       currentY: mousePos.value.y
     };
+  } else if (newTool === 'place-component') {
+    emit('select', []);
+    isDragging.value = false;
+    isResizing.value = false;
+    isRotating.value = false;
+    isSelectingMarquee.value = false;
+    polylineDrawing.value.active = false;
+    polylineDrawing.value.points = [];
+    arrowDrawing.value.active = false;
+    placeDrawing.value = {
+      active: false,
+      startX: mousePos.value.x,
+      startY: mousePos.value.y,
+      currentX: mousePos.value.x,
+      currentY: mousePos.value.y,
+      def: props.activeComponentDef
+    };
   } else {
     polylineDrawing.value.active = false;
     polylineDrawing.value.points = [];
     arrowDrawing.value.active = false;
+    placeDrawing.value.active = false;
   }
 });
 
@@ -156,6 +195,7 @@ const isSpacePressed = ref(false);
 const isSelectingMarquee = ref(false);
 const hasMovedMarquee = ref(false);
 const suppressNextCanvasClick = ref(false);
+const lastInteractionTime = ref(0);
 const marqueeBox = ref<{ startX: number; startY: number; x: number; y: number; width: number; height: number }>({
   startX: 0,
   startY: 0,
@@ -288,6 +328,44 @@ const getComponentAABB = (c: ScreenComponent) => {
   };
 };
 
+// Live Component Placement Real-Time Visual Preview Component Object (用户拉框确定起止点时实时同步显示真实图形)
+const placementPreviewComponent = computed<ScreenComponent | null>(() => {
+  if (props.drawTool !== 'place-component' || !placeDrawing.value.active) {
+    return null;
+  }
+  const def = placeDrawing.value.def || props.activeComponentDef;
+  if (!def) return null;
+
+  const minX = Math.min(placeDrawing.value.startX, placeDrawing.value.currentX);
+  const minY = Math.min(placeDrawing.value.startY, placeDrawing.value.currentY);
+  const rawW = Math.abs(placeDrawing.value.currentX - placeDrawing.value.startX);
+  const rawH = Math.abs(placeDrawing.value.currentY - placeDrawing.value.startY);
+  const w = Math.max(6, rawW);
+  const h = Math.max(6, rawH);
+
+  return {
+    id: 'placement-live-preview-temp',
+    name: def.name || '图元',
+    type: def.type,
+    category: def.category || 'basic',
+    x: minX,
+    y: minY,
+    width: w,
+    height: h,
+    rotation: 0,
+    zIndex: 99999,
+    locked: false,
+    visible: true,
+    states: def.states ? JSON.parse(JSON.stringify(def.states)) : undefined,
+    activeState: def.activeState || (def.states?.[0]?.id ?? '1'),
+    children: def.children ? JSON.parse(JSON.stringify(def.children)) : (def.states?.[0]?.children ? JSON.parse(JSON.stringify(def.states[0].children)) : undefined),
+    style: JSON.parse(JSON.stringify(def.style || def.defaultStyle || { fill: '#00f2ff', fillOpacity: 0.15, stroke: '#00f2ff', strokeWidth: 2 })),
+    animation: def.animation ? JSON.parse(JSON.stringify(def.animation)) : (def.defaultAnimation ? JSON.parse(JSON.stringify(def.defaultAnimation)) : undefined),
+    data: JSON.parse(JSON.stringify(def.data || def.defaultData || { mapping: {} })),
+    customProps: def.customProps ? JSON.parse(JSON.stringify(def.customProps)) : (def.defaultCustomProps ? JSON.parse(JSON.stringify(def.defaultCustomProps)) : undefined)
+  };
+});
+
 // O(1) Selected IDs Set
 const selectedSet = computed(() => new Set(props.selectedIds));
 
@@ -387,8 +465,8 @@ const handleFitAndCenter = () => {
     );
   } else {
     fitCanvasToViewport(
-      props.screen.width || 1920,
-      props.screen.height || 1080,
+      props.screen.width || 1980,
+      props.screen.height || 1100,
       container,
       activeComps,
       (newZoom) => {
@@ -400,7 +478,7 @@ const handleFitAndCenter = () => {
 
 // 视口复位至标尺原点坐标 (0, 0)
 const handleResetViewport = () => {
-  panOffset.value = { x: 24, y: 24 };
+  panOffset.value = { x: 30, y: 30 };
 };
 
 // 一键定位：平移全图图元左上角至 (0, 0) 原点坐标
@@ -496,6 +574,17 @@ const processMouseMove = (e: MouseEvent) => {
       arrowDrawing.value.startY = coords.y;
       arrowDrawing.value.currentX = coords.x;
       arrowDrawing.value.currentY = coords.y;
+    }
+    return;
+  }
+
+  // 3.5. Component Click-to-Place Preview (Start & End Point Determination)
+  if (props.drawTool === 'place-component') {
+    placeDrawing.value.currentX = coords.x;
+    placeDrawing.value.currentY = coords.y;
+    if (!placeDrawing.value.active) {
+      placeDrawing.value.startX = coords.x;
+      placeDrawing.value.startY = coords.y;
     }
     return;
   }
@@ -682,13 +771,28 @@ const handleMouseUpWorkspace = () => {
     endPan();
   }
 
+  if (props.drawTool === 'place-component' && placeDrawing.value.active) {
+    const w = Math.abs(placeDrawing.value.currentX - placeDrawing.value.startX);
+    const h = Math.abs(placeDrawing.value.currentY - placeDrawing.value.startY);
+    if (w >= 12 || h >= 12) {
+      suppressNextCanvasClick.value = true;
+      lastInteractionTime.value = Date.now();
+      finishPlaceDrawing();
+      setTimeout(() => {
+        suppressNextCanvasClick.value = false;
+      }, 200);
+      return;
+    }
+  }
+
   if (isSelectingMarquee.value) {
     if (hasMovedMarquee.value) {
       suppressNextCanvasClick.value = true;
+      lastInteractionTime.value = Date.now();
       setTimeout(() => {
         suppressNextCanvasClick.value = false;
         hasMovedMarquee.value = false;
-      }, 150);
+      }, 200);
     } else {
       hasMovedMarquee.value = false;
     }
@@ -696,34 +800,48 @@ const handleMouseUpWorkspace = () => {
   }
 
   if (isDragging.value) {
+    suppressNextCanvasClick.value = true;
+    lastInteractionTime.value = Date.now();
     if (hasMovedDrag.value) {
-      suppressNextCanvasClick.value = true;
       emit('commit:history');
       setTimeout(() => {
         suppressNextCanvasClick.value = false;
         hasMovedDrag.value = false;
-      }, 150);
+      }, 200);
     } else {
       hasMovedDrag.value = false;
+      setTimeout(() => {
+        suppressNextCanvasClick.value = false;
+      }, 200);
     }
     isDragging.value = false;
   }
 
   if (isResizing.value) {
+    suppressNextCanvasClick.value = true;
+    lastInteractionTime.value = Date.now();
     if (hasMovedResize.value) {
       emit('commit:history');
       hasMovedResize.value = false;
     }
     isResizing.value = false;
     resizeHandle.value = null;
+    setTimeout(() => {
+      suppressNextCanvasClick.value = false;
+    }, 200);
   }
 
   if (isRotating.value) {
+    suppressNextCanvasClick.value = true;
+    lastInteractionTime.value = Date.now();
     if (hasMovedRotate.value) {
       emit('commit:history');
       hasMovedRotate.value = false;
     }
     isRotating.value = false;
+    setTimeout(() => {
+      suppressNextCanvasClick.value = false;
+    }, 200);
   }
 };
 
@@ -739,6 +857,8 @@ const handleStartDrag = (e: MouseEvent, comp: ScreenComponent) => {
   if (props.drawTool !== 'select') return;
   e.stopPropagation();
 
+  lastInteractionTime.value = Date.now();
+  suppressNextCanvasClick.value = true;
   contextMenu.value.visible = false;
 
   let activeIds = [...props.selectedIds];
@@ -779,7 +899,10 @@ const handleStartDrag = (e: MouseEvent, comp: ScreenComponent) => {
 // Component Click Handler (maintains sustained selection on click)
 const handleCompClick = (e: MouseEvent, comp: ScreenComponent) => {
   e.stopPropagation();
-  if (isPanning.value || hasMovedDrag.value || hasMovedMarquee.value || suppressNextCanvasClick.value) {
+  lastInteractionTime.value = Date.now();
+  suppressNextCanvasClick.value = true;
+
+  if (isPanning.value || hasMovedDrag.value || hasMovedMarquee.value) {
     return;
   }
   if (e.shiftKey) {
@@ -794,7 +917,8 @@ const handleCompClick = (e: MouseEvent, comp: ScreenComponent) => {
 
 // Canvas Background Click & Drawing Tool Handlers
 const handleCanvasClick = (e: MouseEvent) => {
-  if (suppressNextCanvasClick.value) {
+  // If user just interacted with a component, handle, or drag/resize/rotate, DO NOT deselect!
+  if (suppressNextCanvasClick.value || (Date.now() - lastInteractionTime.value) < 260) {
     suppressNextCanvasClick.value = false;
     return;
   }
@@ -845,10 +969,39 @@ const handleCanvasClick = (e: MouseEvent) => {
     return;
   }
 
+  // Component Click-to-Place Mode (单击确定起点，在屏幕自己确定终点完成放置)
+  if (props.drawTool === 'place-component') {
+    if (!placeDrawing.value.active) {
+      placeDrawing.value.active = true;
+      placeDrawing.value.startX = coords.x;
+      placeDrawing.value.startY = coords.y;
+      placeDrawing.value.currentX = coords.x;
+      placeDrawing.value.currentY = coords.y;
+      placeDrawing.value.def = props.activeComponentDef;
+    } else {
+      placeDrawing.value.currentX = coords.x;
+      placeDrawing.value.currentY = coords.y;
+      finishPlaceDrawing();
+    }
+    return;
+  }
+
   // Selection clear ONLY when clicking blank canvas background
   const target = e.target as HTMLElement;
-  const isInsideComp = target.closest('.cursor-move');
-  if (!isInsideComp && !isSelectingMarquee.value && !hasMovedMarquee.value && !isPanning.value && !hasMovedDrag.value) {
+  const isInsideInteractiveComp = 
+    target.closest('[data-component-id]') ||
+    target.closest('.component-node') ||
+    target.closest('.group') ||
+    target.closest('.selection-overlay') ||
+    target.closest('.cursor-move') ||
+    target.closest('.rotate-handle') ||
+    target.closest('.resize-handle');
+
+  if (isInsideInteractiveComp) {
+    return;
+  }
+
+  if (!isSelectingMarquee.value && !hasMovedMarquee.value && !isPanning.value && !hasMovedDrag.value && !isResizing.value && !isRotating.value) {
     emit('select', []);
   }
 };
@@ -896,6 +1049,42 @@ const finishArrowDrawing = () => {
   }, minX, minY);
 
   arrowDrawing.value.active = false;
+  emit('finish:draw');
+};
+
+// Finish Component Placement (确定起始与终止点，完成组件实例化)
+const finishPlaceDrawing = () => {
+  if (!placeDrawing.value.active) return;
+  const def = placeDrawing.value.def || props.activeComponentDef;
+  if (!def) {
+    placeDrawing.value.active = false;
+    emit('finish:draw');
+    return;
+  }
+
+  const { startX, startY, currentX, currentY } = placeDrawing.value;
+  let minX = Math.min(startX, currentX);
+  let minY = Math.min(startY, currentY);
+  let w = Math.abs(currentX - startX);
+  let h = Math.abs(currentY - startY);
+
+  // If user made a fast single click (distance < 12px), use component's default width and height
+  if (w < 12 && h < 12) {
+    w = def.defaultWidth || def.width || 140;
+    h = def.defaultHeight || def.height || 100;
+  } else {
+    w = Math.max(16, w);
+    h = Math.max(16, h);
+  }
+
+  const compPayload = {
+    ...def,
+    width: w,
+    height: h
+  };
+
+  emit('add:component:at', compPayload, minX, minY);
+  placeDrawing.value.active = false;
   emit('finish:draw');
 };
 
@@ -960,8 +1149,16 @@ const handleCanvasMouseDown = (e: MouseEvent) => {
   if (props.drawTool !== 'select') return;
 
   const target = e.target as HTMLElement;
-  const isInsideComp = target.closest('.cursor-move');
-  if (!isInsideComp) {
+  const isInsideInteractiveComp = 
+    target.closest('[data-component-id]') ||
+    target.closest('.component-node') ||
+    target.closest('.group') ||
+    target.closest('.selection-overlay') ||
+    target.closest('.cursor-move') ||
+    target.closest('.rotate-handle') ||
+    target.closest('.resize-handle');
+
+  if (!isInsideInteractiveComp) {
     const coords = getCanvasCoords(e.clientX, e.clientY, true);
     isSelectingMarquee.value = true;
     hasMovedMarquee.value = false;
@@ -985,6 +1182,8 @@ const handleStartResize = (e: MouseEvent, handle: string) => {
   }
   e.stopPropagation();
   e.preventDefault();
+  lastInteractionTime.value = Date.now();
+  suppressNextCanvasClick.value = true;
   if (!primarySelected.value || primarySelected.value.locked) return;
 
   const comp = primarySelected.value;
@@ -1011,6 +1210,8 @@ const handleStartRotate = (e: MouseEvent) => {
   }
   e.stopPropagation();
   e.preventDefault();
+  lastInteractionTime.value = Date.now();
+  suppressNextCanvasClick.value = true;
   if (!primarySelected.value || primarySelected.value.locked) return;
 
   const comp = primarySelected.value;
@@ -1371,10 +1572,9 @@ defineExpose({
   <div 
     ref="containerRef"
     @wheel.prevent="onWheelWorkspace"
-    class="flex-1 h-full bg-[#03060f] relative overflow-hidden select-none flex flex-col"
+    class="flex-1 h-full bg-[#0d1f38] relative overflow-hidden select-none flex flex-col"
     :class="{
-      'cursor-grab': isSpacePressed && !isPanning,
-      'cursor-grabbing': isPanning,
+      'cursor-move': isSpacePressed || isPanning,
       'cursor-crosshair': drawTool !== 'select'
     }"
   >
@@ -1393,12 +1593,11 @@ defineExpose({
       class="flex-1 w-full h-full relative overflow-hidden infinite-canvas-plane"
       :class="{
         'cursor-crosshair': drawTool !== 'select',
-        'cursor-grab': isSpacePressed && !isPanning,
-        'cursor-grabbing': isPanning,
+        'cursor-move': isSpacePressed || isPanning,
         'cursor-default': drawTool === 'select' && !isSpacePressed && !isPanning
       }"
       :style="{
-        backgroundColor: screen.backgroundColor || '#040810',
+        backgroundColor: screen.backgroundColor || '#0f223d',
         backgroundImage: showGrid 
           ? `radial-gradient(circle, ${effectiveGridColor} 1.2px, transparent 1.2px)` 
           : 'none',
@@ -1427,22 +1626,25 @@ defineExpose({
         <div
           v-for="comp in components"
           :key="comp.id"
-          @mousedown.stop="drawTool === 'select' && !isBorderComponent(comp) && handleStartDrag($event, comp)"
-          @click.stop="drawTool === 'select' && !isBorderComponent(comp) && handleCompClick($event, comp)"
-          @contextmenu="drawTool === 'select' && !isBorderComponent(comp) && handleContextMenu($event, comp.id)"
-          class="absolute group"
+          :data-component-id="comp.id"
+          @mousedown.stop="drawTool === 'select' && handleStartDrag($event, comp)"
+          @click.stop="drawTool === 'select' && handleCompClick($event, comp)"
+          @contextmenu="drawTool === 'select' && handleContextMenu($event, comp.id)"
+          class="absolute group component-node select-none"
           :class="{
-            'cursor-move': drawTool === 'select',
-            'pointer-events-auto': drawTool === 'select' && !isBorderComponent(comp) && comp.visible !== false,
-            'pointer-events-none': drawTool !== 'select' || isBorderComponent(comp) || comp.visible === false,
+            'cursor-move': drawTool === 'select' && !comp.locked,
+            'pointer-events-auto': drawTool === 'select' && comp.visible !== false,
+            'pointer-events-none': drawTool !== 'select' || comp.visible === false,
             'opacity-40': comp.visible === false,
-            'cursor-not-allowed': comp.locked && drawTool === 'select'
+            'cursor-default': comp.locked && drawTool === 'select'
           }"
           :style="{
             left: `${comp.x}px`,
             top: `${comp.y}px`,
-            width: `${comp.width}px`,
-            height: `${comp.height}px`,
+            width: `${Math.max(2, comp.width)}px`,
+            height: `${Math.max(2, comp.height)}px`,
+            minWidth: '4px',
+            minHeight: '4px',
             transform: comp.rotation ? `rotate(${comp.rotation}deg)` : 'translateZ(0)',
             transformOrigin: 'center center',
             zIndex: comp.zIndex || 1,
@@ -1450,44 +1652,19 @@ defineExpose({
             willChange: selectedIds.includes(comp.id) ? 'transform' : 'auto'
           }"
         >
+          <!-- Invisible Expanded Hit Area (at least 24px) for ultra-thin or single-line compressed widgets -->
+          <div 
+            v-if="drawTool === 'select' && (comp.width <= 14 || comp.height <= 14)"
+            class="absolute -inset-3 pointer-events-auto cursor-move z-10"
+            title="点击选中图元"
+          />
+
           <!-- Component Content -->
           <WidgetRenderer
             :component="comp"
             :datasets="datasets"
             :preview-mode="false"
           />
-
-          <!-- 4 Edge Hit-test Strips for Border Components (Middle allows clicking underlying widgets) -->
-          <template v-if="drawTool === 'select' && isBorderComponent(comp) && comp.visible !== false">
-            <div 
-              @mousedown.stop="handleStartDrag($event, comp)"
-              @click.stop="handleCompClick($event, comp)"
-              @contextmenu="handleContextMenu($event, comp.id)"
-              class="absolute top-0 left-0 right-0 h-6 cursor-move pointer-events-auto z-20"
-              title="边框顶部线条"
-            />
-            <div 
-              @mousedown.stop="handleStartDrag($event, comp)"
-              @click.stop="handleCompClick($event, comp)"
-              @contextmenu="handleContextMenu($event, comp.id)"
-              class="absolute bottom-0 left-0 right-0 h-6 cursor-move pointer-events-auto z-20"
-              title="边框底部线条"
-            />
-            <div 
-              @mousedown.stop="handleStartDrag($event, comp)"
-              @click.stop="handleCompClick($event, comp)"
-              @contextmenu="handleContextMenu($event, comp.id)"
-              class="absolute top-0 bottom-0 left-0 w-6 cursor-move pointer-events-auto z-20"
-              title="边框左侧线条"
-            />
-            <div 
-              @mousedown.stop="handleStartDrag($event, comp)"
-              @click.stop="handleCompClick($event, comp)"
-              @contextmenu="handleContextMenu($event, comp.id)"
-              class="absolute top-0 bottom-0 right-0 w-6 cursor-move pointer-events-auto z-20"
-              title="边框右侧线条"
-            />
-          </template>
 
           <!-- Locked Indicator Badge -->
           <div v-if="comp.locked" class="absolute top-1 right-1 p-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-500/40 z-30 pointer-events-auto">
@@ -1498,34 +1675,28 @@ defineExpose({
         <!-- High-Performance Dedicated Selection & Transform Overlay (Iterates ONLY over selectedComponents: 0, 1, or few items) -->
         <div 
           v-if="drawTool === 'select' && selectedComponents.length > 0"
-          class="pointer-events-none"
+          class="pointer-events-none selection-overlay"
         >
           <div
             v-for="comp in selectedComponents"
             :key="'sel-' + comp.id"
-            class="absolute pointer-events-none"
+            :data-component-id="comp.id"
+            class="absolute pointer-events-none selection-box"
             :style="{
               left: `${comp.x}px`,
               top: `${comp.y}px`,
-              width: `${comp.width}px`,
-              height: `${comp.height}px`,
+              width: `${Math.max(4, comp.width)}px`,
+              height: `${Math.max(4, comp.height)}px`,
               transform: comp.rotation ? `rotate(${comp.rotation}deg)` : 'translateZ(0)',
               transformOrigin: 'center center',
               zIndex: 99999
             }"
           >
-            <!-- 1. Single Selection Active State: 4 Edge Hit Bars + 8 Resizers + Rotation Grip + Border + Tag -->
+            <!-- 1. Single Selection Active State: 4 Edge Hit Bars + 8 Resizers + Rotation Grip + Border -->
             <div 
               v-if="selectedIds.length === 1"
               class="absolute -inset-0.5 border-2 border-cyan-400 pointer-events-none rounded-xs shadow-[0_0_14px_rgba(0,242,255,0.75)]"
             >
-              <!-- Single Selection Tag Badge -->
-              <div class="absolute -top-6 left-0 flex items-center gap-1.5 bg-[#080e1c]/95 border border-cyan-400/90 text-cyan-200 px-2 py-0.5 rounded text-[10px] font-mono font-bold shadow-lg pointer-events-none whitespace-nowrap z-50">
-                <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
-                <span class="truncate max-w-[120px]">{{ comp.name }}</span>
-                <Lock v-if="comp.locked" class="w-2.5 h-2.5 text-amber-400 ml-0.5" />
-              </div>
-
               <!-- Top Rotation Handle (自由旋转控件) -->
               <template v-if="!comp.locked">
                 <div class="absolute -top-8 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-auto z-50">
@@ -1740,37 +1911,16 @@ defineExpose({
               stroke-width="2"
               stroke-dasharray="4 3"
             />
-            <!-- Placed vertices with index tags -->
+            <!-- Placed vertices -->
             <g v-for="(p, idx) in polylineDrawing.points" :key="idx">
               <circle 
                 :cx="p.x" 
                 :cy="p.y" 
-                r="6" 
+                r="5" 
                 fill="#00f2ff" 
                 stroke="#040810"
-                stroke-width="2"
+                stroke-width="1.5"
               />
-              <rect 
-                :x="p.x + 8" 
-                :y="p.y - 18" 
-                width="34" 
-                height="15" 
-                rx="3" 
-                fill="#090f1d" 
-                fill-opacity="0.9" 
-                stroke="#00f2ff" 
-                stroke-width="0.8" 
-              />
-              <text 
-                :x="p.x + 12" 
-                :y="p.y - 7" 
-                fill="#00f2ff" 
-                font-size="9" 
-                font-family="monospace" 
-                font-weight="bold"
-              >
-                #{{ idx + 1 }}
-              </text>
             </g>
           </template>
 
@@ -1870,13 +2020,110 @@ defineExpose({
             />
           </g>
         </svg>
+
+        <!-- Real-Time Synchronous Component Visual Preview (实时同步扩大显示组件/图形本体，不再画斜线) -->
+        <div
+          v-if="placementPreviewComponent"
+          class="absolute pointer-events-none z-45"
+          :style="{
+            left: `${placementPreviewComponent.x}px`,
+            top: `${placementPreviewComponent.y}px`,
+            width: `${placementPreviewComponent.width}px`,
+            height: `${placementPreviewComponent.height}px`
+          }"
+        >
+          <!-- Real component rendering (scales dynamically in real-time) -->
+          <WidgetRenderer
+            :component="placementPreviewComponent"
+            :datasets="datasets"
+            :preview-mode="false"
+          />
+
+          <!-- Subtle glowing boundary box with 4 cyan corner accents -->
+          <div class="absolute -inset-0.5 border border-cyan-400 border-dashed bg-cyan-400/10 pointer-events-none rounded-xs shadow-[0_0_12px_rgba(0,242,255,0.45)]">
+            <div class="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-cyan-300" />
+            <div class="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-cyan-300" />
+            <div class="absolute -bottom-1 -left-1 w-2 h-2 border-b-2 border-l-2 border-cyan-300" />
+            <div class="absolute -bottom-1 -right-1 w-2 h-2 border-b-2 border-r-2 border-cyan-300" />
+          </div>
+        </div>
+
+        <!-- Interactive Component Placement Live SVG Overlay (单机选中后在屏幕自己确定起始和终止点) -->
+        <svg 
+          v-if="drawTool === 'place-component'" 
+          class="absolute top-0 left-0 pointer-events-none z-50 overflow-visible"
+          style="width: 1px; height: 1px;"
+        >
+          <template v-if="placeDrawing.active && placementPreviewComponent">
+            <!-- Start Point Circle -->
+            <circle
+              :cx="placeDrawing.startX"
+              :cy="placeDrawing.startY"
+              r="6"
+              fill="#00e5a3"
+              stroke="#040810"
+              stroke-width="2"
+            />
+            <circle
+              :cx="placeDrawing.startX"
+              :cy="placeDrawing.startY"
+              r="11"
+              fill="none"
+              stroke="#00e5a3"
+              stroke-width="1.5"
+              stroke-dasharray="3 3"
+            />
+
+            <!-- End Point / Cursor Circle -->
+            <circle
+              :cx="placeDrawing.currentX"
+              :cy="placeDrawing.currentY"
+              r="6"
+              fill="#00f2ff"
+              stroke="#040810"
+              stroke-width="2"
+            />
+            <circle
+              :cx="placeDrawing.currentX"
+              :cy="placeDrawing.currentY"
+              r="12"
+              fill="none"
+              stroke="#00f2ff"
+              stroke-width="1.5"
+              stroke-dasharray="3 3"
+            />
+          </template>
+
+          <!-- Cursor Hint when awaiting first click -->
+          <template v-else>
+            <g :transform="`translate(${placeDrawing.currentX}, ${placeDrawing.currentY})`">
+              <circle 
+                cx="0" 
+                cy="0" 
+                r="6" 
+                fill="#00f2ff" 
+                stroke="#040810" 
+                stroke-width="2" 
+              />
+              <circle 
+                cx="0" 
+                cy="0" 
+                r="14" 
+                fill="none" 
+                stroke="#00f2ff" 
+                stroke-width="1.5" 
+                stroke-dasharray="3 3" 
+              />
+            </g>
+          </template>
+        </svg>
       </div>
     </div>
 
     <!-- Right-Click Context Menu -->
     <div
       v-if="contextMenu.visible"
-      class="fixed bg-[#060c1a] border border-cyan-400/60 rounded-xl shadow-[0_10px_35px_rgba(0,0,0,0.9)] p-1.5 z-50 backdrop-blur-md w-56 max-h-[calc(100vh-20px)] overflow-y-auto custom-scrollbar text-xs font-sans text-cyan-100"
+      class="fixed bg-[#132745] border border-cyan-400/60 rounded-xl shadow-[0_10px_35px_rgba(0,0,0,0.9)] p-1.5 z-50 backdrop-blur-md w-56 max-h-[calc(100vh-20px)] overflow-y-auto custom-scrollbar text-xs font-sans text-cyan-100"
       :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
       @click.stop
     >
@@ -1891,7 +2138,7 @@ defineExpose({
           <!-- View / Edit Properties Inspector (选中右击查看属性) -->
           <button
             @click="emit('open:property-inspector'); closeContextMenu();"
-            class="w-full text-left px-2.5 py-1.5 bg-cyan-950/80 hover:bg-cyan-900/90 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group transition-colors border border-cyan-400/50"
+            class="w-full text-left px-2.5 py-1.5 bg-[#1c3a66] hover:bg-cyan-600 hover:text-slate-950 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group transition-colors border border-cyan-400/50"
           >
             <div class="flex items-center gap-2 font-normal">
               <Sliders class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
@@ -2054,20 +2301,29 @@ defineExpose({
           </button>
         </div>
 
-        <!-- Multi-Item Alignment Options -->
+        <!-- Multi-Item Alignment & Equal Size Options -->
         <template v-if="effectiveContextMenuIds.length > 1">
           <div class="h-[1px] bg-cyan-500/30 my-1" />
-          <div class="px-2 py-0.5 text-[10px] text-cyan-300 font-light">对齐与等间距分布</div>
-          <div class="grid grid-cols-4 gap-1 px-1 py-1">
-            <button @click="emit('align', 'left'); closeContextMenu();" class="p-1 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="左对齐">左对齐</button>
-            <button @click="emit('align', 'center'); closeContextMenu();" class="p-1 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="水平居中">居中</button>
-            <button @click="emit('align', 'right'); closeContextMenu();" class="p-1 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="右对齐">右对齐</button>
-            <button @click="emit('align', 'distribute-h'); closeContextMenu();" class="p-1 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="水平等间距分布">水平均布</button>
+          <div class="px-2 py-0.5 text-[10px] text-cyan-300 font-light flex items-center justify-between">
+            <span>尺寸统一 (等大小)</span>
+          </div>
+          <div class="grid grid-cols-3 gap-1 px-1 py-1">
+            <button @click="emit('align', 'equal-width'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-cyan-600 hover:text-slate-950 border border-cyan-500/40 text-cyan-200 text-center text-[11px] font-light cursor-pointer" title="所有选中元件统一为相同宽度 (以主选为主)">等宽</button>
+            <button @click="emit('align', 'equal-height'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-cyan-600 hover:text-slate-950 border border-cyan-500/40 text-cyan-200 text-center text-[11px] font-light cursor-pointer" title="所有选中元件统一为相同高度 (以主选为主)">等高</button>
+            <button @click="emit('align', 'equal-size'); closeContextMenu();" class="p-1 rounded bg-cyan-500/30 hover:bg-cyan-500 hover:text-slate-950 border border-cyan-400 text-cyan-100 text-center text-[11px] font-medium cursor-pointer" title="所有选中元件统一为相同宽高 (完全等大小)">等大小</button>
+          </div>
 
-            <button @click="emit('align', 'top'); closeContextMenu();" class="p-1 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="顶对齐">顶对齐</button>
-            <button @click="emit('align', 'middle'); closeContextMenu();" class="p-1 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="垂直居中">垂直居中</button>
-            <button @click="emit('align', 'bottom'); closeContextMenu();" class="p-1 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="底对齐">底对齐</button>
-            <button @click="emit('align', 'distribute-v'); closeContextMenu();" class="p-1 rounded bg-[#09152b] hover:bg-cyan-950 border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="垂直等间距分布">垂直均布</button>
+          <div class="px-2 py-0.5 text-[10px] text-cyan-300 font-light mt-0.5">对齐与等间距分布</div>
+          <div class="grid grid-cols-4 gap-1 px-1 py-1">
+            <button @click="emit('align', 'left'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-[#1f4273] border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="左对齐">左对齐</button>
+            <button @click="emit('align', 'center'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-[#1f4273] border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="水平居中">居中</button>
+            <button @click="emit('align', 'right'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-[#1f4273] border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="右对齐">右对齐</button>
+            <button @click="emit('align', 'distribute-h'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-[#1f4273] border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="水平等间距分布">水平均布</button>
+
+            <button @click="emit('align', 'top'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-[#1f4273] border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="顶对齐">顶对齐</button>
+            <button @click="emit('align', 'middle'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-[#1f4273] border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="垂直居中">垂直居中</button>
+            <button @click="emit('align', 'bottom'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-[#1f4273] border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="底对齐">底对齐</button>
+            <button @click="emit('align', 'distribute-v'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-[#1f4273] border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="垂直等间距分布">垂直均布</button>
           </div>
         </template>
 
@@ -2131,7 +2387,7 @@ defineExpose({
     </div>
 
     <!-- Bottom Status Bar -->
-    <div class="h-7 bg-[#050c1c] border-t border-cyan-400/50 px-3 flex items-center justify-between text-[11px] font-mono text-cyan-200 z-30 select-none shadow-md">
+    <div class="h-7 bg-[#132745] border-t border-cyan-400/50 px-3 flex items-center justify-between text-[11px] font-mono text-cyan-200 z-30 select-none shadow-md">
       <div class="flex items-center gap-4">
         <div class="flex items-center gap-1.5 text-cyan-200 font-light">
           <span class="text-cyan-300">光标坐标:</span>

@@ -95,6 +95,7 @@ export type ComponentType =
   | 'custom-html'
 
   // 9. Decorations (丰富科技边框)
+  | 'deco-border-minimal'
   | 'deco-border-neon'
   | 'deco-border-tech'
   | 'deco-border-mech'

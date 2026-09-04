@@ -9,12 +9,16 @@ if (process.platform === 'linux') {
   app.commandLine.appendSwitch('disable-dev-shm-usage'); // 关键：解决共享内存不足导致的渲染器崩溃
   app.commandLine.appendSwitch('disable-gpu-process-crash-limit');
   
-  // 字体清晰度与色彩配置文件
+  // 字体清晰度与色彩配置文件 (凝思系统/Linux LCD 亚像素高清渲染核心优化)
   app.commandLine.appendSwitch('enable-font-antialiasing');
-  app.commandLine.appendSwitch('font-render-hinting', 'medium');
-  app.commandLine.appendSwitch('force-device-scale-factor', '1');
+  app.commandLine.appendSwitch('enable-lcd-text'); // 开启 LCD RGB 次像素文字渲染，杜绝灰度抗锯齿导致的字体模糊发虚
+  app.commandLine.appendSwitch('font-render-hinting', process.env.SCADA_FONT_HINTING || 'slight'); // Linux CJK 字体最优微调模式
+  app.commandLine.appendSwitch('force-device-scale-factor', process.env.SCADA_SCALE_FACTOR || '1');
   app.commandLine.appendSwitch('high-dpi-support', '1');
   app.commandLine.appendSwitch('force-color-profile', 'srgb');
+
+  // 图像与 2D Canvas 矢量硬加速优化
+  app.commandLine.appendSwitch('enable-features', 'Accelerated2dCanvas,OverlayScrollbar,CanvasOopRasterization');
 
   // 关键优化：解决凝思系统 SwiftShader 软件渲染下的 Passthrough 报错，并启用校验解码器提升平移/旋转帧率
   app.commandLine.appendSwitch('use-cmd-decoder', 'validating');

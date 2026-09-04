@@ -82,6 +82,7 @@ const endArrow = computed(() => style.value.endArrow || props.component.type ===
     <svg 
       class="w-full h-full overflow-visible"
       :viewBox="`0 0 ${component.width} ${component.height}`"
+      shape-rendering="geometricPrecision"
     >
       <defs v-if="startArrow || endArrow">
         <marker

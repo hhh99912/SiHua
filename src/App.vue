@@ -12,6 +12,7 @@ import {
 import { INITIAL_DATASETS, tickDataset, executeSimulatedTeleControl, executeSimulatedTeleRegulation } from './data/presetDatasets';
 import { syncDatasetFastIndex, generateUniqueDuplicateName } from './utils/scadaResolver';
 import { PRESET_MULTI_SCREENS } from './data/presetMultiScreens';
+import { COMPONENT_DEFINITIONS } from './data/componentLibrary';
 import { getCustomSymbols, addCustomSymbol } from './utils/customSymbolStorage';
 import Navbar from './components/Navbar.vue';
 import ComponentPalette from './components/ComponentPalette.vue';
@@ -61,7 +62,9 @@ const selectedIds = ref<string[]>([]);
 const zoom = ref<number>(0.62);
 const isStreaming = ref<boolean>(true);
 const leftSidebarTab = ref<'palette' | 'layers'>('palette');
-const drawTool = ref<'select' | 'draw-polyline' | 'draw-arrow'>('select');
+const drawTool = ref<string>('select');
+const activePlacementDef = ref<any>(null);
+const activeShapeType = ref<string>('');
 
 // Infinite Canvas & Snapping Controls
 const showGrid = ref<boolean>(true);
@@ -155,8 +158,8 @@ const handleAddScreen = async (payload: { name: string; width: number; height: n
   syncActiveScreenToProject();
   const newId = `screen-${Date.now()}`;
   const uniqueName = getUniqueScreenName(payload.name);
-  const screenWidth = payload.width || 1920;
-  const screenHeight = payload.height || 1080;
+  const screenWidth = payload.width || 1980;
+  const screenHeight = payload.height || 1100;
   const newScreenItem: ScreenItem = {
     id: newId,
     name: uniqueName,
@@ -165,7 +168,7 @@ const handleAddScreen = async (payload: { name: string; width: number; height: n
       name: uniqueName,
       width: screenWidth,
       height: screenHeight,
-      backgroundColor: '#040914',
+      backgroundColor: '#0a1d3b',
       backgroundGrid: true,
       gridSize: 20,
       gridColor: 'rgba(0, 242, 255, 0.22)',
@@ -176,8 +179,8 @@ const handleAddScreen = async (payload: { name: string; width: number; height: n
     components: [
       {
         id: `comp-border-${Date.now()}`,
-        name: '科技全屏边框',
-        type: 'deco-border-neon',
+        name: '极简工控边框',
+        type: 'deco-border-minimal',
         category: 'decoration',
         x: 0,
         y: 0,
@@ -191,9 +194,8 @@ const handleAddScreen = async (payload: { name: string; width: number; height: n
           strokeWidth: 2
         },
         customProps: {
-          borderStyle: 'deco-border-neon',
-          title: uniqueName,
-          showTitle: true
+          borderStyle: 'deco-border-minimal',
+          showTitle: false
         },
         data: { mapping: {} }
       }
@@ -420,39 +422,45 @@ const fitToScreen = () => {
   });
 };
 
-// 4. Component Operations
+// 4. Component Operations (Click to select, then click & drag in canvas to determine start and end points)
 const handleAddComponentFromPalette = (def: any) => {
-  const compWidth = def.width || def.defaultWidth || 160;
-  const compHeight = def.height || def.defaultHeight || 160;
-  const centerX = Math.max(0, Math.round((screen.value.width - compWidth) / 2));
-  const centerY = Math.max(0, Math.round((screen.value.height - compHeight) / 2));
-  const maxZ = components.value.reduce((max, c) => Math.max(max, c.zIndex || 1), 0);
+  activePlacementDef.value = JSON.parse(JSON.stringify(def));
+  activeShapeType.value = def.type;
+  drawTool.value = 'place-component';
+};
 
-  const newComp: ScreenComponent = {
-    id: `comp-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-    name: `${def.name} #${components.value.length + 1}`,
-    type: def.type,
-    category: def.category,
-    x: centerX,
-    y: centerY,
-    width: compWidth,
-    height: compHeight,
-    rotation: 0,
-    zIndex: maxZ + 1,
-    locked: false,
-    visible: true,
-    states: def.states ? JSON.parse(JSON.stringify(def.states)) : undefined,
-    activeState: def.activeState || (def.states?.[0]?.id ?? '1'),
-    children: def.children ? JSON.parse(JSON.stringify(def.children)) : (def.states?.[0]?.children ? JSON.parse(JSON.stringify(def.states[0].children)) : undefined),
-    style: JSON.parse(JSON.stringify(def.style || def.defaultStyle || {})),
-    animation: def.animation ? JSON.parse(JSON.stringify(def.animation)) : (def.defaultAnimation ? JSON.parse(JSON.stringify(def.defaultAnimation)) : undefined),
-    data: JSON.parse(JSON.stringify(def.data || def.defaultData || { mapping: {} })),
-    customProps: def.customProps ? JSON.parse(JSON.stringify(def.customProps)) : (def.defaultCustomProps ? JSON.parse(JSON.stringify(def.defaultCustomProps)) : undefined)
+const handleSelectBasicShape = (shapeType: string) => {
+  if (shapeType === 'select') {
+    drawTool.value = 'select';
+    activePlacementDef.value = null;
+    activeShapeType.value = '';
+    return;
+  }
+  if (shapeType === 'draw-polyline') {
+    drawTool.value = 'draw-polyline';
+    activePlacementDef.value = null;
+    activeShapeType.value = 'draw-polyline';
+    return;
+  }
+  if (shapeType === 'draw-arrow') {
+    drawTool.value = 'draw-arrow';
+    activePlacementDef.value = null;
+    activeShapeType.value = 'draw-arrow';
+    return;
+  }
+
+  const def = COMPONENT_DEFINITIONS.find(d => d.type === shapeType) || {
+    type: shapeType,
+    category: 'basic',
+    name: shapeType.replace('draw-', ''),
+    defaultWidth: 160,
+    defaultHeight: 120,
+    defaultStyle: { fill: '#00f2ff', fillOpacity: 0.15, stroke: '#00f2ff', strokeWidth: 2 }
   };
 
-  components.value.push(newComp);
-  selectedIds.value = [newComp.id];
-  recordHistory();
+  activePlacementDef.value = JSON.parse(JSON.stringify(def));
+  activeShapeType.value = shapeType;
+  drawTool.value = 'place-component';
 };
 
 const handleAddComponentAt = (def: any, x: number, y: number) => {
@@ -531,19 +539,13 @@ const handleUpdateComponents = (updatedComps: ScreenComponent[], record = false)
   if (!Array.isArray(updatedComps) || updatedComps.length === 0) return;
   const map = new Map(updatedComps.map(c => [c.id, c]));
   const currentList = components.value;
-  let hasMetaChange = false;
   for (let i = 0; i < currentList.length; i++) {
     const updated = map.get(currentList[i].id);
     if (updated) {
-      if ('locked' in updated || 'visible' in updated || 'zIndex' in updated || 'name' in updated) {
-        hasMetaChange = true;
-      }
       Object.assign(currentList[i], updated);
     }
   }
-  if (hasMetaChange) {
-    components.value = [...components.value];
-  }
+  components.value = [...components.value];
   if (record) recordHistory();
 };
 
@@ -719,12 +721,12 @@ const handleMoveDown = (ids: string | string[]) => {
   recordHistory();
 };
 
-// Alignment tools (Supports single, multi-selection, and even distribution)
-const handleAlignComponent = (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'distribute-h' | 'distribute-v') => {
+// Alignment & Equal Sizing tools (Supports single, multi-selection, equal sizing, and even distribution)
+const handleAlignComponent = (type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'distribute-h' | 'distribute-v' | 'equal-width' | 'equal-height' | 'equal-size' | 'equal-max-size' | 'equal-min-size' | 'make-square') => {
   const targets = components.value.filter(c => selectedIds.value.includes(c.id) && !c.locked);
   if (targets.length === 0) return;
 
-  if (targets.length === 1 && !type.startsWith('distribute')) {
+  if (targets.length === 1 && !type.startsWith('distribute') && !type.startsWith('equal') && type !== 'make-square') {
     const target = targets[0];
     if (type === 'left') target.x = 0;
     if (type === 'center') target.x = Math.round((screen.value.width - target.width) / 2);
@@ -732,6 +734,34 @@ const handleAlignComponent = (type: 'left' | 'center' | 'right' | 'top' | 'middl
     if (type === 'top') target.y = 0;
     if (type === 'middle') target.y = Math.round((screen.value.height - target.height) / 2);
     if (type === 'bottom') target.y = Math.round(screen.value.height - target.height);
+  } else if (targets.length >= 1 && (type.startsWith('equal') || type === 'make-square')) {
+    // Equal Sizing features
+    if (type === 'equal-width') {
+      const baseW = targets[0].width;
+      targets.forEach(c => { c.width = baseW; });
+    } else if (type === 'equal-height') {
+      const baseH = targets[0].height;
+      targets.forEach(c => { c.height = baseH; });
+    } else if (type === 'equal-size') {
+      const baseW = targets[0].width;
+      const baseH = targets[0].height;
+      targets.forEach(c => { c.width = baseW; c.height = baseH; });
+    } else if (type === 'equal-max-size') {
+      const maxW = Math.max(...targets.map(c => c.width));
+      const maxH = Math.max(...targets.map(c => c.height));
+      targets.forEach(c => { c.width = maxW; c.height = maxH; });
+    } else if (type === 'equal-min-size') {
+      const minW = Math.min(...targets.map(c => c.width));
+      const minH = Math.min(...targets.map(c => c.height));
+      targets.forEach(c => { c.width = minW; c.height = minH; });
+    } else if (type === 'make-square') {
+      targets.forEach(c => {
+        const sz = Math.max(c.width, c.height);
+        c.width = sz;
+        c.height = sz;
+      });
+    }
+    components.value = [...components.value];
   } else if (targets.length >= 2) {
     if (type === 'distribute-h') {
       if (targets.length >= 3) {
@@ -1139,7 +1169,7 @@ onBeforeUnmount(() => {
   />
 
   <!-- 2. SCADA Master Studio Workspace (After login) -->
-  <div v-else class="h-screen w-screen flex flex-col bg-[#040810] text-slate-200 overflow-hidden font-sans select-none">
+  <div v-else class="h-screen w-screen flex flex-col bg-[#0b172a] text-slate-200 overflow-hidden font-sans select-none">
     <!-- Top Navigation & Global Controls -->
     <Navbar
       :screen="screen"
@@ -1148,6 +1178,7 @@ onBeforeUnmount(() => {
       :canUndo="canUndo"
       :canRedo="canRedo"
       :drawTool="drawTool"
+      :activeShapeType="activeShapeType"
       :selectedIds="selectedIds"
       :selectedComponents="selectedComponents"
       :showGrid="showGrid"
@@ -1157,6 +1188,7 @@ onBeforeUnmount(() => {
       @update:screen="screen = $event; recordHistory();"
       @update:zoom="zoom = $event"
       @update:drawTool="drawTool = $event"
+      @select:shape="handleSelectBasicShape"
       @update:showGrid="showGrid = $event"
       @update:gridSize="gridSize = $event"
       @update:snapToGrid="snapToGrid = $event"
@@ -1187,7 +1219,7 @@ onBeforeUnmount(() => {
     <!-- Main Workspace Studio -->
     <div class="flex-1 flex overflow-hidden relative">
       <!-- Left Sidebar Navigation Tabs (Palette vs Layers) -->
-      <div class="w-11 shrink-0 bg-[#050914] border-r border-cyan-500/20 flex flex-col items-center py-2.5 gap-2.5 z-30">
+      <div class="w-11 shrink-0 bg-[#0c1d37] border-r border-cyan-500/25 flex flex-col items-center py-2.5 gap-2.5 z-30">
         <button
           @click="leftSidebarTab = 'palette'"
           class="w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer"
@@ -1247,6 +1279,7 @@ onBeforeUnmount(() => {
           :zoom="zoom"
           :datasets="datasets"
           :drawTool="drawTool"
+          :activeComponentDef="activePlacementDef"
           :canPaste="clipboard.length > 0"
           :showGrid="showGrid"
           :gridSize="gridSize"
@@ -1274,7 +1307,7 @@ onBeforeUnmount(() => {
           @save:symbol="handleOpenSaveSymbolModal"
           @undo="handleUndo"
           @redo="handleRedo"
-          @finish:draw="drawTool = 'select'"
+          @finish:draw="drawTool = 'select'; activePlacementDef = null; activeShapeType = '';"
           @open:property-inspector="showPropertyInspector = true"
           @open:control-modal="(devId) => { controlInitialDeviceId = devId; showControlModal = true; }"
           @commit:history="recordHistory"

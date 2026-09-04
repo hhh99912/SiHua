@@ -1,0 +1,99 @@
+{
+  "id": "screen-1788502118446",
+  "name": "新画面 5",
+  "description": "",
+  "version": "2.0.0",
+  "updatedAt": "2026-09-04T06:18:54.808Z",
+  "screen": {
+    "id": "screen-1788502118446",
+    "name": "新画面 5",
+    "width": 1980,
+    "height": 1100,
+    "backgroundColor": "#0f223d",
+    "backgroundGrid": true,
+    "gridSize": 20,
+    "gridColor": "rgba(0, 242, 255, 0.22)",
+    "theme": "cyber-dark",
+    "version": "2.0.0",
+    "updatedAt": "2026-09-04T06:08:38.446Z"
+  },
+  "components": [
+    {
+      "id": "comp-1788502124581-0uk2",
+      "name": "重装机甲铆钉边框 #1",
+      "type": "deco-border-mech",
+      "category": "decoration",
+      "x": 0,
+      "y": 0,
+      "width": 1860,
+      "height": 980,
+      "rotation": 0,
+      "zIndex": 1,
+      "locked": false,
+      "visible": true,
+      "activeState": "1",
+      "style": {
+        "stroke": "#38bdf8",
+        "fill": "rgba(6, 14, 28, 0.75)"
+      },
+      "data": {
+        "mapping": {}
+      },
+      "customProps": {
+        "borderStyle": "deco-border-mech"
+      }
+    },
+    {
+      "id": "comp-1788502732014-uox6",
+      "name": "折线走线 #2",
+      "type": "draw-polyline",
+      "category": "basic",
+      "x": 320,
+      "y": 160,
+      "width": 880,
+      "height": 520,
+      "rotation": 0,
+      "zIndex": 2,
+      "locked": false,
+      "visible": true,
+      "activeState": "1",
+      "style": {
+        "stroke": "#00f2ff",
+        "strokeWidth": 3,
+        "lineType": "step-horizontal",
+        "lineStyle": "solid"
+      },
+      "data": {
+        "mapping": {}
+      },
+      "customProps": {
+        "points": [
+          {
+            "xRatio": 1,
+            "yRatio": 0,
+            "x": 880,
+            "y": 0
+          },
+          {
+            "xRatio": 0.5909090909090909,
+            "yRatio": 0.6923076923076923,
+            "x": 520,
+            "y": 360
+          },
+          {
+            "xRatio": 0,
+            "yRatio": 1,
+            "x": 0,
+            "y": 520
+          },
+          {
+            "xRatio": 0,
+            "yRatio": 1,
+            "x": 0,
+            "y": 520
+          }
+        ]
+      }
+    }
+  ]
+}

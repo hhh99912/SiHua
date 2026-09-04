@@ -54,6 +54,7 @@ const breakerState = computed(() => {
       class="w-full h-full overflow-visible"
       viewBox="0 0 60 80" 
       preserveAspectRatio="xMidYMid meet"
+      shape-rendering="geometricPrecision"
     >
       <!-- Top Incomer Terminal Line -->
       <line x1="30" y1="0" x2="30" y2="20" :stroke="breakerState.stroke" :stroke-width="breakerState.strokeWidth" stroke-linecap="round" />

@@ -219,6 +219,8 @@ const cylPaths = computed(() => {
       class="w-full h-full overflow-visible"
       :viewBox="`0 0 ${width} ${height}`"
       preserveAspectRatio="none"
+      shape-rendering="geometricPrecision"
+      text-rendering="geometricPrecision"
     >
       <defs v-if="streamerActive || style.gradient">
         <!-- Dynamic Streamer Laser Glow Filter -->

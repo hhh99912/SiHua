@@ -262,9 +262,9 @@ export function loadAllScreensFromDisk(): {
       const screenConfig = parsed.screen || {
         id: screenId,
         name: screenName,
-        width: 1920,
-        height: 1080,
-        backgroundColor: '#040914',
+        width: 1980,
+        height: 1100,
+        backgroundColor: '#0f223d',
         backgroundGrid: true,
         gridSize: 20,
         gridColor: 'rgba(0, 242, 255, 0.22)',
@@ -311,7 +311,7 @@ export function loadAllScreensFromDisk(): {
               id: sid,
               name: sname,
               description: p.description || '',
-              screen: p.screen || { id: sid, name: sname, width: 1920, height: 1080 },
+              screen: p.screen || { id: sid, name: sname, width: 1980, height: 1100, backgroundColor: '#0f223d' },
               components: p.components || []
             });
             validFiles.push(fn);

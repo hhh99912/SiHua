@@ -1197,6 +1197,26 @@ export const COMPONENT_DEFINITIONS: ComponentDefinition[] = [
   // 6. Cyber Decorations & Borders (科技边框)
   // ==========================================
   {
+    type: 'deco-border-minimal',
+    category: 'decoration',
+    name: '极简透明边框',
+    nameEn: 'Minimalist Transparent Frame',
+    iconName: 'Square',
+    description: '没有任何文字特效的极简工控边框，内部完全透明，四角高精直角卡尺',
+    defaultWidth: 1980,
+    defaultHeight: 1100,
+    defaultStyle: {
+      stroke: '#00f2ff',
+      strokeWidth: 2,
+      fill: 'transparent'
+    },
+    defaultCustomProps: {
+      borderStyle: 'deco-border-minimal',
+      showTitle: false
+    },
+    defaultData: { mapping: {} }
+  },
+  {
     type: 'deco-border-neon',
     category: 'decoration',
     name: '霓虹四角标科技框',

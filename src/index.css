@@ -4,11 +4,11 @@
 
 @layer base {
   body {
-    background-color: #040810;
+    background-color: #152e52;
     color: #f8fafc;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", "Noto Sans CJK SC", "Noto Sans SC", sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    font-family: "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", "WenQuanYi Zen Hei", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Heiti SC", "SimHei", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: subpixel-antialiased;
+    -moz-osx-font-smoothing: auto;
     text-rendering: optimizeLegibility;
     font-feature-settings: "liga" 0, "tnum" 1;
     font-variant-numeric: tabular-nums;
@@ -17,8 +17,8 @@
 
   input, textarea, select, button {
     font-family: inherit;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    -webkit-font-smoothing: subpixel-antialiased;
+    -moz-osx-font-smoothing: auto;
     text-rendering: optimizeLegibility;
   }
 
@@ -27,16 +27,40 @@
     opacity: 0.8;
   }
 
+  /* SVG Text & Vector Rendering for Crisp Industrial Visuals */
   svg text {
     text-rendering: geometricPrecision;
-    shape-rendering: geometricPrecision;
+    -webkit-font-smoothing: subpixel-antialiased;
   }
 
-  .scada-crisp-layer {
+  svg {
+    shape-rendering: geometricPrecision;
+    text-rendering: geometricPrecision;
+  }
+
+  /* High Precision & Crisp Edge Rendering for Diagrams, Bitmaps, and Canvases */
+  .scada-crisp-layer,
+  .infinite-canvas-plane,
+  canvas {
     transform: translateZ(0);
     backface-visibility: hidden;
     image-rendering: -webkit-optimize-contrast;
     image-rendering: crisp-edges;
+  }
+
+  img {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+
+  /* High-Contrast Monospace / Digital SCADA Numbers */
+  .font-mono,
+  .font-digital,
+  .font-tabular {
+    font-family: 'Chakra Petch', 'JetBrains Mono', 'WenQuanYi Micro Hei Mono', 'DejaVu Sans Mono', 'Ubuntu Mono', Consolas, 'Courier New', monospace !important;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: subpixel-antialiased;
+    letter-spacing: 0.5px;
   }
 }
 
@@ -47,16 +71,16 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(11, 19, 34, 0.6);
+  background: rgba(18, 38, 68, 0.7);
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0, 242, 255, 0.25);
+  background: rgba(0, 242, 255, 0.35);
   border-radius: 4px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 242, 255, 0.6);
+  background: rgba(0, 242, 255, 0.75);
 }
 
 /* Animations for industrial pipe flow and tank waves */
@@ -92,26 +116,23 @@
 
 /* ==========================================================================
    Linx / Industrial Linux X11 Compatible Cursors (凝思/麒麟工控机兼容鼠标指针)
-   避免缺少 Xcursor 主题时回退为黑色十字符号 (XC_X_cursor)
+   彻底杜绝 grab/grabbing/not-allowed 导致凝思系统由于缺少主题而显示黑色十字符号 (XC_X_cursor)
+   统一使用标准且100%兼容的 pointer, default, move, crosshair
    ========================================================================== */
 
-/* 1. Grab (小手抓取) */
+/* 1. Grab & Grabbing -> 使用标准 move 或 pointer */
 .cursor-grab,
-[class*="cursor-grab"],
-[style*="cursor: grab"],
-[style*="cursor:grab"] {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v3M14 5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6M10 7a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8a6 6 0 0 0 6 6h2a6 6 0 0 0 6-6v-4' stroke='%23000000' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v3M14 5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6M10 7a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8a6 6 0 0 0 6 6h2a6 6 0 0 0 6-6v-4' stroke='%2300f2ff' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='rgba(6,14,28,0.75)'/%3E%3C/svg%3E") 10 10, grab, -webkit-grab, pointer, move !important;
-}
-
-/* 2. Grabbing (小手闭合抓取) */
 .cursor-grabbing,
+[class*="cursor-grab"],
 [class*="cursor-grabbing"],
+[style*="cursor: grab"],
+[style*="cursor:grab"],
 [style*="cursor: grabbing"],
 [style*="cursor:grabbing"] {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M7 11V8a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2m-2 0h4a2 2 0 0 1 2 2v3a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5v-2a2 2 0 0 1 2-2h2' stroke='%23000000' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M7 11V8a2 2 0 0 1 2-2h0a2 2 0 0 1 2 2v2m-2 0h4a2 2 0 0 1 2 2v3a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5v-2a2 2 0 0 1 2-2h2' stroke='%2300f2ff' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' fill='rgba(0,242,255,0.4)'/%3E%3C/svg%3E") 10 10, grabbing, -webkit-grabbing, move, pointer !important;
+  cursor: move !important;
 }
 
-/* 3. Not-Allowed (禁用/禁止符号) */
+/* 2. Disabled & Not-Allowed -> 使用标准 default，绝不使用 not-allowed */
 .cursor-not-allowed,
 [class*="cursor-not-allowed"],
 [style*="cursor: not-allowed"],
@@ -121,6 +142,6 @@ input:disabled,
 select:disabled,
 textarea:disabled,
 [disabled] {
-  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Ccircle cx='12' cy='12' r='9' stroke='%23000000' stroke-width='3.5'/%3E%3Ccircle cx='12' cy='12' r='9' stroke='%23ef4444' stroke-width='2' fill='rgba(239,68,68,0.25)'/%3E%3Cline x1='5.6' y1='5.6' x2='18.4' y2='18.4' stroke='%23000000' stroke-width='3.5'/%3E%3Cline x1='5.6' y1='5.6' x2='18.4' y2='18.4' stroke='%23ef4444' stroke-width='2'/%3E%3C/svg%3E") 12 12, not-allowed, no-drop, default !important;
+  cursor: default !important;
 }
 

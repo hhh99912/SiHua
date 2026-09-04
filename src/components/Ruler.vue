@@ -88,7 +88,7 @@ const canvasBoundsOnRuler = computed(() => {
 <template>
   <!-- Top Horizontal Ruler -->
   <div 
-    class="absolute top-0 left-[30px] right-0 h-[30px] bg-[#070e1c] border-b border-cyan-400/50 overflow-hidden pointer-events-none select-none z-20 shadow-sm"
+    class="absolute top-0 left-[30px] right-0 h-[30px] bg-[#071329] border-b border-cyan-400/80 overflow-hidden pointer-events-none select-none z-20 shadow-md"
   >
     <svg class="w-full h-full">
       <!-- Active Canvas Highlight Band on Ruler -->
@@ -97,11 +97,11 @@ const canvasBoundsOnRuler = computed(() => {
         y="0"
         :width="Math.max(0, canvasBoundsOnRuler.w)"
         height="30"
-        fill="rgba(0, 242, 255, 0.12)"
+        fill="rgba(0, 242, 255, 0.18)"
       />
       <!-- Active Canvas Boundary Lines -->
-      <line :x1="canvasBoundsOnRuler.x1" y1="0" :x2="canvasBoundsOnRuler.x1" y2="30" stroke="#00f2ff" stroke-width="2" />
-      <line :x1="canvasBoundsOnRuler.x2" y1="0" :x2="canvasBoundsOnRuler.x2" y2="30" stroke="#00f2ff" stroke-width="2" />
+      <line :x1="canvasBoundsOnRuler.x1" y1="0" :x2="canvasBoundsOnRuler.x1" y2="30" stroke="#00f2ff" stroke-width="2" shape-rendering="crispEdges" />
+      <line :x1="canvasBoundsOnRuler.x2" y1="0" :x2="canvasBoundsOnRuler.x2" y2="30" stroke="#00f2ff" stroke-width="2" shape-rendering="crispEdges" />
 
       <!-- Horizontal Ticks -->
       <g 
@@ -111,21 +111,23 @@ const canvasBoundsOnRuler = computed(() => {
       >
         <line 
           x1="0" 
-          :y1="tick.isMajor ? 14 : 22" 
+          :y1="tick.isMajor ? 13 : 21" 
           x2="0" 
           y2="30" 
-          :stroke="tick.isMajor ? '#38bdf8' : '#0284c7'" 
+          :stroke="tick.isMajor ? '#00f2ff' : '#0284c7'" 
           :stroke-width="tick.isMajor ? 1.5 : 1" 
+          shape-rendering="crispEdges"
         />
-        <!-- Horizontal major tick text -->
+        <!-- Horizontal major tick text - High Contrast Crisp White/Cyan -->
         <text
           v-if="tick.isMajor"
           x="4"
-          y="12"
-          fill="#38bdf8"
-          font-size="9"
-          font-weight="normal"
-          font-family="monospace"
+          y="11"
+          fill="#f0f9ff"
+          font-size="10"
+          font-weight="bold"
+          font-family="'JetBrains Mono', monospace"
+          text-rendering="geometricPrecision"
           class="select-none"
         >
           {{ tick.value }}
@@ -140,13 +142,14 @@ const canvasBoundsOnRuler = computed(() => {
         y2="30"
         stroke="#facc15"
         stroke-width="2"
+        shape-rendering="crispEdges"
       />
     </svg>
   </div>
 
-  <!-- Left Vertical Ruler (Wider track to prevent text truncation) -->
+  <!-- Left Vertical Ruler - Upright Horizontal Numbers for Maximum Legibility & Zero Aliasing -->
   <div 
-    class="absolute top-[30px] left-0 bottom-0 w-[30px] bg-[#070e1c] border-r border-cyan-400/50 overflow-hidden pointer-events-none select-none z-20 shadow-sm"
+    class="absolute top-[30px] left-0 bottom-0 w-[30px] bg-[#071329] border-r border-cyan-400/80 overflow-hidden pointer-events-none select-none z-20 shadow-md"
   >
     <svg class="w-full h-full">
       <!-- Active Canvas Highlight Band on Ruler -->
@@ -155,11 +158,11 @@ const canvasBoundsOnRuler = computed(() => {
         :y="canvasBoundsOnRuler.y1"
         width="30"
         :height="Math.max(0, canvasBoundsOnRuler.h)"
-        fill="rgba(0, 242, 255, 0.12)"
+        fill="rgba(0, 242, 255, 0.18)"
       />
       <!-- Active Canvas Boundary Lines -->
-      <line x1="0" :y1="canvasBoundsOnRuler.y1" x2="30" :y2="canvasBoundsOnRuler.y1" stroke="#00f2ff" stroke-width="2" />
-      <line x1="0" :y1="canvasBoundsOnRuler.y2" x2="30" :y2="canvasBoundsOnRuler.y2" stroke="#00f2ff" stroke-width="2" />
+      <line x1="0" :y1="canvasBoundsOnRuler.y1" x2="30" :y2="canvasBoundsOnRuler.y1" stroke="#00f2ff" stroke-width="2" shape-rendering="crispEdges" />
+      <line x1="0" :y1="canvasBoundsOnRuler.y2" x2="30" :y2="canvasBoundsOnRuler.y2" stroke="#00f2ff" stroke-width="2" shape-rendering="crispEdges" />
 
       <!-- Vertical Ticks -->
       <g 
@@ -168,25 +171,25 @@ const canvasBoundsOnRuler = computed(() => {
         :transform="`translate(0, ${tick.pos})`"
       >
         <line 
-          :x1="tick.isMajor ? 18 : 24" 
+          :x1="tick.isMajor ? 16 : 23" 
           y1="0" 
           x2="30" 
           y2="0" 
           :stroke="tick.isMajor ? '#00f2ff' : '#0284c7'" 
           :stroke-width="tick.isMajor ? 1.5 : 1" 
+          shape-rendering="crispEdges"
         />
-        <!-- Shifted rightwards (x=16) so vertical numbers have generous spacing, perfectly visible and clear -->
+        <!-- Vertical major tick text - Rendered UPRIGHT (正着写) with geometricPrecision: perfectly crisp, matching horizontal ruler -->
         <text
           v-if="tick.isMajor"
-          x="16"
-          y="4"
-          fill="#38bdf8"
+          x="2"
+          y="-3"
+          fill="#f0f9ff"
           font-size="9"
-          font-weight="normal"
-          font-family="monospace"
+          font-weight="bold"
+          font-family="'JetBrains Mono', monospace"
+          text-rendering="geometricPrecision"
           class="select-none"
-          text-anchor="end"
-          transform="rotate(-90 16,4)"
         >
           {{ tick.value }}
         </text>
@@ -200,12 +203,13 @@ const canvasBoundsOnRuler = computed(() => {
         :y2="cursorGuideY"
         stroke="#facc15"
         stroke-width="2"
+        shape-rendering="crispEdges"
       />
     </svg>
   </div>
 
   <!-- Top-Left Origin Junction (0, 0) -->
-  <div class="absolute top-0 left-0 w-[30px] h-[30px] bg-[#050914] border-r border-b border-cyan-400/60 flex items-center justify-center text-[10px] font-mono text-cyan-300 font-bold z-30 select-none shadow-md">
+  <div class="absolute top-0 left-0 w-[30px] h-[30px] bg-[#0a1b38] border-r border-b border-cyan-400 flex items-center justify-center text-[10px] font-mono text-cyan-200 font-black z-30 select-none shadow-md">
     px
   </div>
 </template>

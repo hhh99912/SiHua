@@ -1,0 +1,89 @@
+{
+  "id": "screen-low-voltage-04kv",
+  "name": "0.4kV低压配电画面",
+  "description": "0.4kV 综合智能配电进线、电容无功自动补偿及动力支路用电",
+  "version": "2.0.0",
+  "updatedAt": "2026-09-04T05:06:50.823Z",
+  "screen": {
+    "id": "screen-low-voltage-04kv",
+    "name": "0.4kV低压配电画面",
+    "width": 1980,
+    "height": 1100,
+    "backgroundColor": "#0f223d",
+    "backgroundGrid": true,
+    "gridSize": 20,
+    "gridColor": "rgba(0, 242, 255, 0.22)",
+    "theme": "cyber-dark",
+    "version": "2.0.0",
+    "updatedAt": "2026-09-04T05:06:21.772Z"
+  },
+  "components": [
+    {
+      "id": "comp-nav-bar-3",
+      "name": "多画面全局导航条",
+      "type": "nav-tabs",
+      "category": "custom",
+      "x": 60,
+      "y": 20,
+      "width": 1800,
+      "height": 52,
+      "rotation": 0,
+      "zIndex": 10,
+      "style": {
+        "fill": "rgba(6, 14, 28, 0.92)",
+        "stroke": "#00f2ff",
+        "strokeWidth": 1,
+        "borderRadius": 10
+      },
+      "data": {
+        "mapping": {}
+      },
+      "customProps": {
+        "screens": [
+          {
+            "id": "screen-10kv-main",
+            "name": "⚡ 10kV一次系统接线图"
+          },
+          {
+            "id": "screen-transformer-detail",
+            "name": "🔄 #1主变压器及测控画面"
+          },
+          {
+            "id": "screen-low-voltage-04kv",
+            "name": "🏭 0.4kV低压配电画面"
+          },
+          {
+            "id": "screen-telemetry-scada",
+            "name": "📊 全站电力遥测与告警"
+          }
+        ]
+      }
+    },
+    {
+      "id": "comp-low-meter",
+      "name": "201 低压总进线总有功 (P)",
+      "type": "metric-float",
+      "category": "metrics",
+      "x": 120,
+      "y": 240,
+      "width": 240,
+      "height": 80,
+      "rotation": 0,
+      "zIndex": 3,
+      "style": {
+        "fill": "rgba(6, 14, 28, 0.92)",
+        "stroke": "#00f2ff"
+      },
+      "data": {
+        "datasetId": "ds-scada-station",
+        "mapping": {
+          "deviceId": "DEV-201",
+          "pointCategory": "telemetry",
+          "pointId": 1,
+          "valueKey": "DEV-201_YC_1",
+          "unitKey": "kW"
+        }
+      }
+    }
+  ]
+}
