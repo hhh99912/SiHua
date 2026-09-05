@@ -47,7 +47,13 @@ import {
   Clock,
   Calendar,
   Timer,
-  Radio
+  Radio,
+  Lock,
+  Key,
+  RotateCw,
+  Sliders,
+  Users,
+  Power
 } from 'lucide-vue-next';
 import { ComponentCategory, ComponentType, CustomSymbolDef } from '../types';
 import { COMPONENT_DEFINITIONS, ComponentDefinition } from '../data/componentLibrary';
@@ -73,13 +79,14 @@ onMounted(() => {
 
 const categories: { id: ComponentCategory | 'all'; label: string }[] = [
   { id: 'all', label: '全部' },
+  { id: 'buttons', label: '🔘 交互控制 / 按钮' },
   { id: 'status', label: '🟢 状态图元/遥信' },
   { id: 'metrics', label: '🔢 数值图元/遥测' },
   { id: 'electrical', label: '⚡ 电力一次系统' },
   { id: 'industrial', label: '🏭 工业管网/设备' },
   { id: 'charts', label: '📊 统计图表/曲线' },
   { id: 'decoration', label: '✨ 科技边框/修饰' },
-  { id: 'basic', label: '📐 基础几何/按键' },
+  { id: 'basic', label: '📐 基础几何图元' },
   { id: 'custom', label: '🧩 复合自定义图元' },
 ];
 
@@ -127,7 +134,13 @@ const iconMap: Record<string, any> = {
   Clock,
   Calendar,
   Timer,
-  Radio
+  Radio,
+  Lock,
+  Key,
+  RotateCw,
+  Sliders,
+  Users,
+  Power
 };
 
 const getIcon = (iconName?: string) => {
@@ -168,6 +181,12 @@ const filteredComponents = computed(() => {
     let matchCategory = false;
     if (activeCategory.value === 'all') {
       matchCategory = true;
+    } else if (activeCategory.value === 'custom') {
+      matchCategory = c.category === 'custom' || c.type === 'composite-symbol' || Boolean(c.defaultCustomProps?.isCustomSymbol);
+    } else if (activeCategory.value === 'buttons') {
+      matchCategory = c.category === 'buttons' || c.type === 'ctrl-button';
+    } else if (activeCategory.value === 'basic') {
+      matchCategory = c.category === 'basic' && c.type !== 'ctrl-button';
     } else {
       matchCategory = c.category === activeCategory.value;
     }

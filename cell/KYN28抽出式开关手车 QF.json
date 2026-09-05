@@ -1,0 +1,249 @@
+{
+  "id": "cell-elec-handcart",
+  "name": "KYN28抽出式开关手车 QF",
+  "category": "electrical",
+  "iconName": "Layers",
+  "description": "标准高压抽出式断路器手车，含动静插头与灭弧箱体，严禁闸符，0边距贴边，支持工作合/工作分/试验/检修4态",
+  "defaultWidth": 60,
+  "defaultHeight": 100,
+  "type": "composite-symbol",
+  "defaultStyle": {
+    "fill": "transparent",
+    "stroke": "#00f2ff",
+    "strokeWidth": 2
+  },
+  "states": [
+    {
+      "id": "1",
+      "name": "工作位置 (合闸)",
+      "matchValue": "1",
+      "children": [
+        {
+          "id": "hc-top-sock-1",
+          "name": "上静触头",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 22,
+          "y": 0,
+          "width": 16,
+          "height": 10,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "fill": "rgba(239, 68, 68, 0.4)",
+            "stroke": "#ef4444",
+            "strokeWidth": 2,
+            "borderRadius": 2
+          }
+        },
+        {
+          "id": "hc-frame-1",
+          "name": "手车底盘",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 0,
+          "y": 12,
+          "width": 60,
+          "height": 76,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "fill": "rgba(15, 23, 42, 0.75)",
+            "stroke": "#ef4444",
+            "strokeWidth": 1.5,
+            "strokeDasharray": "4,3",
+            "borderRadius": 4
+          }
+        },
+        {
+          "id": "hc-arc-box-1",
+          "name": "灭弧室主体",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 10,
+          "y": 26,
+          "width": 40,
+          "height": 48,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "rgba(239, 68, 68, 0.25)",
+            "stroke": "#ef4444",
+            "strokeWidth": 2.5,
+            "borderRadius": 3
+          }
+        },
+        {
+          "id": "hc-line-1",
+          "name": "主触头闭合线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 28,
+          "y": 8,
+          "width": 4,
+          "height": 84,
+          "rotation": 0,
+          "zIndex": 3,
+          "style": {
+            "stroke": "#ef4444",
+            "strokeWidth": 4
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0.5,
+                "yRatio": 0,
+                "x": 2,
+                "y": 0
+              },
+              {
+                "xRatio": 0.5,
+                "yRatio": 1,
+                "x": 2,
+                "y": 84
+              }
+            ]
+          }
+        },
+        {
+          "id": "hc-bot-sock-1",
+          "name": "下静触头",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 22,
+          "y": 90,
+          "width": 16,
+          "height": 10,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "fill": "rgba(239, 68, 68, 0.4)",
+            "stroke": "#ef4444",
+            "strokeWidth": 2,
+            "borderRadius": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "0",
+      "name": "工作位置 (分闸)",
+      "matchValue": "0",
+      "children": [
+        {
+          "id": "hc-top-sock-0",
+          "name": "上静触头",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 22,
+          "y": 0,
+          "width": 16,
+          "height": 10,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "fill": "rgba(16, 185, 129, 0.3)",
+            "stroke": "#10b981",
+            "strokeWidth": 2,
+            "borderRadius": 2
+          }
+        },
+        {
+          "id": "hc-frame-0",
+          "name": "手车底盘",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 0,
+          "y": 12,
+          "width": 60,
+          "height": 76,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "fill": "rgba(15, 23, 42, 0.75)",
+            "stroke": "#10b981",
+            "strokeWidth": 1.5,
+            "strokeDasharray": "4,3",
+            "borderRadius": 4
+          }
+        },
+        {
+          "id": "hc-arc-box-0",
+          "name": "灭弧室主体",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 10,
+          "y": 26,
+          "width": 40,
+          "height": 48,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "rgba(16, 185, 129, 0.15)",
+            "stroke": "#10b981",
+            "strokeWidth": 2,
+            "borderRadius": 3
+          }
+        },
+        {
+          "id": "hc-line-0",
+          "name": "分闸倾斜触头",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 18,
+          "y": 34,
+          "width": 24,
+          "height": 32,
+          "rotation": 0,
+          "zIndex": 3,
+          "style": {
+            "stroke": "#10b981",
+            "strokeWidth": 3
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0.9,
+                "yRatio": 0.1,
+                "x": 22,
+                "y": 3
+              },
+              {
+                "xRatio": 0.1,
+                "yRatio": 0.9,
+                "x": 2,
+                "y": 29
+              }
+            ]
+          }
+        },
+        {
+          "id": "hc-bot-sock-0",
+          "name": "下静触头",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 22,
+          "y": 90,
+          "width": 16,
+          "height": 10,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "fill": "rgba(16, 185, 129, 0.3)",
+            "stroke": "#10b981",
+            "strokeWidth": 2,
+            "borderRadius": 2
+          }
+        }
+      ]
+    }
+  ],
+  "tags": [
+    "手车",
+    "开关柜",
+    "KYN28",
+    "抽出式"
+  ],
+  "filename": "KYN28抽出式开关手车 QF.json",
+  "updatedAt": "2026-09-04T13:28:54.167Z"
+}

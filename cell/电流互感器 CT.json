@@ -1,0 +1,98 @@
+{
+  "id": "cell-elec-ct",
+  "name": "电流互感器 CT",
+  "category": "electrical",
+  "iconName": "Activity",
+  "description": "电流互感器，由贯穿母线与穿心采样圆形线圈组装，0边距",
+  "defaultWidth": 30,
+  "defaultHeight": 50,
+  "type": "composite-symbol",
+  "defaultStyle": {
+    "fill": "transparent",
+    "stroke": "#00f2ff",
+    "strokeWidth": 2
+  },
+  "states": [
+    {
+      "id": "1",
+      "name": "正常采样运行",
+      "matchValue": "1",
+      "children": [
+        {
+          "id": "ct-line",
+          "name": "一次穿心母线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 13,
+          "y": 0,
+          "width": 4,
+          "height": 50,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "stroke": "#00f2ff",
+            "strokeWidth": 3
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0.5,
+                "yRatio": 0,
+                "x": 2,
+                "y": 0
+              },
+              {
+                "xRatio": 0.5,
+                "yRatio": 1,
+                "x": 2,
+                "y": 50
+              }
+            ]
+          }
+        },
+        {
+          "id": "ct-circle",
+          "name": "采样线圈",
+          "type": "draw-circle",
+          "category": "basic",
+          "x": 0,
+          "y": 10,
+          "width": 30,
+          "height": 30,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "rgba(0, 242, 255, 0.15)",
+            "stroke": "#00f2ff",
+            "strokeWidth": 2
+          }
+        },
+        {
+          "id": "ct-dot",
+          "name": "极性端点",
+          "type": "draw-circle",
+          "category": "basic",
+          "x": 6,
+          "y": 14,
+          "width": 4,
+          "height": 4,
+          "rotation": 0,
+          "zIndex": 3,
+          "style": {
+            "fill": "#ef4444",
+            "stroke": "#ef4444",
+            "strokeWidth": 1
+          }
+        }
+      ]
+    }
+  ],
+  "tags": [
+    "CT",
+    "TA",
+    "互感器",
+    "遥测采样"
+  ],
+  "filename": "电流互感器 CT.json",
+  "updatedAt": "2026-09-04T13:28:54.167Z"
+}

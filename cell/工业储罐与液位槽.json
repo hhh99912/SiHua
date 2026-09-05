@@ -1,0 +1,68 @@
+{
+  "id": "cell-ind-tank",
+  "name": "工业储罐与液位槽",
+  "category": "industrial",
+  "iconName": "Database",
+  "description": "工业储液罐，外壁大圆角几何框与罐内动液位，0边距",
+  "defaultWidth": 60,
+  "defaultHeight": 80,
+  "type": "composite-symbol",
+  "defaultStyle": {
+    "fill": "transparent",
+    "stroke": "#00f2ff",
+    "strokeWidth": 2
+  },
+  "states": [
+    {
+      "id": "1",
+      "name": "储液工况",
+      "matchValue": "1",
+      "children": [
+        {
+          "id": "tank-body",
+          "name": "储罐外壁",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 0,
+          "y": 0,
+          "width": 60,
+          "height": 80,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "fill": "rgba(15, 23, 42, 0.7)",
+            "stroke": "#00f2ff",
+            "strokeWidth": 2,
+            "borderRadius": 10
+          }
+        },
+        {
+          "id": "tank-liquid",
+          "name": "液体液面",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 4,
+          "y": 30,
+          "width": 52,
+          "height": 46,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "rgba(0, 242, 255, 0.35)",
+            "stroke": "#00f2ff",
+            "strokeWidth": 1,
+            "borderRadius": 6
+          }
+        }
+      ]
+    }
+  ],
+  "tags": [
+    "储罐",
+    "液位",
+    "油水罐",
+    "化工"
+  ],
+  "filename": "工业储罐与液位槽.json",
+  "updatedAt": "2026-09-04T13:28:54.168Z"
+}

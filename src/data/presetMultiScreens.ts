@@ -1,6 +1,15 @@
 import { ScreenItem } from '../types';
+import { PV_HIGH_VOLTAGE_TEMPLATE } from './pvHighVoltageTemplate';
 
 export const PRESET_MULTI_SCREENS: ScreenItem[] = [
+  // Screen 0: 35kV高压光伏一次系统图 (全新高压光伏电力系统模板)
+  {
+    id: PV_HIGH_VOLTAGE_TEMPLATE.schema.screen.id || 'screen-pv-high-voltage',
+    name: PV_HIGH_VOLTAGE_TEMPLATE.name,
+    description: PV_HIGH_VOLTAGE_TEMPLATE.description || '35kV高压光伏一次系统图',
+    screen: PV_HIGH_VOLTAGE_TEMPLATE.schema.screen,
+    components: PV_HIGH_VOLTAGE_TEMPLATE.schema.components
+  },
   // Screen 1: 10kV配电室一次系统接线图
   {
     id: 'screen-10kv-main',
@@ -20,36 +29,7 @@ export const PRESET_MULTI_SCREENS: ScreenItem[] = [
       updatedAt: new Date().toISOString()
     },
     components: [
-      // 1. Global Navigation Bar
-      {
-        id: 'comp-nav-bar',
-        name: '多画面全局导航条',
-        type: 'nav-tabs',
-        category: 'custom',
-        x: 60,
-        y: 20,
-        width: 1800,
-        height: 52,
-        rotation: 0,
-        zIndex: 10,
-        style: {
-          fill: 'rgba(6, 14, 28, 0.92)',
-          stroke: '#00f2ff',
-          strokeWidth: 1,
-          borderRadius: 10
-        },
-        data: { mapping: {} },
-        customProps: {
-          screens: [
-            { id: 'screen-10kv-main', name: '⚡ 10kV一次系统接线图' },
-            { id: 'screen-transformer-detail', name: '🔄 #1主变压器及测控画面' },
-            { id: 'screen-low-voltage-04kv', name: '🏭 0.4kV低压配电画面' },
-            { id: 'screen-telemetry-scada', name: '📊 全站电力遥测与告警' }
-          ]
-        }
-      },
-
-      // 2. Title & Header
+      // 1. Title & Header
       {
         id: 'comp-main-title',
         name: 'SCADA主标题',
@@ -342,33 +322,6 @@ export const PRESET_MULTI_SCREENS: ScreenItem[] = [
     },
     components: [
       {
-        id: 'comp-nav-bar-2',
-        name: '多画面全局导航条',
-        type: 'nav-tabs',
-        category: 'custom',
-        x: 60,
-        y: 20,
-        width: 1800,
-        height: 52,
-        rotation: 0,
-        zIndex: 10,
-        style: {
-          fill: 'rgba(6, 14, 28, 0.92)',
-          stroke: '#00f2ff',
-          strokeWidth: 1,
-          borderRadius: 10
-        },
-        data: { mapping: {} },
-        customProps: {
-          screens: [
-            { id: 'screen-10kv-main', name: '⚡ 10kV一次系统接线图' },
-            { id: 'screen-transformer-detail', name: '🔄 #1主变压器及测控画面' },
-            { id: 'screen-low-voltage-04kv', name: '🏭 0.4kV低压配电画面' },
-            { id: 'screen-telemetry-scada', name: '📊 全站电力遥测与告警' }
-          ]
-        }
-      },
-      {
         id: 'comp-tf-main',
         name: '#1 主变压器双绕组',
         type: 'elec-transformer',
@@ -461,33 +414,6 @@ export const PRESET_MULTI_SCREENS: ScreenItem[] = [
     },
     components: [
       {
-        id: 'comp-nav-bar-3',
-        name: '多画面全局导航条',
-        type: 'nav-tabs',
-        category: 'custom',
-        x: 60,
-        y: 20,
-        width: 1800,
-        height: 52,
-        rotation: 0,
-        zIndex: 10,
-        style: {
-          fill: 'rgba(6, 14, 28, 0.92)',
-          stroke: '#00f2ff',
-          strokeWidth: 1,
-          borderRadius: 10
-        },
-        data: { mapping: {} },
-        customProps: {
-          screens: [
-            { id: 'screen-10kv-main', name: '⚡ 10kV一次系统接线图' },
-            { id: 'screen-transformer-detail', name: '🔄 #1主变压器及测控画面' },
-            { id: 'screen-low-voltage-04kv', name: '🏭 0.4kV低压配电画面' },
-            { id: 'screen-telemetry-scada', name: '📊 全站电力遥测与告警' }
-          ]
-        }
-      },
-      {
         id: 'comp-low-meter',
         name: '201 低压总进线总有功 (P)',
         type: 'metric-float',
@@ -536,33 +462,6 @@ export const PRESET_MULTI_SCREENS: ScreenItem[] = [
     },
     components: [
       {
-        id: 'comp-nav-bar-4',
-        name: '多画面全局导航条',
-        type: 'nav-tabs',
-        category: 'custom',
-        x: 60,
-        y: 20,
-        width: 1800,
-        height: 52,
-        rotation: 0,
-        zIndex: 10,
-        style: {
-          fill: 'rgba(6, 14, 28, 0.92)',
-          stroke: '#00f2ff',
-          strokeWidth: 1,
-          borderRadius: 10
-        },
-        data: { mapping: {} },
-        customProps: {
-          screens: [
-            { id: 'screen-10kv-main', name: '⚡ 10kV一次系统接线图' },
-            { id: 'screen-transformer-detail', name: '🔄 #1主变压器及测控画面' },
-            { id: 'screen-low-voltage-04kv', name: '🏭 0.4kV低压配电画面' },
-            { id: 'screen-telemetry-scada', name: '📊 全站电力遥测与告警' }
-          ]
-        }
-      },
-      {
         id: 'comp-chart-load-line',
         name: '24小时总用电负荷趋势',
         type: 'chart-line',
@@ -580,23 +479,6 @@ export const PRESET_MULTI_SCREENS: ScreenItem[] = [
           datasetId: 'ds-scada-station',
           mapping: {}
         }
-      },
-      {
-        id: 'comp-alarm-feed-scada',
-        name: '变电站 SOE 事件与跳闸告警列表',
-        type: 'ind-alarm-list',
-        category: 'industrial',
-        x: 740,
-        y: 200,
-        width: 540,
-        height: 360,
-        rotation: 0,
-        zIndex: 3,
-        style: {
-          stroke: '#ef4444',
-          fill: 'rgba(15, 23, 42, 0.85)'
-        },
-        data: { mapping: {} }
       }
     ]
   }

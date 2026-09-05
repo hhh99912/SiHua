@@ -1,0 +1,299 @@
+{
+  "id": "cell-elec-disconnector",
+  "name": "高压隔离开关 QS",
+  "category": "electrical",
+  "iconName": "ZapOff",
+  "description": "电力隔离开关，由上下圆形静触座与直线动触刀组装，不使用任何闸符，0边距贴边，支持分合双态",
+  "defaultWidth": 20,
+  "defaultHeight": 70,
+  "type": "composite-symbol",
+  "defaultStyle": {
+    "fill": "transparent",
+    "stroke": "#00f2ff",
+    "strokeWidth": 2
+  },
+  "states": [
+    {
+      "id": "1",
+      "name": "状态 1 (合闸 / 导通)",
+      "matchValue": "1",
+      "children": [
+        {
+          "id": "qs-top-line-1",
+          "name": "上引线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 12,
+          "y": 0,
+          "width": 4,
+          "height": 18,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "stroke": "#ef4444",
+            "strokeWidth": 3
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0.5,
+                "yRatio": 0,
+                "x": 2,
+                "y": 0
+              },
+              {
+                "xRatio": 0.5,
+                "yRatio": 1,
+                "x": 2,
+                "y": 18
+              }
+            ]
+          }
+        },
+        {
+          "id": "qs-top-circle-1",
+          "name": "上静触头",
+          "type": "draw-circle",
+          "category": "basic",
+          "x": 8,
+          "y": 18,
+          "width": 12,
+          "height": 12,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "#ef4444",
+            "stroke": "#ef4444",
+            "strokeWidth": 1
+          }
+        },
+        {
+          "id": "qs-blade-1",
+          "name": "合闸动触刀",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 12,
+          "y": 28,
+          "width": 4,
+          "height": 18,
+          "rotation": 0,
+          "zIndex": 3,
+          "style": {
+            "stroke": "#ef4444",
+            "strokeWidth": 4
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0.5,
+                "yRatio": 0,
+                "x": 2,
+                "y": 0
+              },
+              {
+                "xRatio": 0.5,
+                "yRatio": 1,
+                "x": 2,
+                "y": 18
+              }
+            ]
+          }
+        },
+        {
+          "id": "qs-bot-circle-1",
+          "name": "下轴端触头",
+          "type": "draw-circle",
+          "category": "basic",
+          "x": 8,
+          "y": 44,
+          "width": 12,
+          "height": 12,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "#ef4444",
+            "stroke": "#ef4444",
+            "strokeWidth": 1
+          }
+        },
+        {
+          "id": "qs-bot-line-1",
+          "name": "下引线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 12,
+          "y": 54,
+          "width": 4,
+          "height": 16,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "stroke": "#ef4444",
+            "strokeWidth": 3
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0.5,
+                "yRatio": 0,
+                "x": 2,
+                "y": 0
+              },
+              {
+                "xRatio": 0.5,
+                "yRatio": 1,
+                "x": 2,
+                "y": 16
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "0",
+      "name": "状态 0 (分闸 / 隔离)",
+      "matchValue": "0",
+      "children": [
+        {
+          "id": "qs-top-line-0",
+          "name": "上引线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 12,
+          "y": 0,
+          "width": 4,
+          "height": 18,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "stroke": "#10b981",
+            "strokeWidth": 3
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0.5,
+                "yRatio": 0,
+                "x": 2,
+                "y": 0
+              },
+              {
+                "xRatio": 0.5,
+                "yRatio": 1,
+                "x": 2,
+                "y": 18
+              }
+            ]
+          }
+        },
+        {
+          "id": "qs-top-circle-0",
+          "name": "上静触头",
+          "type": "draw-circle",
+          "category": "basic",
+          "x": 8,
+          "y": 18,
+          "width": 12,
+          "height": 12,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "transparent",
+            "stroke": "#10b981",
+            "strokeWidth": 2
+          }
+        },
+        {
+          "id": "qs-blade-0",
+          "name": "分闸倾斜触刀",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 0,
+          "y": 26,
+          "width": 14,
+          "height": 22,
+          "rotation": 0,
+          "zIndex": 3,
+          "style": {
+            "stroke": "#10b981",
+            "strokeWidth": 3
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0,
+                "yRatio": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "xRatio": 1,
+                "yRatio": 1,
+                "x": 14,
+                "y": 22
+              }
+            ]
+          }
+        },
+        {
+          "id": "qs-bot-circle-0",
+          "name": "下轴端触头",
+          "type": "draw-circle",
+          "category": "basic",
+          "x": 8,
+          "y": 44,
+          "width": 12,
+          "height": 12,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "#10b981",
+            "stroke": "#10b981",
+            "strokeWidth": 1
+          }
+        },
+        {
+          "id": "qs-bot-line-0",
+          "name": "下引线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 12,
+          "y": 54,
+          "width": 4,
+          "height": 16,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "stroke": "#10b981",
+            "strokeWidth": 3
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0.5,
+                "yRatio": 0,
+                "x": 2,
+                "y": 0
+              },
+              {
+                "xRatio": 0.5,
+                "yRatio": 1,
+                "x": 2,
+                "y": 16
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "tags": [
+    "一次系统",
+    "隔离开关",
+    "刀闸",
+    "QS"
+  ],
+  "filename": "高压隔离开关 QS.json",
+  "updatedAt": "2026-09-04T13:28:54.166Z"
+}

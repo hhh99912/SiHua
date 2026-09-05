@@ -1,0 +1,137 @@
+{
+  "id": "cell-ind-bess",
+  "name": "储能电池模组 BESS",
+  "category": "industrial",
+  "iconName": "Database",
+  "description": "电化学储能模组，包含集装箱框体、正负极极耳与内部多层电池电芯条纹，0边距",
+  "defaultWidth": 70,
+  "defaultHeight": 50,
+  "type": "composite-symbol",
+  "defaultStyle": {
+    "fill": "transparent",
+    "stroke": "#00f2ff",
+    "strokeWidth": 2
+  },
+  "states": [
+    {
+      "id": "1",
+      "name": "充放电运行中",
+      "matchValue": "1",
+      "children": [
+        {
+          "id": "bess-pole-pos",
+          "name": "正极极耳",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 12,
+          "y": 0,
+          "width": 12,
+          "height": 6,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "#ef4444",
+            "stroke": "#ef4444",
+            "strokeWidth": 1,
+            "borderRadius": 1
+          }
+        },
+        {
+          "id": "bess-pole-neg",
+          "name": "负极极耳",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 46,
+          "y": 0,
+          "width": 12,
+          "height": 6,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "#3b82f6",
+            "stroke": "#3b82f6",
+            "strokeWidth": 1,
+            "borderRadius": 1
+          }
+        },
+        {
+          "id": "bess-case",
+          "name": "模组外壳",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 0,
+          "y": 6,
+          "width": 70,
+          "height": 44,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "fill": "rgba(15, 23, 42, 0.85)",
+            "stroke": "#00f2ff",
+            "strokeWidth": 2,
+            "borderRadius": 4
+          }
+        },
+        {
+          "id": "bess-cell-1",
+          "name": "电芯层1",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 8,
+          "y": 14,
+          "width": 54,
+          "height": 6,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "rgba(0, 242, 255, 0.5)",
+            "stroke": "#00f2ff",
+            "strokeWidth": 1
+          }
+        },
+        {
+          "id": "bess-cell-2",
+          "name": "电芯层2",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 8,
+          "y": 24,
+          "width": 54,
+          "height": 6,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "rgba(0, 242, 255, 0.5)",
+            "stroke": "#00f2ff",
+            "strokeWidth": 1
+          }
+        },
+        {
+          "id": "bess-cell-3",
+          "name": "电芯层3",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 8,
+          "y": 34,
+          "width": 54,
+          "height": 6,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "rgba(0, 242, 255, 0.5)",
+            "stroke": "#00f2ff",
+            "strokeWidth": 1
+          }
+        }
+      ]
+    }
+  ],
+  "tags": [
+    "储能",
+    "电池",
+    "BESS",
+    "锂电"
+  ],
+  "filename": "储能电池模组 BESS.json",
+  "updatedAt": "2026-09-04T13:28:54.168Z"
+}

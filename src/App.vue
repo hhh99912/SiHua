@@ -12,8 +12,9 @@ import {
 import { INITIAL_DATASETS, tickDataset, executeSimulatedTeleControl, executeSimulatedTeleRegulation } from './data/presetDatasets';
 import { syncDatasetFastIndex, generateUniqueDuplicateName } from './utils/scadaResolver';
 import { PRESET_MULTI_SCREENS } from './data/presetMultiScreens';
+import { PRESET_TEMPLATES } from './data/templates';
 import { COMPONENT_DEFINITIONS } from './data/componentLibrary';
-import { getCustomSymbols, addCustomSymbol } from './utils/customSymbolStorage';
+import { getCustomSymbols, addCustomSymbol, refreshCustomSymbolsFromDisk } from './utils/customSymbolStorage';
 import Navbar from './components/Navbar.vue';
 import ComponentPalette from './components/ComponentPalette.vue';
 import LayerManager from './components/LayerManager.vue';
@@ -154,12 +155,95 @@ const getUniqueScreenName = (baseName: string, excludeId?: string): string => {
 };
 
 // Add new screen (names must be unique, persistence on manual save)
-const handleAddScreen = async (payload: { name: string; width: number; height: number }) => {
+const handleAddScreen = async (payload: { 
+  name: string; 
+  width: number; 
+  height: number; 
+  templateId?: string;
+  templateModel?: any;
+}) => {
   syncActiveScreenToProject();
   const newId = `screen-${Date.now()}`;
   const uniqueName = getUniqueScreenName(payload.name);
   const screenWidth = payload.width || 1980;
   const screenHeight = payload.height || 1100;
+
+  let componentsToUse: ScreenComponent[] = [];
+  let screenConfigFromTemplate: Partial<ScreenConfig> = {};
+
+  // 1. 无模板创建：自动添加极简工控方框 (用户明确要求)
+  if (!payload.templateId || payload.templateId === '__blank_minimal__') {
+    const minimalBorder: ScreenComponent = {
+      id: `comp-border-${Date.now()}`,
+      name: '极简工控方框',
+      type: 'deco-border-minimal',
+      category: 'decoration',
+      x: 20,
+      y: 20,
+      width: screenWidth - 40,
+      height: screenHeight - 40,
+      rotation: 0,
+      zIndex: 1,
+      style: {
+        borderColor: 'rgba(0, 242, 255, 0.4)',
+        borderWidth: 1,
+        backgroundColor: 'transparent'
+      },
+      data: { mapping: {} }
+    };
+    componentsToUse = [minimalBorder];
+  } else {
+    // 2. 按模板创建：优先使用从 model/ 检索到的 templateModel，或从 PRESET_TEMPLATES 查找
+    let rawComponents: any[] = [];
+    let rawScreen: any = null;
+    let rawDatasets: any[] = [];
+
+    if (payload.templateModel) {
+      rawComponents = payload.templateModel.components || [];
+      rawScreen = payload.templateModel.screen;
+      rawDatasets = payload.templateModel.datasets || [];
+    } else {
+      const tpl = PRESET_TEMPLATES.find(t => t.id === payload.templateId);
+      if (tpl) {
+        rawComponents = tpl.schema.components || [];
+        rawScreen = tpl.schema.screen;
+        rawDatasets = tpl.schema.datasets || [];
+      }
+    }
+
+    if (rawComponents.length > 0) {
+      // 深度拷贝并重新分配组件 ID
+      componentsToUse = rawComponents.map((c, idx) => ({
+        ...JSON.parse(JSON.stringify(c)),
+        id: `comp-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`
+      }));
+    }
+
+    if (rawScreen) {
+      screenConfigFromTemplate = JSON.parse(JSON.stringify(rawScreen));
+    }
+
+    // 合并数据集配置（如有）
+    if (rawDatasets && rawDatasets.length > 0) {
+      rawDatasets.forEach(tplDs => {
+        const existingDs = datasets.value.find(d => d.id === tplDs.id);
+        if (existingDs) {
+          (tplDs.devices || []).forEach((dev: any) => {
+            if (!existingDs.devices.some(d => d.id === dev.id)) {
+              existingDs.devices.push(JSON.parse(JSON.stringify(dev)));
+            }
+          });
+        } else {
+          datasets.value.push(JSON.parse(JSON.stringify(tplDs)));
+        }
+      });
+      syncDatasetFastIndex(datasets.value);
+    }
+  }
+
+  // 严格过滤掉任何已废弃的旧版组件
+  componentsToUse = componentsToUse.filter(c => (c.type as string) !== 'nav-tabs' && (c.type as string) !== 'metric-card');
+
   const newScreenItem: ScreenItem = {
     id: newId,
     name: uniqueName,
@@ -168,38 +252,15 @@ const handleAddScreen = async (payload: { name: string; width: number; height: n
       name: uniqueName,
       width: screenWidth,
       height: screenHeight,
-      backgroundColor: '#0a1d3b',
+      backgroundColor: screenConfigFromTemplate.backgroundColor || '#000000',
       backgroundGrid: true,
       gridSize: 20,
-      gridColor: 'rgba(0, 242, 255, 0.22)',
-      theme: 'cyber-dark',
+      gridColor: screenConfigFromTemplate.gridColor || 'rgba(255, 255, 255, 0.05)',
+      theme: screenConfigFromTemplate.theme || 'cyber-dark',
       version: '2.0.0',
       updatedAt: new Date().toISOString()
     },
-    components: [
-      {
-        id: `comp-border-${Date.now()}`,
-        name: '极简工控边框',
-        type: 'deco-border-minimal',
-        category: 'decoration',
-        x: 0,
-        y: 0,
-        width: screenWidth,
-        height: screenHeight,
-        rotation: 0,
-        zIndex: 1,
-        style: {
-          fill: 'transparent',
-          stroke: '#00f2ff',
-          strokeWidth: 2
-        },
-        customProps: {
-          borderStyle: 'deco-border-minimal',
-          showTitle: false
-        },
-        data: { mapping: {} }
-      }
-    ]
+    components: componentsToUse
   };
 
   screens.value.push(newScreenItem);
@@ -1065,6 +1126,16 @@ onMounted(async () => {
     }
   } catch (err) {
     console.warn('[SCADA] 扫描 graph 磁盘大屏失败，回退到默认大屏:', err);
+  }
+
+  // 2. 启动时自动检索并加载 cell/ 目录下的所有独立自定义图元 JSON 文件
+  try {
+    const loadedCells = await refreshCustomSymbolsFromDisk();
+    if (loadedCells && loadedCells.length > 0) {
+      console.log(`[SCADA] 启动已检索并同步 cell/ 目录: 共 ${loadedCells.length} 个规范化图元 JSON`);
+    }
+  } catch (err) {
+    console.warn('[SCADA] 自动检索 cell/ 目录图元失败:', err);
   }
 
   recordHistory();

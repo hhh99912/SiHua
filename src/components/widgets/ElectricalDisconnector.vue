@@ -40,16 +40,73 @@ const disconnectorState = computed(() => {
     statusText: resolved.statusText,
     numericValue: resolved.numericValue,
     stroke: style.stroke && style.stroke !== '#00f2ff' ? style.stroke : statusColor,
-    strokeWidth: style.strokeWidth || 2.5
+    strokeWidth: style.strokeWidth || 2.5,
+    direction: customProps?.direction || customProps?.side || 'vertical'
   };
 });
 </script>
 
 <template>
   <div class="w-full h-full flex items-center justify-center select-none relative overflow-visible">
-    <!-- Grounding Switch (接地刀闸) -->
+    <!-- 1. Grounding Switch (接地刀闸 - 左侧横出支路) -->
     <svg 
-      v-if="disconnectorState.isGrounding" 
+      v-if="disconnectorState.isGrounding && disconnectorState.direction === 'left'" 
+      class="w-full h-full overflow-visible"
+      viewBox="0 0 50 60" 
+      preserveAspectRatio="xMidYMid meet"
+    >
+      <!-- Horizontal Conductor from right (connected to vertical feeder) -->
+      <line x1="50" y1="20" x2="30" y2="20" :stroke="disconnectorState.stroke" :stroke-width="disconnectorState.strokeWidth" stroke-linecap="round" />
+      <circle cx="30" cy="20" r="2.5" :fill="disconnectorState.stroke" />
+      
+      <!-- Blade angled down-left to earth -->
+      <line 
+        :x1="30" :y1="20" 
+        :x2="disconnectorState.isClosed ? 14 : 18" 
+        :y2="disconnectorState.isClosed ? 36 : 10" 
+        :stroke="disconnectorState.statusColor" 
+        :stroke-width="disconnectorState.strokeWidth + 0.5" 
+        stroke-linecap="round"
+      />
+      <circle cx="14" cy="36" r="2" :fill="disconnectorState.statusColor" />
+      
+      <!-- Ground Plate Bars (大地标识) -->
+      <line x1="4" y1="41" x2="24" y2="41" :stroke="disconnectorState.statusColor" :stroke-width="disconnectorState.strokeWidth" stroke-linecap="round" />
+      <line x1="7" y1="46" x2="21" y2="46" :stroke="disconnectorState.statusColor" :stroke-width="disconnectorState.strokeWidth - 0.5" stroke-linecap="round" />
+      <line x1="10" y1="51" x2="18" y2="51" :stroke="disconnectorState.statusColor" :stroke-width="disconnectorState.strokeWidth - 1" stroke-linecap="round" />
+    </svg>
+
+    <!-- 2. Grounding Switch (接地刀闸 - 右侧横出支路) -->
+    <svg 
+      v-else-if="disconnectorState.isGrounding && disconnectorState.direction === 'right'" 
+      class="w-full h-full overflow-visible"
+      viewBox="0 0 50 60" 
+      preserveAspectRatio="xMidYMid meet"
+    >
+      <!-- Horizontal Conductor from left (connected to vertical feeder) -->
+      <line x1="0" y1="20" x2="20" y2="20" :stroke="disconnectorState.stroke" :stroke-width="disconnectorState.strokeWidth" stroke-linecap="round" />
+      <circle cx="20" cy="20" r="2.5" :fill="disconnectorState.stroke" />
+      
+      <!-- Blade angled down-right to earth -->
+      <line 
+        :x1="20" :y1="20" 
+        :x2="disconnectorState.isClosed ? 36 : 32" 
+        :y2="disconnectorState.isClosed ? 36 : 10" 
+        :stroke="disconnectorState.statusColor" 
+        :stroke-width="disconnectorState.strokeWidth + 0.5" 
+        stroke-linecap="round"
+      />
+      <circle cx="36" cy="36" r="2" :fill="disconnectorState.statusColor" />
+      
+      <!-- Ground Plate Bars (大地标识) -->
+      <line x1="26" y1="41" x2="46" y2="41" :stroke="disconnectorState.statusColor" :stroke-width="disconnectorState.strokeWidth" stroke-linecap="round" />
+      <line x1="29" y1="46" x2="43" y2="46" :stroke="disconnectorState.statusColor" :stroke-width="disconnectorState.strokeWidth - 0.5" stroke-linecap="round" />
+      <line x1="32" y1="51" x2="40" y2="51" :stroke="disconnectorState.statusColor" :stroke-width="disconnectorState.strokeWidth - 1" stroke-linecap="round" />
+    </svg>
+
+    <!-- 3. Grounding Switch (接地刀闸 - 垂直标准) -->
+    <svg 
+      v-else-if="disconnectorState.isGrounding" 
       class="w-full h-full overflow-visible"
       viewBox="0 0 50 60" 
       preserveAspectRatio="xMidYMid meet"

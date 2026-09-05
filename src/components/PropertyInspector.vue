@@ -286,6 +286,101 @@ const isElectricalSwitch = computed(() => {
   return ['elec-breaker', 'elec-disconnector', 'elec-grounding', 'elec-handcart', 'ctrl-indicator'].includes(props.component.type);
 });
 
+const isSystemStatusComponent = computed(() => {
+  if (!props.component) return false;
+  if (props.component.states && props.component.states.length > 0) return false;
+  const t = props.component.type;
+  const c = props.component.category;
+  return isElectricalSwitch.value || 
+    c === 'status' || 
+    t === 'ctrl-indicator' || 
+    t.startsWith('elec-') || 
+    t.includes('valve') ||
+    t.includes('pump') ||
+    t.includes('motor') ||
+    t.includes('switch') ||
+    t === 'pipe-flow' ||
+    props.component.customProps?.state !== undefined ||
+    props.component.style?.indicatorState !== undefined;
+});
+
+const currentResolvedBinaryState = computed(() => {
+  if (!props.component) return 0;
+  const comp = props.component;
+  const cp = comp.customProps || {};
+  const st = comp.style || {};
+  if (cp.state !== undefined) {
+    if (typeof cp.state === 'string') {
+      const lower = cp.state.toLowerCase();
+      if (lower === '1' || lower === 'closed' || lower === 'on' || lower.includes('合')) return 1;
+      return 0;
+    }
+    return Number(cp.state) === 1 ? 1 : 0;
+  }
+  if (st.indicatorState !== undefined) {
+    if (st.indicatorState === 'normal' || st.indicatorState === 1 || String(st.indicatorState) === '1') return 1;
+    return 0;
+  }
+  if (comp.activeState !== undefined) {
+    return Number(comp.activeState) === 1 ? 1 : 0;
+  }
+  return 0;
+});
+
+const testBinaryState = (val: number) => {
+  if (!props.component) return;
+  const isElec = ['elec-breaker', 'elec-disconnector', 'elec-grounding'].includes(props.component.type);
+  const stateStr = isElec ? (val === 1 ? 'closed' : 'open') : val;
+  
+  updateComponentProps({ activeState: val });
+  updateComponentCustomProps({
+    state: stateStr,
+    position: val,
+    status: val
+  });
+  updateComponentStyle({
+    indicatorState: val === 1 ? 'normal' : 'off'
+  });
+  if (props.component.data?.staticData && typeof props.component.data.staticData === 'object') {
+    updateComponentData({
+      staticData: {
+        ...props.component.data.staticData,
+        state: val,
+        value: val
+      }
+    });
+  }
+
+  // Synchronize live telemetry dataset point if bound
+  const sKey = props.component.data?.mapping?.statusKey || props.component.data?.mapping?.stateKey || props.component.data?.mapping?.valueKey;
+  if (sKey && boundDataset.value?.devices) {
+    for (const dev of boundDataset.value.devices) {
+      const sig = dev.teleSignals?.find((s: any) => `${dev.deviceId}_YX_${s.pointId}` === sKey || String(s.pointId) === String(sKey));
+      if (sig) {
+        sig.value = val;
+        sig.statusText = val === 1 ? '合闸 (1)' : '分闸 (0)';
+      }
+    }
+  }
+};
+
+const testMultiState = (stateId: string, matchVal?: any) => {
+  if (!props.component) return;
+  updateComponentProps({ activeState: stateId });
+  if (matchVal !== undefined) {
+    updateComponentCustomProps({ state: matchVal });
+    if (props.component.data?.staticData && typeof props.component.data.staticData === 'object') {
+      updateComponentData({
+        staticData: {
+          ...props.component.data.staticData,
+          state: matchVal,
+          value: matchVal
+        }
+      });
+    }
+  }
+};
+
 // SCADA Full Binding Details Inspector
 const currentBindingDetails = computed(() => {
   const comp = props.component;
@@ -1011,7 +1106,7 @@ const handleTextTitleChange = (newVal: string) => {
   if (!props.component) return;
   if (props.component.type === 'ctrl-button') {
     updateComponentStyle({ buttonText: newVal });
-  } else if (['metric-clock', 'metric-time-banner', 'metric-clock-analog', 'metric-countdown', 'nav-tabs'].includes(props.component.type)) {
+  } else if (['metric-clock', 'metric-time-banner', 'metric-clock-analog', 'metric-countdown'].includes(props.component.type)) {
     updateComponentCustomProps({ title: newVal });
   } else {
     updateComponentProps({ name: newVal });
@@ -1982,34 +2077,6 @@ const toggleBatchVisibility = () => {
       <!-- Tab Content Area -->
       <div class="flex-1 overflow-y-auto p-3 space-y-4 custom-scrollbar text-xs font-mono font-light">
         
-        <!-- MULTI-STATE SELECTOR (For Custom Symbols with States) -->
-        <div v-if="component.states && component.states.length > 0" class="p-3 rounded-xl bg-cyan-950/40 border border-cyan-400/50 space-y-2">
-          <div class="flex items-center justify-between text-xs font-normal text-cyan-200">
-            <span class="flex items-center gap-1.5">
-              <Sparkles class="w-3.5 h-3.5 text-amber-300 stroke-[2]" />
-              <span>当前呈现状态 (Active State)</span>
-            </span>
-            <span class="text-[10px] text-cyan-300/80 font-light">共 {{ component.states.length }} 个状态</span>
-          </div>
-
-          <div class="grid grid-cols-2 gap-1.5 pt-1">
-            <button
-              v-for="st in component.states"
-              :key="st.id"
-              @click="updateComponentProps({ activeState: st.id })"
-              class="py-1.5 px-2 rounded-lg text-xs font-mono cursor-pointer border transition-all truncate text-left flex items-center justify-between gap-1"
-              :class="String(component.activeState ?? '1') === String(st.id)
-                ? 'bg-cyan-500 text-slate-950 font-normal border-cyan-400 shadow-sm'
-                : 'bg-[#09152b] text-cyan-200 border-cyan-500/40 hover:border-cyan-300 font-light'"
-            >
-              <span class="truncate">{{ st.name }}</span>
-              <span class="text-[9px] px-1 rounded font-normal" :class="String(component.activeState ?? '1') === String(st.id) ? 'bg-slate-950/30 text-slate-950' : 'bg-cyan-950 text-cyan-300 border border-cyan-500/40'">
-                ={{ st.matchValue ?? st.id }}
-              </span>
-            </button>
-          </div>
-        </div>
-
         <!-- TAB 1: GEOMETRY & ALIGNMENT -->
         <div v-if="activeTab === 'geometry'" class="space-y-4">
           <!-- Component Name -->
@@ -2389,25 +2456,103 @@ const toggleBatchVisibility = () => {
             </div>
           </div>
 
-          <!-- 1. Electrical Component Switch Status -->
-          <div v-if="component && ['elec-breaker', 'elec-disconnector', 'elec-grounding'].includes(component.type)" class="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/40 space-y-2.5">
-            <div class="flex items-center gap-1.5 text-xs font-bold text-cyan-300">
-              <Zap class="w-4 h-4 text-amber-400" />
-              <span class="font-normal text-cyan-200">开关元件合分闸状态</span>
+          <!-- Control Button Exclusive Appearance (控制按钮专属形态与风格) -->
+          <div v-if="component.type === 'ctrl-button'" class="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/40 space-y-3">
+            <div class="flex items-center justify-between text-xs font-bold text-cyan-300">
+              <span class="flex items-center gap-1.5">
+                <Sliders class="w-4 h-4 text-cyan-400" />
+                <span class="font-normal text-cyan-200">控制按钮专属形态与主题</span>
+              </span>
+              <span class="text-[10px] text-cyan-400/70 font-mono font-light">高保真工业控制机构</span>
             </div>
 
-            <!-- Switch / Breaker State Switcher -->
+            <!-- Button Variant Selection -->
             <div>
-              <label class="text-xs font-light text-cyan-200 block mb-1">开关当前呈现状态 (State)</label>
+              <label class="text-xs font-light text-cyan-200 block mb-1">按键控制机构形态</label>
               <select
-                :value="component.customProps?.state || 'closed'"
-                @change="updateComponentCustomProps({ state: ($event.target as HTMLSelectElement).value })"
+                :value="component.style.buttonVariant || 'solid'"
+                @change="updateComponentStyle({ buttonVariant: ($event.target as HTMLSelectElement).value })"
                 class="w-full bg-[#050c1c] border border-cyan-500/30 focus:border-cyan-400 rounded-lg px-2.5 py-1.5 text-cyan-200 outline-hidden cursor-pointer font-light text-xs"
               >
-                <option value="closed">🔴 合闸 (Closed / 闭合导通)</option>
-                <option value="open">🟢 分闸 (Open / 断开隔离)</option>
-                <option value="fault">⚠️ 故障跳闸 (Fault)</option>
+                <option value="flip-cover">🔒 翻盖防误触安全按钮 (Flip-Cover Safety)</option>
+                <option value="key-lock">🔑 五防钥匙闭锁旋转开关 (Key Interlock Switch)</option>
+                <option value="rotary-3pos">🎛️ 三档工况选择旋钮 (3-Position Knob)</option>
+                <option value="rocker-switch">⚡ 双向机械互锁翘板 (Dual Seesaw Rocker)</option>
+                <option value="charge-hold">⏳ 长按充能防误动按钮 (Charge-to-Fire Hold)</option>
+                <option value="latch-estop">🛑 旋转复位自锁急停钮 (Twist-Reset E-Stop)</option>
+                <option value="slide-confirm">🛡️ 滑动解锁确认执行滑块 (Slide-to-Confirm)</option>
+                <option value="two-hand">🖐️ 双人双键同押确认器 (Two-Hand Permissive)</option>
+                <option value="solid">◽ 工业微晶标准按键 (Standard Button)</option>
+                <option value="outline">✨ 科技微晶线框按键 (Cyber Outline)</option>
               </select>
+            </div>
+
+            <!-- Button Color Theme Preset -->
+            <div>
+              <label class="text-xs font-light text-cyan-200 block mb-1">快速色彩主题 (可被文字/背景颜色覆盖)</label>
+              <div class="grid grid-cols-6 gap-1">
+                <button
+                  v-for="th in [
+                    { id: 'cyan', label: '青', color: '#00f2ff' },
+                    { id: 'emerald', label: '绿', color: '#10b981' },
+                    { id: 'amber', label: '黄', color: '#f59e0b' },
+                    { id: 'rose', label: '红', color: '#f43f5e' },
+                    { id: 'indigo', label: '蓝', color: '#6366f1' },
+                    { id: 'slate', label: '灰', color: '#94a3b8' }
+                  ]"
+                  :key="th.id"
+                  type="button"
+                  @click="updateComponentStyle({ buttonColorTheme: th.id })"
+                  class="py-1 rounded text-[10px] font-mono border transition-all text-center cursor-pointer flex flex-col items-center gap-0.5"
+                  :class="(component.style.buttonColorTheme || 'cyan') === th.id
+                    ? 'border-cyan-400 bg-cyan-950/80 text-white font-bold'
+                    : 'border-cyan-500/20 bg-[#050c1c] text-slate-300 hover:border-cyan-400'"
+                >
+                  <span class="w-2.5 h-2.5 rounded-full" :style="{ backgroundColor: th.color }"></span>
+                  <span>{{ th.label }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Explicit Button Text Color & Background Color Pickers -->
+            <div class="grid grid-cols-2 gap-2 pt-1 border-t border-cyan-500/20">
+              <div>
+                <label class="text-[11px] font-light text-cyan-200 block mb-1">文字颜色</label>
+                <div class="flex items-center gap-1.5">
+                  <input
+                    type="color"
+                    :value="component.style.textColor || component.style.color || '#00f2ff'"
+                    @input="updateComponentStyle({ textColor: ($event.target as HTMLInputElement).value, color: ($event.target as HTMLInputElement).value })"
+                    class="w-6 h-6 rounded bg-transparent border-0 cursor-pointer shrink-0"
+                  />
+                  <input
+                    type="text"
+                    :value="component.style.textColor || component.style.color || ''"
+                    @input="updateComponentStyle({ textColor: ($event.target as HTMLInputElement).value, color: ($event.target as HTMLInputElement).value })"
+                    placeholder="默认主题"
+                    class="w-full bg-[#050c1c] border border-cyan-500/30 focus:border-cyan-400 rounded px-1.5 py-1 text-cyan-100 font-mono text-[11px] outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label class="text-[11px] font-light text-cyan-200 block mb-1">按键背景底色</label>
+                <div class="flex items-center gap-1.5">
+                  <input
+                    type="color"
+                    :value="component.style.fill || component.style.backgroundColor || '#07101e'"
+                    @input="updateComponentStyle({ fill: ($event.target as HTMLInputElement).value, backgroundColor: ($event.target as HTMLInputElement).value })"
+                    class="w-6 h-6 rounded bg-transparent border-0 cursor-pointer shrink-0"
+                  />
+                  <input
+                    type="text"
+                    :value="component.style.fill || component.style.backgroundColor || ''"
+                    @input="updateComponentStyle({ fill: ($event.target as HTMLInputElement).value, backgroundColor: ($event.target as HTMLInputElement).value })"
+                    placeholder="默认主题"
+                    class="w-full bg-[#050c1c] border border-cyan-500/30 focus:border-cyan-400 rounded px-1.5 py-1 text-cyan-100 font-mono text-[11px] outline-hidden"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -2419,7 +2564,7 @@ const toggleBatchVisibility = () => {
             </div>
 
             <!-- Text Content -->
-            <div v-if="component.type === 'draw-text' || component.type === 'ctrl-button' || component.type === 'metric-header' || component.type === 'metric-clock' || component.type === 'metric-time-banner' || component.type === 'metric-clock-analog' || component.type === 'metric-countdown' || component.type === 'nav-tabs'">
+            <div v-if="component.type === 'draw-text' || component.type === 'ctrl-button' || component.type === 'metric-header' || component.type === 'metric-clock' || component.type === 'metric-time-banner' || component.type === 'metric-clock-analog' || component.type === 'metric-countdown'">
               <label class="text-xs font-light text-cyan-200 block mb-1">展示标题 / 文本内容</label>
               <input
                 type="text"
@@ -2662,96 +2807,20 @@ const toggleBatchVisibility = () => {
             </div>
           </div>
 
-          <!-- 5. Electrical Switch Enum Quick Controls -->
-          <div v-if="['elec-breaker', 'elec-disconnector', 'elec-grounding', 'elec-handcart', 'ctrl-indicator'].includes(component.type)" class="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/40 space-y-2.5">
-            <div class="flex items-center justify-between text-xs font-bold text-cyan-300">
-              <span class="flex items-center gap-1.5">
-                <Zap class="w-4 h-4 text-amber-400" />
-                <span class="font-normal text-cyan-200">设备开关状态 (枚举: 0分 / 1合 / 2警)</span>
-              </span>
-              <span class="font-mono text-cyan-300 font-light text-xs">
-                {{ component.customProps?.state ?? component.customProps?.position ?? (component.style.indicatorState === 'alarm' ? 2 : (component.style.indicatorState === 'normal' ? 1 : 0)) }}
-              </span>
-            </div>
-
-            <div class="grid grid-cols-3 gap-1.5 pt-1">
-              <button
-                @click="updateComponentCustomProps({ state: 0, position: 0 }), updateComponentStyle({ indicatorState: 'off' })"
-                class="py-1.5 px-2 rounded-lg text-xs font-mono font-light cursor-pointer border transition-all text-center"
-                :class="(component.customProps?.state === 0 || component.customProps?.position === 0 || component.style.indicatorState === 'off')
-                  ? 'bg-slate-700 text-white border-slate-400 shadow-xs'
-                  : 'bg-[#050c1c] text-cyan-300 border-cyan-500/30 hover:border-cyan-400'"
-              >
-                0: 分闸 / 停
-              </button>
-
-              <button
-                @click="updateComponentCustomProps({ state: 1, position: 1 }), updateComponentStyle({ indicatorState: 'normal' })"
-                class="py-1.5 px-2 rounded-lg text-xs font-mono font-light cursor-pointer border transition-all text-center"
-                :class="(component.customProps?.state === 1 || component.customProps?.position === 1 || component.style.indicatorState === 'normal')
-                  ? 'bg-emerald-500 text-slate-950 font-medium border-emerald-400 shadow-xs'
-                  : 'bg-[#050c1c] text-emerald-300 border-cyan-500/30 hover:border-emerald-400'"
-              >
-                1: 合闸 / 运
-              </button>
-
-              <button
-                @click="updateComponentCustomProps({ state: 2, position: 2 }), updateComponentStyle({ indicatorState: 'alarm' })"
-                class="py-1.5 px-2 rounded-lg text-xs font-mono font-light cursor-pointer border transition-all text-center"
-                :class="(component.customProps?.state === 2 || component.customProps?.position === 2 || component.style.indicatorState === 'alarm')
-                  ? 'bg-amber-500 text-slate-950 font-medium border-amber-400 shadow-xs'
-                  : 'bg-[#050c1c] text-amber-300 border-cyan-500/30 hover:border-amber-400'"
-              >
-                2: 故障 / 警
-              </button>
-            </div>
-          </div>
-
-          <!-- SPECIAL: Status Indicator Atomic Style Controls -->
+          <!-- SPECIAL: Status Indicator Atomic Style Controls (保留状态颜色定制，移除冗余切换测试) -->
           <div v-if="component.type === 'ctrl-indicator' || component.category === 'status' || component.type.startsWith('elec-')" class="p-3 rounded-xl bg-[#050c1c] border border-cyan-500/40 space-y-3">
             <div class="flex items-center justify-between text-xs font-bold text-cyan-300">
               <span class="flex items-center gap-1.5">
                 <CircleDot class="w-4 h-4 text-cyan-400" />
-                <span class="font-normal text-cyan-200">0/1 状态模拟与双态颜色定制</span>
+                <span class="font-normal text-cyan-200">双态状态颜色定制 (0态分闸 / 1态合闸)</span>
               </span>
-              <span class="text-[10px] text-cyan-400/70 font-mono font-light">状态驱动</span>
-            </div>
-
-            <!-- State Toggle 0:Green vs 1:Red -->
-            <div>
-              <label class="text-xs font-light text-cyan-200 block mb-1">快速状态切换 (0=分闸绿, 1=合闸红)</label>
-              <div class="grid grid-cols-3 gap-1.5">
-                <button
-                  @click="updateComponentCustomProps({ state: 0 }), updateComponentProps({ activeState: 0 })"
-                  class="py-1.5 px-2 rounded-lg text-xs font-light border text-center cursor-pointer transition-all flex items-center justify-center gap-1.5"
-                  :class="(component.customProps?.state === 0 || component.activeState === 0) ? 'bg-emerald-500 text-slate-950 font-medium border-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-[#050c1c] text-emerald-300 border-cyan-500/30 hover:border-emerald-400'"
-                >
-                  <span class="w-2.5 h-2.5 rounded-full" :style="{ backgroundColor: component.customProps?.color0 || '#00e676' }"></span>
-                  <span>0: {{ component.customProps?.text0 || '分闸' }}</span>
-                </button>
-                <button
-                  @click="updateComponentCustomProps({ state: 1 }), updateComponentProps({ activeState: 1 })"
-                  class="py-1.5 px-2 rounded-lg text-xs font-light border text-center cursor-pointer transition-all flex items-center justify-center gap-1.5"
-                  :class="(component.customProps?.state === 1 || component.activeState === 1) ? 'bg-red-500 text-white font-medium border-red-400 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-[#050c1c] text-red-300 border-cyan-500/30 hover:border-red-400'"
-                >
-                  <span class="w-2.5 h-2.5 rounded-full" :style="{ backgroundColor: component.customProps?.color1 || '#ff2233' }"></span>
-                  <span>1: {{ component.customProps?.text1 || '合闸' }}</span>
-                </button>
-                <button
-                  @click="updateComponentCustomProps({ state: 2 }), updateComponentProps({ activeState: 2 })"
-                  class="py-1.5 px-2 rounded-lg text-xs font-light border text-center cursor-pointer transition-all flex items-center justify-center gap-1.5"
-                  :class="(component.customProps?.state === 2 || component.activeState === 2) ? 'bg-amber-500 text-slate-950 font-medium border-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.5)]' : 'bg-[#050c1c] text-amber-300 border-cyan-500/30 hover:border-amber-400'"
-                >
-                  <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
-                  <span>2: 故障</span>
-                </button>
-              </div>
+              <span class="text-[10px] text-cyan-400/70 font-mono font-light">外观配置</span>
             </div>
 
             <!-- Custom 0/1 State Colors -->
-            <div class="grid grid-cols-2 gap-2 pt-1 border-t border-cyan-500/20">
+            <div class="grid grid-cols-2 gap-2 pt-1">
               <div>
-                <label class="text-[11px] font-light text-emerald-400 block mb-1">🟢 0 态显示颜色</label>
+                <label class="text-[11px] font-light text-emerald-400 block mb-1">🟢 0 态显示颜色 (分闸/常态)</label>
                 <div class="flex items-center gap-1.5">
                   <input
                     type="color"
@@ -2768,7 +2837,7 @@ const toggleBatchVisibility = () => {
                 </div>
               </div>
               <div>
-                <label class="text-[11px] font-light text-red-400 block mb-1">🔴 1 态显示颜色</label>
+                <label class="text-[11px] font-light text-red-400 block mb-1">🔴 1 态显示颜色 (合闸/动作)</label>
                 <div class="flex items-center gap-1.5">
                   <input
                     type="color"
@@ -2999,96 +3068,6 @@ const toggleBatchVisibility = () => {
             </div>
           </div>
 
-          <!-- SPECIAL: Alarm Feed Style Controls -->
-          <div v-if="component.type === 'ind-alarm-list'" class="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/40 space-y-3">
-            <div class="flex items-center gap-1.5 text-xs font-bold text-cyan-300">
-              <AlertTriangle class="w-4 h-4 text-amber-400" />
-              <span class="font-normal text-cyan-200">实时告警事件滚屏组件配置</span>
-            </div>
-
-            <!-- Display Mode -->
-            <div>
-              <label class="text-xs font-light text-cyan-200 block mb-1">展示滚屏模式</label>
-              <div class="grid grid-cols-3 gap-1.5">
-                <button
-                  @click="updateComponentCustomProps({ mode: 'ticker' })"
-                  class="py-1.5 px-2 rounded-lg text-xs font-light border text-center cursor-pointer transition-all"
-                  :class="(component.customProps?.mode || 'ticker') === 'ticker' ? 'bg-cyan-500 text-slate-950 font-medium border-cyan-400' : 'bg-[#050c1c] text-cyan-300 border-cyan-500/30 hover:border-cyan-400'"
-                >
-                  无缝连续滚屏
-                </button>
-                <button
-                  @click="updateComponentCustomProps({ mode: 'table' })"
-                  class="py-1.5 px-2 rounded-lg text-xs font-light border text-center cursor-pointer transition-all"
-                  :class="component.customProps?.mode === 'table' ? 'bg-cyan-500 text-slate-950 font-medium border-cyan-400' : 'bg-[#050c1c] text-cyan-300 border-cyan-500/30 hover:border-cyan-400'"
-                >
-                  工控列表表格
-                </button>
-                <button
-                  @click="updateComponentCustomProps({ mode: 'marquee' })"
-                  class="py-1.5 px-2 rounded-lg text-xs font-light border text-center cursor-pointer transition-all"
-                  :class="component.customProps?.mode === 'marquee' ? 'bg-cyan-500 text-slate-950 font-medium border-cyan-400' : 'bg-[#050c1c] text-cyan-300 border-cyan-500/30 hover:border-cyan-400'"
-                >
-                  单行横向跑马灯
-                </button>
-              </div>
-            </div>
-
-            <!-- Scroll Speed -->
-            <div>
-              <label class="text-xs font-light text-cyan-200 block mb-1">滚动速度</label>
-              <select
-                :value="component.customProps?.scrollSpeed || 'normal'"
-                @change="updateComponentCustomProps({ scrollSpeed: ($event.target as HTMLSelectElement).value })"
-                class="w-full bg-[#050c1c] border border-cyan-500/30 focus:border-cyan-400 rounded-lg px-2 py-1 text-cyan-200 text-xs font-light outline-hidden cursor-pointer"
-              >
-                <option value="slow">慢速 (24秒循环)</option>
-                <option value="normal">中速标准 (14秒循环)</option>
-                <option value="fast">快速 (8秒循环)</option>
-              </select>
-            </div>
-
-            <!-- Column Visibility Toggles -->
-            <div class="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-cyan-500/20 font-light">
-              <label class="flex items-center gap-1.5 cursor-pointer text-cyan-200 hover:text-white">
-                <input
-                  type="checkbox"
-                  :checked="component.customProps?.showHeader !== false"
-                  @change="updateComponentCustomProps({ showHeader: ($event.target as HTMLInputElement).checked })"
-                  class="accent-cyan-400 rounded"
-                />
-                <span>显示列表表头</span>
-              </label>
-              <label class="flex items-center gap-1.5 cursor-pointer text-cyan-200 hover:text-white">
-                <input
-                  type="checkbox"
-                  :checked="component.customProps?.showLevelBadge !== false"
-                  @change="updateComponentCustomProps({ showLevelBadge: ($event.target as HTMLInputElement).checked })"
-                  class="accent-cyan-400 rounded"
-                />
-                <span>显示告警级别徽章</span>
-              </label>
-              <label class="flex items-center gap-1.5 cursor-pointer text-cyan-200 hover:text-white">
-                <input
-                  type="checkbox"
-                  :checked="component.customProps?.showTime !== false"
-                  @change="updateComponentCustomProps({ showTime: ($event.target as HTMLInputElement).checked })"
-                  class="accent-cyan-400 rounded"
-                />
-                <span>显示发生时间</span>
-              </label>
-              <label class="flex items-center gap-1.5 cursor-pointer text-cyan-200 hover:text-white">
-                <input
-                  type="checkbox"
-                  :checked="component.customProps?.showDevice !== false"
-                  @change="updateComponentCustomProps({ showDevice: ($event.target as HTMLInputElement).checked })"
-                  class="accent-cyan-400 rounded"
-                />
-                <span>显示装置名称</span>
-              </label>
-            </div>
-          </div>
-
           <!-- SPECIAL: ECharts Advanced Style & Threshold Lines Controls -->
           <div v-if="isChartComponent" class="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/40 space-y-3">
             <div class="flex items-center gap-1.5 text-xs font-bold text-cyan-300">
@@ -3200,143 +3179,67 @@ const toggleBatchVisibility = () => {
               </div>
             </div>
           </div>
-
-          <!-- 6. Streamer & Dynamic Glow Effect (流光动效) -->
-          <div class="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/40 space-y-2.5">
-            <div class="flex items-center justify-between text-xs font-bold text-cyan-300">
-              <div class="flex items-center gap-1.5">
-                <Sparkles class="w-4 h-4 text-amber-400" />
-                <span class="font-normal text-cyan-200">动态流光特效 (Streamer Glow)</span>
-              </div>
-              <label class="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  :checked="component.style.streamer?.active || false"
-                  @change="updateComponentStyle({
-                    streamer: {
-                      ...(component.style.streamer || { color: '#00f2ff', speed: 2, direction: 'forward', type: 'laser', width: 2 }),
-                      active: ($event.target as HTMLInputElement).checked
-                    }
-                  })"
-                  class="sr-only peer"
-                />
-                <div class="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-cyan-500"></div>
-              </label>
-            </div>
-
-            <div v-if="component.style.streamer?.active" class="space-y-2 pt-1 border-t border-cyan-500/20">
-              <!-- Streamer Color -->
-              <div>
-                <label class="text-xs font-light text-cyan-200 block mb-1">流光色彩</label>
-                <div class="flex items-center gap-2">
-                  <input
-                    type="color"
-                    :value="component.style.streamer?.color || '#00f2ff'"
-                    @input="updateComponentStyle({
-                      streamer: {
-                        ...(component.style.streamer || {}),
-                        color: ($event.target as HTMLInputElement).value
-                      }
-                    })"
-                    class="w-7 h-7 rounded bg-transparent border-0 cursor-pointer"
-                  />
-                  <input
-                    type="text"
-                    :value="component.style.streamer?.color || '#00f2ff'"
-                    @input="updateComponentStyle({
-                      streamer: {
-                        ...(component.style.streamer || {}),
-                        color: ($event.target as HTMLInputElement).value
-                      }
-                    })"
-                    class="flex-1 bg-[#050c1c] border border-cyan-500/30 focus:border-cyan-400 rounded-lg px-2 py-1 text-cyan-100 font-light text-xs outline-hidden"
-                  />
-                </div>
-              </div>
-
-              <!-- Streamer Type & Direction -->
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <label class="text-xs font-light text-cyan-200 block mb-1">流光样式</label>
-                  <select
-                    :value="component.style.streamer?.type || 'laser'"
-                    @change="updateComponentStyle({
-                      streamer: {
-                        ...(component.style.streamer || {}),
-                        type: ($event.target as HTMLSelectElement).value as any
-                      }
-                    })"
-                    class="w-full bg-[#050c1c] border border-cyan-500/30 focus:border-cyan-400 rounded-lg px-2 py-1 text-cyan-100 text-xs font-light outline-hidden cursor-pointer"
-                  >
-                    <option value="laser">激光流动 (Laser)</option>
-                    <option value="pulse">脉冲波光 (Pulse)</option>
-                    <option value="dots">光粒子虚点 (Dots)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label class="text-xs font-light text-cyan-200 block mb-1">流动方向</label>
-                  <select
-                    :value="component.style.streamer?.direction || 'forward'"
-                    @change="updateComponentStyle({
-                      streamer: {
-                        ...(component.style.streamer || {}),
-                        direction: ($event.target as HTMLSelectElement).value as any
-                      }
-                    })"
-                    class="w-full bg-[#050c1c] border border-cyan-500/30 focus:border-cyan-400 rounded-lg px-2 py-1 text-cyan-100 text-xs font-light outline-hidden cursor-pointer"
-                  >
-                    <option value="forward">正向流动 (Forward)</option>
-                    <option value="reverse">反向流动 (Reverse)</option>
-                  </select>
-                </div>
-              </div>
-
-              <!-- Streamer Speed -->
-              <div>
-                <label class="text-xs font-light text-cyan-200 block mb-1">流速周期: {{ component.style.streamer?.speed || 2 }} 秒/圈</label>
-                <input
-                  type="range"
-                  min="0.5"
-                  max="6"
-                  step="0.2"
-                  :value="component.style.streamer?.speed || 2"
-                  @input="updateComponentStyle({
-                    streamer: {
-                      ...(component.style.streamer || {}),
-                      speed: Number(($event.target as HTMLInputElement).value)
-                    }
-                  })"
-                  class="w-full accent-cyan-400 cursor-pointer"
-                />
-              </div>
-            </div>
-          </div>
         </div>
 
         <!-- TAB 3: DATA BINDING -->
         <div v-if="activeTab === 'data'" class="space-y-4">
-          <!-- State Simulation Test for Custom Symbols -->
-          <div v-if="component.states && component.states.length > 0" class="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/40 space-y-2">
-            <div class="flex items-center justify-between text-xs font-bold text-emerald-300">
+          <!-- Consolidated State Simulation Test (数据菜单中唯一且集成的状态测试，支持自定义多状态图元与普通系统自带0/1状态图元) -->
+          <div v-if="(component.states && component.states.length > 0) || isSystemStatusComponent" class="p-3 rounded-xl bg-cyan-950/40 border border-cyan-400/50 space-y-2.5">
+            <div class="flex items-center justify-between text-xs font-bold text-cyan-300">
               <span class="flex items-center gap-1.5">
-                <Workflow class="w-4 h-4 text-emerald-400" />
-                <span class="font-normal text-emerald-200">图元状态快速模拟测试</span>
+                <Workflow class="w-4 h-4 text-cyan-400" />
+                <span class="font-normal text-cyan-200">
+                  {{ component.states && component.states.length > 0 ? '自定义图元多状态测试' : '设备状态模拟测试 (0/1切换)' }}
+                </span>
               </span>
-              <span class="text-[10px] text-emerald-400/70 font-light">点击即时切换</span>
+              <span class="text-[10px] font-mono font-light text-cyan-300 px-1.5 py-0.5 rounded bg-[#050c1c] border border-cyan-500/30">
+                当前: {{ component.states && component.states.length > 0 ? (component.activeState ?? '1') : currentResolvedBinaryState }}
+              </span>
             </div>
-            <div class="grid grid-cols-2 gap-1.5 pt-1">
+
+            <!-- Case A: Custom Multi-State Symbols -->
+            <div v-if="component.states && component.states.length > 0" class="grid grid-cols-2 gap-1.5 pt-0.5">
               <button
                 v-for="st in component.states"
                 :key="st.id"
-                @click="updateComponentProps({ activeState: st.id })"
-                class="py-1.5 px-2 rounded-lg text-xs font-mono font-light cursor-pointer border transition-all truncate text-left flex items-center justify-between"
+                type="button"
+                @click="testMultiState(st.id, st.matchValue)"
+                class="py-1.5 px-2 rounded-lg text-xs font-mono cursor-pointer border transition-all truncate text-left flex items-center justify-between gap-1"
                 :class="String(component.activeState ?? '1') === String(st.id)
-                  ? 'bg-emerald-500 text-slate-950 font-medium border-emerald-400 shadow-xs'
-                  : 'bg-[#050c1c] text-cyan-200 border-cyan-500/30 hover:border-emerald-500/50'"
+                  ? 'bg-cyan-500 text-slate-950 font-medium border-cyan-400 shadow-[0_0_10px_rgba(0,242,255,0.4)]'
+                  : 'bg-[#050c1c] text-cyan-200 border-cyan-500/30 hover:border-cyan-400 font-light'"
               >
                 <span class="truncate">{{ st.name }}</span>
-                <span class="text-[10px] opacity-75 font-mono">值:{{ st.matchValue ?? st.id }}</span>
+                <span class="text-[9px] px-1 rounded font-mono" :class="String(component.activeState ?? '1') === String(st.id) ? 'bg-slate-950/30 text-slate-950' : 'bg-cyan-950 text-cyan-300 border border-cyan-500/40'">
+                  ={{ st.matchValue ?? st.id }}
+                </span>
+              </button>
+            </div>
+
+            <!-- Case B: Standard System Stateful Components (0 / 1 切换) -->
+            <div v-else-if="isSystemStatusComponent" class="grid grid-cols-2 gap-2 pt-0.5">
+              <button
+                type="button"
+                @click="testBinaryState(0)"
+                class="py-2 px-2.5 rounded-lg text-xs font-light cursor-pointer border transition-all flex items-center justify-center gap-2"
+                :class="currentResolvedBinaryState === 0
+                  ? 'bg-slate-700 text-white font-medium border-slate-300 shadow-[0_0_12px_rgba(148,163,184,0.4)]'
+                  : 'bg-[#050c1c] text-slate-300 border-cyan-500/30 hover:border-slate-400'"
+              >
+                <span class="w-2.5 h-2.5 rounded-full" :style="{ backgroundColor: component.customProps?.color0 || '#00e676' }"></span>
+                <span>0: 分闸 / 断开 / 常态</span>
+              </button>
+
+              <button
+                type="button"
+                @click="testBinaryState(1)"
+                class="py-2 px-2.5 rounded-lg text-xs font-light cursor-pointer border transition-all flex items-center justify-center gap-2"
+                :class="currentResolvedBinaryState === 1
+                  ? 'bg-emerald-500 text-slate-950 font-medium border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.4)]'
+                  : 'bg-[#050c1c] text-emerald-300 border-cyan-500/30 hover:border-emerald-400'"
+              >
+                <span class="w-2.5 h-2.5 rounded-full" :style="{ backgroundColor: component.customProps?.color1 || '#ff2233' }"></span>
+                <span>1: 合闸 / 导通 / 动作</span>
               </button>
             </div>
           </div>
@@ -3731,43 +3634,6 @@ const toggleBatchVisibility = () => {
                     <span class="text-[10px] text-cyan-400 font-mono">series_device_load</span>
                   </button>
                 </div>
-              </div>
-            </div>
-
-            <!-- SPECIAL SECTION: Alarm Feed Binding & Filter -->
-            <div v-if="component.type === 'ind-alarm-list'" class="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/40 space-y-2.5">
-              <div class="flex items-center gap-1.5 text-xs font-bold text-cyan-300">
-                <AlertTriangle class="w-4 h-4 text-amber-400" />
-                <span class="font-normal text-cyan-200">实时告警事件源过滤</span>
-              </div>
-
-              <!-- Device Filter -->
-              <div>
-                <label class="text-[11px] font-light text-cyan-200 block mb-1">告警来源装置过滤</label>
-                <select
-                  :value="component.data.mapping?.deviceId || 'ALL'"
-                  @change="updateComponentData({ mapping: { ...component.data.mapping, deviceId: ($event.target as HTMLSelectElement).value } })"
-                  class="w-full bg-[#050c1c] border border-cyan-500/30 focus:border-cyan-400 rounded-lg px-2 py-1 text-cyan-200 text-xs font-light outline-hidden cursor-pointer"
-                >
-                  <option value="ALL">全部装置 (全站综合事件流)</option>
-                  <option v-for="dev in currentDatasetDevices" :key="dev.deviceId" :value="dev.deviceId">
-                    [{{ dev.deviceId }}] {{ dev.name }}
-                  </option>
-                </select>
-              </div>
-
-              <!-- Severity Filter -->
-              <div>
-                <label class="text-[11px] font-light text-cyan-200 block mb-1">告警级别过滤</label>
-                <select
-                  :value="component.data.mapping?.severityLevel || 'ALL'"
-                  @change="updateComponentData({ mapping: { ...component.data.mapping, severityLevel: ($event.target as HTMLSelectElement).value } })"
-                  class="w-full bg-[#050c1c] border border-cyan-500/30 focus:border-cyan-400 rounded-lg px-2 py-1 text-cyan-200 text-xs font-light outline-hidden cursor-pointer"
-                >
-                  <option value="ALL">全部级别 (严重事故 + 异常预警 + 运行提示)</option>
-                  <option value="CRITICAL_ONLY">仅紧急事故 (CRITICAL 跳闸/过流/短路)</option>
-                  <option value="WARNING_PLUS">预警及以上 (CRITICAL + WARNING)</option>
-                </select>
               </div>
             </div>
 

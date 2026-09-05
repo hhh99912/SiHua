@@ -1,0 +1,124 @@
+{
+  "id": "cell-elec-pcs",
+  "name": "光伏逆变升压一体机 PCS",
+  "category": "electrical",
+  "iconName": "Zap",
+  "description": "光伏电站集散式逆变一体机，由外壳、对角分割线与交直流标识组合，0边距贴边",
+  "defaultWidth": 80,
+  "defaultHeight": 50,
+  "type": "composite-symbol",
+  "defaultStyle": {
+    "fill": "transparent",
+    "stroke": "#00f2ff",
+    "strokeWidth": 2
+  },
+  "states": [
+    {
+      "id": "1",
+      "name": "发电并网中",
+      "matchValue": "1",
+      "children": [
+        {
+          "id": "pcs-case",
+          "name": "逆变器机壳",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 0,
+          "y": 0,
+          "width": 80,
+          "height": 50,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "fill": "rgba(15, 23, 42, 0.85)",
+            "stroke": "#10b981",
+            "strokeWidth": 2,
+            "borderRadius": 4
+          }
+        },
+        {
+          "id": "pcs-diag-line",
+          "name": "对角分割线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 0,
+          "y": 0,
+          "width": 80,
+          "height": 50,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "stroke": "#10b981",
+            "strokeWidth": 1.5
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0,
+                "yRatio": 1,
+                "x": 0,
+                "y": 50
+              },
+              {
+                "xRatio": 1,
+                "yRatio": 0,
+                "x": 80,
+                "y": 0
+              }
+            ]
+          }
+        },
+        {
+          "id": "pcs-text-dc",
+          "name": "DC标识",
+          "type": "draw-text",
+          "category": "basic",
+          "x": 8,
+          "y": 24,
+          "width": 24,
+          "height": 18,
+          "rotation": 0,
+          "zIndex": 3,
+          "style": {
+            "fill": "transparent",
+            "fontSize": 13,
+            "textColor": "#10b981",
+            "fontWeight": "bold"
+          },
+          "customProps": {
+            "text": "DC"
+          }
+        },
+        {
+          "id": "pcs-text-ac",
+          "name": "AC标识",
+          "type": "draw-text",
+          "category": "basic",
+          "x": 48,
+          "y": 8,
+          "width": 24,
+          "height": 18,
+          "rotation": 0,
+          "zIndex": 3,
+          "style": {
+            "fill": "transparent",
+            "fontSize": 13,
+            "textColor": "#10b981",
+            "fontWeight": "bold"
+          },
+          "customProps": {
+            "text": "AC"
+          }
+        }
+      ]
+    }
+  ],
+  "tags": [
+    "光伏",
+    "逆变器",
+    "PCS",
+    "并网"
+  ],
+  "filename": "光伏逆变升压一体机 PCS.json",
+  "updatedAt": "2026-09-04T13:28:54.168Z"
+}

@@ -48,21 +48,6 @@ const children = computed<ScreenComponent[]>(() => {
   return props.component.children || props.component.customProps?.children || [];
 });
 
-// Streamer Effect config
-const isStreamerActive = computed(() => {
-  return props.component.style?.streamer?.active;
-});
-
-const streamerConfig = computed(() => {
-  return props.component.style?.streamer || {
-    active: false,
-    color: '#00f2ff',
-    speed: 2,
-    direction: 'forward',
-    type: 'laser'
-  };
-});
-
 // Calculate bounding box of children if defined to scale appropriately
 const baseBounds = computed(() => {
   if (children.value.length === 0) return { width: props.component.width, height: props.component.height };
@@ -121,46 +106,6 @@ const scaleY = computed(() => props.component.height / (baseBounds.value.height 
         <span>{{ component.name }}</span>
         <span class="text-[10px] text-slate-500 mt-0.5">复合图元 (暂无子图元)</span>
       </div>
-
-      <!-- Animated Streamer Effect Border/Halo -->
-      <svg 
-        v-if="isStreamerActive" 
-        class="absolute inset-0 w-full h-full pointer-events-none overflow-visible"
-      >
-        <rect
-          x="1"
-          y="1"
-          :width="Math.max(2, component.width - 2)"
-          :height="Math.max(2, component.height - 2)"
-          :rx="component.style?.borderRadius || 0"
-          :ry="component.style?.borderRadius || 0"
-          fill="none"
-          :stroke="streamerConfig.color || '#00f2ff'"
-          :stroke-width="streamerConfig.width || 2"
-          :stroke-dasharray="streamerConfig.type === 'dots' ? '4,8' : '20,40'"
-          class="animate-streamer-flow"
-          :style="{
-            animationDuration: `${Math.max(0.5, streamerConfig.speed || 2)}s`,
-            animationDirection: streamerConfig.direction === 'reverse' ? 'reverse' : 'normal',
-            filter: `drop-shadow(0 0 6px ${streamerConfig.color || '#00f2ff'})`
-          }"
-        />
-      </svg>
     </div>
   </div>
 </template>
-
-<style scoped>
-@keyframes streamerFlow {
-  from {
-    stroke-dashoffset: 0;
-  }
-  to {
-    stroke-dashoffset: -120;
-  }
-}
-
-.animate-streamer-flow {
-  animation: streamerFlow linear infinite;
-}
-</style>

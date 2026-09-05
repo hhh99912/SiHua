@@ -1,0 +1,141 @@
+{
+  "id": "cell-ind-pump",
+  "name": "离心泵与加压泵 P",
+  "category": "industrial",
+  "iconName": "Activity",
+  "description": "工业离心泵，由泵壳外圆、切向出水口矩形与内部中心动叶轮拼装而成，0边距贴合",
+  "defaultWidth": 60,
+  "defaultHeight": 60,
+  "type": "composite-symbol",
+  "defaultStyle": {
+    "fill": "transparent",
+    "stroke": "#00f2ff",
+    "strokeWidth": 2
+  },
+  "states": [
+    {
+      "id": "1",
+      "name": "状态 1 (运行中)",
+      "matchValue": "1",
+      "children": [
+        {
+          "id": "pump-volute-1",
+          "name": "泵蜗壳",
+          "type": "draw-circle",
+          "category": "basic",
+          "x": 0,
+          "y": 10,
+          "width": 50,
+          "height": 50,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "fill": "rgba(16, 185, 129, 0.2)",
+            "stroke": "#10b981",
+            "strokeWidth": 2.5
+          }
+        },
+        {
+          "id": "pump-outlet-1",
+          "name": "切向出水口",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 30,
+          "y": 0,
+          "width": 30,
+          "height": 20,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "rgba(16, 185, 129, 0.25)",
+            "stroke": "#10b981",
+            "strokeWidth": 2
+          }
+        },
+        {
+          "id": "pump-rotor-1",
+          "name": "叶轮中心轴",
+          "type": "draw-circle",
+          "category": "basic",
+          "x": 18,
+          "y": 28,
+          "width": 14,
+          "height": 14,
+          "rotation": 0,
+          "zIndex": 3,
+          "style": {
+            "fill": "#10b981",
+            "stroke": "#10b981",
+            "strokeWidth": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "0",
+      "name": "状态 0 (停机)",
+      "matchValue": "0",
+      "children": [
+        {
+          "id": "pump-volute-0",
+          "name": "泵蜗壳",
+          "type": "draw-circle",
+          "category": "basic",
+          "x": 0,
+          "y": 10,
+          "width": 50,
+          "height": 50,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "fill": "rgba(100, 116, 139, 0.15)",
+            "stroke": "#64748b",
+            "strokeWidth": 2
+          }
+        },
+        {
+          "id": "pump-outlet-0",
+          "name": "切向出水口",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 30,
+          "y": 0,
+          "width": 30,
+          "height": 20,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "rgba(100, 116, 139, 0.2)",
+            "stroke": "#64748b",
+            "strokeWidth": 1.5
+          }
+        },
+        {
+          "id": "pump-rotor-0",
+          "name": "叶轮中心轴",
+          "type": "draw-circle",
+          "category": "basic",
+          "x": 18,
+          "y": 28,
+          "width": 14,
+          "height": 14,
+          "rotation": 0,
+          "zIndex": 3,
+          "style": {
+            "fill": "#64748b",
+            "stroke": "#64748b",
+            "strokeWidth": 1
+          }
+        }
+      ]
+    }
+  ],
+  "tags": [
+    "水泵",
+    "离心泵",
+    "给水",
+    "加压"
+  ],
+  "filename": "离心泵与加压泵 P.json",
+  "updatedAt": "2026-09-04T13:28:54.168Z"
+}

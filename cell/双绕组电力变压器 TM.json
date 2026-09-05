@@ -1,0 +1,130 @@
+{
+  "id": "cell-elec-transformer",
+  "name": "双绕组电力变压器 TM",
+  "category": "electrical",
+  "iconName": "Cpu",
+  "description": "电力主变压器，由高低压引线与两个基础正圆相交组装，严禁使用外部闸符，边界贴边0距离",
+  "defaultWidth": 40,
+  "defaultHeight": 80,
+  "type": "composite-symbol",
+  "defaultStyle": {
+    "fill": "transparent",
+    "stroke": "#00f2ff",
+    "strokeWidth": 2
+  },
+  "states": [
+    {
+      "id": "1",
+      "name": "状态 1 (带电运行)",
+      "matchValue": "1",
+      "children": [
+        {
+          "id": "trans-line-top",
+          "name": "高压引线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 18,
+          "y": 0,
+          "width": 4,
+          "height": 12,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "stroke": "#ef4444",
+            "strokeWidth": 3
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0.5,
+                "yRatio": 0,
+                "x": 2,
+                "y": 0
+              },
+              {
+                "xRatio": 0.5,
+                "yRatio": 1,
+                "x": 2,
+                "y": 12
+              }
+            ]
+          }
+        },
+        {
+          "id": "trans-circle-top",
+          "name": "一次侧绕组",
+          "type": "draw-circle",
+          "category": "basic",
+          "x": 0,
+          "y": 10,
+          "width": 40,
+          "height": 40,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "fill": "rgba(239, 68, 68, 0.1)",
+            "stroke": "#ef4444",
+            "strokeWidth": 2.5
+          }
+        },
+        {
+          "id": "trans-circle-bot",
+          "name": "二次侧绕组",
+          "type": "draw-circle",
+          "category": "basic",
+          "x": 0,
+          "y": 30,
+          "width": 40,
+          "height": 40,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "fill": "rgba(0, 242, 255, 0.1)",
+            "stroke": "#00f2ff",
+            "strokeWidth": 2.5
+          }
+        },
+        {
+          "id": "trans-line-bot",
+          "name": "低压引线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 18,
+          "y": 68,
+          "width": 4,
+          "height": 12,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "stroke": "#00f2ff",
+            "strokeWidth": 3
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0.5,
+                "yRatio": 0,
+                "x": 2,
+                "y": 0
+              },
+              {
+                "xRatio": 0.5,
+                "yRatio": 1,
+                "x": 2,
+                "y": 12
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "tags": [
+    "变压器",
+    "双绕组",
+    "TM",
+    "升压变"
+  ],
+  "filename": "双绕组电力变压器 TM.json",
+  "updatedAt": "2026-09-04T13:28:54.167Z"
+}

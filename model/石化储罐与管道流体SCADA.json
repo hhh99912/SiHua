@@ -1,0 +1,182 @@
+{
+  "id": "tpl-chemical-tank",
+  "name": "石化储罐与管道流体SCADA",
+  "description": "高精反应釜动态波浪液位、阀门开度、管线粒子流速与防爆安全指数",
+  "category": "能源化工",
+  "tags": [
+    "储罐液位",
+    "流体管线",
+    "安全指数",
+    "阀门控制"
+  ],
+  "version": "2.0.0",
+  "updatedAt": "2026-09-04T13:20:38.680Z",
+  "screen": {
+    "id": "screen-chemical-02",
+    "name": "石化储罐与管道SCADA总控大屏",
+    "description": "1920x1080 工业风深色大屏，集成实时遥测、流体管道拓扑与机床状态矩阵",
+    "width": 1920,
+    "height": 1080,
+    "backgroundColor": "#090d16",
+    "backgroundGrid": true,
+    "gridSize": 20,
+    "gridColor": "rgba(0, 242, 255, 0.22)",
+    "theme": "industrial-steel",
+    "version": "2.0.0",
+    "updatedAt": "2026-09-04T13:20:38.661Z"
+  },
+  "components": [
+    {
+      "id": "chem-title",
+      "name": "大屏科幻标题",
+      "type": "metric-title",
+      "category": "metrics",
+      "x": 480,
+      "y": 25,
+      "width": 960,
+      "height": 70,
+      "rotation": 0,
+      "zIndex": 10,
+      "style": {
+        "textColor": "#fef08a",
+        "fontSize": 28,
+        "fontWeight": "bold"
+      },
+      "data": {
+        "datasetId": "ds-chemical-tanks",
+        "mapping": {
+          "titleKey": "国家级石化新材料园区 · 储运与反应釜SCADA监控中心"
+        }
+      }
+    },
+    {
+      "id": "chem-tank-1",
+      "name": "A-101 储罐",
+      "type": "ind-tank",
+      "category": "industrial",
+      "x": 100,
+      "y": 160,
+      "width": 320,
+      "height": 380,
+      "rotation": 0,
+      "zIndex": 5,
+      "style": {
+        "fill": "rgba(15, 23, 42, 0.9)",
+        "stroke": "#00f2ff",
+        "strokeWidth": 2
+      },
+      "data": {
+        "datasetId": "ds-chemical-tanks",
+        "mapping": {
+          "titleKey": "A-101 乙烯原料储罐",
+          "valueKey": "tank1_level_pct",
+          "unitKey": "%"
+        }
+      }
+    },
+    {
+      "id": "chem-tank-2",
+      "name": "A-102 储罐",
+      "type": "ind-tank",
+      "category": "industrial",
+      "x": 460,
+      "y": 160,
+      "width": 320,
+      "height": 380,
+      "rotation": 0,
+      "zIndex": 5,
+      "style": {
+        "fill": "rgba(15, 23, 42, 0.9)",
+        "stroke": "#f59e0b",
+        "strokeWidth": 2
+      },
+      "data": {
+        "datasetId": "ds-chemical-tanks",
+        "mapping": {
+          "titleKey": "A-102 聚合反应釜",
+          "valueKey": "tank2_level_pct",
+          "unitKey": "%"
+        }
+      }
+    },
+    {
+      "id": "chem-pipe-flow",
+      "name": "主物料输送管道",
+      "type": "ind-pipe",
+      "category": "industrial",
+      "x": 100,
+      "y": 580,
+      "width": 680,
+      "height": 60,
+      "rotation": 0,
+      "zIndex": 5,
+      "style": {
+        "stroke": "#00f2ff",
+        "strokeWidth": 3
+      },
+      "animation": {
+        "enable": true,
+        "type": "flow",
+        "speed": 2,
+        "loop": true
+      },
+      "data": {
+        "datasetId": "ds-chemical-tanks",
+        "mapping": {
+          "titleKey": "输料主干管流速",
+          "valueKey": "flow_rate_lpm",
+          "unitKey": "L/min"
+        }
+      }
+    },
+    {
+      "id": "chem-flow-chart",
+      "name": "瞬时流量时序折线",
+      "type": "chart-line",
+      "category": "charts",
+      "x": 820,
+      "y": 160,
+      "width": 1000,
+      "height": 480,
+      "rotation": 0,
+      "zIndex": 4,
+      "style": {
+        "fill": "rgba(15, 23, 42, 0.9)",
+        "stroke": "#38bdf8",
+        "strokeWidth": 1
+      },
+      "data": {
+        "datasetId": "ds-chemical-tanks",
+        "mapping": {
+          "titleKey": "主管网实时流速时序图 (L/min)",
+          "categoriesKey": "series_flow",
+          "seriesKey": "series_flow",
+          "unitKey": "L/min"
+        }
+      }
+    },
+    {
+      "id": "chem-alarms",
+      "name": "安全报警流",
+      "type": "ind-alarm-list",
+      "category": "industrial",
+      "x": 100,
+      "y": 670,
+      "width": 1720,
+      "height": 360,
+      "rotation": 0,
+      "zIndex": 4,
+      "style": {
+        "fill": "rgba(15, 23, 42, 0.95)",
+        "stroke": "#ef4444",
+        "strokeWidth": 1
+      },
+      "data": {
+        "datasetId": "ds-industrial-alarms",
+        "mapping": {
+          "titleKey": "危化品储运安全实时预警"
+        }
+      }
+    }
+  ]
+}

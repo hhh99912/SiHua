@@ -28,12 +28,6 @@ const strokeDasharray = computed(() => {
   return undefined;
 });
 
-// Streamer / Glow effect
-const streamerActive = computed(() => Boolean(style.value.streamer?.active));
-const streamerColor = computed(() => style.value.streamer?.color || '#00f2ff');
-const streamerSpeed = computed(() => `${style.value.streamer?.speed || 2}s`);
-const isReverse = computed(() => style.value.streamer?.direction === 'reverse');
-
 // Helper calculations only when non-rectangular vector shape is active
 const pad = computed(() => Math.max(1, Math.ceil(strokeWidth.value / 2)));
 const innerW = computed(() => Math.max(1, width.value - pad.value * 2));
@@ -185,7 +179,7 @@ const cylPaths = computed(() => {
   >
     <!-- 1. FAST PATH: Standard Rectangle (Zero SVG Overhead, Pure Hardware-Accelerated CSS Box) -->
     <div
-      v-if="type === 'draw-rect' && !streamerActive && !style.gradient"
+      v-if="type === 'draw-rect' && !style.gradient"
       class="w-full h-full box-border"
       :style="{
         backgroundColor: fill && fill !== 'transparent' ? fill : 'transparent',
@@ -200,7 +194,7 @@ const cylPaths = computed(() => {
 
     <!-- 2. FAST PATH: Rounded Rectangle (Zero SVG Overhead, Pure Hardware-Accelerated CSS Box) -->
     <div
-      v-else-if="type === 'draw-rounded-rect' && !streamerActive && !style.gradient"
+      v-else-if="type === 'draw-rounded-rect' && !style.gradient"
       class="w-full h-full box-border"
       :style="{
         backgroundColor: fill && fill !== 'transparent' ? fill : 'transparent',
@@ -222,35 +216,25 @@ const cylPaths = computed(() => {
       shape-rendering="geometricPrecision"
       text-rendering="geometricPrecision"
     >
-      <defs v-if="streamerActive || style.gradient">
-        <!-- Dynamic Streamer Laser Glow Filter -->
-        <filter v-if="streamerActive" id="streamer-glow" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="3" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-
+      <defs v-if="style.gradient">
         <!-- Linear gradient if enabled -->
         <linearGradient 
-          v-if="style.gradient" 
           id="custom-gradient" 
           :x1="style.gradient.type === 'linear' ? '0%' : '50%'" 
           :y1="style.gradient.type === 'linear' ? '0%' : '50%'" 
           :x2="style.gradient.type === 'linear' ? '100%' : '100%'" 
-          :y2="style.gradient.type === 'linear' ? '100%' : '100%'"
+          :y2="style.gradient.type === 'linear' ? '0%' : '100%'"
         >
           <stop 
-            v-for="(gColor, idx) in style.gradient.colors" 
+            v-for="(gColor, idx) in (style.gradient.colors || [style.gradient.from || '#00f2ff', style.gradient.to || '#0284c7'])" 
             :key="idx" 
-            :offset="`${(idx / (style.gradient.colors.length - 1)) * 100}%`" 
+            :offset="`${(idx / (Math.max(1, (style.gradient.colors?.length || 2) - 1))) * 100}%`" 
             :stop-color="gColor" 
           />
         </linearGradient>
       </defs>
 
-      <!-- 1. Rectangle (Fallback for streamer or gradient) -->
+      <!-- 1. Rectangle (Fallback for gradient) -->
       <rect
         v-if="type === 'draw-rect'"
         :x="pad"
@@ -469,40 +453,6 @@ const cylPaths = computed(() => {
         :stroke-width="strokeWidth"
         :stroke-dasharray="strokeDasharray"
       />
-
-      <!-- Streamer Laser Highlight Overlay -->
-      <line
-        v-if="streamerActive"
-        :x1="pad"
-        :y1="pad"
-        :x2="width - pad"
-        :y2="pad"
-        :stroke="streamerColor"
-        :stroke-width="strokeWidth + 2"
-        stroke-linecap="round"
-        filter="url(#streamer-glow)"
-        class="streamer-glow-line"
-        :style="{
-          animationDuration: streamerSpeed,
-          animationDirection: isReverse ? 'reverse' : 'normal'
-        }"
-      />
     </svg>
   </div>
 </template>
-
-<style scoped>
-@keyframes streamerDash {
-  0% {
-    stroke-dashoffset: 200;
-  }
-  100% {
-    stroke-dashoffset: 0;
-  }
-}
-
-.streamer-glow-line {
-  stroke-dasharray: 40 160;
-  animation: streamerDash 2s linear infinite;
-}
-</style>

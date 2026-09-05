@@ -529,23 +529,277 @@ export const COMPONENT_DEFINITIONS: ComponentDefinition[] = [
   },
   {
     type: 'ctrl-button',
-    category: 'basic',
-    name: '工业控制按钮',
-    nameEn: 'Industrial Control Button',
+    category: 'buttons',
+    name: '翻盖防误触安全按钮',
+    nameEn: 'Flip-Cover Safety Button',
+    iconName: 'Lock',
+    description: '重工防灾铰链式物理翻盖防护罩，必须先掀开黄色护盖才允许按动核心按钮，杜绝误动',
+    defaultWidth: 160,
+    defaultHeight: 52,
+    defaultStyle: {
+      buttonText: '高压主断路器分闸',
+      buttonColorTheme: 'rose',
+      buttonVariant: 'flip-cover',
+      borderRadius: 10,
+      fill: '#07101e',
+      textColor: '#ffffff'
+    },
+    defaultData: {
+      action: {
+        type: 'tele-control',
+        label: '分闸操作'
+      },
+      mapping: {}
+    }
+  },
+  {
+    type: 'ctrl-button',
+    category: 'buttons',
+    name: '五防钥匙闭锁旋转开关',
+    nameEn: 'Key Interlock Switch',
+    iconName: 'Key',
+    description: '电力五防闭锁黄铜机械钥匙开关，点击旋转90°导通钥匙后，右侧操作执行钮方可解锁',
+    defaultWidth: 170,
+    defaultHeight: 52,
+    defaultStyle: {
+      buttonText: '倒闸操作许可',
+      buttonColorTheme: 'emerald',
+      buttonVariant: 'key-lock',
+      borderRadius: 12,
+      fill: '#071021',
+      textColor: '#ffffff'
+    },
+    defaultData: {
+      action: {
+        type: 'none',
+        label: '钥匙放行'
+      },
+      mapping: {}
+    }
+  },
+  {
+    type: 'ctrl-button',
+    category: 'buttons',
+    name: '三档工况选择旋钮',
+    nameEn: '3-Position Rotary Knob',
+    iconName: 'RotateCw',
+    description: '重工机械档位旋钮，支持「就地 LOCAL / 切除 STOP / 远方 REMOTE」三档精准工况切换',
+    defaultWidth: 200,
+    defaultHeight: 54,
+    defaultStyle: {
+      buttonText: '控制工况切换',
+      buttonColorTheme: 'cyan',
+      buttonVariant: 'rotary-3pos',
+      borderRadius: 12,
+      fill: '#070f1e',
+      textColor: '#00f2ff'
+    },
+    defaultData: {
+      action: {
+        type: 'dispatch-command',
+        label: '工况切换'
+      },
+      mapping: {}
+    }
+  },
+  {
+    type: 'ctrl-button',
+    category: 'buttons',
+    name: '双向机械互锁翘板',
+    nameEn: 'Dual Seesaw Rocker',
+    iconName: 'Sliders',
+    description: '双向物理互锁跷跷板开关，左侧触发分闸(绿色)，右侧触发合闸(红色)，手感极其逼真',
+    defaultWidth: 160,
+    defaultHeight: 50,
+    defaultStyle: {
+      buttonText: '断路器分合',
+      buttonColorTheme: 'slate',
+      buttonVariant: 'rocker-switch',
+      borderRadius: 10,
+      fill: '#030814',
+      textColor: '#ffffff'
+    },
+    defaultData: {
+      action: {
+        type: 'tele-control',
+        label: '分合控制'
+      },
+      mapping: {}
+    }
+  },
+  {
+    type: 'ctrl-button',
+    category: 'buttons',
+    name: '长按充能防误动按钮',
+    nameEn: 'Charge-to-Fire Hold Button',
+    iconName: 'Zap',
+    description: '电容持续蓄能机构，必须持续长按1.5秒充能环达到100%才触发高危调度指令，松开即刻清零',
+    defaultWidth: 170,
+    defaultHeight: 52,
+    defaultStyle: {
+      buttonText: '母线带电解列',
+      buttonColorTheme: 'cyan',
+      buttonVariant: 'charge-hold',
+      borderRadius: 12,
+      fill: '#071226',
+      textColor: '#00f2ff'
+    },
+    defaultData: {
+      action: {
+        type: 'dispatch-command',
+        commandValue: 'FIRE_TRIGGER',
+        label: '充能执行'
+      },
+      mapping: {}
+    }
+  },
+  {
+    type: 'ctrl-button',
+    category: 'buttons',
+    name: '旋转复位自锁急停钮',
+    nameEn: 'Twist-to-Reset Latch E-Stop',
+    iconName: 'AlertOctagon',
+    description: '工业自锁机械急停蘑菇头，拍下立即锁定下沉并报警，必须顺时针旋转把手弹起方能复位',
+    defaultWidth: 160,
+    defaultHeight: 56,
+    defaultStyle: {
+      buttonText: '紧急跳闸 ESTOP',
+      buttonColorTheme: 'rose',
+      buttonVariant: 'latch-estop',
+      borderRadius: 16,
+      fill: '#1c1917',
+      textColor: '#ffffff'
+    },
+    defaultData: {
+      action: {
+        type: 'dispatch-command',
+        commandValue: 'EMERGENCY_SHUTDOWN',
+        label: '急停跳闸'
+      },
+      mapping: {}
+    }
+  },
+  {
+    type: 'ctrl-button',
+    category: 'buttons',
+    name: '滑动解锁确认执行滑块',
+    nameEn: 'Slide-to-Confirm Interlock',
     iconName: 'ToggleRight',
-    description: '工业级可交互控制按键，支持遥控分合闸下发、金属边框、指令触发与页面跳转',
+    description: '防误碰单向机械滑轨，需按住手柄横向拖拽滑动至最右端终点，方可核准并执行核心指令',
+    defaultWidth: 200,
+    defaultHeight: 48,
+    defaultStyle: {
+      buttonText: '全站切机确认',
+      buttonColorTheme: 'cyan',
+      buttonVariant: 'slide-confirm',
+      borderRadius: 12,
+      fill: '#030813',
+      textColor: '#00f2ff'
+    },
+    defaultData: {
+      action: {
+        type: 'dispatch-command',
+        label: '滑动确认'
+      },
+      mapping: {}
+    }
+  },
+  {
+    type: 'ctrl-button',
+    category: 'buttons',
+    name: '双人双键同押确认器',
+    nameEn: 'Two-Hand Permissive Interlock',
+    iconName: 'Users',
+    description: '两票三制双人许可闭锁，需操作人1与监护人2在有效时限内先后完成授权核准，才能连通触点',
+    defaultWidth: 200,
+    defaultHeight: 52,
+    defaultStyle: {
+      buttonText: '双人监护复核',
+      buttonColorTheme: 'indigo',
+      buttonVariant: 'two-hand',
+      borderRadius: 12,
+      fill: '#060e1d',
+      textColor: '#ffffff'
+    },
+    defaultData: {
+      action: {
+        type: 'dispatch-command',
+        label: '双人授权'
+      },
+      mapping: {}
+    }
+  },
+  {
+    type: 'ctrl-button',
+    category: 'buttons',
+    name: '工业控制按钮 (赛博高光)',
+    nameEn: 'Cyber Glow Button',
+    iconName: 'Power',
+    description: '标准赛博实心发光按钮，支持遥控分合闸、指令触发、文字与背景全定制',
     defaultWidth: 140,
     defaultHeight: 46,
     defaultStyle: {
       buttonText: '断路器合闸',
       buttonColorTheme: 'cyan',
       buttonVariant: 'solid',
-      borderRadius: 8
+      borderRadius: 8,
+      fill: '',
+      textColor: ''
     },
     defaultData: {
       action: {
         type: 'none',
         label: '按钮操作'
+      },
+      mapping: {}
+    }
+  },
+  {
+    type: 'ctrl-button',
+    category: 'buttons',
+    name: '金属质感机械按键',
+    nameEn: 'Metallic Bezel Button',
+    iconName: 'Sliders',
+    description: '内外双层微斜边金属机械质感按键，配备状态微灯与按压微凹质感',
+    defaultWidth: 140,
+    defaultHeight: 46,
+    defaultStyle: {
+      buttonText: '遥控分闸执行',
+      buttonColorTheme: 'slate',
+      buttonVariant: 'metallic',
+      borderRadius: 10,
+      fill: '',
+      textColor: ''
+    },
+    defaultData: {
+      action: {
+        type: 'none',
+        label: '按钮操作'
+      },
+      mapping: {}
+    }
+  },
+  {
+    type: 'ctrl-button',
+    category: 'buttons',
+    name: '科技线框幽灵按钮',
+    nameEn: 'Cyber Outline Button',
+    iconName: 'Sparkles',
+    description: '半透明微晶深色底座 + 发光细边框，微光呼吸感，高档 SCADA 主界面常备',
+    defaultWidth: 140,
+    defaultHeight: 46,
+    defaultStyle: {
+      buttonText: '画面跳转/监控',
+      buttonColorTheme: 'cyan',
+      buttonVariant: 'outline',
+      borderRadius: 8,
+      fill: 'transparent',
+      textColor: '#00f2ff'
+    },
+    defaultData: {
+      action: {
+        type: 'jump-screen',
+        label: '画面跳转'
       },
       mapping: {}
     }
@@ -805,152 +1059,10 @@ export const COMPONENT_DEFINITIONS: ComponentDefinition[] = [
 
   // ==========================================
   // 2. Electrical Power System Primary Components (电力一次系统图元)
+  // 注：断路器、隔离开关、接地刀闸、变压器、互感器、手车等图元均统一使用
+  // cell/ 目录下规范的自定义设计工坊图元（零边距、无闸符、多状态几何装配），
+  // 在 ComponentPalette 中通过 customSymbols 自动无缝聚合展示与拖拽。
   // ==========================================
-  {
-    type: 'elec-breaker',
-    category: 'electrical',
-    name: '高压真空断路器 QF (0/1/2)',
-    nameEn: 'HV Vacuum Circuit Breaker',
-    iconName: 'Zap',
-    description: '国标/IEC标准高压真空断路器，支持 0:分闸(断开/绿), 1:合闸(闭合/红), 2:故障(跳闸/黄)',
-    defaultWidth: 70,
-    defaultHeight: 90,
-    defaultStyle: {
-      stroke: '#00f2ff',
-      strokeWidth: 2.5,
-      breakerColorClosed: '#ef4444',
-      breakerColorOpen: '#10b981'
-    },
-    defaultCustomProps: {
-      state: 1 // 1: 合闸, 0: 分闸, 2: 故障
-    },
-    defaultData: {
-      datasetId: 'ds-scada-station',
-      mapping: {
-        stateKey: 'DEV_101_YX_1'
-      }
-    }
-  },
-  {
-    type: 'elec-handcart',
-    category: 'electrical',
-    name: '开关柜抽出式手车 (0/1/2)',
-    nameEn: 'Switchgear Withdrawable Handcart',
-    iconName: 'Layers',
-    description: 'KYN28高压开关柜可抽出式断路器手车，支持 0:试验位置, 1:工作位置, 2:检修隔离',
-    defaultWidth: 80,
-    defaultHeight: 90,
-    defaultStyle: {
-      stroke: '#00f2ff',
-      strokeWidth: 2
-    },
-    defaultCustomProps: {
-      position: 1 // 1: 工作位置, 0: 试验位置, 2: 检修
-    },
-    defaultData: {
-      datasetId: 'ds-scada-station',
-      mapping: {
-        stateKey: 'DEV_101_YX_2'
-      }
-    }
-  },
-  {
-    type: 'elec-disconnector',
-    category: 'electrical',
-    name: '隔离开关 / 刀闸 QS (0/1/2)',
-    nameEn: 'Isolator Switch / Disconnector',
-    iconName: 'ZapOff',
-    description: '电力隔离开关，支持 0:分闸(隔离), 1:合闸(导通), 2:故障',
-    defaultWidth: 60,
-    defaultHeight: 70,
-    defaultStyle: {
-      stroke: '#00f2ff',
-      strokeWidth: 2.5
-    },
-    defaultCustomProps: {
-      state: 1
-    },
-    defaultData: { mapping: {} }
-  },
-  {
-    type: 'elec-grounding',
-    category: 'electrical',
-    name: '接地刀闸 QE (0/1/2)',
-    nameEn: 'Grounding Disconnector Switch',
-    iconName: 'Minus',
-    description: '高压出线/母线快速接地刀闸，支持 0:分闸, 1:合闸(接地导通), 2:故障',
-    defaultWidth: 60,
-    defaultHeight: 70,
-    defaultStyle: {
-      stroke: '#eab308',
-      strokeWidth: 2.5
-    },
-    defaultCustomProps: {
-      state: 0
-    },
-    defaultData: { mapping: {} }
-  },
-  {
-    type: 'elec-transformer',
-    category: 'electrical',
-    name: '电力主变压器 TM',
-    nameEn: 'Power Transformer',
-    iconName: 'Activity',
-    description: '双绕组/三绕组电力变压器，双圆相交标准电力符号，带油温与瓦斯信号',
-    defaultWidth: 100,
-    defaultHeight: 130,
-    defaultStyle: {
-      stroke: '#00f2ff',
-      strokeWidth: 2.5,
-      voltageLevel: '10kV'
-    },
-    defaultData: { mapping: {} }
-  },
-  {
-    type: 'elec-ct',
-    category: 'electrical',
-    name: '电流互感器 TA / CT',
-    nameEn: 'Current Transformer',
-    iconName: 'Circle',
-    description: '高精度测量/保护用电流互感器，圆形同心电磁感应标准一次符号',
-    defaultWidth: 50,
-    defaultHeight: 60,
-    defaultStyle: {
-      stroke: '#00f2ff',
-      strokeWidth: 2
-    },
-    defaultData: { mapping: {} }
-  },
-  {
-    type: 'elec-pt',
-    category: 'electrical',
-    name: '电压互感器 TV / PT',
-    nameEn: 'Voltage Transformer',
-    iconName: 'Circle',
-    description: '母线三相电压测量用电磁式电压互感器，带一次熔断器符号',
-    defaultWidth: 50,
-    defaultHeight: 70,
-    defaultStyle: {
-      stroke: '#00f2ff',
-      strokeWidth: 2
-    },
-    defaultData: { mapping: {} }
-  },
-  {
-    type: 'elec-arrester',
-    category: 'electrical',
-    name: '氧化锌避雷器 F',
-    nameEn: 'Lightning Surge Arrester',
-    iconName: 'Zap',
-    description: '高压母线与线路防雷过电压保护用金属氧化物避雷器',
-    defaultWidth: 50,
-    defaultHeight: 70,
-    defaultStyle: {
-      stroke: '#00f2ff',
-      strokeWidth: 2
-    },
-    defaultData: { mapping: {} }
-  },
   {
     type: 'elec-busbar',
     category: 'electrical',
@@ -1121,21 +1233,6 @@ export const COMPONENT_DEFINITIONS: ComponentDefinition[] = [
     },
     defaultData: { mapping: {} }
   },
-  {
-    type: 'ind-alarm-list',
-    category: 'industrial',
-    name: '实时告警事件滚屏',
-    nameEn: 'Realtime SCADA Alarm Feed',
-    iconName: 'AlertTriangle',
-    description: '变电站与生产线实时SOE事件、事故跳闸与越限告警滚屏列表',
-    defaultWidth: 320,
-    defaultHeight: 200,
-    defaultStyle: {
-      stroke: '#ef4444',
-      fill: 'rgba(15, 23, 42, 0.85)'
-    },
-    defaultData: { mapping: {} }
-  },
 
   // ==========================================
   // 5. Visual Charts (可视化图表)
@@ -1271,10 +1368,10 @@ export const COMPONENT_DEFINITIONS: ComponentDefinition[] = [
   {
     type: 'deco-border-hud-double',
     category: 'decoration',
-    name: '双线流光HUD科技框',
-    nameEn: 'HUD Double Streamer Frame',
+    name: '双线精工HUD科技框',
+    nameEn: 'HUD Double Precision Frame',
     iconName: 'Layers',
-    description: '动态双层微框与四周刻度标尺，增强大屏纵深感',
+    description: '工业双层微框与四周刻度标尺，增强大屏纵深感',
     defaultWidth: 340,
     defaultHeight: 220,
     defaultStyle: {

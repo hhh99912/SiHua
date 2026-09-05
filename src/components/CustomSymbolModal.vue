@@ -1812,11 +1812,12 @@ const handleFileChange = async (e: Event) => {
               <Box class="w-5 h-5" />
             </div>
             <div>
-              <h2 class="text-sm font-bold text-slate-100 font-mono tracking-wide">
-                SCADA 工业图元资产库与设计工坊
+              <h2 class="text-sm font-bold text-slate-100 font-mono tracking-wide flex items-center gap-2">
+                <span>SCADA 工业图元资产库与设计工坊</span>
+                <span class="px-2 py-0.5 rounded text-[10px] bg-cyan-950/80 text-cyan-300 border border-cyan-500/40">cell/ 独立存储 ({{ symbols.length }})</span>
               </h2>
               <p class="text-[11px] text-slate-400 font-mono">
-                管理多态工业图元、电气微元，支持在无限画布中自由绘制与状态调度
+                图元全部独立保存在 cell/ 目录下（一个图元一个 JSON），由基础几何组件 0 边距严格组装，无闸符，启动自动扫描检索
               </p>
             </div>
           </div>

@@ -1,0 +1,151 @@
+{
+  "id": "cell-ind-motor",
+  "name": "三相交流感应电动机 M",
+  "category": "industrial",
+  "iconName": "Cpu",
+  "description": "工业驱动电机，由定子圆框、底座支撑与中心矢量代号组装，0边距紧致贴合",
+  "defaultWidth": 60,
+  "defaultHeight": 64,
+  "type": "composite-symbol",
+  "defaultStyle": {
+    "fill": "transparent",
+    "stroke": "#00f2ff",
+    "strokeWidth": 2
+  },
+  "states": [
+    {
+      "id": "1",
+      "name": "状态 1 (运行中)",
+      "matchValue": "1",
+      "children": [
+        {
+          "id": "motor-circle-1",
+          "name": "定子外圆",
+          "type": "draw-circle",
+          "category": "basic",
+          "x": 2,
+          "y": 0,
+          "width": 56,
+          "height": 56,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "fill": "rgba(0, 242, 255, 0.15)",
+            "stroke": "#00f2ff",
+            "strokeWidth": 2.5
+          }
+        },
+        {
+          "id": "motor-label-1",
+          "name": "电机铭牌",
+          "type": "draw-text",
+          "category": "basic",
+          "x": 18,
+          "y": 12,
+          "width": 24,
+          "height": 28,
+          "rotation": 0,
+          "zIndex": 3,
+          "style": {
+            "fill": "transparent",
+            "fontSize": 22,
+            "textColor": "#00f2ff",
+            "fontWeight": "bold"
+          },
+          "customProps": {
+            "text": "M"
+          }
+        },
+        {
+          "id": "motor-base-1",
+          "name": "安装底座",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 0,
+          "y": 56,
+          "width": 60,
+          "height": 8,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "rgba(0, 242, 255, 0.4)",
+            "stroke": "#00f2ff",
+            "strokeWidth": 1.5,
+            "borderRadius": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "0",
+      "name": "状态 0 (停机备用)",
+      "matchValue": "0",
+      "children": [
+        {
+          "id": "motor-circle-0",
+          "name": "定子外圆",
+          "type": "draw-circle",
+          "category": "basic",
+          "x": 2,
+          "y": 0,
+          "width": 56,
+          "height": 56,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "fill": "rgba(100, 116, 139, 0.15)",
+            "stroke": "#64748b",
+            "strokeWidth": 2
+          }
+        },
+        {
+          "id": "motor-label-0",
+          "name": "电机铭牌",
+          "type": "draw-text",
+          "category": "basic",
+          "x": 18,
+          "y": 12,
+          "width": 24,
+          "height": 28,
+          "rotation": 0,
+          "zIndex": 3,
+          "style": {
+            "fill": "transparent",
+            "fontSize": 22,
+            "textColor": "#64748b",
+            "fontWeight": "bold"
+          },
+          "customProps": {
+            "text": "M"
+          }
+        },
+        {
+          "id": "motor-base-0",
+          "name": "安装底座",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 0,
+          "y": 56,
+          "width": 60,
+          "height": 8,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "rgba(100, 116, 139, 0.3)",
+            "stroke": "#64748b",
+            "strokeWidth": 1.5,
+            "borderRadius": 2
+          }
+        }
+      ]
+    }
+  ],
+  "tags": [
+    "电机",
+    "动力",
+    "感应电机",
+    "M"
+  ],
+  "filename": "三相交流感应电动机 M.json",
+  "updatedAt": "2026-09-04T13:28:54.167Z"
+}

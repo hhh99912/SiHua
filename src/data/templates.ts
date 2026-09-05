@@ -1,16 +1,8 @@
-import { ProjectSchema, ScreenComponent, ScreenConfig } from '../types';
+import { ProjectSchema, ScreenComponent, ScreenConfig, TemplateMeta } from '../types';
 import { INITIAL_DATASETS } from './presetDatasets';
+import { PV_HIGH_VOLTAGE_TEMPLATE } from './pvHighVoltageTemplate';
 
-export interface TemplateMeta {
-  id: string;
-  name: string;
-  nameEn: string;
-  description: string;
-  category: string;
-  tags: string[];
-  thumbnailGradient: string;
-  schema: ProjectSchema;
-}
+export type { TemplateMeta };
 
 // 1. Smart Factory Digital Twin Template (1920x1080)
 const SMART_FACTORY_COMPONENTS: ScreenComponent[] = [
@@ -89,7 +81,7 @@ const SMART_FACTORY_COMPONENTS: ScreenComponent[] = [
   {
     id: 'comp-kpi-02',
     name: '综合稼动率 OEE',
-    type: 'metric-card',
+    type: 'metric-float',
     category: 'metrics',
     x: 330,
     y: 100,
@@ -98,24 +90,25 @@ const SMART_FACTORY_COMPONENTS: ScreenComponent[] = [
     rotation: 0,
     zIndex: 5,
     style: {
-      fill: 'rgba(10, 22, 38, 0.85)',
-      stroke: '#00e5a3',
-      strokeWidth: 1,
-      themePreset: 'tech-emerald'
+      fill: 'transparent',
+      stroke: 'transparent',
+      strokeWidth: 0,
+      textColor: '#00e5a3',
+      fontSize: 28,
+      decimals: 1,
+      trimZeros: false
     },
     data: {
       datasetId: 'ds-factory-telemetry',
       mapping: {
-        titleKey: '综合稼动率 OEE',
-        valueKey: 'oee_efficiency_pct',
-        unitKey: '%'
+        valueKey: 'oee_efficiency_pct'
       }
     }
   },
   {
     id: 'comp-kpi-03',
     name: '主轴功率与转速',
-    type: 'metric-card',
+    type: 'metric-float',
     category: 'metrics',
     x: 1330,
     y: 100,
@@ -124,24 +117,25 @@ const SMART_FACTORY_COMPONENTS: ScreenComponent[] = [
     rotation: 0,
     zIndex: 5,
     style: {
-      fill: 'rgba(10, 22, 38, 0.85)',
-      stroke: '#f59e0b',
-      strokeWidth: 1,
-      themePreset: 'industrial-amber'
+      fill: 'transparent',
+      stroke: 'transparent',
+      strokeWidth: 0,
+      textColor: '#f59e0b',
+      fontSize: 28,
+      decimals: 2,
+      trimZeros: true
     },
     data: {
       datasetId: 'ds-factory-telemetry',
       mapping: {
-        titleKey: '车间总功率负载',
-        valueKey: 'power_consumption_kw',
-        unitKey: 'kW'
+        valueKey: 'power_consumption_kw'
       }
     }
   },
   {
     id: 'comp-kpi-04',
     name: '良品率指标',
-    type: 'metric-card',
+    type: 'metric-float',
     category: 'metrics',
     x: 1610,
     y: 100,
@@ -150,16 +144,18 @@ const SMART_FACTORY_COMPONENTS: ScreenComponent[] = [
     rotation: 0,
     zIndex: 5,
     style: {
-      fill: 'rgba(10, 22, 38, 0.85)',
-      stroke: '#3b82f6',
-      strokeWidth: 1
+      fill: 'transparent',
+      stroke: 'transparent',
+      strokeWidth: 0,
+      textColor: '#3b82f6',
+      fontSize: 28,
+      decimals: 1,
+      trimZeros: false
     },
     data: {
       datasetId: 'ds-factory-telemetry',
       mapping: {
-        titleKey: '综合良品率 (FPY)',
-        valueKey: 'yield_rate_pct',
-        unitKey: '%'
+        valueKey: 'yield_rate_pct'
       }
     }
   },
@@ -382,9 +378,9 @@ const SMART_FACTORY_COMPONENTS: ScreenComponent[] = [
   },
   {
     id: 'comp-alarm-01',
-    name: '实时告警日志',
-    type: 'ind-alarm-list',
-    category: 'industrial',
+    name: '实时遥测与工况统计',
+    type: 'chart-bar',
+    category: 'charts',
     x: 1330,
     y: 620,
     width: 560,
@@ -393,14 +389,17 @@ const SMART_FACTORY_COMPONENTS: ScreenComponent[] = [
     zIndex: 4,
     style: {
       fill: 'rgba(12, 22, 37, 0.9)',
-      stroke: '#ef4444',
+      stroke: '#00f2ff',
       strokeWidth: 1,
       borderRadius: 8
     },
     data: {
-      datasetId: 'ds-industrial-alarms',
+      datasetId: 'ds-energy-grid',
       mapping: {
-        titleKey: '工控网络实时预警事件'
+        titleKey: '工控系统运行负荷分布',
+        categoriesKey: 'series_tank_names',
+        seriesKey: 'series_tank_compare',
+        unitKey: '%'
       }
     }
   }
@@ -422,6 +421,7 @@ const DEFAULT_SCREEN_CONFIG: ScreenConfig = {
 };
 
 export const PRESET_TEMPLATES: TemplateMeta[] = [
+  PV_HIGH_VOLTAGE_TEMPLATE,
   {
     id: 'tpl-smart-factory',
     name: '智能工厂车间数字孪生大屏',
@@ -537,17 +537,25 @@ export const PRESET_TEMPLATES: TemplateMeta[] = [
         },
         {
           id: 'chem-alarms',
-          name: '安全报警流',
-          type: 'ind-alarm-list',
-          category: 'industrial',
+          name: '储运实时监测数据走势',
+          type: 'chart-line',
+          category: 'charts',
           x: 100,
           y: 670,
           width: 1720,
           height: 360,
           rotation: 0,
           zIndex: 4,
-          style: { fill: 'rgba(15, 23, 42, 0.95)', stroke: '#ef4444', strokeWidth: 1 },
-          data: { datasetId: 'ds-industrial-alarms', mapping: { titleKey: '危化品储运安全实时预警' } }
+          style: { fill: 'rgba(15, 23, 42, 0.95)', stroke: '#00f2ff', strokeWidth: 1 },
+          data: {
+            datasetId: 'ds-energy-grid',
+            mapping: {
+              titleKey: '危化品储运安全实时压力走势',
+              categoriesKey: 'series_time',
+              seriesKey: 'series_flow',
+              unitKey: 'MPa'
+            }
+          }
         }
       ]
     }
@@ -602,7 +610,7 @@ export const PRESET_TEMPLATES: TemplateMeta[] = [
         {
           id: 'eng-kpi-soc',
           name: '储能电池SOC',
-          type: 'metric-card',
+          type: 'metric-float',
           category: 'metrics',
           x: 410,
           y: 120,
@@ -610,8 +618,8 @@ export const PRESET_TEMPLATES: TemplateMeta[] = [
           height: 120,
           rotation: 0,
           zIndex: 5,
-          style: { fill: 'rgba(6, 20, 24, 0.9)', stroke: '#06b6d4' },
-          data: { datasetId: 'ds-energy-grid', mapping: { titleKey: '储能系统剩余 SOC', valueKey: 'battery_soc_pct', unitKey: '%' } }
+          style: { fill: 'transparent', stroke: 'transparent', textColor: '#06b6d4', fontSize: 32 },
+          data: { datasetId: 'ds-energy-grid', mapping: { valueKey: 'battery_soc_pct' } }
         },
         {
           id: 'eng-chart-solar',

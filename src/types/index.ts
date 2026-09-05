@@ -1,4 +1,5 @@
 export type ComponentCategory = 
+  | 'buttons'      // 🔘 交互控制 / 按钮组件
   | 'status'       // 🟢 状态图元 (遥信/指示灯/状态码/拓扑状态点)
   | 'metrics'      // 🔢 数值图元 (遥测/数码管/仪表盘/计数器)
   | 'electrical'   // ⚡ 电力一次系统图元 (断路器/手车/隔离开关/主变/互感器/避雷器/母线/电表)
@@ -79,7 +80,6 @@ export type ComponentType =
   // 6. Metrics & Time Widgets
   | 'metric-float'
   | 'metric-flipper'
-  | 'metric-card'
   | 'metric-title'
   | 'metric-progress'
   | 'metric-clock'
@@ -87,10 +87,7 @@ export type ComponentType =
   | 'metric-clock-analog'
   | 'metric-countdown'
 
-  // 7. Navigation
-  | 'nav-tabs'
-
-  // 8. Custom
+  // 7. Custom
   | 'custom-svg'
   | 'custom-html'
 
@@ -188,7 +185,24 @@ export interface StyleConfig {
 
   // Button
   buttonText?: string;
-  buttonVariant?: 'solid' | 'outline' | 'glass' | 'metallic' | 'emergency-stop';
+  buttonVariant?: 
+    | 'flip-cover' 
+    | 'key-lock' 
+    | 'rotary-3pos' 
+    | 'rocker-switch' 
+    | 'charge-hold' 
+    | 'latch-estop' 
+    | 'slide-confirm' 
+    | 'two-hand' 
+    | 'solid' 
+    | 'outline' 
+    | 'glass' 
+    | 'metallic' 
+    | 'emergency-stop' 
+    | 'capsule' 
+    | 'armor' 
+    | 'neon' 
+    | 'flat';
   buttonColorTheme?: 'cyan' | 'emerald' | 'amber' | 'rose' | 'indigo' | 'slate';
   buttonIcon?: string;
   isPressed?: boolean;
@@ -337,14 +351,16 @@ export interface DataFieldMapping {
 }
 
 export interface ComponentAction {
-  type: 'none' | 'jump-screen' | 'tele-control' | 'tele-regulation' | 'open-modal' | 'external-link';
+  type: 'none' | 'jump-screen' | 'tele-control' | 'tele-regulation' | 'open-modal' | 'external-link' | 'dispatch-command';
   targetScreenId?: string;
   deviceId?: string;
   pointId?: string | number;
   controlValue?: number;
   regulationValue?: number;
+  commandValue?: any;
   url?: string;
   label?: string;
+  [key: string]: any;
 }
 
 export interface ComponentDataConfig {
@@ -449,8 +465,8 @@ export interface CustomSymbolDef {
   customSvgCode?: string;
   customHtmlCode?: string;
   tags?: string[];
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ScreenItem {
@@ -479,6 +495,17 @@ export interface ProjectSchema {
   customSymbols?: CustomSymbolDef[];
   screens?: ScreenItem[];
   activeScreenId?: string;
+}
+
+export interface TemplateMeta {
+  id: string;
+  name: string;
+  nameEn: string;
+  description: string;
+  category: string;
+  tags: string[];
+  thumbnailGradient: string;
+  schema: ProjectSchema;
 }
 
 export interface HistorySnapshot {

@@ -1,0 +1,271 @@
+{
+  "id": "cell-ind-valve",
+  "name": "气动调节蝶阀",
+  "category": "industrial",
+  "iconName": "ToggleRight",
+  "description": "流体控制调节阀，由执行机构顶框、驱动立柱与左右对置三角形几何阀体组装，无闸符，0边距",
+  "defaultWidth": 50,
+  "defaultHeight": 60,
+  "type": "composite-symbol",
+  "defaultStyle": {
+    "fill": "transparent",
+    "stroke": "#00f2ff",
+    "strokeWidth": 2
+  },
+  "states": [
+    {
+      "id": "1",
+      "name": "状态 1 (阀门开启)",
+      "matchValue": "1",
+      "children": [
+        {
+          "id": "valve-actuator-1",
+          "name": "气动执行器",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 10,
+          "y": 0,
+          "width": 30,
+          "height": 14,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "rgba(16, 185, 129, 0.3)",
+            "stroke": "#10b981",
+            "strokeWidth": 2,
+            "borderRadius": 3
+          }
+        },
+        {
+          "id": "valve-stem-1",
+          "name": "执行立柱",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 23,
+          "y": 14,
+          "width": 4,
+          "height": 14,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "stroke": "#10b981",
+            "strokeWidth": 3
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0.5,
+                "yRatio": 0,
+                "x": 2,
+                "y": 0
+              },
+              {
+                "xRatio": 0.5,
+                "yRatio": 1,
+                "x": 2,
+                "y": 14
+              }
+            ]
+          }
+        },
+        {
+          "id": "valve-left-1",
+          "name": "左侧阀芯",
+          "type": "draw-polygon",
+          "category": "basic",
+          "x": 0,
+          "y": 28,
+          "width": 25,
+          "height": 32,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "rgba(16, 185, 129, 0.25)",
+            "stroke": "#10b981",
+            "strokeWidth": 2
+          },
+          "customProps": {
+            "points": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 25,
+                "y": 16
+              },
+              {
+                "x": 0,
+                "y": 32
+              }
+            ]
+          }
+        },
+        {
+          "id": "valve-right-1",
+          "name": "右侧阀芯",
+          "type": "draw-polygon",
+          "category": "basic",
+          "x": 25,
+          "y": 28,
+          "width": 25,
+          "height": 32,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "rgba(16, 185, 129, 0.25)",
+            "stroke": "#10b981",
+            "strokeWidth": 2
+          },
+          "customProps": {
+            "points": [
+              {
+                "x": 25,
+                "y": 0
+              },
+              {
+                "x": 0,
+                "y": 16
+              },
+              {
+                "x": 25,
+                "y": 32
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "0",
+      "name": "状态 0 (阀门关闭)",
+      "matchValue": "0",
+      "children": [
+        {
+          "id": "valve-actuator-0",
+          "name": "气动执行器",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 10,
+          "y": 0,
+          "width": 30,
+          "height": 14,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "rgba(239, 68, 68, 0.3)",
+            "stroke": "#ef4444",
+            "strokeWidth": 2,
+            "borderRadius": 3
+          }
+        },
+        {
+          "id": "valve-stem-0",
+          "name": "执行立柱",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 23,
+          "y": 14,
+          "width": 4,
+          "height": 14,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "stroke": "#ef4444",
+            "strokeWidth": 3
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0.5,
+                "yRatio": 0,
+                "x": 2,
+                "y": 0
+              },
+              {
+                "xRatio": 0.5,
+                "yRatio": 1,
+                "x": 2,
+                "y": 14
+              }
+            ]
+          }
+        },
+        {
+          "id": "valve-left-0",
+          "name": "左侧阀芯",
+          "type": "draw-polygon",
+          "category": "basic",
+          "x": 0,
+          "y": 28,
+          "width": 25,
+          "height": 32,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "rgba(239, 68, 68, 0.25)",
+            "stroke": "#ef4444",
+            "strokeWidth": 2
+          },
+          "customProps": {
+            "points": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 25,
+                "y": 16
+              },
+              {
+                "x": 0,
+                "y": 32
+              }
+            ]
+          }
+        },
+        {
+          "id": "valve-right-0",
+          "name": "右侧阀芯",
+          "type": "draw-polygon",
+          "category": "basic",
+          "x": 25,
+          "y": 28,
+          "width": 25,
+          "height": 32,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "rgba(239, 68, 68, 0.25)",
+            "stroke": "#ef4444",
+            "strokeWidth": 2
+          },
+          "customProps": {
+            "points": [
+              {
+                "x": 25,
+                "y": 0
+              },
+              {
+                "x": 0,
+                "y": 16
+              },
+              {
+                "x": 25,
+                "y": 32
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "tags": [
+    "阀门",
+    "蝶阀",
+    "调节阀",
+    "管道"
+  ],
+  "filename": "气动调节蝶阀.json",
+  "updatedAt": "2026-09-04T13:28:54.168Z"
+}

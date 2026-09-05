@@ -293,6 +293,81 @@ export const STATION_DEVICES: ScadaDeviceItem[] = [
     teleRegulations: [
       { pointId: 1, name: '光伏最大有功功率限制出力', unit: 'kW', min: 0, max: 2000, step: 50, value: 1500 }
     ]
+  },
+  {
+    deviceId: 'DEV-PV-3501',
+    deviceName: '35kV 光伏集电进线 301 测控保护装置',
+    deviceType: '35kV 线路测控保护微机单元',
+    commStatus: 1,
+    ipAddress: '192.168.4.101',
+    telemetries: [
+      { pointId: 1, name: '35kV母线AB线电压', factor: 0.1, unit: 'kV', rawValue: 352.5, value: 35.25, description: '35kV I段母线Uab' },
+      { pointId: 2, name: '35kV母线BC线电压', factor: 0.1, unit: 'kV', rawValue: 352.8, value: 35.28, description: '35kV I段母线Ubc' },
+      { pointId: 3, name: '35kV母线CA线电压', factor: 0.1, unit: 'kV', rawValue: 352.3, value: 35.23, description: '35kV I段母线Uca' },
+      { pointId: 4, name: '301集电进线A相电流', factor: 1.0, unit: 'A', rawValue: 135.2, value: 135.2, description: '301集电回路Ia' },
+      { pointId: 5, name: '301集电进线B相电流', factor: 1.0, unit: 'A', rawValue: 134.8, value: 134.8, description: '301集电回路Ib' },
+      { pointId: 6, name: '301集电进线C相电流', factor: 1.0, unit: 'A', rawValue: 135.6, value: 135.6, description: '301集电回路Ic' },
+      { pointId: 7, name: '301集电线路有功功率', factor: 1.0, unit: 'kW', rawValue: 8240.5, value: 8240.5, description: '301集电回路总有功功率' },
+      { pointId: 8, name: '301集电线路无功功率', factor: 1.0, unit: 'kvar', rawValue: 620.4, value: 620.4, description: '301集电回路总无功功率' },
+      { pointId: 9, name: '301回路综合功率因数', factor: 0.01, unit: '', rawValue: 99, value: 0.99, description: '301集电综合功率因数' },
+      { pointId: 10, name: '电网基准系统频率', factor: 0.01, unit: 'Hz', rawValue: 5001, value: 50.01, description: '电网工频基准' }
+    ],
+    teleSignals: [
+      { pointId: 1, name: '301 真空断路器位置 (0:分/1:合/2:跳)', value: 1, statusText: '合闸 (1)' },
+      { pointId: 2, name: '301 母线侧隔离手车 (0:试/1:工/2:检)', value: 1, statusText: '工作位置 (1)' },
+      { pointId: 3, name: '301 出线侧隔离刀闸 (0:分/1:合/2:障)', value: 1, statusText: '合闸 (1)' },
+      { pointId: 4, name: '301 线路侧快速接地刀 (0:分/1:合/2:障)', value: 0, statusText: '分闸 (0)' },
+      { pointId: 5, name: '301 弹簧储能状态 (0:已储/1:未储)', value: 0, statusText: '已储能 (0)' },
+      { pointId: 6, name: '301 微机保护动作总告警 (0:常/1:动)', value: 0, statusText: '正常 (0)' }
+    ],
+    energies: [
+      { pointId: 1, name: '301回路反向有功上网电量', factor: 0.01, unit: 'MWh', value: 3450.8 }
+    ],
+    teleControls: [
+      {
+        pointId: 1,
+        name: '301 断路器分合闸遥控',
+        targetPointId: 1,
+        options: [
+          { label: '分闸指令 (0)', value: 0 },
+          { label: '合闸指令 (1)', value: 1 }
+        ]
+      }
+    ],
+    teleRegulations: []
+  },
+  {
+    deviceId: 'DEV-PV-BOX01',
+    deviceName: '1# 光伏升压箱变 3150kVA 测控装置',
+    deviceType: '箱式变电站综合测控终端',
+    commStatus: 1,
+    ipAddress: '192.168.4.102',
+    telemetries: [
+      { pointId: 1, name: '箱变高压侧线电压', factor: 0.1, unit: 'kV', rawValue: 352.4, value: 35.24 },
+      { pointId: 2, name: '箱变低压侧Uab电压', factor: 1.0, unit: 'V', rawValue: 805.2, value: 805.2 },
+      { pointId: 3, name: '箱变低压侧总输入电流', factor: 1.0, unit: 'A', rawValue: 2250.0, value: 2250.0 },
+      { pointId: 4, name: '箱变双分裂输出总功率', factor: 1.0, unit: 'kW', rawValue: 3125.0, value: 3125.0 },
+      { pointId: 5, name: '箱变顶层油温传感器', factor: 1.0, unit: '℃', rawValue: 54.6, value: 54.6 },
+      { pointId: 6, name: '箱变三相绕组热点温度', factor: 1.0, unit: '℃', rawValue: 62.3, value: 62.3 },
+      { pointId: 7, name: '箱变当前视在负荷率', factor: 1.0, unit: '%', rawValue: 78.5, value: 78.5 },
+      { pointId: 8, name: '光伏子阵太阳辐射度', factor: 1.0, unit: 'W/㎡', rawValue: 885, value: 885 },
+      { pointId: 9, name: '光伏组件背板电池温度', factor: 1.0, unit: '℃', rawValue: 42.5, value: 42.5 },
+      { pointId: 10, name: '组串逆变器综合效率', factor: 0.1, unit: '%', rawValue: 988, value: 98.8 }
+    ],
+    teleSignals: [
+      { pointId: 1, name: '箱变35kV侧高压真空负荷开关 (0:分/1:合)', value: 1, statusText: '合闸 (1)' },
+      { pointId: 2, name: '箱变0.8kV低压进线断路器1 (0:分/1:合)', value: 1, statusText: '合闸 (1)' },
+      { pointId: 3, name: '箱变0.8kV低压进线断路器2 (0:分/1:合)', value: 1, statusText: '合闸 (1)' },
+      { pointId: 4, name: '箱变重瓦斯跳闸 (0:常/1:动)', value: 0, statusText: '正常 (0)' },
+      { pointId: 5, name: '箱变油位异常告警 (0:常/1:告警)', value: 0, statusText: '正常 (0)' },
+      { pointId: 6, name: '箱变压力释放阀动作 (0:常/1:动)', value: 0, statusText: '正常 (0)' },
+      { pointId: 7, name: '箱变舱内强制风冷启动 (0:停/1:运)', value: 1, statusText: '运行 (1)' }
+    ],
+    energies: [
+      { pointId: 1, name: '箱变累计上网电量', factor: 0.01, unit: 'MWh', value: 1890.6 }
+    ],
+    teleControls: [],
+    teleRegulations: []
   }
 ];
 
@@ -329,8 +404,8 @@ export function tickDataset(dataset: DatasetItem): DatasetItem {
       for (let t = 0; t < dev.telemetries.length; t++) {
         const yc = dev.telemetries[t];
         if (yc.unit === 'kV') {
-          const delta = (Math.random() - 0.5) * 0.04;
-          yc.value = Math.max(9.8, Math.min(10.6, Number((yc.value + delta).toFixed(2))));
+          const delta = (Math.random() - 0.5) * (yc.value > 20 ? 0.08 : 0.04);
+          yc.value = Number((yc.value + delta).toFixed(2));
         } else if (yc.unit === 'A') {
           const delta = (Math.random() - 0.5) * (yc.value * 0.02);
           yc.value = Math.max(0, Number((yc.value + delta).toFixed(1)));

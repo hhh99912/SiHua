@@ -376,11 +376,6 @@ const selectedComponents = computed(() => {
   return props.components.filter(c => set.has(c.id));
 });
 
-// Selection Order Index
-const getSelectionIndex = (id: string) => {
-  const idx = props.selectedIds.indexOf(id);
-  return idx >= 0 ? idx + 1 : 0;
-};
 
 // Combined bounding box of all currently selected components in multi-select mode
 const selectedGroupBBox = computed(() => {
@@ -1811,26 +1806,11 @@ defineExpose({
               </template>
             </div>
 
-            <!-- 2. Multi-Selection Active State: High-contrast Cyan Outline + Area Tint + 4 Corner Accents + Numbered Tag -->
+            <!-- 2. Multi-Selection Active State: Clean crisp cyan outline, without individual floating tags or markers -->
             <div 
               v-else
-              class="absolute -inset-0.5 border-2 border-cyan-400 bg-cyan-400/15 pointer-events-none rounded-xs shadow-[0_0_16px_rgba(0,242,255,0.7)]"
-            >
-              <!-- 4 White Corner Brackets for Maximum Visibility -->
-              <div class="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-white shadow-xs" />
-              <div class="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-white shadow-xs" />
-              <div class="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-white shadow-xs" />
-              <div class="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-white shadow-xs" />
-
-              <!-- High-visibility Multi-Select Index & Name Tag -->
-              <div class="absolute -top-6 left-0 flex items-center gap-1 bg-[#050b18]/95 border border-cyan-300 text-cyan-200 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shadow-[0_2px_8px_rgba(0,0,0,0.8)] pointer-events-none whitespace-nowrap z-50">
-                <span class="px-1 py-0.2 bg-cyan-400 text-slate-950 rounded-[2px] font-bold text-[9px] leading-tight">
-                  #{{ getSelectionIndex(comp.id) }}
-                </span>
-                <span class="truncate max-w-[100px] text-white">{{ comp.name }}</span>
-                <Lock v-if="comp.locked" class="w-2.5 h-2.5 text-amber-400 ml-0.5" />
-              </div>
-            </div>
+              class="absolute -inset-0.5 border border-cyan-400/90 bg-cyan-400/10 pointer-events-none rounded-xs shadow-[0_0_8px_rgba(0,242,255,0.4)]"
+            />
           </div>
         </div>
 

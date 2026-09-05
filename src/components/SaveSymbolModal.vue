@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { ScreenComponent, CustomSymbolDef, CustomSymbolStateDef } from '../types';
-import { getCustomSymbols, saveCustomSymbols, addCustomSymbol } from '../utils/customSymbolStorage';
+import { getCustomSymbols, saveCustomSymbols, addCustomSymbol, normalizeSymbolZeroMargin } from '../utils/customSymbolStorage';
+import { saveCellToDisk } from '../utils/cellFileService';
 import WidgetRenderer from './widgets/WidgetRenderer.vue';
 import { 
   BookmarkPlus, Plus, Check, X, Tag, Sparkles, Layers,
-  Zap, Activity, ShieldAlert, Cpu, RefreshCw
+  Zap, Activity, ShieldAlert, Cpu, RefreshCw, FolderDown
 } from 'lucide-vue-next';
 
 interface Props {
@@ -102,7 +103,7 @@ const handleSave = () => {
       children: currentChildren
     };
 
-    const newDef: CustomSymbolDef = {
+    const rawDef: CustomSymbolDef = {
       id: `symbol-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       name: symbolName.value.trim(),
       category: symbolCategory.value,
@@ -125,7 +126,11 @@ const handleSave = () => {
       updatedAt: new Date().toISOString()
     };
 
+    // 严格确保 0 边距规范化
+    const newDef = normalizeSymbolZeroMargin(rawDef);
+
     addCustomSymbol(newDef);
+    saveCellToDisk(newDef).catch(err => console.warn('保存到 cell 目录失败:', err));
     emit('saved', newDef);
     emit('close');
   } else {
@@ -152,15 +157,17 @@ const handleSave = () => {
       states.push(updatedState);
     }
 
-    const updatedSymbol: CustomSymbolDef = {
+    const rawUpdatedSymbol: CustomSymbolDef = {
       ...targetSymbol,
       states,
       children: currentChildren, // Update default children as well
       updatedAt: new Date().toISOString()
     };
 
+    const updatedSymbol = normalizeSymbolZeroMargin(rawUpdatedSymbol);
     const allSymbols = existingSymbols.value.map(s => s.id === updatedSymbol.id ? updatedSymbol : s);
     saveCustomSymbols(allSymbols);
+    saveCellToDisk(updatedSymbol).catch(err => console.warn('保存到 cell 目录失败:', err));
     emit('saved', updatedSymbol);
     emit('close');
   }
@@ -369,8 +376,9 @@ const handleSave = () => {
 
       <!-- Footer Buttons -->
       <div class="px-5 py-3.5 border-t border-cyan-500/20 bg-[#040813] flex items-center justify-between">
-        <div class="text-xs text-slate-400 font-mono">
-          将自动剔除绝对位置偏移，按相对坐标原点封装
+        <div class="text-[11px] text-cyan-300 font-mono flex items-center gap-1.5">
+          <FolderDown class="w-3.5 h-3.5 text-cyan-400" />
+          <span>自动紧致贴合边界(间距0px)，独立存储至 <strong>cell/&lt;图元名&gt;.json</strong></span>
         </div>
 
         <div class="flex items-center gap-2.5">

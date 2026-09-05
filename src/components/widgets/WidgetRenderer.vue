@@ -9,7 +9,6 @@ import FloatMetric from './FloatMetric.vue';
 import CustomSvgWidget from './CustomSvgWidget.vue';
 import CustomHtmlWidget from './CustomHtmlWidget.vue';
 import StatusMatrix from './StatusMatrix.vue';
-import AlarmFeed from './AlarmFeed.vue';
 import CyberBorder from './CyberBorder.vue';
 import CustomLeaferCanvas from './CustomLeaferCanvas.vue';
 import ElectricalBreaker from './ElectricalBreaker.vue';
@@ -18,7 +17,6 @@ import ElectricalDisconnector from './ElectricalDisconnector.vue';
 import ElectricalTransformer from './ElectricalTransformer.vue';
 import ElectricalSensor from './ElectricalSensor.vue';
 import ElectricalBusbar from './ElectricalBusbar.vue';
-import MultiScreenNavWidget from './MultiScreenNavWidget.vue';
 import ControlButton from './ControlButton.vue';
 import StraightLine from './StraightLine.vue';
 import PolyLine from './PolyLine.vue';
@@ -174,11 +172,6 @@ const isComposite = computed(() => props.component?.type === 'composite-symbol' 
         :component="component"
         :datasets="datasets"
       />
-      <AlarmFeed 
-        v-else-if="compType === 'ind-alarm-list'"
-        :component="component"
-        :datasets="datasets"
-      />
       <DigitalCounter 
         v-else
         :component="component"
@@ -186,17 +179,7 @@ const isComposite = computed(() => props.component?.type === 'composite-symbol' 
       />
     </div>
 
-    <!-- 12. Navigation Bar -->
-    <MultiScreenNavWidget
-      v-else-if="compType === 'nav-tabs'"
-      :component="component"
-      :datasets="datasets"
-      :preview-mode="previewMode"
-      @jump:screen="emit('jump:screen', $event)"
-      class="pointer-events-auto"
-    />
-
-    <!-- 13. Custom User Primitives & Graphics -->
+    <!-- 12. Custom User Primitives & Graphics -->
     <div v-else-if="compCategory === 'custom' || compType === 'custom-svg' || compType === 'custom-html'" class="w-full h-full">
       <CustomSvgWidget 
         v-if="compType === 'custom-svg'"
