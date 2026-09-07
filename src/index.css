@@ -1,0 +1,184 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #152e52;
+    color: #f8fafc;
+    font-family: "Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei", "WenQuanYi Zen Hei", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Heiti SC", "SimHei", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: subpixel-antialiased;
+    -moz-osx-font-smoothing: auto;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "liga" 0, "tnum" 1;
+    font-variant-numeric: tabular-nums;
+    overflow: hidden;
+  }
+
+  input, textarea, select, button {
+    font-family: inherit;
+    -webkit-font-smoothing: subpixel-antialiased;
+    -moz-osx-font-smoothing: auto;
+    text-rendering: optimizeLegibility;
+  }
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    opacity: 0.8;
+  }
+
+  /* SVG Text & Vector Rendering for Crisp Industrial Visuals */
+  svg text {
+    text-rendering: geometricPrecision;
+    -webkit-font-smoothing: subpixel-antialiased;
+  }
+
+  svg {
+    shape-rendering: geometricPrecision;
+    text-rendering: geometricPrecision;
+  }
+
+  /* High Precision & Crisp Edge Rendering for Diagrams, Bitmaps, and Canvases */
+  .scada-crisp-layer,
+  .infinite-canvas-plane,
+  canvas {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+
+  img {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+
+  /* High-Contrast Monospace / Digital SCADA Numbers */
+  .font-mono,
+  .font-digital,
+  .font-tabular {
+    font-family: 'Chakra Petch', 'JetBrains Mono', 'WenQuanYi Micro Hei Mono', 'DejaVu Sans Mono', 'Ubuntu Mono', Consolas, 'Courier New', monospace !important;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: subpixel-antialiased;
+    letter-spacing: 0.5px;
+  }
+}
+
+/* Custom Cyberpunk Dark Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(18, 38, 68, 0.7);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 242, 255, 0.35);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 242, 255, 0.75);
+}
+
+/* Animations for industrial pipe flow and tank waves */
+@keyframes flowRight {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0%);
+  }
+}
+
+@keyframes wave {
+  0% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-25%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(0, 242, 255, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(0, 242, 255, 0.8);
+  }
+}
+
+/* ==========================================================================
+   Linx / Industrial Linux X11 Compatible Cursors (凝思/麒麟工控机兼容鼠标指针)
+   彻底杜绝 grab/grabbing/not-allowed/nwse-resize/nesw-resize 导致凝思系统由于缺少主题而显示黑色十字符号 (XC_X_cursor)
+   统一使用高质量嵌入式 SVG 指针与 100% 兼容的标准回退
+   ========================================================================== */
+
+/* 1. Grab & Grabbing -> 使用标准 move 或 pointer */
+.cursor-grab,
+.cursor-grabbing,
+[class*="cursor-grab"],
+[class*="cursor-grabbing"],
+[style*="cursor: grab"],
+[style*="cursor:grab"],
+[style*="cursor: grabbing"],
+[style*="cursor:grabbing"] {
+  cursor: move !important;
+}
+
+/* 2. Disabled & Not-Allowed -> 使用标准 default，绝不使用 not-allowed */
+.cursor-not-allowed,
+[class*="cursor-not-allowed"],
+[style*="cursor: not-allowed"],
+[style*="cursor:not-allowed"],
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled,
+[disabled] {
+  cursor: default !important;
+}
+
+/* 3. Diagonal & Standard Resizers -> 嵌入式高质量 SVG 双向箭头 + 安全回退，彻底解决凝思系统黑叉叉 (XC_X_cursor) */
+.cursor-nwse-resize,
+[class*="cursor-nwse-resize"],
+[style*="cursor: nwse-resize"],
+[style*="cursor:nwse-resize"],
+[style*="cursor: nw-resize"],
+[style*="cursor: se-resize"] {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M5 5h6M5 5v6M5 5l14 14M19 19h-6M19 19v-6' stroke='%23000000' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M5 5h6M5 5v6M5 5l14 14M19 19h-6M19 19v-6' stroke='%2300f2ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 12 12, nw-resize, pointer !important;
+}
+
+.cursor-nesw-resize,
+[class*="cursor-nesw-resize"],
+[style*="cursor: nesw-resize"],
+[style*="cursor:nesw-resize"],
+[style*="cursor: ne-resize"],
+[style*="cursor: sw-resize"] {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M19 5h-6M19 5v6M19 5L5 19M5 19h6M5 19v-6' stroke='%23000000' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M19 5h-6M19 5v6M19 5L5 19M5 19h6M5 19v-6' stroke='%2300f2ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 12 12, ne-resize, pointer !important;
+}
+
+.cursor-ns-resize,
+[class*="cursor-ns-resize"],
+[style*="cursor: ns-resize"],
+[style*="cursor:ns-resize"],
+[style*="cursor: n-resize"],
+[style*="cursor: s-resize"] {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M12 4l-4 4M12 4l4 4M12 4v16M12 20l-4-4M12 20l4-4' stroke='%23000000' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M12 4l-4 4M12 4l4 4M12 4v16M12 20l-4-4M12 20l4-4' stroke='%2300f2ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 12 12, n-resize, pointer !important;
+}
+
+.cursor-ew-resize,
+[class*="cursor-ew-resize"],
+[style*="cursor: ew-resize"],
+[style*="cursor:ew-resize"],
+[style*="cursor: e-resize"],
+[style*="cursor: w-resize"] {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M4 12l4-4M4 12l4 4M4 12h16M20 12l-4-4M20 12l4-4' stroke='%23000000' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M4 12l4-4M4 12l4 4M4 12h16M20 12l-4-4M20 12l4-4' stroke='%2300f2ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 12 12, e-resize, pointer !important;
+}
+

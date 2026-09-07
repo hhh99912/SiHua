@@ -1,0 +1,10 @@
+﻿node_modules/
+release/
+dist/
+dist-electron/
+*.exe
+*.asar
+*.tar
+*.zip
+.cache/
+temp_electron_cache/

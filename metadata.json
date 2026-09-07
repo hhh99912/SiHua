@@ -1,0 +1,7 @@
+{
+  "name": "GE-SCADA",
+  "description": "GE-SCADA 工业监控系统与组态工程平台，支持实时监控、遥控置数、历史曲线与工程管理。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

@@ -1,0 +1,94 @@
+{
+  "id": "screen-transformer-detail",
+  "name": "#1主变压器及测控画面",
+  "description": "110kV/10kV #1主变压器绕组温度、高低压侧负荷、油温及瓦斯信号",
+  "version": "2.0.0",
+  "updatedAt": "2026-09-06T15:31:56.638Z",
+  "screen": {
+    "id": "screen-transformer-detail",
+    "name": "#1主变压器及测控画面",
+    "width": 1980,
+    "height": 1100,
+    "backgroundColor": "#0f223d",
+    "backgroundGrid": true,
+    "gridSize": 20,
+    "gridColor": "rgba(0, 242, 255, 0.22)",
+    "theme": "cyber-dark",
+    "version": "2.0.0",
+    "updatedAt": "2026-09-06T15:31:56.568Z"
+  },
+  "components": [
+    {
+      "id": "comp-tf-main",
+      "name": "#1 主变压器双绕组",
+      "type": "elec-transformer",
+      "category": "electrical",
+      "x": 200,
+      "y": 250,
+      "width": 180,
+      "height": 220,
+      "rotation": 0,
+      "zIndex": 3,
+      "style": {
+        "stroke": "#00f2ff",
+        "strokeWidth": 3,
+        "voltageLevel": "10kV"
+      },
+      "data": {
+        "mapping": {}
+      }
+    },
+    {
+      "id": "comp-tf-temp-metric",
+      "name": "主变顶层油温遥测",
+      "type": "metric-float",
+      "category": "metrics",
+      "x": 460,
+      "y": 250,
+      "width": 220,
+      "height": 90,
+      "rotation": 0,
+      "zIndex": 4,
+      "style": {
+        "decimals": 1,
+        "suffix": " ℃",
+        "fontSize": 26,
+        "textColor": "#00f2ff",
+        "stroke": "#00f2ff",
+        "fill": "rgba(0, 242, 255, 0.1)"
+      },
+      "data": {
+        "datasetId": "ds-scada-station",
+        "mapping": {
+          "valueKey": "DEV-102_YC_3"
+        }
+      }
+    },
+    {
+      "id": "comp-tf-load-metric",
+      "name": "主变实时负荷率",
+      "type": "metric-float",
+      "category": "metrics",
+      "x": 460,
+      "y": 360,
+      "width": 220,
+      "height": 90,
+      "rotation": 0,
+      "zIndex": 4,
+      "style": {
+        "decimals": 1,
+        "suffix": " %",
+        "fontSize": 26,
+        "textColor": "#00e5a3",
+        "stroke": "#00e5a3",
+        "fill": "rgba(0, 229, 163, 0.1)"
+      },
+      "data": {
+        "datasetId": "ds-scada-station",
+        "mapping": {
+          "valueKey": "DEV-102_YC_5"
+        }
+      }
+    }
+  ]
+}

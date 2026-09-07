@@ -1,0 +1,60 @@
+{
+  "id": "screen-telemetry-scada",
+  "name": "全站电力遥测与告警",
+  "description": "全站负荷趋势、事件告警滚屏与微电网新能源指标监控",
+  "version": "2.0.0",
+  "updatedAt": "2026-09-04T05:06:50.823Z",
+  "screen": {
+    "id": "screen-telemetry-scada",
+    "name": "全站电力遥测与告警",
+    "width": 1980,
+    "height": 1100,
+    "backgroundColor": "#0f223d",
+    "backgroundGrid": true,
+    "gridSize": 20,
+    "gridColor": "rgba(0, 242, 255, 0.22)",
+    "theme": "cyber-dark",
+    "version": "2.0.0",
+    "updatedAt": "2026-09-04T05:06:21.772Z"
+  },
+  "components": [
+    {
+      "id": "comp-chart-load-line",
+      "name": "24小时总用电负荷趋势",
+      "type": "chart-line",
+      "category": "charts",
+      "x": 100,
+      "y": 200,
+      "width": 600,
+      "height": 360,
+      "rotation": 0,
+      "zIndex": 3,
+      "style": {
+        "stroke": "#00f2ff"
+      },
+      "data": {
+        "datasetId": "ds-scada-station",
+        "mapping": {}
+      }
+    },
+    {
+      "id": "comp-alarm-feed-scada",
+      "name": "变电站 SOE 事件与跳闸告警列表",
+      "type": "ind-alarm-list",
+      "category": "industrial",
+      "x": 740,
+      "y": 200,
+      "width": 540,
+      "height": 360,
+      "rotation": 0,
+      "zIndex": 3,
+      "style": {
+        "stroke": "#ef4444",
+        "fill": "rgba(15, 23, 42, 0.85)"
+      },
+      "data": {
+        "mapping": {}
+      }
+    }
+  ]
+}

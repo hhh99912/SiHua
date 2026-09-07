@@ -1,0 +1,152 @@
+{
+  "id": "tpl-energy-grid",
+  "name": "新能源微电网与负荷枢纽",
+  "description": "光伏并网发电、储能SOC电量、厂区负荷率及碳排放减量指标",
+  "category": "绿色微电网",
+  "tags": [
+    "光伏出力",
+    "储能SOC",
+    "负荷预测",
+    "绿电消纳"
+  ],
+  "version": "2.0.0",
+  "updatedAt": "2026-09-04T13:20:38.680Z",
+  "screen": {
+    "id": "screen-energy-03",
+    "name": "绿色低碳微电网控制中心",
+    "description": "1920x1080 工业风深色大屏，集成实时遥测、流体管道拓扑与机床状态矩阵",
+    "width": 1920,
+    "height": 1080,
+    "backgroundColor": "#061014",
+    "backgroundGrid": true,
+    "gridSize": 20,
+    "gridColor": "rgba(0, 242, 255, 0.22)",
+    "theme": "carbon-matrix",
+    "version": "2.0.0",
+    "updatedAt": "2026-09-04T13:20:38.661Z"
+  },
+  "components": [
+    {
+      "id": "eng-title",
+      "name": "大屏主标题",
+      "type": "metric-title",
+      "category": "metrics",
+      "x": 480,
+      "y": 20,
+      "width": 960,
+      "height": 70,
+      "rotation": 0,
+      "zIndex": 10,
+      "style": {
+        "textColor": "#6ee7b7",
+        "fontSize": 28,
+        "fontWeight": "bold"
+      },
+      "data": {
+        "datasetId": "ds-energy-grid",
+        "mapping": {
+          "titleKey": "零碳智慧园区 · 储能与多能互补微网调控中心"
+        }
+      }
+    },
+    {
+      "id": "eng-kpi-solar",
+      "name": "光伏实时出力",
+      "type": "metric-flipper",
+      "category": "metrics",
+      "x": 60,
+      "y": 120,
+      "width": 320,
+      "height": 120,
+      "rotation": 0,
+      "zIndex": 5,
+      "style": {
+        "fill": "rgba(6, 20, 24, 0.9)",
+        "stroke": "#10b981",
+        "textColor": "#10b981"
+      },
+      "data": {
+        "datasetId": "ds-energy-grid",
+        "mapping": {
+          "titleKey": "光伏实时出力 (kW)",
+          "valueKey": "solar_power_kw",
+          "unitKey": "kW"
+        }
+      }
+    },
+    {
+      "id": "eng-kpi-soc",
+      "name": "储能电池SOC",
+      "type": "metric-float",
+      "category": "metrics",
+      "x": 410,
+      "y": 120,
+      "width": 320,
+      "height": 120,
+      "rotation": 0,
+      "zIndex": 5,
+      "style": {
+        "fill": "transparent",
+        "stroke": "transparent",
+        "textColor": "#06b6d4",
+        "fontSize": 32
+      },
+      "data": {
+        "datasetId": "ds-energy-grid",
+        "mapping": {
+          "valueKey": "battery_soc_pct"
+        }
+      }
+    },
+    {
+      "id": "eng-chart-solar",
+      "name": "光伏与用电负荷对比",
+      "type": "chart-line",
+      "category": "charts",
+      "x": 60,
+      "y": 270,
+      "width": 860,
+      "height": 420,
+      "rotation": 0,
+      "zIndex": 4,
+      "style": {
+        "fill": "rgba(6, 20, 24, 0.9)",
+        "stroke": "#10b981"
+      },
+      "data": {
+        "datasetId": "ds-energy-grid",
+        "mapping": {
+          "titleKey": "光伏出力 (kW) 与全厂用电负荷动态曲线",
+          "seriesKey": "series_solar",
+          "categoriesKey": "series_load",
+          "unitKey": "kW"
+        }
+      }
+    },
+    {
+      "id": "eng-pie-sources",
+      "name": "供电结构分布",
+      "type": "chart-pie",
+      "category": "charts",
+      "x": 950,
+      "y": 270,
+      "width": 900,
+      "height": 420,
+      "rotation": 0,
+      "zIndex": 4,
+      "style": {
+        "fill": "rgba(6, 20, 24, 0.9)",
+        "stroke": "#06b6d4"
+      },
+      "data": {
+        "datasetId": "ds-energy-grid",
+        "mapping": {
+          "titleKey": "园区绿电与市网消纳配比",
+          "categoriesKey": "series_tank_names",
+          "seriesKey": "series_tank_compare",
+          "unitKey": "%"
+        }
+      }
+    }
+  ]
+}

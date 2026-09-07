@@ -1,0 +1,184 @@
+{
+  "id": "cell-elec-arrester",
+  "name": "氧化锌避雷器 F",
+  "category": "electrical",
+  "iconName": "Zap",
+  "description": "高压避雷器，由顶部引线、非线性电阻矩形箱与基础直线接地排组装，严禁使用闸符，0边距",
+  "defaultWidth": 26,
+  "defaultHeight": 60,
+  "type": "composite-symbol",
+  "defaultStyle": {
+    "fill": "transparent",
+    "stroke": "#00f2ff",
+    "strokeWidth": 2
+  },
+  "states": [
+    {
+      "id": "1",
+      "name": "防护运行中",
+      "matchValue": "1",
+      "children": [
+        {
+          "id": "arr-top-line",
+          "name": "进线端",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 11,
+          "y": 0,
+          "width": 4,
+          "height": 12,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "stroke": "#00f2ff",
+            "strokeWidth": 2.5
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0.5,
+                "yRatio": 0,
+                "x": 2,
+                "y": 0
+              },
+              {
+                "xRatio": 0.5,
+                "yRatio": 1,
+                "x": 2,
+                "y": 12
+              }
+            ]
+          }
+        },
+        {
+          "id": "arr-box",
+          "name": "氧化锌阀片箱",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 3,
+          "y": 12,
+          "width": 20,
+          "height": 30,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "fill": "rgba(0, 242, 255, 0.15)",
+            "stroke": "#00f2ff",
+            "strokeWidth": 2,
+            "borderRadius": 1
+          }
+        },
+        {
+          "id": "arr-zigzag",
+          "name": "避雷几何折线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 6,
+          "y": 16,
+          "width": 14,
+          "height": 22,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "stroke": "#00f2ff",
+            "strokeWidth": 2
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0.2,
+                "yRatio": 0.1,
+                "x": 3,
+                "y": 2
+              },
+              {
+                "xRatio": 0.8,
+                "yRatio": 0.5,
+                "x": 11,
+                "y": 11
+              },
+              {
+                "xRatio": 0.2,
+                "yRatio": 0.9,
+                "x": 3,
+                "y": 20
+              }
+            ]
+          }
+        },
+        {
+          "id": "arr-gnd-1",
+          "name": "接地长横线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 0,
+          "y": 48,
+          "width": 26,
+          "height": 4,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "stroke": "#10b981",
+            "strokeWidth": 2.5
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0,
+                "yRatio": 0.5,
+                "x": 0,
+                "y": 2
+              },
+              {
+                "xRatio": 1,
+                "yRatio": 0.5,
+                "x": 26,
+                "y": 2
+              }
+            ]
+          }
+        },
+        {
+          "id": "arr-gnd-2",
+          "name": "接地短横线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 6,
+          "y": 56,
+          "width": 14,
+          "height": 4,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "stroke": "#10b981",
+            "strokeWidth": 2.5
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0,
+                "yRatio": 0.5,
+                "x": 0,
+                "y": 2
+              },
+              {
+                "xRatio": 1,
+                "yRatio": 0.5,
+                "x": 14,
+                "y": 2
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "tags": [
+    "避雷器",
+    "过电压",
+    "F",
+    "接地保护"
+  ],
+  "filename": "氧化锌避雷器 F.json",
+  "updatedAt": "2026-09-04T13:28:54.167Z"
+}

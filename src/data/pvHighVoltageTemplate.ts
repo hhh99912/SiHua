@@ -1,0 +1,5792 @@
+import { ScreenComponent, TemplateMeta } from '../types';
+import { INITIAL_DATASETS } from './presetDatasets';
+
+export const PV_HIGH_VOLTAGE_COMPONENTS: ScreenComponent[] = [
+  {
+    "id": "comp-station-title",
+    "name": "35kV高压光伏一次系统接线图",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 720,
+    "y": 18,
+    "width": 480,
+    "height": 40,
+    "rotation": 0,
+    "zIndex": 2,
+    "style": {
+      "text": "35kV高压光伏一次系统接线图",
+      "fontSize": 24,
+      "fontWeight": "bold",
+      "textColor": "#00f2ff",
+      "textAlign": "center",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-legend-frame",
+    "name": "图例边框",
+    "type": "draw-rect",
+    "category": "basic",
+    "x": 35,
+    "y": 65,
+    "width": 120,
+    "height": 110,
+    "rotation": 0,
+    "zIndex": 3,
+    "style": {
+      "fill": "rgba(6, 15, 30, 0.6)",
+      "stroke": "#334155",
+      "strokeWidth": 1,
+      "borderRadius": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-legend-lbl-0",
+    "name": "图例标签-Ia:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 45,
+    "y": 72,
+    "width": 40,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 4,
+    "style": {
+      "text": "Ia:",
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-legend-unit-0",
+    "name": "图例单位-A",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 90,
+    "y": 72,
+    "width": 55,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 5,
+    "style": {
+      "text": "A",
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-legend-lbl-1",
+    "name": "图例标签-P:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 45,
+    "y": 96,
+    "width": 40,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 6,
+    "style": {
+      "text": "P:",
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-legend-unit-1",
+    "name": "图例单位-MW",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 90,
+    "y": 96,
+    "width": 55,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 7,
+    "style": {
+      "text": "MW",
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-legend-lbl-2",
+    "name": "图例标签-Q:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 45,
+    "y": 120,
+    "width": 40,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 8,
+    "style": {
+      "text": "Q:",
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-legend-unit-2",
+    "name": "图例单位-Mvar",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 90,
+    "y": 120,
+    "width": 55,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 9,
+    "style": {
+      "text": "Mvar",
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-legend-lbl-3",
+    "name": "图例标签-U:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 45,
+    "y": 144,
+    "width": 40,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 10,
+    "style": {
+      "text": "U:",
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-legend-unit-3",
+    "name": "图例单位-kV",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 90,
+    "y": 144,
+    "width": 55,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 11,
+    "style": {
+      "text": "kV",
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-frame",
+    "name": "气象站外框",
+    "type": "draw-rect",
+    "category": "basic",
+    "x": 35,
+    "y": 190,
+    "width": 215,
+    "height": 270,
+    "rotation": 0,
+    "zIndex": 12,
+    "style": {
+      "fill": "rgba(6, 15, 30, 0.75)",
+      "stroke": "#ffffff",
+      "strokeWidth": 1.5,
+      "borderRadius": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-title",
+    "name": "气象站标题",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 42,
+    "y": 196,
+    "width": 200,
+    "height": 24,
+    "rotation": 0,
+    "zIndex": 13,
+    "style": {
+      "text": "气象环境监测站",
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#ffffff",
+      "fill": "transparent",
+      "textAlign": "center"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-divider",
+    "name": "气象站标题分割线",
+    "type": "draw-line",
+    "category": "basic",
+    "x": 35,
+    "y": 224,
+    "width": 215,
+    "height": 1,
+    "rotation": 0,
+    "zIndex": 14,
+    "style": {
+      "stroke": "#ffffff",
+      "strokeWidth": 1
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-lbl-0",
+    "name": "气象标签-水平总辐射:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 40,
+    "y": 230,
+    "width": 82,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 15,
+    "style": {
+      "text": "水平总辐射:",
+      "fontSize": 12,
+      "fontWeight": "bold",
+      "textColor": "#cbd5e1",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-val-0",
+    "name": "气象数值-RAD_GLOBAL",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 124,
+    "y": 230,
+    "width": 60,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 16,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "right",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "RAD_GLOBAL"
+      }
+    }
+  },
+  {
+    "id": "comp-weather-unit-0",
+    "name": "气象单位-W/㎡",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 188,
+    "y": 230,
+    "width": 55,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 17,
+    "style": {
+      "text": "W/㎡",
+      "fontSize": 11,
+      "fontWeight": "normal",
+      "textColor": "#94a3b8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-lbl-1",
+    "name": "气象标签-倾斜总辐射:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 40,
+    "y": 254,
+    "width": 82,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 18,
+    "style": {
+      "text": "倾斜总辐射:",
+      "fontSize": 12,
+      "fontWeight": "bold",
+      "textColor": "#cbd5e1",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-val-1",
+    "name": "气象数值-RAD_TILT",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 124,
+    "y": 254,
+    "width": 60,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 19,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "right",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "RAD_TILT"
+      }
+    }
+  },
+  {
+    "id": "comp-weather-unit-1",
+    "name": "气象单位-W/㎡",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 188,
+    "y": 254,
+    "width": 55,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 20,
+    "style": {
+      "text": "W/㎡",
+      "fontSize": 11,
+      "fontWeight": "normal",
+      "textColor": "#94a3b8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-lbl-2",
+    "name": "气象标签-环境温度:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 40,
+    "y": 278,
+    "width": 82,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 21,
+    "style": {
+      "text": "环境温度:",
+      "fontSize": 12,
+      "fontWeight": "bold",
+      "textColor": "#cbd5e1",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-val-2",
+    "name": "气象数值-ENV_TEMP",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 124,
+    "y": 278,
+    "width": 60,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 22,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "right",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "ENV_TEMP"
+      }
+    }
+  },
+  {
+    "id": "comp-weather-unit-2",
+    "name": "气象单位-℃",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 188,
+    "y": 278,
+    "width": 55,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 23,
+    "style": {
+      "text": "℃",
+      "fontSize": 11,
+      "fontWeight": "normal",
+      "textColor": "#94a3b8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-lbl-3",
+    "name": "气象标签-光伏板温:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 40,
+    "y": 302,
+    "width": 82,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 24,
+    "style": {
+      "text": "光伏板温:",
+      "fontSize": 12,
+      "fontWeight": "bold",
+      "textColor": "#cbd5e1",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-val-3",
+    "name": "气象数值-PV_TEMP",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 124,
+    "y": 302,
+    "width": 60,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 25,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "right",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "PV_TEMP"
+      }
+    }
+  },
+  {
+    "id": "comp-weather-unit-3",
+    "name": "气象单位-℃",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 188,
+    "y": 302,
+    "width": 55,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 26,
+    "style": {
+      "text": "℃",
+      "fontSize": 11,
+      "fontWeight": "normal",
+      "textColor": "#94a3b8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-lbl-4",
+    "name": "气象标签-现场风速:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 40,
+    "y": 326,
+    "width": 82,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 27,
+    "style": {
+      "text": "现场风速:",
+      "fontSize": 12,
+      "fontWeight": "bold",
+      "textColor": "#cbd5e1",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-val-4",
+    "name": "气象数值-WIND_SPEED",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 124,
+    "y": 326,
+    "width": 60,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 28,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "right",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "WIND_SPEED"
+      }
+    }
+  },
+  {
+    "id": "comp-weather-unit-4",
+    "name": "气象单位-m/s",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 188,
+    "y": 326,
+    "width": 55,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 29,
+    "style": {
+      "text": "m/s",
+      "fontSize": 11,
+      "fontWeight": "normal",
+      "textColor": "#94a3b8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-lbl-5",
+    "name": "气象标签-实时风向:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 40,
+    "y": 350,
+    "width": 82,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 30,
+    "style": {
+      "text": "实时风向:",
+      "fontSize": 12,
+      "fontWeight": "bold",
+      "textColor": "#cbd5e1",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-val-5",
+    "name": "气象数值-WIND_DIR",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 124,
+    "y": 350,
+    "width": 60,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 31,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "right",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "WIND_DIR"
+      }
+    }
+  },
+  {
+    "id": "comp-weather-unit-5",
+    "name": "气象单位-°",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 188,
+    "y": 350,
+    "width": 55,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 32,
+    "style": {
+      "text": "°",
+      "fontSize": 11,
+      "fontWeight": "normal",
+      "textColor": "#94a3b8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-lbl-6",
+    "name": "气象标签-空气湿度:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 40,
+    "y": 374,
+    "width": 82,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 33,
+    "style": {
+      "text": "空气湿度:",
+      "fontSize": 12,
+      "fontWeight": "bold",
+      "textColor": "#cbd5e1",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-val-6",
+    "name": "气象数值-HUMIDITY",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 124,
+    "y": 374,
+    "width": 60,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 34,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "right",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "HUMIDITY"
+      }
+    }
+  },
+  {
+    "id": "comp-weather-unit-6",
+    "name": "气象单位-%",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 188,
+    "y": 374,
+    "width": 55,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 35,
+    "style": {
+      "text": "%",
+      "fontSize": 11,
+      "fontWeight": "normal",
+      "textColor": "#94a3b8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-lbl-7",
+    "name": "气象标签-大气压强:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 40,
+    "y": 398,
+    "width": 82,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 36,
+    "style": {
+      "text": "大气压强:",
+      "fontSize": 12,
+      "fontWeight": "bold",
+      "textColor": "#cbd5e1",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-val-7",
+    "name": "气象数值-AIR_PRESSURE",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 124,
+    "y": 398,
+    "width": 60,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 37,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "right",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "AIR_PRESSURE"
+      }
+    }
+  },
+  {
+    "id": "comp-weather-unit-7",
+    "name": "气象单位-hPa",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 188,
+    "y": 398,
+    "width": 55,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 38,
+    "style": {
+      "text": "hPa",
+      "fontSize": 11,
+      "fontWeight": "normal",
+      "textColor": "#94a3b8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-lbl-8",
+    "name": "气象标签-日照时数:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 40,
+    "y": 422,
+    "width": 82,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 39,
+    "style": {
+      "text": "日照时数:",
+      "fontSize": 12,
+      "fontWeight": "bold",
+      "textColor": "#cbd5e1",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-weather-val-8",
+    "name": "气象数值-SUN_HOURS",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 124,
+    "y": 422,
+    "width": 60,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 40,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "right",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "SUN_HOURS"
+      }
+    }
+  },
+  {
+    "id": "comp-weather-unit-8",
+    "name": "气象单位-h",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 188,
+    "y": 422,
+    "width": 55,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 41,
+    "style": {
+      "text": "h",
+      "fontSize": 11,
+      "fontWeight": "normal",
+      "textColor": "#94a3b8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-fall-frame",
+    "name": "35kV落地变柜外框(虚线)",
+    "type": "draw-rect",
+    "category": "basic",
+    "x": 35,
+    "y": 475,
+    "width": 215,
+    "height": 470,
+    "rotation": 0,
+    "zIndex": 42,
+    "style": {
+      "fill": "rgba(6, 15, 30, 0.4)",
+      "stroke": "#ffffff",
+      "strokeWidth": 1.5,
+      "strokeDasharray": "4 3",
+      "borderRadius": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-fall-title",
+    "name": "35kV落地变标题",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 42,
+    "y": 485,
+    "width": 200,
+    "height": 38,
+    "rotation": 0,
+    "zIndex": 43,
+    "style": {
+      "text": "35kV落地变\n10kV支线",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#ffffff",
+      "fill": "transparent",
+      "textAlign": "center"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-fall-qs",
+    "name": "落地变高压隔离开关",
+    "type": "elec-disconnector",
+    "category": "electrical",
+    "x": 112,
+    "y": 535,
+    "width": 60,
+    "height": 55,
+    "rotation": 0,
+    "zIndex": 44,
+    "style": {
+      "stroke": "#ef4444",
+      "strokeWidth": 2.2
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-fall-tm",
+    "name": "35kV/10kV落地变",
+    "type": "elec-transformer",
+    "category": "electrical",
+    "x": 97,
+    "y": 605,
+    "width": 90,
+    "height": 110,
+    "rotation": 0,
+    "zIndex": 45,
+    "style": {
+      "stroke": "#ef4444",
+      "strokeWidth": 2.2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-fall-qe",
+    "name": "落地变接地刀闸",
+    "type": "elec-grounding",
+    "category": "electrical",
+    "x": 112,
+    "y": 725,
+    "width": 60,
+    "height": 50,
+    "rotation": 0,
+    "zIndex": 46,
+    "style": {
+      "stroke": "#eab308",
+      "strokeWidth": 2.2
+    },
+    "customProps": {
+      "state": 0
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-fall-line-1",
+    "name": "落地变母线进线导线",
+    "type": "draw-line",
+    "category": "basic",
+    "x": 142,
+    "y": 397,
+    "width": 2,
+    "height": 138,
+    "rotation": 0,
+    "zIndex": 47,
+    "style": {
+      "stroke": "#ef4444",
+      "strokeWidth": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-fall-line-2",
+    "name": "变压器下导线",
+    "type": "draw-line",
+    "category": "basic",
+    "x": 142,
+    "y": 715,
+    "width": 2,
+    "height": 12,
+    "rotation": 0,
+    "zIndex": 48,
+    "style": {
+      "stroke": "#ef4444",
+      "strokeWidth": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-fall-lbl-0",
+    "name": "落地变遥测标签-Ia:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 45,
+    "y": 790,
+    "width": 32,
+    "height": 24,
+    "rotation": 0,
+    "zIndex": 49,
+    "style": {
+      "text": "Ia:",
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-fall-val-0",
+    "name": "落地变遥测数值-FALL_IA",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 82,
+    "y": 790,
+    "width": 72,
+    "height": 24,
+    "rotation": 0,
+    "zIndex": 50,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "FALL_IA"
+      }
+    }
+  },
+  {
+    "id": "comp-fall-unit-0",
+    "name": "落地变遥测单位-A",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 160,
+    "y": 790,
+    "width": 50,
+    "height": 24,
+    "rotation": 0,
+    "zIndex": 51,
+    "style": {
+      "text": "A",
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-fall-lbl-1",
+    "name": "落地变遥测标签-P:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 45,
+    "y": 825,
+    "width": 32,
+    "height": 24,
+    "rotation": 0,
+    "zIndex": 52,
+    "style": {
+      "text": "P:",
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-fall-val-1",
+    "name": "落地变遥测数值-FALL_P",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 82,
+    "y": 825,
+    "width": 72,
+    "height": 24,
+    "rotation": 0,
+    "zIndex": 53,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "FALL_P"
+      }
+    }
+  },
+  {
+    "id": "comp-fall-unit-1",
+    "name": "落地变遥测单位-KW",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 160,
+    "y": 825,
+    "width": 50,
+    "height": 24,
+    "rotation": 0,
+    "zIndex": 54,
+    "style": {
+      "text": "KW",
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-fall-lbl-2",
+    "name": "落地变遥测标签-Q:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 45,
+    "y": 860,
+    "width": 32,
+    "height": 24,
+    "rotation": 0,
+    "zIndex": 55,
+    "style": {
+      "text": "Q:",
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-fall-val-2",
+    "name": "落地变遥测数值-FALL_Q",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 82,
+    "y": 860,
+    "width": 72,
+    "height": 24,
+    "rotation": 0,
+    "zIndex": 56,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "FALL_Q"
+      }
+    }
+  },
+  {
+    "id": "comp-fall-unit-2",
+    "name": "落地变遥测单位-Kvar",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 160,
+    "y": 860,
+    "width": 50,
+    "height": 24,
+    "rotation": 0,
+    "zIndex": 57,
+    "style": {
+      "text": "Kvar",
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-110kv-busbar",
+    "name": "110kV电源进线母线",
+    "type": "elec-busbar",
+    "category": "electrical",
+    "x": 350,
+    "y": 85,
+    "width": 320,
+    "height": 12,
+    "rotation": 0,
+    "zIndex": 58,
+    "style": {
+      "stroke": "#ef4444",
+      "strokeWidth": 6,
+      "voltageLevel": "110kV"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-110kv-bus-title",
+    "name": "110kV进线铭牌",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 275,
+    "y": 76,
+    "width": 70,
+    "height": 32,
+    "rotation": 0,
+    "zIndex": 59,
+    "style": {
+      "text": "110kV\n进线",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#ef4444",
+      "fill": "transparent",
+      "textAlign": "center"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-110u-lbl-0",
+    "name": "110kV电压标签-Uab:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 275,
+    "y": 105,
+    "width": 40,
+    "height": 20,
+    "rotation": 0,
+    "zIndex": 60,
+    "style": {
+      "text": "Uab:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-110u-val-0",
+    "name": "110kV电压数值-U110_AB",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 320,
+    "y": 105,
+    "width": 58,
+    "height": 20,
+    "rotation": 0,
+    "zIndex": 61,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "U110_AB"
+      }
+    }
+  },
+  {
+    "id": "comp-110u-unit-0",
+    "name": "110kV电压单位-kV",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 382,
+    "y": 105,
+    "width": 30,
+    "height": 20,
+    "rotation": 0,
+    "zIndex": 62,
+    "style": {
+      "text": "kV",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-110u-lbl-1",
+    "name": "110kV电压标签-Ubc:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 275,
+    "y": 128,
+    "width": 40,
+    "height": 20,
+    "rotation": 0,
+    "zIndex": 63,
+    "style": {
+      "text": "Ubc:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-110u-val-1",
+    "name": "110kV电压数值-U110_BC",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 320,
+    "y": 128,
+    "width": 58,
+    "height": 20,
+    "rotation": 0,
+    "zIndex": 64,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "U110_BC"
+      }
+    }
+  },
+  {
+    "id": "comp-110u-unit-1",
+    "name": "110kV电压单位-kV",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 382,
+    "y": 128,
+    "width": 30,
+    "height": 20,
+    "rotation": 0,
+    "zIndex": 65,
+    "style": {
+      "text": "kV",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-110u-lbl-2",
+    "name": "110kV电压标签-Uca:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 275,
+    "y": 151,
+    "width": 40,
+    "height": 20,
+    "rotation": 0,
+    "zIndex": 66,
+    "style": {
+      "text": "Uca:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-110u-val-2",
+    "name": "110kV电压数值-U110_CA",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 320,
+    "y": 151,
+    "width": 58,
+    "height": 20,
+    "rotation": 0,
+    "zIndex": 67,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 1,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "U110_CA"
+      }
+    }
+  },
+  {
+    "id": "comp-110u-unit-2",
+    "name": "110kV电压单位-kV",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 382,
+    "y": 151,
+    "width": 30,
+    "height": 20,
+    "rotation": 0,
+    "zIndex": 68,
+    "style": {
+      "text": "kV",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-110kv-pt",
+    "name": "110kV母线PT",
+    "type": "elec-pt",
+    "category": "electrical",
+    "x": 430,
+    "y": 110,
+    "width": 45,
+    "height": 65,
+    "rotation": 0,
+    "zIndex": 69,
+    "style": {
+      "stroke": "#ef4444",
+      "strokeWidth": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-110kv-arrester",
+    "name": "110kV氧化锌避雷器",
+    "type": "elec-arrester",
+    "category": "electrical",
+    "x": 380,
+    "y": 110,
+    "width": 45,
+    "height": 65,
+    "rotation": 0,
+    "zIndex": 70,
+    "style": {
+      "stroke": "#ef4444",
+      "strokeWidth": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-110kv-qs1",
+    "name": "110kV主隔离开关 QS1",
+    "type": "elec-disconnector",
+    "category": "electrical",
+    "x": 520,
+    "y": 110,
+    "width": 60,
+    "height": 55,
+    "rotation": 0,
+    "zIndex": 71,
+    "style": {
+      "stroke": "#ef4444",
+      "strokeWidth": 2.5
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-110kv-qf1",
+    "name": "110kV主断路器 QF1",
+    "type": "elec-breaker",
+    "category": "electrical",
+    "x": 515,
+    "y": 180,
+    "width": 70,
+    "height": 75,
+    "rotation": 0,
+    "zIndex": 72,
+    "style": {
+      "stroke": "#ef4444",
+      "strokeWidth": 2.5,
+      "breakerColorClosed": "#ef4444",
+      "breakerColorOpen": "#10b981"
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "stateKey": "DEV_101_YX_1"
+      }
+    }
+  },
+  {
+    "id": "comp-110kv-qs2",
+    "name": "110kV变高隔离开关 QS2",
+    "type": "elec-disconnector",
+    "category": "electrical",
+    "x": 520,
+    "y": 270,
+    "width": 60,
+    "height": 55,
+    "rotation": 0,
+    "zIndex": 73,
+    "style": {
+      "stroke": "#ef4444",
+      "strokeWidth": 2.5
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-qf110-lbl-0",
+    "name": "110kV断路器遥测标签-Ia:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 595,
+    "y": 195,
+    "width": 32,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 74,
+    "style": {
+      "text": "Ia:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-qf110-val-0",
+    "name": "110kV断路器遥测数值-QF110_IA",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 630,
+    "y": 195,
+    "width": 62,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 75,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "QF110_IA"
+      }
+    }
+  },
+  {
+    "id": "comp-qf110-unit-0",
+    "name": "110kV断路器遥测单位-A",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 698,
+    "y": 195,
+    "width": 45,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 76,
+    "style": {
+      "text": "A",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-qf110-lbl-1",
+    "name": "110kV断路器遥测标签-P:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 595,
+    "y": 222,
+    "width": 32,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 77,
+    "style": {
+      "text": "P:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-qf110-val-1",
+    "name": "110kV断路器遥测数值-QF110_P",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 630,
+    "y": 222,
+    "width": 62,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 78,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "QF110_P"
+      }
+    }
+  },
+  {
+    "id": "comp-qf110-unit-1",
+    "name": "110kV断路器遥测单位-MW",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 698,
+    "y": 222,
+    "width": 45,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 79,
+    "style": {
+      "text": "MW",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-qf110-lbl-2",
+    "name": "110kV断路器遥测标签-Q:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 595,
+    "y": 249,
+    "width": 32,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 80,
+    "style": {
+      "text": "Q:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-qf110-val-2",
+    "name": "110kV断路器遥测数值-QF110_Q",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 630,
+    "y": 249,
+    "width": 62,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 81,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "QF110_Q"
+      }
+    }
+  },
+  {
+    "id": "comp-qf110-unit-2",
+    "name": "110kV断路器遥测单位-Mvar",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 698,
+    "y": 249,
+    "width": 45,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 82,
+    "style": {
+      "text": "Mvar",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-main-transformer",
+    "name": "#1主电力变压器",
+    "type": "elec-transformer",
+    "category": "electrical",
+    "x": 760,
+    "y": 190,
+    "width": 140,
+    "height": 160,
+    "rotation": 0,
+    "zIndex": 83,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 3,
+      "voltageLevel": "110kV"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-trans-nameplate",
+    "name": "主变铭牌",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 740,
+    "y": 355,
+    "width": 180,
+    "height": 26,
+    "rotation": 0,
+    "zIndex": 84,
+    "style": {
+      "text": "#1主变 50MVA 110/35kV",
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#00f2ff",
+      "fill": "transparent",
+      "textAlign": "center"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-line-110-trans",
+    "name": "110kV开关至变压器导线",
+    "type": "draw-line",
+    "category": "basic",
+    "x": 550,
+    "y": 325,
+    "width": 210,
+    "height": 2,
+    "rotation": 0,
+    "zIndex": 85,
+    "style": {
+      "stroke": "#ef4444",
+      "strokeWidth": 2.5
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-35kv-in-breaker",
+    "name": "35kV总进线断路器 QF2",
+    "type": "elec-breaker",
+    "category": "electrical",
+    "x": 940,
+    "y": 230,
+    "width": 70,
+    "height": 75,
+    "rotation": 0,
+    "zIndex": 86,
+    "style": {
+      "stroke": "#f59e0b",
+      "strokeWidth": 2.5,
+      "breakerColorClosed": "#ef4444",
+      "breakerColorOpen": "#10b981"
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-in35-lbl-0",
+    "name": "35kV进线遥测标签-Ia:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1020,
+    "y": 225,
+    "width": 32,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 87,
+    "style": {
+      "text": "Ia:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-in35-val-0",
+    "name": "35kV进线遥测数值-IN35_IA",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 1055,
+    "y": 225,
+    "width": 62,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 88,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "IN35_IA"
+      }
+    }
+  },
+  {
+    "id": "comp-in35-unit-0",
+    "name": "35kV进线遥测单位-A",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1122,
+    "y": 225,
+    "width": 45,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 89,
+    "style": {
+      "text": "A",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-in35-lbl-1",
+    "name": "35kV进线遥测标签-P:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1020,
+    "y": 252,
+    "width": 32,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 90,
+    "style": {
+      "text": "P:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-in35-val-1",
+    "name": "35kV进线遥测数值-IN35_P",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 1055,
+    "y": 252,
+    "width": 62,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 91,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "IN35_P"
+      }
+    }
+  },
+  {
+    "id": "comp-in35-unit-1",
+    "name": "35kV进线遥测单位-MW",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1122,
+    "y": 252,
+    "width": 45,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 92,
+    "style": {
+      "text": "MW",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-in35-lbl-2",
+    "name": "35kV进线遥测标签-Q:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1020,
+    "y": 279,
+    "width": 32,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 93,
+    "style": {
+      "text": "Q:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-in35-val-2",
+    "name": "35kV进线遥测数值-IN35_Q",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 1055,
+    "y": 279,
+    "width": 62,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 94,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "IN35_Q"
+      }
+    }
+  },
+  {
+    "id": "comp-in35-unit-2",
+    "name": "35kV进线遥测单位-Mvar",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1122,
+    "y": 279,
+    "width": 45,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 95,
+    "style": {
+      "text": "Mvar",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-line-trans-in35",
+    "name": "主变至35kV进线开关导线",
+    "type": "draw-line",
+    "category": "basic",
+    "x": 900,
+    "y": 270,
+    "width": 40,
+    "height": 2,
+    "rotation": 0,
+    "zIndex": 96,
+    "style": {
+      "stroke": "#f59e0b",
+      "strokeWidth": 2.5
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-line-in35-bus",
+    "name": "35kV进线开关至母线导线",
+    "type": "draw-line",
+    "category": "basic",
+    "x": 975,
+    "y": 305,
+    "width": 2,
+    "height": 85,
+    "rotation": 0,
+    "zIndex": 97,
+    "style": {
+      "stroke": "#f59e0b",
+      "strokeWidth": 2.5
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-35kv-main-busbar",
+    "name": "35kV I段工作母线",
+    "type": "elec-busbar",
+    "category": "electrical",
+    "x": 270,
+    "y": 390,
+    "width": 1610,
+    "height": 14,
+    "rotation": 0,
+    "zIndex": 98,
+    "style": {
+      "stroke": "#f59e0b",
+      "strokeWidth": 6,
+      "voltageLevel": "35kV"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-35kv-bus-title",
+    "name": "35kV母线名称",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 275,
+    "y": 366,
+    "width": 160,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 99,
+    "style": {
+      "text": "35kV I段工作母线",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#f59e0b",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-35u-lbl-0",
+    "name": "35kV母线电压标签-Uab:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 450,
+    "y": 366,
+    "width": 35,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 100,
+    "style": {
+      "text": "Uab:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-35u-val-0",
+    "name": "35kV母线电压数值-U35_AB",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 486,
+    "y": 366,
+    "width": 52,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 101,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "U35_AB"
+      }
+    }
+  },
+  {
+    "id": "comp-35u-unit-0",
+    "name": "35kV母线电压单位-kV",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 540,
+    "y": 366,
+    "width": 25,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 102,
+    "style": {
+      "text": "kV",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-35u-lbl-1",
+    "name": "35kV母线电压标签-Ubc:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 570,
+    "y": 366,
+    "width": 35,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 103,
+    "style": {
+      "text": "Ubc:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-35u-val-1",
+    "name": "35kV母线电压数值-U35_BC",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 606,
+    "y": 366,
+    "width": 52,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 104,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "U35_BC"
+      }
+    }
+  },
+  {
+    "id": "comp-35u-unit-1",
+    "name": "35kV母线电压单位-kV",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 660,
+    "y": 366,
+    "width": 25,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 105,
+    "style": {
+      "text": "kV",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-35u-lbl-2",
+    "name": "35kV母线电压标签-Uca:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 690,
+    "y": 366,
+    "width": 35,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 106,
+    "style": {
+      "text": "Uca:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-35u-val-2",
+    "name": "35kV母线电压数值-U35_CA",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 726,
+    "y": 366,
+    "width": 52,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 107,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "U35_CA"
+      }
+    }
+  },
+  {
+    "id": "comp-35u-unit-2",
+    "name": "35kV母线电压单位-kV",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 780,
+    "y": 366,
+    "width": 25,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 108,
+    "style": {
+      "text": "kV",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-35u-lbl-3",
+    "name": "35kV母线电压标签-3U0:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 810,
+    "y": 366,
+    "width": 35,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 109,
+    "style": {
+      "text": "3U0:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-35u-val-3",
+    "name": "35kV母线电压数值-U35_3U0",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 846,
+    "y": 366,
+    "width": 52,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 110,
+    "style": {
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "U35_3U0"
+      }
+    }
+  },
+  {
+    "id": "comp-35u-unit-3",
+    "name": "35kV母线电压单位-V",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 900,
+    "y": 366,
+    "width": 25,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 111,
+    "style": {
+      "text": "V",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay1-frame",
+    "name": "301 #1集电线路柜外框",
+    "type": "draw-rect",
+    "category": "basic",
+    "x": 270,
+    "y": 425,
+    "width": 210,
+    "height": 520,
+    "rotation": 0,
+    "zIndex": 112,
+    "style": {
+      "fill": "rgba(6, 15, 30, 0.5)",
+      "stroke": "#ffffff",
+      "strokeWidth": 1.5,
+      "borderRadius": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay1-title",
+    "name": "301 #1集电线路柜名称",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 275,
+    "y": 432,
+    "width": 200,
+    "height": 24,
+    "rotation": 0,
+    "zIndex": 113,
+    "style": {
+      "text": "301 #1集电线路柜",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#ffffff",
+      "fill": "transparent",
+      "textAlign": "center"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay1-lead-in",
+    "name": "301 #1集电线路柜母线引下线",
+    "type": "draw-line",
+    "category": "basic",
+    "x": 374,
+    "y": 404,
+    "width": 2,
+    "height": 56,
+    "rotation": 0,
+    "zIndex": 114,
+    "style": {
+      "stroke": "#f59e0b",
+      "strokeWidth": 2.2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay1-qs-bus",
+    "name": "301 #1集电线路柜母线隔离开关",
+    "type": "elec-disconnector",
+    "category": "electrical",
+    "x": 345,
+    "y": 460,
+    "width": 60,
+    "height": 50,
+    "rotation": 0,
+    "zIndex": 115,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay1-qf",
+    "name": "301 #1集电线路柜真空断路器",
+    "type": "elec-breaker",
+    "category": "electrical",
+    "x": 340,
+    "y": 520,
+    "width": 70,
+    "height": 75,
+    "rotation": 0,
+    "zIndex": 116,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2,
+      "breakerColorClosed": "#ef4444",
+      "breakerColorOpen": "#10b981"
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "stateKey": "DEV_BAY1_YX_1"
+      }
+    }
+  },
+  {
+    "id": "comp-bay1-qs-line",
+    "name": "301 #1集电线路柜出线隔离开关",
+    "type": "elec-disconnector",
+    "category": "electrical",
+    "x": 345,
+    "y": 605,
+    "width": 60,
+    "height": 50,
+    "rotation": 0,
+    "zIndex": 117,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay1-ct",
+    "name": "301 #1集电线路柜电流互感器",
+    "type": "elec-ct",
+    "category": "electrical",
+    "x": 353,
+    "y": 665,
+    "width": 44,
+    "height": 48,
+    "rotation": 0,
+    "zIndex": 118,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay1-qe",
+    "name": "301 #1集电线路柜接地刀闸",
+    "type": "elec-grounding",
+    "category": "electrical",
+    "x": 285,
+    "y": 665,
+    "width": 50,
+    "height": 48,
+    "rotation": 0,
+    "zIndex": 119,
+    "style": {
+      "stroke": "#eab308",
+      "strokeWidth": 2
+    },
+    "customProps": {
+      "state": 0
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay1-arrester",
+    "name": "301 #1集电线路柜出线避雷器",
+    "type": "elec-arrester",
+    "category": "electrical",
+    "x": 420,
+    "y": 665,
+    "width": 45,
+    "height": 48,
+    "rotation": 0,
+    "zIndex": 120,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay1-line-out",
+    "name": "301 #1集电线路柜出线电缆",
+    "type": "draw-line",
+    "category": "basic",
+    "x": 374,
+    "y": 713,
+    "width": 2,
+    "height": 32,
+    "rotation": 0,
+    "zIndex": 121,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay1-target",
+    "name": "301 #1集电线路柜出线目标",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 275,
+    "y": 748,
+    "width": 200,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 122,
+    "style": {
+      "text": "至 #1~#8箱变分支 (8MW)",
+      "fontSize": 11,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent",
+      "textAlign": "center"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay1-lbl-0",
+    "name": "301 #1集电线路柜遥测标签-Ia:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 282,
+    "y": 780,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 123,
+    "style": {
+      "text": "Ia:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay1-val-0",
+    "name": "301 #1集电线路柜遥测数值-BAY1_IA",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 330,
+    "y": 780,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 124,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY1_IA"
+      }
+    }
+  },
+  {
+    "id": "comp-bay1-unit-0",
+    "name": "301 #1集电线路柜遥测单位-A",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 410,
+    "y": 780,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 125,
+    "style": {
+      "text": "A",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay1-lbl-1",
+    "name": "301 #1集电线路柜遥测标签-P:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 282,
+    "y": 812,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 126,
+    "style": {
+      "text": "P:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay1-val-1",
+    "name": "301 #1集电线路柜遥测数值-BAY1_P",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 330,
+    "y": 812,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 127,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY1_P"
+      }
+    }
+  },
+  {
+    "id": "comp-bay1-unit-1",
+    "name": "301 #1集电线路柜遥测单位-MW",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 410,
+    "y": 812,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 128,
+    "style": {
+      "text": "MW",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay1-lbl-2",
+    "name": "301 #1集电线路柜遥测标签-Q:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 282,
+    "y": 844,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 129,
+    "style": {
+      "text": "Q:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay1-val-2",
+    "name": "301 #1集电线路柜遥测数值-BAY1_Q",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 330,
+    "y": 844,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 130,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY1_Q"
+      }
+    }
+  },
+  {
+    "id": "comp-bay1-unit-2",
+    "name": "301 #1集电线路柜遥测单位-Mvar",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 410,
+    "y": 844,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 131,
+    "style": {
+      "text": "Mvar",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay1-lbl-3",
+    "name": "301 #1集电线路柜遥测标签-CosΦ:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 282,
+    "y": 876,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 132,
+    "style": {
+      "text": "CosΦ:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay1-val-3",
+    "name": "301 #1集电线路柜遥测数值-BAY1_COS",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 330,
+    "y": 876,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 133,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY1_COS"
+      }
+    }
+  },
+  {
+    "id": "comp-bay1-unit-3",
+    "name": "301 #1集电线路柜遥测单位-",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 410,
+    "y": 876,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 134,
+    "style": {
+      "text": "",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay2-frame",
+    "name": "302 #2集电线路柜外框",
+    "type": "draw-rect",
+    "category": "basic",
+    "x": 500,
+    "y": 425,
+    "width": 210,
+    "height": 520,
+    "rotation": 0,
+    "zIndex": 135,
+    "style": {
+      "fill": "rgba(6, 15, 30, 0.5)",
+      "stroke": "#ffffff",
+      "strokeWidth": 1.5,
+      "borderRadius": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay2-title",
+    "name": "302 #2集电线路柜名称",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 505,
+    "y": 432,
+    "width": 200,
+    "height": 24,
+    "rotation": 0,
+    "zIndex": 136,
+    "style": {
+      "text": "302 #2集电线路柜",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#ffffff",
+      "fill": "transparent",
+      "textAlign": "center"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay2-lead-in",
+    "name": "302 #2集电线路柜母线引下线",
+    "type": "draw-line",
+    "category": "basic",
+    "x": 604,
+    "y": 404,
+    "width": 2,
+    "height": 56,
+    "rotation": 0,
+    "zIndex": 137,
+    "style": {
+      "stroke": "#f59e0b",
+      "strokeWidth": 2.2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay2-qs-bus",
+    "name": "302 #2集电线路柜母线隔离开关",
+    "type": "elec-disconnector",
+    "category": "electrical",
+    "x": 575,
+    "y": 460,
+    "width": 60,
+    "height": 50,
+    "rotation": 0,
+    "zIndex": 138,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay2-qf",
+    "name": "302 #2集电线路柜真空断路器",
+    "type": "elec-breaker",
+    "category": "electrical",
+    "x": 570,
+    "y": 520,
+    "width": 70,
+    "height": 75,
+    "rotation": 0,
+    "zIndex": 139,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2,
+      "breakerColorClosed": "#ef4444",
+      "breakerColorOpen": "#10b981"
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "stateKey": "DEV_BAY2_YX_1"
+      }
+    }
+  },
+  {
+    "id": "comp-bay2-qs-line",
+    "name": "302 #2集电线路柜出线隔离开关",
+    "type": "elec-disconnector",
+    "category": "electrical",
+    "x": 575,
+    "y": 605,
+    "width": 60,
+    "height": 50,
+    "rotation": 0,
+    "zIndex": 140,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay2-ct",
+    "name": "302 #2集电线路柜电流互感器",
+    "type": "elec-ct",
+    "category": "electrical",
+    "x": 583,
+    "y": 665,
+    "width": 44,
+    "height": 48,
+    "rotation": 0,
+    "zIndex": 141,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay2-qe",
+    "name": "302 #2集电线路柜接地刀闸",
+    "type": "elec-grounding",
+    "category": "electrical",
+    "x": 515,
+    "y": 665,
+    "width": 50,
+    "height": 48,
+    "rotation": 0,
+    "zIndex": 142,
+    "style": {
+      "stroke": "#eab308",
+      "strokeWidth": 2
+    },
+    "customProps": {
+      "state": 0
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay2-arrester",
+    "name": "302 #2集电线路柜出线避雷器",
+    "type": "elec-arrester",
+    "category": "electrical",
+    "x": 650,
+    "y": 665,
+    "width": 45,
+    "height": 48,
+    "rotation": 0,
+    "zIndex": 143,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay2-line-out",
+    "name": "302 #2集电线路柜出线电缆",
+    "type": "draw-line",
+    "category": "basic",
+    "x": 604,
+    "y": 713,
+    "width": 2,
+    "height": 32,
+    "rotation": 0,
+    "zIndex": 144,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay2-target",
+    "name": "302 #2集电线路柜出线目标",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 505,
+    "y": 748,
+    "width": 200,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 145,
+    "style": {
+      "text": "至 #9~#16箱变分支 (8MW)",
+      "fontSize": 11,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent",
+      "textAlign": "center"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay2-lbl-0",
+    "name": "302 #2集电线路柜遥测标签-Ia:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 512,
+    "y": 780,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 146,
+    "style": {
+      "text": "Ia:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay2-val-0",
+    "name": "302 #2集电线路柜遥测数值-BAY2_IA",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 560,
+    "y": 780,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 147,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY2_IA"
+      }
+    }
+  },
+  {
+    "id": "comp-bay2-unit-0",
+    "name": "302 #2集电线路柜遥测单位-A",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 640,
+    "y": 780,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 148,
+    "style": {
+      "text": "A",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay2-lbl-1",
+    "name": "302 #2集电线路柜遥测标签-P:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 512,
+    "y": 812,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 149,
+    "style": {
+      "text": "P:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay2-val-1",
+    "name": "302 #2集电线路柜遥测数值-BAY2_P",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 560,
+    "y": 812,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 150,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY2_P"
+      }
+    }
+  },
+  {
+    "id": "comp-bay2-unit-1",
+    "name": "302 #2集电线路柜遥测单位-MW",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 640,
+    "y": 812,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 151,
+    "style": {
+      "text": "MW",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay2-lbl-2",
+    "name": "302 #2集电线路柜遥测标签-Q:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 512,
+    "y": 844,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 152,
+    "style": {
+      "text": "Q:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay2-val-2",
+    "name": "302 #2集电线路柜遥测数值-BAY2_Q",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 560,
+    "y": 844,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 153,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY2_Q"
+      }
+    }
+  },
+  {
+    "id": "comp-bay2-unit-2",
+    "name": "302 #2集电线路柜遥测单位-Mvar",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 640,
+    "y": 844,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 154,
+    "style": {
+      "text": "Mvar",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay2-lbl-3",
+    "name": "302 #2集电线路柜遥测标签-CosΦ:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 512,
+    "y": 876,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 155,
+    "style": {
+      "text": "CosΦ:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay2-val-3",
+    "name": "302 #2集电线路柜遥测数值-BAY2_COS",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 560,
+    "y": 876,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 156,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY2_COS"
+      }
+    }
+  },
+  {
+    "id": "comp-bay2-unit-3",
+    "name": "302 #2集电线路柜遥测单位-",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 640,
+    "y": 876,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 157,
+    "style": {
+      "text": "",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay3-frame",
+    "name": "303 #3集电线路柜外框",
+    "type": "draw-rect",
+    "category": "basic",
+    "x": 730,
+    "y": 425,
+    "width": 210,
+    "height": 520,
+    "rotation": 0,
+    "zIndex": 158,
+    "style": {
+      "fill": "rgba(6, 15, 30, 0.5)",
+      "stroke": "#ffffff",
+      "strokeWidth": 1.5,
+      "borderRadius": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay3-title",
+    "name": "303 #3集电线路柜名称",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 735,
+    "y": 432,
+    "width": 200,
+    "height": 24,
+    "rotation": 0,
+    "zIndex": 159,
+    "style": {
+      "text": "303 #3集电线路柜",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#ffffff",
+      "fill": "transparent",
+      "textAlign": "center"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay3-lead-in",
+    "name": "303 #3集电线路柜母线引下线",
+    "type": "draw-line",
+    "category": "basic",
+    "x": 834,
+    "y": 404,
+    "width": 2,
+    "height": 56,
+    "rotation": 0,
+    "zIndex": 160,
+    "style": {
+      "stroke": "#f59e0b",
+      "strokeWidth": 2.2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay3-qs-bus",
+    "name": "303 #3集电线路柜母线隔离开关",
+    "type": "elec-disconnector",
+    "category": "electrical",
+    "x": 805,
+    "y": 460,
+    "width": 60,
+    "height": 50,
+    "rotation": 0,
+    "zIndex": 161,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay3-qf",
+    "name": "303 #3集电线路柜真空断路器",
+    "type": "elec-breaker",
+    "category": "electrical",
+    "x": 800,
+    "y": 520,
+    "width": 70,
+    "height": 75,
+    "rotation": 0,
+    "zIndex": 162,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2,
+      "breakerColorClosed": "#ef4444",
+      "breakerColorOpen": "#10b981"
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "stateKey": "DEV_BAY3_YX_1"
+      }
+    }
+  },
+  {
+    "id": "comp-bay3-qs-line",
+    "name": "303 #3集电线路柜出线隔离开关",
+    "type": "elec-disconnector",
+    "category": "electrical",
+    "x": 805,
+    "y": 605,
+    "width": 60,
+    "height": 50,
+    "rotation": 0,
+    "zIndex": 163,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay3-ct",
+    "name": "303 #3集电线路柜电流互感器",
+    "type": "elec-ct",
+    "category": "electrical",
+    "x": 813,
+    "y": 665,
+    "width": 44,
+    "height": 48,
+    "rotation": 0,
+    "zIndex": 164,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay3-qe",
+    "name": "303 #3集电线路柜接地刀闸",
+    "type": "elec-grounding",
+    "category": "electrical",
+    "x": 745,
+    "y": 665,
+    "width": 50,
+    "height": 48,
+    "rotation": 0,
+    "zIndex": 165,
+    "style": {
+      "stroke": "#eab308",
+      "strokeWidth": 2
+    },
+    "customProps": {
+      "state": 0
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay3-arrester",
+    "name": "303 #3集电线路柜出线避雷器",
+    "type": "elec-arrester",
+    "category": "electrical",
+    "x": 880,
+    "y": 665,
+    "width": 45,
+    "height": 48,
+    "rotation": 0,
+    "zIndex": 166,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay3-line-out",
+    "name": "303 #3集电线路柜出线电缆",
+    "type": "draw-line",
+    "category": "basic",
+    "x": 834,
+    "y": 713,
+    "width": 2,
+    "height": 32,
+    "rotation": 0,
+    "zIndex": 167,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay3-target",
+    "name": "303 #3集电线路柜出线目标",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 735,
+    "y": 748,
+    "width": 200,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 168,
+    "style": {
+      "text": "至 #17~#24箱变分支 (8MW)",
+      "fontSize": 11,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent",
+      "textAlign": "center"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay3-lbl-0",
+    "name": "303 #3集电线路柜遥测标签-Ia:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 742,
+    "y": 780,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 169,
+    "style": {
+      "text": "Ia:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay3-val-0",
+    "name": "303 #3集电线路柜遥测数值-BAY3_IA",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 790,
+    "y": 780,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 170,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY3_IA"
+      }
+    }
+  },
+  {
+    "id": "comp-bay3-unit-0",
+    "name": "303 #3集电线路柜遥测单位-A",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 870,
+    "y": 780,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 171,
+    "style": {
+      "text": "A",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay3-lbl-1",
+    "name": "303 #3集电线路柜遥测标签-P:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 742,
+    "y": 812,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 172,
+    "style": {
+      "text": "P:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay3-val-1",
+    "name": "303 #3集电线路柜遥测数值-BAY3_P",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 790,
+    "y": 812,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 173,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY3_P"
+      }
+    }
+  },
+  {
+    "id": "comp-bay3-unit-1",
+    "name": "303 #3集电线路柜遥测单位-MW",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 870,
+    "y": 812,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 174,
+    "style": {
+      "text": "MW",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay3-lbl-2",
+    "name": "303 #3集电线路柜遥测标签-Q:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 742,
+    "y": 844,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 175,
+    "style": {
+      "text": "Q:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay3-val-2",
+    "name": "303 #3集电线路柜遥测数值-BAY3_Q",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 790,
+    "y": 844,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 176,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY3_Q"
+      }
+    }
+  },
+  {
+    "id": "comp-bay3-unit-2",
+    "name": "303 #3集电线路柜遥测单位-Mvar",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 870,
+    "y": 844,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 177,
+    "style": {
+      "text": "Mvar",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay3-lbl-3",
+    "name": "303 #3集电线路柜遥测标签-CosΦ:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 742,
+    "y": 876,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 178,
+    "style": {
+      "text": "CosΦ:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay3-val-3",
+    "name": "303 #3集电线路柜遥测数值-BAY3_COS",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 790,
+    "y": 876,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 179,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY3_COS"
+      }
+    }
+  },
+  {
+    "id": "comp-bay3-unit-3",
+    "name": "303 #3集电线路柜遥测单位-",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 870,
+    "y": 876,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 180,
+    "style": {
+      "text": "",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay4-frame",
+    "name": "300 35kV母线PT避雷器柜外框",
+    "type": "draw-rect",
+    "category": "basic",
+    "x": 960,
+    "y": 425,
+    "width": 210,
+    "height": 520,
+    "rotation": 0,
+    "zIndex": 181,
+    "style": {
+      "fill": "rgba(6, 15, 30, 0.5)",
+      "stroke": "#ffffff",
+      "strokeWidth": 1.5,
+      "borderRadius": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay4-title",
+    "name": "300 35kV母线PT避雷器柜名称",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 965,
+    "y": 432,
+    "width": 200,
+    "height": 24,
+    "rotation": 0,
+    "zIndex": 182,
+    "style": {
+      "text": "300 35kV母线PT避雷器柜",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#ffffff",
+      "fill": "transparent",
+      "textAlign": "center"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay4-lead-in",
+    "name": "300 35kV母线PT避雷器柜母线引下线",
+    "type": "draw-line",
+    "category": "basic",
+    "x": 1064,
+    "y": 404,
+    "width": 2,
+    "height": 56,
+    "rotation": 0,
+    "zIndex": 183,
+    "style": {
+      "stroke": "#f59e0b",
+      "strokeWidth": 2.2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay4-qs",
+    "name": "300 35kV母线PT避雷器柜隔离手车/刀闸",
+    "type": "elec-disconnector",
+    "category": "electrical",
+    "x": 1035,
+    "y": 480,
+    "width": 60,
+    "height": 55,
+    "rotation": 0,
+    "zIndex": 184,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay4-pt",
+    "name": "35kV三相电压互感器",
+    "type": "elec-pt",
+    "category": "electrical",
+    "x": 1040,
+    "y": 560,
+    "width": 50,
+    "height": 70,
+    "rotation": 0,
+    "zIndex": 185,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay4-arrester",
+    "name": "35kV母线避雷器",
+    "type": "elec-arrester",
+    "category": "electrical",
+    "x": 1040,
+    "y": 650,
+    "width": 50,
+    "height": 60,
+    "rotation": 0,
+    "zIndex": 186,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay4-qe",
+    "name": "母线检修接地刀闸",
+    "type": "elec-grounding",
+    "category": "electrical",
+    "x": 1040,
+    "y": 730,
+    "width": 50,
+    "height": 50,
+    "rotation": 0,
+    "zIndex": 187,
+    "style": {
+      "stroke": "#eab308",
+      "strokeWidth": 2.2
+    },
+    "customProps": {
+      "state": 0
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay4-note",
+    "name": "PT柜说明",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 970,
+    "y": 810,
+    "width": 190,
+    "height": 48,
+    "rotation": 0,
+    "zIndex": 188,
+    "style": {
+      "text": "母线三相PT测量\n过电压与氧化锌防雷",
+      "fontSize": 12,
+      "fontWeight": "normal",
+      "textColor": "#94a3b8",
+      "fill": "transparent",
+      "textAlign": "center"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay5-frame",
+    "name": "304 35kV母联/分段柜外框",
+    "type": "draw-rect",
+    "category": "basic",
+    "x": 1190,
+    "y": 425,
+    "width": 210,
+    "height": 520,
+    "rotation": 0,
+    "zIndex": 189,
+    "style": {
+      "fill": "rgba(6, 15, 30, 0.5)",
+      "stroke": "#ffffff",
+      "strokeWidth": 1.5,
+      "borderRadius": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay5-title",
+    "name": "304 35kV母联/分段柜名称",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1195,
+    "y": 432,
+    "width": 200,
+    "height": 24,
+    "rotation": 0,
+    "zIndex": 190,
+    "style": {
+      "text": "304 35kV母联/分段柜",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#ffffff",
+      "fill": "transparent",
+      "textAlign": "center"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay5-lead-in",
+    "name": "304 35kV母联/分段柜母线引下线",
+    "type": "draw-line",
+    "category": "basic",
+    "x": 1294,
+    "y": 404,
+    "width": 2,
+    "height": 56,
+    "rotation": 0,
+    "zIndex": 191,
+    "style": {
+      "stroke": "#f59e0b",
+      "strokeWidth": 2.2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay5-qs1",
+    "name": "分段隔离刀闸 QS1",
+    "type": "elec-disconnector",
+    "category": "electrical",
+    "x": 1265,
+    "y": 470,
+    "width": 60,
+    "height": 55,
+    "rotation": 0,
+    "zIndex": 192,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay5-qf",
+    "name": "分段断路器 QF",
+    "type": "elec-breaker",
+    "category": "electrical",
+    "x": 1260,
+    "y": 545,
+    "width": 70,
+    "height": 75,
+    "rotation": 0,
+    "zIndex": 193,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2,
+      "breakerColorClosed": "#ef4444",
+      "breakerColorOpen": "#10b981"
+    },
+    "customProps": {
+      "state": 0
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay5-qs2",
+    "name": "分段隔离刀闸 QS2",
+    "type": "elec-disconnector",
+    "category": "electrical",
+    "x": 1265,
+    "y": 640,
+    "width": 60,
+    "height": 55,
+    "rotation": 0,
+    "zIndex": 194,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay5-note",
+    "name": "分段柜说明",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1200,
+    "y": 720,
+    "width": 190,
+    "height": 48,
+    "rotation": 0,
+    "zIndex": 195,
+    "style": {
+      "text": "35kV II段母联联络\n(常开备用联络)",
+      "fontSize": 12,
+      "fontWeight": "normal",
+      "textColor": "#94a3b8",
+      "fill": "transparent",
+      "textAlign": "center"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay6-frame",
+    "name": "305 #4集电线路柜外框",
+    "type": "draw-rect",
+    "category": "basic",
+    "x": 1420,
+    "y": 425,
+    "width": 210,
+    "height": 520,
+    "rotation": 0,
+    "zIndex": 196,
+    "style": {
+      "fill": "rgba(6, 15, 30, 0.5)",
+      "stroke": "#ffffff",
+      "strokeWidth": 1.5,
+      "borderRadius": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay6-title",
+    "name": "305 #4集电线路柜名称",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1425,
+    "y": 432,
+    "width": 200,
+    "height": 24,
+    "rotation": 0,
+    "zIndex": 197,
+    "style": {
+      "text": "305 #4集电线路柜",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#ffffff",
+      "fill": "transparent",
+      "textAlign": "center"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay6-lead-in",
+    "name": "305 #4集电线路柜母线引下线",
+    "type": "draw-line",
+    "category": "basic",
+    "x": 1524,
+    "y": 404,
+    "width": 2,
+    "height": 56,
+    "rotation": 0,
+    "zIndex": 198,
+    "style": {
+      "stroke": "#f59e0b",
+      "strokeWidth": 2.2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay6-qs-bus",
+    "name": "305 #4集电线路柜母线隔离开关",
+    "type": "elec-disconnector",
+    "category": "electrical",
+    "x": 1495,
+    "y": 460,
+    "width": 60,
+    "height": 50,
+    "rotation": 0,
+    "zIndex": 199,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay6-qf",
+    "name": "305 #4集电线路柜真空断路器",
+    "type": "elec-breaker",
+    "category": "electrical",
+    "x": 1490,
+    "y": 520,
+    "width": 70,
+    "height": 75,
+    "rotation": 0,
+    "zIndex": 200,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2,
+      "breakerColorClosed": "#ef4444",
+      "breakerColorOpen": "#10b981"
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "stateKey": "DEV_BAY6_YX_1"
+      }
+    }
+  },
+  {
+    "id": "comp-bay6-qs-line",
+    "name": "305 #4集电线路柜出线隔离开关",
+    "type": "elec-disconnector",
+    "category": "electrical",
+    "x": 1495,
+    "y": 605,
+    "width": 60,
+    "height": 50,
+    "rotation": 0,
+    "zIndex": 201,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay6-ct",
+    "name": "305 #4集电线路柜电流互感器",
+    "type": "elec-ct",
+    "category": "electrical",
+    "x": 1503,
+    "y": 665,
+    "width": 44,
+    "height": 48,
+    "rotation": 0,
+    "zIndex": 202,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay6-qe",
+    "name": "305 #4集电线路柜接地刀闸",
+    "type": "elec-grounding",
+    "category": "electrical",
+    "x": 1435,
+    "y": 665,
+    "width": 50,
+    "height": 48,
+    "rotation": 0,
+    "zIndex": 203,
+    "style": {
+      "stroke": "#eab308",
+      "strokeWidth": 2
+    },
+    "customProps": {
+      "state": 0
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay6-arrester",
+    "name": "305 #4集电线路柜出线避雷器",
+    "type": "elec-arrester",
+    "category": "electrical",
+    "x": 1570,
+    "y": 665,
+    "width": 45,
+    "height": 48,
+    "rotation": 0,
+    "zIndex": 204,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay6-line-out",
+    "name": "305 #4集电线路柜出线电缆",
+    "type": "draw-line",
+    "category": "basic",
+    "x": 1524,
+    "y": 713,
+    "width": 2,
+    "height": 32,
+    "rotation": 0,
+    "zIndex": 205,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay6-target",
+    "name": "305 #4集电线路柜出线目标",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1425,
+    "y": 748,
+    "width": 200,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 206,
+    "style": {
+      "text": "至 #25~#32箱变分支 (8MW)",
+      "fontSize": 11,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent",
+      "textAlign": "center"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay6-lbl-0",
+    "name": "305 #4集电线路柜遥测标签-Ia:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1432,
+    "y": 780,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 207,
+    "style": {
+      "text": "Ia:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay6-val-0",
+    "name": "305 #4集电线路柜遥测数值-BAY6_IA",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 1480,
+    "y": 780,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 208,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY6_IA"
+      }
+    }
+  },
+  {
+    "id": "comp-bay6-unit-0",
+    "name": "305 #4集电线路柜遥测单位-A",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1560,
+    "y": 780,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 209,
+    "style": {
+      "text": "A",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay6-lbl-1",
+    "name": "305 #4集电线路柜遥测标签-P:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1432,
+    "y": 812,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 210,
+    "style": {
+      "text": "P:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay6-val-1",
+    "name": "305 #4集电线路柜遥测数值-BAY6_P",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 1480,
+    "y": 812,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 211,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY6_P"
+      }
+    }
+  },
+  {
+    "id": "comp-bay6-unit-1",
+    "name": "305 #4集电线路柜遥测单位-MW",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1560,
+    "y": 812,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 212,
+    "style": {
+      "text": "MW",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay6-lbl-2",
+    "name": "305 #4集电线路柜遥测标签-Q:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1432,
+    "y": 844,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 213,
+    "style": {
+      "text": "Q:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay6-val-2",
+    "name": "305 #4集电线路柜遥测数值-BAY6_Q",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 1480,
+    "y": 844,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 214,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY6_Q"
+      }
+    }
+  },
+  {
+    "id": "comp-bay6-unit-2",
+    "name": "305 #4集电线路柜遥测单位-Mvar",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1560,
+    "y": 844,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 215,
+    "style": {
+      "text": "Mvar",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay6-lbl-3",
+    "name": "305 #4集电线路柜遥测标签-CosΦ:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1432,
+    "y": 876,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 216,
+    "style": {
+      "text": "CosΦ:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay6-val-3",
+    "name": "305 #4集电线路柜遥测数值-BAY6_COS",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 1480,
+    "y": 876,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 217,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY6_COS"
+      }
+    }
+  },
+  {
+    "id": "comp-bay6-unit-3",
+    "name": "305 #4集电线路柜遥测单位-",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1560,
+    "y": 876,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 218,
+    "style": {
+      "text": "",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay7-frame",
+    "name": "306 #5储能进线集电柜外框",
+    "type": "draw-rect",
+    "category": "basic",
+    "x": 1650,
+    "y": 425,
+    "width": 210,
+    "height": 520,
+    "rotation": 0,
+    "zIndex": 219,
+    "style": {
+      "fill": "rgba(6, 15, 30, 0.5)",
+      "stroke": "#ffffff",
+      "strokeWidth": 1.5,
+      "borderRadius": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay7-title",
+    "name": "306 #5储能进线集电柜名称",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1655,
+    "y": 432,
+    "width": 200,
+    "height": 24,
+    "rotation": 0,
+    "zIndex": 220,
+    "style": {
+      "text": "306 #5储能进线集电柜",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#ffffff",
+      "fill": "transparent",
+      "textAlign": "center"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay7-lead-in",
+    "name": "306 #5储能进线集电柜母线引下线",
+    "type": "draw-line",
+    "category": "basic",
+    "x": 1754,
+    "y": 404,
+    "width": 2,
+    "height": 56,
+    "rotation": 0,
+    "zIndex": 221,
+    "style": {
+      "stroke": "#f59e0b",
+      "strokeWidth": 2.2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay7-qs-bus",
+    "name": "306 #5储能进线集电柜母线隔离开关",
+    "type": "elec-disconnector",
+    "category": "electrical",
+    "x": 1725,
+    "y": 460,
+    "width": 60,
+    "height": 50,
+    "rotation": 0,
+    "zIndex": 222,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay7-qf",
+    "name": "306 #5储能进线集电柜真空断路器",
+    "type": "elec-breaker",
+    "category": "electrical",
+    "x": 1720,
+    "y": 520,
+    "width": 70,
+    "height": 75,
+    "rotation": 0,
+    "zIndex": 223,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2,
+      "breakerColorClosed": "#ef4444",
+      "breakerColorOpen": "#10b981"
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "stateKey": "DEV_BAY7_YX_1"
+      }
+    }
+  },
+  {
+    "id": "comp-bay7-qs-line",
+    "name": "306 #5储能进线集电柜出线隔离开关",
+    "type": "elec-disconnector",
+    "category": "electrical",
+    "x": 1725,
+    "y": 605,
+    "width": 60,
+    "height": 50,
+    "rotation": 0,
+    "zIndex": 224,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "customProps": {
+      "state": 1
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay7-ct",
+    "name": "306 #5储能进线集电柜电流互感器",
+    "type": "elec-ct",
+    "category": "electrical",
+    "x": 1733,
+    "y": 665,
+    "width": 44,
+    "height": 48,
+    "rotation": 0,
+    "zIndex": 225,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay7-qe",
+    "name": "306 #5储能进线集电柜接地刀闸",
+    "type": "elec-grounding",
+    "category": "electrical",
+    "x": 1665,
+    "y": 665,
+    "width": 50,
+    "height": 48,
+    "rotation": 0,
+    "zIndex": 226,
+    "style": {
+      "stroke": "#eab308",
+      "strokeWidth": 2
+    },
+    "customProps": {
+      "state": 0
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay7-arrester",
+    "name": "306 #5储能进线集电柜出线避雷器",
+    "type": "elec-arrester",
+    "category": "electrical",
+    "x": 1800,
+    "y": 665,
+    "width": 45,
+    "height": 48,
+    "rotation": 0,
+    "zIndex": 227,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay7-line-out",
+    "name": "306 #5储能进线集电柜出线电缆",
+    "type": "draw-line",
+    "category": "basic",
+    "x": 1754,
+    "y": 713,
+    "width": 2,
+    "height": 32,
+    "rotation": 0,
+    "zIndex": 228,
+    "style": {
+      "stroke": "#00f2ff",
+      "strokeWidth": 2.2
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay7-target",
+    "name": "306 #5储能进线集电柜出线目标",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1655,
+    "y": 748,
+    "width": 200,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 229,
+    "style": {
+      "text": "至 10MW/20MWh储能系统",
+      "fontSize": 11,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent",
+      "textAlign": "center"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay7-lbl-0",
+    "name": "306 #5储能进线集电柜遥测标签-Ia:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1662,
+    "y": 780,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 230,
+    "style": {
+      "text": "Ia:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay7-val-0",
+    "name": "306 #5储能进线集电柜遥测数值-BAY7_IA",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 1710,
+    "y": 780,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 231,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY7_IA"
+      }
+    }
+  },
+  {
+    "id": "comp-bay7-unit-0",
+    "name": "306 #5储能进线集电柜遥测单位-A",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1790,
+    "y": 780,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 232,
+    "style": {
+      "text": "A",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay7-lbl-1",
+    "name": "306 #5储能进线集电柜遥测标签-P:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1662,
+    "y": 812,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 233,
+    "style": {
+      "text": "P:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay7-val-1",
+    "name": "306 #5储能进线集电柜遥测数值-BAY7_P",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 1710,
+    "y": 812,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 234,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY7_P"
+      }
+    }
+  },
+  {
+    "id": "comp-bay7-unit-1",
+    "name": "306 #5储能进线集电柜遥测单位-MW",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1790,
+    "y": 812,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 235,
+    "style": {
+      "text": "MW",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay7-lbl-2",
+    "name": "306 #5储能进线集电柜遥测标签-Q:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1662,
+    "y": 844,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 236,
+    "style": {
+      "text": "Q:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay7-val-2",
+    "name": "306 #5储能进线集电柜遥测数值-BAY7_Q",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 1710,
+    "y": 844,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 237,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY7_Q"
+      }
+    }
+  },
+  {
+    "id": "comp-bay7-unit-2",
+    "name": "306 #5储能进线集电柜遥测单位-Mvar",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1790,
+    "y": 844,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 238,
+    "style": {
+      "text": "Mvar",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay7-lbl-3",
+    "name": "306 #5储能进线集电柜遥测标签-CosΦ:",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1662,
+    "y": 876,
+    "width": 44,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 239,
+    "style": {
+      "text": "CosΦ:",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#38bdf8",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  },
+  {
+    "id": "comp-bay7-val-3",
+    "name": "306 #5储能进线集电柜遥测数值-BAY7_COS",
+    "type": "metric-float",
+    "category": "metrics",
+    "x": 1710,
+    "y": 876,
+    "width": 75,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 240,
+    "style": {
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent",
+      "stroke": "transparent",
+      "strokeWidth": 0,
+      "textAlign": "center",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "customProps": {
+      "displayStyle": "pure-digital",
+      "decimals": 2,
+      "trimZeros": false
+    },
+    "data": {
+      "datasetId": "ds-scada-station",
+      "mapping": {
+        "valueKey": "BAY7_COS"
+      }
+    }
+  },
+  {
+    "id": "comp-bay7-unit-3",
+    "name": "306 #5储能进线集电柜遥测单位-",
+    "type": "draw-text",
+    "category": "basic",
+    "x": 1790,
+    "y": 876,
+    "width": 58,
+    "height": 22,
+    "rotation": 0,
+    "zIndex": 241,
+    "style": {
+      "text": "",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "textColor": "#22c55e",
+      "fill": "transparent"
+    },
+    "data": {
+      "mapping": {}
+    }
+  }
+];
+
+export const PV_HIGH_VOLTAGE_TEMPLATE: TemplateMeta = {
+  id: 'tpl-pv-high-voltage',
+  name: '35kV高压光伏一次系统接线图',
+  nameEn: '35kV High Voltage PV Substation Primary Single-Line Diagram',
+  description: '国标/行业标准35kV/110kV新能源光伏变电站一次接线图，100%采用基础几何与标准电气图元原子组装',
+  category: '新能源电力',
+  tags: ['35kV', '110kV', '光伏升压站', '一次系统图', '纯图元组装'],
+  thumbnailGradient: 'from-amber-950 via-slate-900 to-cyan-950',
+  schema: {
+    version: '2.0.0',
+    screen: {
+      id: 'screen-pv-high-voltage',
+      name: '35kV高压光伏一次系统接线图',
+      width: 1920,
+      height: 970,
+      backgroundColor: '#000000',
+      backgroundGrid: true,
+      gridSize: 20,
+      gridColor: 'rgba(255, 255, 255, 0.05)',
+      theme: 'cyber-dark',
+      version: '2.0.0',
+      updatedAt: new Date().toISOString()
+    },
+    components: PV_HIGH_VOLTAGE_COMPONENTS,
+    datasets: INITIAL_DATASETS
+  }
+};

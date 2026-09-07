@@ -1,0 +1,289 @@
+{
+  "id": "model-1788629972929",
+  "name": "新画面 5999",
+  "description": "由「新画面 5」导出的标准大屏图元组装模板",
+  "category": "新能源电力",
+  "tags": [
+    "自定义模板"
+  ],
+  "version": "2.0.0",
+  "updatedAt": "2026-09-05T17:39:32.929Z",
+  "filename": "新画面 5999.json",
+  "screen": {
+    "id": "screen-1788502118446",
+    "name": "新画面 5999",
+    "width": 1860,
+    "height": 980,
+    "backgroundColor": "#0f223d",
+    "backgroundGrid": true,
+    "gridSize": 20,
+    "gridColor": "rgba(0, 242, 255, 0.22)",
+    "theme": "cyber-dark",
+    "version": "2.0.0",
+    "updatedAt": "2026-09-04T06:08:38.446Z"
+  },
+  "components": [
+    {
+      "id": "comp-1788502124581-0uk2",
+      "name": "重装机甲铆钉边框 #1",
+      "type": "deco-border-mech",
+      "category": "decoration",
+      "x": 240,
+      "y": 440,
+      "width": 1860,
+      "height": 980,
+      "rotation": 0,
+      "zIndex": 1,
+      "locked": false,
+      "visible": true,
+      "activeState": "1",
+      "style": {
+        "stroke": "#38bdf8",
+        "fill": "rgba(6, 14, 28, 0.75)"
+      },
+      "data": {
+        "mapping": {}
+      },
+      "customProps": {
+        "borderStyle": "deco-border-mech"
+      }
+    },
+    {
+      "id": "comp-1788502732014-uox6",
+      "name": "折线走线 #2",
+      "type": "draw-polyline",
+      "category": "basic",
+      "x": 1320,
+      "y": 560,
+      "width": 880,
+      "height": 520,
+      "rotation": 0,
+      "zIndex": 2,
+      "locked": false,
+      "visible": true,
+      "activeState": "1",
+      "style": {
+        "stroke": "#00f2ff",
+        "strokeWidth": 3,
+        "lineType": "step-horizontal",
+        "lineStyle": "solid"
+      },
+      "data": {
+        "mapping": {}
+      },
+      "customProps": {
+        "points": [
+          {
+            "xRatio": 1,
+            "yRatio": 0,
+            "x": 880,
+            "y": 0
+          },
+          {
+            "xRatio": 0.5909090909090909,
+            "yRatio": 0.6923076923076923,
+            "x": 520,
+            "y": 360
+          },
+          {
+            "xRatio": 0,
+            "yRatio": 1,
+            "x": 0,
+            "y": 520
+          },
+          {
+            "xRatio": 0,
+            "yRatio": 1,
+            "x": 0,
+            "y": 520
+          }
+        ]
+      }
+    },
+    {
+      "id": "comp-1788629909754-1gwa",
+      "name": "矩形 / 科技底座 #3",
+      "type": "draw-rect",
+      "category": "basic",
+      "x": 400,
+      "y": 160,
+      "width": 760,
+      "height": 160,
+      "rotation": 0,
+      "zIndex": 3,
+      "locked": false,
+      "visible": true,
+      "activeState": "1",
+      "style": {
+        "fill": "#00f2ff",
+        "fillOpacity": 0.15,
+        "stroke": "#00f2ff",
+        "strokeWidth": 2,
+        "borderRadius": 0
+      },
+      "data": {
+        "mapping": {}
+      }
+    },
+    {
+      "id": "comp-1788629927074-vg0v",
+      "name": "圆角矩形 #4",
+      "type": "draw-rounded-rect",
+      "category": "basic",
+      "x": 520,
+      "y": 80,
+      "width": 120,
+      "height": 120,
+      "rotation": 0,
+      "zIndex": 4,
+      "locked": false,
+      "visible": true,
+      "activeState": "1",
+      "style": {
+        "fill": "#00f2ff",
+        "fillOpacity": 0.15,
+        "stroke": "#00f2ff",
+        "strokeWidth": 2,
+        "borderRadius": 12
+      },
+      "data": {
+        "mapping": {}
+      }
+    },
+    {
+      "id": "comp-1788629936705-8bcu",
+      "name": "695",
+      "type": "composite-symbol",
+      "category": "electrical",
+      "x": 550,
+      "y": 370,
+      "width": 760,
+      "height": 240,
+      "rotation": 0,
+      "zIndex": 5,
+      "locked": false,
+      "visible": true,
+      "states": [
+        {
+          "id": "1",
+          "name": "状态 1 (正常运行 / 合闸)",
+          "children": [
+            {
+              "id": "comp-1788629909754-1gwa",
+              "name": "矩形 / 科技底座 #3",
+              "type": "draw-rect",
+              "category": "basic",
+              "x": 0,
+              "y": 80,
+              "width": 760,
+              "height": 160,
+              "rotation": 0,
+              "zIndex": 1,
+              "locked": false,
+              "visible": true,
+              "activeState": "1",
+              "style": {
+                "fill": "#00f2ff",
+                "fillOpacity": 0.15,
+                "stroke": "#00f2ff",
+                "strokeWidth": 2,
+                "borderRadius": 0
+              },
+              "data": {
+                "mapping": {}
+              }
+            },
+            {
+              "id": "comp-1788629927074-vg0v",
+              "name": "圆角矩形 #4",
+              "type": "draw-rounded-rect",
+              "category": "basic",
+              "x": 120,
+              "y": 0,
+              "width": 120,
+              "height": 120,
+              "rotation": 0,
+              "zIndex": 2,
+              "locked": false,
+              "visible": true,
+              "activeState": "1",
+              "style": {
+                "fill": "#00f2ff",
+                "fillOpacity": 0.15,
+                "stroke": "#00f2ff",
+                "strokeWidth": 2,
+                "borderRadius": 12
+              },
+              "data": {
+                "mapping": {}
+              }
+            }
+          ]
+        }
+      ],
+      "activeState": "1",
+      "children": [
+        {
+          "id": "comp-1788629909754-1gwa",
+          "name": "矩形 / 科技底座 #3",
+          "type": "draw-rect",
+          "category": "basic",
+          "x": 0,
+          "y": 80,
+          "width": 760,
+          "height": 160,
+          "rotation": 0,
+          "zIndex": 1,
+          "locked": false,
+          "visible": true,
+          "activeState": "1",
+          "style": {
+            "fill": "#00f2ff",
+            "fillOpacity": 0.15,
+            "stroke": "#00f2ff",
+            "strokeWidth": 2,
+            "borderRadius": 0
+          },
+          "data": {
+            "mapping": {}
+          }
+        },
+        {
+          "id": "comp-1788629927074-vg0v",
+          "name": "圆角矩形 #4",
+          "type": "draw-rounded-rect",
+          "category": "basic",
+          "x": 120,
+          "y": 0,
+          "width": 120,
+          "height": 120,
+          "rotation": 0,
+          "zIndex": 2,
+          "locked": false,
+          "visible": true,
+          "activeState": "1",
+          "style": {
+            "fill": "#00f2ff",
+            "fillOpacity": 0.15,
+            "stroke": "#00f2ff",
+            "strokeWidth": 2,
+            "borderRadius": 12
+          },
+          "data": {
+            "mapping": {}
+          }
+        }
+      ],
+      "style": {
+        "fill": "transparent",
+        "stroke": "#00f2ff",
+        "strokeWidth": 1.5,
+        "borderRadius": 4
+      },
+      "data": {
+        "mapping": {}
+      }
+    }
+  ],
+  "datasets": []
+}

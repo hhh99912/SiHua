@@ -1,0 +1,416 @@
+{
+  "id": "tpl-smart-factory",
+  "name": "智能工厂车间数字孪生大屏",
+  "description": "工业制造、数控机床、OEE稼动率、功率遥测与告警流水线一体化",
+  "category": "智能制造",
+  "tags": [
+    "OEE",
+    "PLC遥测",
+    "机床矩阵",
+    "工况告警"
+  ],
+  "version": "2.0.0",
+  "updatedAt": "2026-09-04T13:20:38.679Z",
+  "screen": {
+    "id": "screen-smart-factory-01",
+    "name": "智能工厂数字化大屏 (Smart Factory DataV)",
+    "description": "1920x1080 工业风深色大屏，集成实时遥测、流体管道拓扑与机床状态矩阵",
+    "width": 1920,
+    "height": 1080,
+    "backgroundColor": "#070b14",
+    "backgroundGrid": true,
+    "gridSize": 20,
+    "gridColor": "rgba(0, 242, 255, 0.22)",
+    "theme": "cyber-dark",
+    "version": "2.0.0",
+    "updatedAt": "2026-09-04T13:20:38.661Z"
+  },
+  "components": [
+    {
+      "id": "comp-title-01",
+      "name": "SCADA主标题",
+      "type": "metric-title",
+      "category": "metrics",
+      "x": 480,
+      "y": 20,
+      "width": 960,
+      "height": 70,
+      "rotation": 0,
+      "zIndex": 10,
+      "style": {
+        "textColor": "#e2f1ff",
+        "fontSize": 28,
+        "fontWeight": "bold",
+        "letterSpacing": 4
+      },
+      "data": {
+        "datasetId": "ds-factory-telemetry",
+        "mapping": {
+          "titleKey": "智能重工 · 超级智造数字化双碳管控平台"
+        }
+      }
+    },
+    {
+      "id": "comp-hazard-01",
+      "name": "顶部警示斑马条",
+      "type": "deco-hazard-stripe",
+      "category": "decoration",
+      "x": 560,
+      "y": 84,
+      "width": 800,
+      "height": 12,
+      "rotation": 0,
+      "zIndex": 5,
+      "style": {
+        "fill": "#f59e0b",
+        "opacity": 0.8
+      },
+      "data": {
+        "mapping": {}
+      }
+    },
+    {
+      "id": "comp-kpi-01",
+      "name": "今日累计产量",
+      "type": "metric-flipper",
+      "category": "metrics",
+      "x": 30,
+      "y": 100,
+      "width": 280,
+      "height": 100,
+      "rotation": 0,
+      "zIndex": 5,
+      "style": {
+        "fill": "rgba(10, 22, 38, 0.85)",
+        "stroke": "#00f2ff",
+        "strokeWidth": 1,
+        "textColor": "#00f2ff",
+        "themePreset": "cyber-cyan"
+      },
+      "data": {
+        "datasetId": "ds-factory-telemetry",
+        "mapping": {
+          "titleKey": "今日累计产出 (PCS)",
+          "valueKey": "daily_yield_units",
+          "unitKey": "件"
+        }
+      }
+    },
+    {
+      "id": "comp-kpi-02",
+      "name": "综合稼动率 OEE",
+      "type": "metric-float",
+      "category": "metrics",
+      "x": 330,
+      "y": 100,
+      "width": 260,
+      "height": 100,
+      "rotation": 0,
+      "zIndex": 5,
+      "style": {
+        "fill": "transparent",
+        "stroke": "transparent",
+        "strokeWidth": 0,
+        "textColor": "#00e5a3",
+        "fontSize": 28,
+        "decimals": 1,
+        "trimZeros": false
+      },
+      "data": {
+        "datasetId": "ds-factory-telemetry",
+        "mapping": {
+          "valueKey": "oee_efficiency_pct"
+        }
+      }
+    },
+    {
+      "id": "comp-kpi-03",
+      "name": "主轴功率与转速",
+      "type": "metric-float",
+      "category": "metrics",
+      "x": 1330,
+      "y": 100,
+      "width": 260,
+      "height": 100,
+      "rotation": 0,
+      "zIndex": 5,
+      "style": {
+        "fill": "transparent",
+        "stroke": "transparent",
+        "strokeWidth": 0,
+        "textColor": "#f59e0b",
+        "fontSize": 28,
+        "decimals": 2,
+        "trimZeros": true
+      },
+      "data": {
+        "datasetId": "ds-factory-telemetry",
+        "mapping": {
+          "valueKey": "power_consumption_kw"
+        }
+      }
+    },
+    {
+      "id": "comp-kpi-04",
+      "name": "良品率指标",
+      "type": "metric-float",
+      "category": "metrics",
+      "x": 1610,
+      "y": 100,
+      "width": 280,
+      "height": 100,
+      "rotation": 0,
+      "zIndex": 5,
+      "style": {
+        "fill": "transparent",
+        "stroke": "transparent",
+        "strokeWidth": 0,
+        "textColor": "#3b82f6",
+        "fontSize": 28,
+        "decimals": 1,
+        "trimZeros": false
+      },
+      "data": {
+        "datasetId": "ds-factory-telemetry",
+        "mapping": {
+          "valueKey": "yield_rate_pct"
+        }
+      }
+    },
+    {
+      "id": "comp-line-01",
+      "name": "实时功率/温度遥测折线",
+      "type": "chart-line",
+      "category": "charts",
+      "x": 30,
+      "y": 220,
+      "width": 560,
+      "height": 380,
+      "rotation": 0,
+      "zIndex": 4,
+      "style": {
+        "fill": "rgba(12, 22, 37, 0.9)",
+        "stroke": "#00f2ff",
+        "strokeWidth": 1,
+        "borderRadius": 8
+      },
+      "data": {
+        "datasetId": "ds-factory-telemetry",
+        "mapping": {
+          "titleKey": "主轴功率动态变化 (kW)",
+          "categoriesKey": "series_time",
+          "seriesKey": "series_power",
+          "unitKey": "kW",
+          "thresholdMax": 855
+        }
+      }
+    },
+    {
+      "id": "comp-bar-01",
+      "name": "工序产出柱状图",
+      "type": "chart-bar",
+      "category": "charts",
+      "x": 30,
+      "y": 620,
+      "width": 560,
+      "height": 420,
+      "rotation": 0,
+      "zIndex": 4,
+      "style": {
+        "fill": "rgba(12, 22, 37, 0.9)",
+        "stroke": "#00e5a3",
+        "strokeWidth": 1,
+        "borderRadius": 8
+      },
+      "data": {
+        "datasetId": "ds-factory-telemetry",
+        "mapping": {
+          "titleKey": "车间各工段实时产量分布",
+          "categoriesKey": "series_categories",
+          "seriesKey": "series_line_output",
+          "unitKey": "件"
+        }
+      }
+    },
+    {
+      "id": "comp-border-center",
+      "name": "中控主透镜框",
+      "type": "deco-border-neon",
+      "category": "decoration",
+      "x": 610,
+      "y": 220,
+      "width": 700,
+      "height": 520,
+      "rotation": 0,
+      "zIndex": 1,
+      "style": {
+        "fill": "rgba(8, 16, 30, 0.7)",
+        "stroke": "#00f2ff",
+        "strokeWidth": 1
+      },
+      "data": {
+        "mapping": {
+          "titleKey": "车间主轴与核心流体动力拓扑"
+        }
+      }
+    },
+    {
+      "id": "comp-gauge-01",
+      "name": "主轴转速工控表盘",
+      "type": "chart-gauge",
+      "category": "charts",
+      "x": 630,
+      "y": 270,
+      "width": 320,
+      "height": 260,
+      "rotation": 0,
+      "zIndex": 6,
+      "style": {
+        "fill": "rgba(13, 27, 42, 0.8)",
+        "stroke": "#00f2ff",
+        "strokeWidth": 1,
+        "themePreset": "cyber-cyan"
+      },
+      "data": {
+        "datasetId": "ds-factory-telemetry",
+        "mapping": {
+          "titleKey": "主轴转速",
+          "valueKey": "spindle_speed_rpm",
+          "unitKey": "RPM",
+          "thresholdMax": 4000
+        }
+      }
+    },
+    {
+      "id": "comp-tank-01",
+      "name": "冷却液储罐液位",
+      "type": "ind-tank",
+      "category": "industrial",
+      "x": 980,
+      "y": 270,
+      "width": 300,
+      "height": 260,
+      "rotation": 0,
+      "zIndex": 6,
+      "style": {
+        "fill": "rgba(10, 20, 35, 0.9)",
+        "stroke": "#00f2ff",
+        "strokeWidth": 1
+      },
+      "data": {
+        "datasetId": "ds-chemical-tanks",
+        "mapping": {
+          "titleKey": "A-101冷却液储罐",
+          "valueKey": "tank1_level_pct",
+          "unitKey": "%"
+        }
+      }
+    },
+    {
+      "id": "comp-pipe-01",
+      "name": "主轴冷却回路管道",
+      "type": "ind-pipe",
+      "category": "industrial",
+      "x": 650,
+      "y": 560,
+      "width": 620,
+      "height": 50,
+      "rotation": 0,
+      "zIndex": 6,
+      "style": {
+        "fill": "#132338",
+        "stroke": "#00f2ff",
+        "strokeWidth": 2
+      },
+      "animation": {
+        "enable": true,
+        "type": "flow",
+        "speed": 2,
+        "direction": "forward",
+        "loop": true
+      },
+      "data": {
+        "datasetId": "ds-chemical-tanks",
+        "mapping": {
+          "titleKey": "循环冷却进水主回路",
+          "valueKey": "flow_rate_lpm",
+          "unitKey": "L/min"
+        }
+      }
+    },
+    {
+      "id": "comp-matrix-01",
+      "name": "机床状态点阵",
+      "type": "ind-matrix",
+      "category": "industrial",
+      "x": 610,
+      "y": 760,
+      "width": 700,
+      "height": 280,
+      "rotation": 0,
+      "zIndex": 4,
+      "style": {
+        "fill": "rgba(12, 22, 37, 0.9)",
+        "stroke": "#00f2ff",
+        "strokeWidth": 1
+      },
+      "data": {
+        "datasetId": "ds-factory-telemetry",
+        "mapping": {
+          "titleKey": "全厂 12 个智能工段执行状态监测"
+        }
+      }
+    },
+    {
+      "id": "comp-pie-01",
+      "name": "能源占比环形图",
+      "type": "chart-pie",
+      "category": "charts",
+      "x": 1330,
+      "y": 220,
+      "width": 560,
+      "height": 380,
+      "rotation": 0,
+      "zIndex": 4,
+      "style": {
+        "fill": "rgba(12, 22, 37, 0.9)",
+        "stroke": "#f59e0b",
+        "strokeWidth": 1,
+        "borderRadius": 8
+      },
+      "data": {
+        "datasetId": "ds-energy-grid",
+        "mapping": {
+          "titleKey": "厂区能耗构成与峰谷分布",
+          "categoriesKey": "series_tank_names",
+          "seriesKey": "series_tank_compare",
+          "unitKey": "%"
+        }
+      }
+    },
+    {
+      "id": "comp-alarm-01",
+      "name": "实时告警日志",
+      "type": "ind-alarm-list",
+      "category": "industrial",
+      "x": 1330,
+      "y": 620,
+      "width": 560,
+      "height": 420,
+      "rotation": 0,
+      "zIndex": 4,
+      "style": {
+        "fill": "rgba(12, 22, 37, 0.9)",
+        "stroke": "#ef4444",
+        "strokeWidth": 1,
+        "borderRadius": 8
+      },
+      "data": {
+        "datasetId": "ds-industrial-alarms",
+        "mapping": {
+          "titleKey": "工控网络实时预警事件"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,329 @@
+{
+  "id": "cell-elec-grounding",
+  "name": "快速接地刀闸 QE",
+  "category": "electrical",
+  "iconName": "ShieldAlert",
+  "description": "电力接地刀闸，由垂直触头与三道水平基础直线接地排组装，严禁使用闸符，0边距，支持检修接地多态",
+  "defaultWidth": 36,
+  "defaultHeight": 56,
+  "type": "composite-symbol",
+  "defaultStyle": {
+    "fill": "transparent",
+    "stroke": "#00f2ff",
+    "strokeWidth": 2
+  },
+  "states": [
+    {
+      "id": "0",
+      "name": "状态 0 (分闸 / 隔离运行)",
+      "matchValue": "0",
+      "children": [
+        {
+          "id": "qe-top-0",
+          "name": "接线触头",
+          "type": "draw-circle",
+          "category": "basic",
+          "x": 14,
+          "y": 0,
+          "width": 8,
+          "height": 8,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "transparent",
+            "stroke": "#10b981",
+            "strokeWidth": 2
+          }
+        },
+        {
+          "id": "qe-blade-0",
+          "name": "分闸刀柄",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 0,
+          "y": 8,
+          "width": 16,
+          "height": 20,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "stroke": "#10b981",
+            "strokeWidth": 2.5
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0,
+                "yRatio": 0,
+                "x": 0,
+                "y": 0
+              },
+              {
+                "xRatio": 1,
+                "yRatio": 1,
+                "x": 16,
+                "y": 20
+              }
+            ]
+          }
+        },
+        {
+          "id": "qe-gnd-1-0",
+          "name": "接地极长横线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 0,
+          "y": 34,
+          "width": 36,
+          "height": 4,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "stroke": "#10b981",
+            "strokeWidth": 3
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0,
+                "yRatio": 0.5,
+                "x": 0,
+                "y": 2
+              },
+              {
+                "xRatio": 1,
+                "yRatio": 0.5,
+                "x": 36,
+                "y": 2
+              }
+            ]
+          }
+        },
+        {
+          "id": "qe-gnd-2-0",
+          "name": "接地极中横线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 7,
+          "y": 42,
+          "width": 22,
+          "height": 4,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "stroke": "#10b981",
+            "strokeWidth": 3
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0,
+                "yRatio": 0.5,
+                "x": 0,
+                "y": 2
+              },
+              {
+                "xRatio": 1,
+                "yRatio": 0.5,
+                "x": 22,
+                "y": 2
+              }
+            ]
+          }
+        },
+        {
+          "id": "qe-gnd-3-0",
+          "name": "接地极短横线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 13,
+          "y": 50,
+          "width": 10,
+          "height": 6,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "stroke": "#10b981",
+            "strokeWidth": 3
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0,
+                "yRatio": 0.5,
+                "x": 0,
+                "y": 3
+              },
+              {
+                "xRatio": 1,
+                "yRatio": 0.5,
+                "x": 10,
+                "y": 3
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "1",
+      "name": "状态 1 (合闸 / 检修接地)",
+      "matchValue": "1",
+      "children": [
+        {
+          "id": "qe-top-1",
+          "name": "接线触头",
+          "type": "draw-circle",
+          "category": "basic",
+          "x": 14,
+          "y": 0,
+          "width": 8,
+          "height": 8,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "#f59e0b",
+            "stroke": "#f59e0b",
+            "strokeWidth": 1
+          }
+        },
+        {
+          "id": "qe-blade-1",
+          "name": "合闸接地刀",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 16,
+          "y": 8,
+          "width": 4,
+          "height": 26,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "stroke": "#f59e0b",
+            "strokeWidth": 3.5
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0.5,
+                "yRatio": 0,
+                "x": 2,
+                "y": 0
+              },
+              {
+                "xRatio": 0.5,
+                "yRatio": 1,
+                "x": 2,
+                "y": 26
+              }
+            ]
+          }
+        },
+        {
+          "id": "qe-gnd-1-1",
+          "name": "接地极长横线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 0,
+          "y": 34,
+          "width": 36,
+          "height": 4,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "stroke": "#f59e0b",
+            "strokeWidth": 3
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0,
+                "yRatio": 0.5,
+                "x": 0,
+                "y": 2
+              },
+              {
+                "xRatio": 1,
+                "yRatio": 0.5,
+                "x": 36,
+                "y": 2
+              }
+            ]
+          }
+        },
+        {
+          "id": "qe-gnd-2-1",
+          "name": "接地极中横线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 7,
+          "y": 42,
+          "width": 22,
+          "height": 4,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "stroke": "#f59e0b",
+            "strokeWidth": 3
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0,
+                "yRatio": 0.5,
+                "x": 0,
+                "y": 2
+              },
+              {
+                "xRatio": 1,
+                "yRatio": 0.5,
+                "x": 22,
+                "y": 2
+              }
+            ]
+          }
+        },
+        {
+          "id": "qe-gnd-3-1",
+          "name": "接地极短横线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 13,
+          "y": 50,
+          "width": 10,
+          "height": 6,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "stroke": "#f59e0b",
+            "strokeWidth": 3
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0,
+                "yRatio": 0.5,
+                "x": 0,
+                "y": 3
+              },
+              {
+                "xRatio": 1,
+                "yRatio": 0.5,
+                "x": 10,
+                "y": 3
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "tags": [
+    "一次系统",
+    "接地刀闸",
+    "QE",
+    "检修"
+  ],
+  "filename": "快速接地刀闸 QE.json",
+  "updatedAt": "2026-09-04T13:28:54.166Z"
+}

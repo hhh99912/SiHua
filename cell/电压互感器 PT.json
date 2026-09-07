@@ -1,0 +1,162 @@
+{
+  "id": "cell-elec-pt",
+  "name": "电压互感器 PT",
+  "category": "electrical",
+  "iconName": "Activity",
+  "description": "电压互感器，由高压侧引线、双绕组基础几何圆与接地极组合拼装，0边距",
+  "defaultWidth": 30,
+  "defaultHeight": 60,
+  "type": "composite-symbol",
+  "defaultStyle": {
+    "fill": "transparent",
+    "stroke": "#00f2ff",
+    "strokeWidth": 2
+  },
+  "states": [
+    {
+      "id": "1",
+      "name": "正常测压运行",
+      "matchValue": "1",
+      "children": [
+        {
+          "id": "pt-line-top",
+          "name": "高压进线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 13,
+          "y": 0,
+          "width": 4,
+          "height": 10,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "stroke": "#00f2ff",
+            "strokeWidth": 2.5
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0.5,
+                "yRatio": 0,
+                "x": 2,
+                "y": 0
+              },
+              {
+                "xRatio": 0.5,
+                "yRatio": 1,
+                "x": 2,
+                "y": 10
+              }
+            ]
+          }
+        },
+        {
+          "id": "pt-circle-1",
+          "name": "一次线圈",
+          "type": "draw-circle",
+          "category": "basic",
+          "x": 3,
+          "y": 8,
+          "width": 24,
+          "height": 24,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "rgba(0, 242, 255, 0.1)",
+            "stroke": "#00f2ff",
+            "strokeWidth": 2
+          }
+        },
+        {
+          "id": "pt-circle-2",
+          "name": "二次线圈",
+          "type": "draw-circle",
+          "category": "basic",
+          "x": 3,
+          "y": 22,
+          "width": 24,
+          "height": 24,
+          "rotation": 0,
+          "zIndex": 2,
+          "style": {
+            "fill": "rgba(16, 185, 129, 0.1)",
+            "stroke": "#10b981",
+            "strokeWidth": 2
+          }
+        },
+        {
+          "id": "pt-gnd-1",
+          "name": "接地长横线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 0,
+          "y": 48,
+          "width": 30,
+          "height": 4,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "stroke": "#10b981",
+            "strokeWidth": 2
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0,
+                "yRatio": 0.5,
+                "x": 0,
+                "y": 2
+              },
+              {
+                "xRatio": 1,
+                "yRatio": 0.5,
+                "x": 30,
+                "y": 2
+              }
+            ]
+          }
+        },
+        {
+          "id": "pt-gnd-2",
+          "name": "接地短横线",
+          "type": "draw-line",
+          "category": "basic",
+          "x": 8,
+          "y": 56,
+          "width": 14,
+          "height": 4,
+          "rotation": 0,
+          "zIndex": 1,
+          "style": {
+            "stroke": "#10b981",
+            "strokeWidth": 2
+          },
+          "customProps": {
+            "points": [
+              {
+                "xRatio": 0,
+                "yRatio": 0.5,
+                "x": 0,
+                "y": 2
+              },
+              {
+                "xRatio": 1,
+                "yRatio": 0.5,
+                "x": 14,
+                "y": 2
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "tags": [
+    "PT",
+    "TV",
+    "互感器",
+    "电压测量"
+  ],
+  "filename": "电压互感器 PT.json",
+  "updatedAt": "2026-09-04T13:28:54.167Z"
+}
