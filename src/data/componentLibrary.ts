@@ -513,17 +513,24 @@ export const COMPONENT_DEFINITIONS: ComponentDefinition[] = [
   {
     type: 'draw-text',
     category: 'basic',
-    name: '静态文本 / 工业标牌',
-    nameEn: 'Text / Nameplate',
+    name: '静态文本',
+    nameEn: 'Static Text',
     iconName: 'Type',
-    description: '工业矢量文本标牌与设备铭牌，支持字号、字体、荧光描边与发光效果',
+    description: '用于图纸说明、设备标识、系统标题等文本排版，支持字号、字重、字体系列、对齐与荧光发光效果',
     defaultWidth: 160,
     defaultHeight: 40,
     defaultStyle: {
       text: '10kV 配电室 #1 主变',
       fontSize: 16,
-      fontWeight: 'bold',
-      textColor: '#00f2ff'
+      fontWeight: '400',
+      fontFamily: "'Noto Sans SC', system-ui, sans-serif",
+      textAlign: 'center',
+      verticalAlign: 'center',
+      textColor: '#00f2ff',
+      fill: 'transparent',
+      stroke: 'transparent',
+      strokeWidth: 0,
+      borderRadius: 0
     },
     defaultData: { mapping: {} }
   },

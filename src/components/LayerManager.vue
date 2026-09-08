@@ -12,8 +12,7 @@ import {
   ChevronDown,
   ArrowUpToLine,
   ArrowDownToLine,
-  Edit2,
-  Search
+  Edit2
 } from 'lucide-vue-next';
 import { ScreenComponent } from '../types';
 
@@ -43,7 +42,6 @@ const emit = defineEmits<{
 
 const editingId = ref<string | null>(null);
 const editingName = ref('');
-const filterKeyword = ref('');
 
 const activeSelectedIds = computed(() => {
   if (props.selectedIds && props.selectedIds.length > 0) return props.selectedIds;
@@ -53,19 +51,10 @@ const activeSelectedIds = computed(() => {
 
 // Display components in reverse order (top z-index on top)
 const reversedComponents = computed(() => {
-  const list = [...(props.components || [])].map((comp, originalIdx) => ({
+  return [...(props.components || [])].map((comp, originalIdx) => ({
     comp,
     originalIdx
-  }));
-  
-  if (!filterKeyword.value) {
-    return list.reverse();
-  }
-  const kw = filterKeyword.value.toLowerCase();
-  return list.filter(item => 
-    (item.comp?.name || '').toLowerCase().includes(kw) ||
-    (item.comp?.type || '').toLowerCase().includes(kw)
-  ).reverse();
+  })).reverse();
 });
 
 const handleItemClick = (e: MouseEvent, compId: string) => {
@@ -113,29 +102,16 @@ const toggleLock = (comp: ScreenComponent, e: Event) => {
 </script>
 
 <template>
-  <aside class="w-60 shrink-0 h-full bg-[#10213b] border-r border-cyan-400/50 flex flex-col select-none z-30 shadow-xl overflow-hidden font-sans">
+  <aside class="w-64 shrink-0 h-full bg-[#10213b] border-r border-cyan-400/50 flex flex-col select-none z-30 shadow-xl overflow-hidden font-sans">
     <!-- Header -->
-    <div class="p-2.5 border-b border-cyan-500/30 bg-[#142c4e]">
-      <div class="flex items-center justify-between mb-2">
-        <div class="flex items-center gap-1.5 font-mono text-xs text-cyan-200">
-          <Layers class="w-3.5 h-3.5 text-cyan-300" />
-          <span class="font-normal tracking-wide">图层与组件管理</span>
-        </div>
-        <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#183761] border border-cyan-500/40 text-cyan-300 font-light">
-          {{ components.length }} 个元件
-        </span>
+    <div class="px-2.5 py-2 border-b border-cyan-500/30 bg-[#142c4e] flex items-center justify-between">
+      <div class="flex items-center gap-1.5 font-mono font-medium text-xs text-cyan-200">
+        <Layers class="w-3.5 h-3.5 text-cyan-300" />
+        <span class="font-normal tracking-wide">图层与组件管理</span>
       </div>
-
-      <!-- Search Filter -->
-      <div class="relative">
-        <Search class="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-cyan-300" />
-        <input
-          v-model="filterKeyword"
-          type="text"
-          placeholder="搜索图层名称/类型..."
-          class="w-full bg-[#183761] border border-cyan-500/40 focus:border-cyan-300 rounded-lg pl-8 pr-2 py-1 text-xs text-cyan-100 placeholder:text-cyan-300/60 outline-hidden font-mono font-light shadow-inner"
-        />
-      </div>
+      <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#183761] border border-cyan-500/40 text-cyan-300 font-light">
+        {{ components.length }} 个元件
+      </span>
     </div>
 
     <!-- Layer List -->
@@ -144,7 +120,7 @@ const toggleLock = (comp: ScreenComponent, e: Event) => {
         v-if="reversedComponents.length === 0"
         class="text-center py-10 text-xs font-mono text-cyan-300 font-light"
       >
-        暂无图层或未匹配到元件
+        暂无图层元件
       </div>
 
       <div
@@ -264,12 +240,6 @@ const toggleLock = (comp: ScreenComponent, e: Event) => {
           </button>
         </div>
       </div>
-    </div>
-
-    <!-- Footer Quick Actions -->
-    <div class="p-2 border-t border-cyan-500/30 bg-[#142c4e] flex items-center justify-between text-[10px] font-mono text-cyan-300 font-light">
-      <span>双击名称可重命名</span>
-      <span class="text-cyan-200">Shift可多选</span>
     </div>
   </aside>
 </template>

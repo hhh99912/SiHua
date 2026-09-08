@@ -5,7 +5,7 @@
   "type": "mock",
   "updateIntervalMs": 2000,
   "isStreaming": true,
-  "updatedAt": "2026-09-08T07:48:09.387Z",
+  "updatedAt": "2026-09-08T09:13:07.084Z",
   "devices": [
     {
       "deviceId": "DEV-101",
@@ -1010,7 +1010,7 @@
     }
   ],
   "data": {
-    "timestamp": "15:48:09",
+    "timestamp": "17:13:07",
     "DEV-101_comm": 1,
     "DEV-101_YC_1": 10.25,
     "DEV-101_YC_2": 10.28,

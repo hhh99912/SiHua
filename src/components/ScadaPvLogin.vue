@@ -282,7 +282,6 @@ onBeforeUnmount(() => {
         <Server class="w-4 h-4 text-cyan-400" />
         <span>GE-SCADA 工业监控平台</span>
       </div>
-      
       <div class="text-[11px] text-slate-400 flex items-center gap-2">
         <span class="w-2 h-2 rounded-full bg-emerald-500" />
         <span>系统工况正常</span>

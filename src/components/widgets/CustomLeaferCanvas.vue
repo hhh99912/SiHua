@@ -28,6 +28,77 @@ const strokeDasharray = computed(() => {
   return undefined;
 });
 
+// 3. Static Text & Industrial Placard Properties
+const isTextType = computed(() => type.value === 'draw-text' || type.value === 'metric-header');
+
+const displayText = computed(() => {
+  if (style.value.text !== undefined && style.value.text !== '') return String(style.value.text);
+  if (props.component.customProps?.title) return String(props.component.customProps.title);
+  return props.component.name || '文本标签';
+});
+
+const textColor = computed(() => {
+  return style.value.textColor || '#00f2ff';
+});
+
+const textFontSize = computed(() => {
+  return Number(style.value.fontSize) || Math.max(12, Math.round(height.value * 0.55));
+});
+
+const textFontWeight = computed(() => {
+  const w = style.value.fontWeight;
+  if (!w || w === 'normal') return '400';
+  if (w === 'bold') return '700';
+  return String(w);
+});
+
+const textFontFamily = computed(() => {
+  return style.value.fontFamily || "'Noto Sans SC', system-ui, -apple-system, sans-serif";
+});
+
+const textAlign = computed(() => {
+  return style.value.textAlign || 'center';
+});
+
+const textVerticalAlign = computed(() => {
+  return style.value.verticalAlign || 'center';
+});
+
+const textJustifyContent = computed(() => {
+  const a = textAlign.value;
+  if (a === 'left') return 'flex-start';
+  if (a === 'right') return 'flex-end';
+  if (a === 'justify') return 'space-between';
+  return 'center';
+});
+
+const textItemsAlign = computed(() => {
+  const v = textVerticalAlign.value;
+  if (v === 'top') return 'flex-start';
+  if (v === 'bottom') return 'flex-end';
+  return 'center';
+});
+
+const textBgColor = computed(() => {
+  const bg = style.value.fill || style.value.bgColor;
+  if (!bg || bg === 'transparent') return 'transparent';
+  return bg;
+});
+
+const textBgOpacity = computed(() => {
+  if (style.value.fillOpacity !== undefined) return Number(style.value.fillOpacity);
+  if (style.value.bgOpacity !== undefined) return Number(style.value.bgOpacity);
+  return 1;
+});
+
+const textLetterSpacing = computed(() => {
+  return style.value.letterSpacing !== undefined ? `${style.value.letterSpacing}px` : 'normal';
+});
+
+const textLineHeight = computed(() => {
+  return style.value.lineHeight || 1.3;
+});
+
 // Helper calculations only when non-rectangular vector shape is active
 const pad = computed(() => Math.max(1, Math.ceil(strokeWidth.value / 2)));
 const innerW = computed(() => Math.max(1, width.value - pad.value * 2));
@@ -207,7 +278,47 @@ const cylPaths = computed(() => {
       }"
     />
 
-    <!-- 3. VECTOR PATHS (SVG On-Demand Rendering) -->
+    <!-- 3. FAST PATH: Static Text (Zero SVG clipping, subpixel crisp typography, flex layout, background) -->
+    <div
+      v-else-if="isTextType"
+      class="w-full h-full box-border flex select-none pointer-events-none"
+      :style="{
+        backgroundColor: textBgColor,
+        opacity: textBgColor !== 'transparent' ? textBgOpacity : 1,
+        border: 'none',
+        boxSizing: 'border-box',
+        justifyContent: textJustifyContent,
+        alignItems: textItemsAlign,
+        paddingLeft: '2px',
+        paddingRight: '2px',
+        paddingTop: '2px',
+        paddingBottom: '2px',
+        color: textColor,
+        fontSize: `${textFontSize}px`,
+        fontWeight: textFontWeight,
+        fontFamily: textFontFamily,
+        letterSpacing: textLetterSpacing,
+        lineHeight: textLineHeight,
+        textDecoration: style.textDecoration || 'none',
+        fontStyle: style.fontStyle || 'normal',
+        textShadow: style.textShadow || (style.glow ? `0 0 8px ${textColor}` : 'none'),
+        whiteSpace: style.whiteSpace || 'pre-wrap',
+        wordBreak: 'break-word',
+        overflow: 'hidden'
+      }"
+    >
+      <span
+        class="inline-block max-w-full"
+        :style="{
+          textAlign: textAlign,
+          width: (textAlign === 'justify' || textAlign === 'center') ? '100%' : 'auto'
+        }"
+      >
+        {{ displayText }}
+      </span>
+    </div>
+
+    <!-- 4. VECTOR PATHS (SVG On-Demand Rendering) -->
     <svg 
       v-else
       class="w-full h-full overflow-visible"
@@ -415,23 +526,7 @@ const cylPaths = computed(() => {
         <path :d="cylPaths.top" :fill="fill" :fill-opacity="Math.min(1, fillOpacity + 0.2)" :stroke="stroke" :stroke-width="strokeWidth" />
       </g>
 
-      <!-- 16. Text Label (矢量文本 / 标牌) -->
-      <text
-        v-else-if="type === 'draw-text'"
-        :x="width / 2"
-        :y="height / 2"
-        dominant-baseline="central"
-        text-anchor="middle"
-        :fill="style.textColor || style.stroke || fill"
-        :font-size="style.fontSize || Math.max(12, Math.round(height * 0.6))"
-        :font-weight="style.fontWeight || 'bold'"
-        :font-family="style.fontFamily || 'monospace'"
-        :letter-spacing="style.letterSpacing || 1"
-      >
-        {{ style.text || component.name || '文本标签' }}
-      </text>
-
-      <!-- 17. Generic Calculated SVG Shape Path -->
+      <!-- 16. Generic Calculated SVG Shape Path -->
       <path
         v-else-if="shapePath"
         :d="shapePath"

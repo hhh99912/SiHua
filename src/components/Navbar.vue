@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 import {
   Monitor,
   Play,
@@ -12,6 +12,7 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
+  Minimize2,
   Trash2,
   LayoutTemplate,
   ChevronDown,
@@ -61,7 +62,7 @@ import {
   Ruler as RulerIcon
 } from 'lucide-vue-next';
 import { ScreenConfig, ScreenComponent } from '../types';
-import { detectPlatform } from '../utils/platform';
+import { detectPlatform, windowToggleFullscreen } from '../utils/platform';
 import { currentUser } from '../utils/auth';
 
 interface Props {
@@ -147,6 +148,30 @@ const basicGeometryTools = [
   { type: 'draw-text', name: '文本标签 / 标牌', icon: Type, desc: '静态文本与标牌：单击选中后在屏幕确定起始和终止点' },
   { type: 'ctrl-button', name: '控制按钮', icon: ToggleRight, desc: '工业控制按钮：单击选中后在屏幕确定起始和终止点' }
 ];
+
+// 全屏与退出全屏状态与控制
+const isFullscreen = ref(typeof document !== 'undefined' && Boolean(document.fullscreenElement));
+
+const handleFullscreenToggle = async () => {
+  const state = await windowToggleFullscreen();
+  isFullscreen.value = typeof document !== 'undefined' ? Boolean(document.fullscreenElement) : state;
+};
+
+const handleFullscreenChange = () => {
+  if (typeof document !== 'undefined') {
+    isFullscreen.value = Boolean(document.fullscreenElement);
+  }
+};
+
+onMounted(() => {
+  document.addEventListener('fullscreenchange', handleFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+});
 </script>
 
 <template>
@@ -620,11 +645,13 @@ const basicGeometryTools = [
           </button>
 
           <button
-            @click="emit('fit:screen')"
-            class="p-1 rounded hover:bg-cyan-500/30 text-cyan-200 hover:text-white cursor-pointer transition-colors ml-0.5"
-            title="一键居中：自适应缩放并从原点 (0, 0) 铺满编辑界面"
+            @click="handleFullscreenToggle"
+            class="p-1 rounded cursor-pointer transition-all ml-0.5"
+            :class="isFullscreen ? 'bg-cyan-400 text-slate-950 font-bold shadow-[0_0_8px_rgba(0,242,255,0.4)]' : 'text-cyan-200 hover:text-white hover:bg-cyan-500/30'"
+            :title="isFullscreen ? '退出全屏 (ESC / F11)' : '全屏显示 (F11)'"
           >
-            <Maximize2 class="w-3.5 h-3.5 stroke-[2]" />
+            <Minimize2 v-if="isFullscreen" class="w-3.5 h-3.5 stroke-[2]" />
+            <Maximize2 v-else class="w-3.5 h-3.5 stroke-[2]" />
           </button>
         </div>
       </div>
