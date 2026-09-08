@@ -1260,6 +1260,11 @@ const handleContextMenu = (e: MouseEvent, compId: string | null) => {
   e.preventDefault();
   e.stopPropagation();
 
+  // If in drawing mode, exit drawing mode
+  if (props.drawTool !== 'select') {
+    emit('finish:draw');
+  }
+
   if (compId && !props.selectedIds.includes(compId)) {
     emit('select', [compId]);
   }
@@ -1293,6 +1298,21 @@ const handleContextMenu = (e: MouseEvent, compId: string | null) => {
   };
 };
 
+// Handle right-click on blank canvas background
+const handleCanvasContextMenu = (e: MouseEvent) => {
+  e.preventDefault();
+  e.stopPropagation();
+
+  if (props.drawTool !== 'select') {
+    emit('finish:draw');
+  }
+
+  // Clear selection when right-clicking on empty canvas so canvas operations appear
+  emit('select', []);
+
+  handleContextMenu(e, null);
+};
+
 const closeContextMenu = () => {
   contextMenu.value.visible = false;
 };
@@ -1306,7 +1326,7 @@ const effectiveContextMenuIds = computed(() => {
     }
     return [contextMenu.value.targetCompId];
   }
-  return props.selectedIds || [];
+  return [];
 });
 
 const effectiveContextMenuComponents = computed(() => {
@@ -1658,6 +1678,7 @@ defineExpose({
   <div 
     ref="containerRef"
     @wheel.prevent="onWheelWorkspace"
+    @contextmenu.prevent="handleCanvasContextMenu"
     class="flex-1 h-full bg-[#0d1f38] relative overflow-hidden select-none flex flex-col"
     :class="{
       'cursor-move': isSpacePressed || isPanning,
@@ -1693,7 +1714,7 @@ defineExpose({
       @mousedown="handleCanvasMouseDown"
       @click="handleCanvasClick"
       @dblclick="handleCanvasDblClick"
-      @contextmenu="handleCanvasContextMenu"
+      @contextmenu.stop.prevent="handleCanvasContextMenu"
       @wheel="onWheelWorkspace"
       @dragover="handleDragOver"
       @drop="handleDrop"
@@ -1715,7 +1736,7 @@ defineExpose({
           :data-component-id="comp.id"
           @mousedown.stop="drawTool === 'select' && handleStartDrag($event, comp)"
           @click.stop="drawTool === 'select' && handleCompClick($event, comp)"
-          @contextmenu="drawTool === 'select' && handleContextMenu($event, comp.id)"
+          @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
           class="absolute group component-node select-none"
           :class="{
             'cursor-move': drawTool === 'select' && !comp.locked,
@@ -1753,7 +1774,12 @@ defineExpose({
           />
 
           <!-- Locked Indicator Badge -->
-          <div v-if="comp.locked" class="absolute top-1 right-1 p-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-500/40 z-30 pointer-events-auto">
+          <div 
+            v-if="comp.locked" 
+            @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
+            class="absolute top-1 right-1 p-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-500/40 z-30 pointer-events-auto cursor-pointer"
+            title="图元已锁定 (右击可解锁)"
+          >
             <Lock class="w-3 h-3 stroke-[2]" />
           </div>
         </div>
@@ -1767,6 +1793,7 @@ defineExpose({
             v-for="comp in selectedComponents"
             :key="'sel-' + comp.id"
             :data-component-id="comp.id"
+            @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
             class="absolute pointer-events-none selection-box"
             :style="{
               left: `${comp.x}px`,
@@ -1787,6 +1814,7 @@ defineExpose({
               <div 
                 v-if="!comp.locked"
                 @mousedown.stop="handleStartDrag($event, comp)"
+                @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
                 class="absolute -inset-3 pointer-events-auto cursor-move z-20"
                 title="拖拽移动组件"
               />
@@ -2213,6 +2241,7 @@ defineExpose({
       class="fixed bg-[#132745] border border-cyan-400/60 rounded-xl shadow-[0_10px_35px_rgba(0,0,0,0.9)] p-1.5 z-50 backdrop-blur-md w-56 max-h-[calc(100vh-20px)] overflow-y-auto custom-scrollbar text-xs font-sans text-cyan-100"
       :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
       @click.stop
+      @contextmenu.stop.prevent
     >
       <template v-if="effectiveContextMenuIds.length > 0">
         <!-- Multi-Selection or Single Selection Header -->

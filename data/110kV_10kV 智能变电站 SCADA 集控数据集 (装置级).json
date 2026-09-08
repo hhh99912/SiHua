@@ -1,0 +1,1809 @@
+{
+  "id": "ds-scada-station",
+  "name": "110kV/10kV 智能变电站 SCADA 集控数据集 (装置级)",
+  "description": "以装置号为初始单位，涵盖 DEV-101 (10kV进线)、DEV-102 (1#主变)、DEV-103 (母联备自投)、DEV-201 (低压配电)、DEV-301 (分布式光伏) 的遥测、遥信(0/1/2)、电度、遥控与遥调",
+  "type": "mock",
+  "updateIntervalMs": 2000,
+  "isStreaming": true,
+  "updatedAt": "2026-09-08T01:25:35.308Z",
+  "devices": [
+    {
+      "deviceId": "DEV-101",
+      "deviceName": "10kV 进线 101 测控保护装置",
+      "deviceType": "线路测控保护单元",
+      "commStatus": 1,
+      "ipAddress": "192.168.1.101",
+      "telemetries": [
+        {
+          "pointId": 1,
+          "name": "A相电压 Ua",
+          "factor": 0.1,
+          "unit": "kV",
+          "rawValue": 102.5,
+          "value": 10.25,
+          "description": "10kV母线A相对地电压"
+        },
+        {
+          "pointId": 2,
+          "name": "B相电压 Ub",
+          "factor": 0.1,
+          "unit": "kV",
+          "rawValue": 102.8,
+          "value": 10.28,
+          "description": "10kV母线B相对地电压"
+        },
+        {
+          "pointId": 3,
+          "name": "C相电压 Uc",
+          "factor": 0.1,
+          "unit": "kV",
+          "rawValue": 102.2,
+          "value": 10.22,
+          "description": "10kV母线C相对地电压"
+        },
+        {
+          "pointId": 4,
+          "name": "A相电流 Ia",
+          "factor": 1,
+          "unit": "A",
+          "rawValue": 428.6,
+          "value": 428.6,
+          "description": "101进线A相进线电流"
+        },
+        {
+          "pointId": 5,
+          "name": "B相电流 Ib",
+          "factor": 1,
+          "unit": "A",
+          "rawValue": 425.1,
+          "value": 425.1,
+          "description": "101进线B相进线电流"
+        },
+        {
+          "pointId": 6,
+          "name": "C相电流 Ic",
+          "factor": 1,
+          "unit": "A",
+          "rawValue": 431.2,
+          "value": 431.2,
+          "description": "101进线C相进线电流"
+        },
+        {
+          "pointId": 7,
+          "name": "有功功率 P",
+          "factor": 1,
+          "unit": "kW",
+          "rawValue": 7620.5,
+          "value": 7620.5,
+          "description": "101三相总有功功率"
+        },
+        {
+          "pointId": 8,
+          "name": "无功功率 Q",
+          "factor": 1,
+          "unit": "kvar",
+          "rawValue": 1210.4,
+          "value": 1210.4,
+          "description": "101三相总无功功率"
+        },
+        {
+          "pointId": 9,
+          "name": "功率因数 CosΦ",
+          "factor": 0.01,
+          "unit": "",
+          "rawValue": 98,
+          "value": 0.98,
+          "description": "101综合功率因数"
+        },
+        {
+          "pointId": 10,
+          "name": "电网频率 F",
+          "factor": 0.01,
+          "unit": "Hz",
+          "rawValue": 5002,
+          "value": 50.02,
+          "description": "系统电网工频频率"
+        }
+      ],
+      "teleSignals": [
+        {
+          "pointId": 1,
+          "name": "101 断路器位置 (0:分/1:合/2:跳)",
+          "value": 1,
+          "statusText": "合闸 (1)",
+          "description": "101真空断路器主触头常开辅助触点"
+        },
+        {
+          "pointId": 2,
+          "name": "101 手车工作位置 (0:试/1:工/2:检)",
+          "value": 1,
+          "statusText": "工作位置 (1)",
+          "description": "可抽出式手车在工作试验位置"
+        },
+        {
+          "pointId": 3,
+          "name": "101 隔离开关位置 (0:分/1:合/2:障)",
+          "value": 1,
+          "statusText": "合闸 (1)",
+          "description": "母线侧隔离刀闸位置"
+        },
+        {
+          "pointId": 4,
+          "name": "101 接地刀闸位置 (0:分/1:合/2:障)",
+          "value": 0,
+          "statusText": "分闸 (0)",
+          "description": "线路侧接地刀闸位置"
+        },
+        {
+          "pointId": 5,
+          "name": "101 保护事故总跳闸 (0:常/1:动/2:障)",
+          "value": 0,
+          "statusText": "正常 (0)",
+          "description": "微机保护速断过流动作出口"
+        },
+        {
+          "pointId": 6,
+          "name": "101 机构弹簧未储能 (0:已储/1:未储/2:障)",
+          "value": 0,
+          "statusText": "正常已储能 (0)",
+          "description": "断路器操动机构储能状态"
+        },
+        {
+          "pointId": 7,
+          "name": "101 重合闸动作 (0:复归/1:动作/2:闭锁)",
+          "value": 0,
+          "statusText": "未动作 (0)",
+          "description": "一次自动重合闸动作指示"
+        }
+      ],
+      "energies": [
+        {
+          "pointId": 1,
+          "name": "正向有功总电能",
+          "factor": 0.01,
+          "unit": "kWh",
+          "value": 284560.8,
+          "description": "电度表双向累计正向有功电量"
+        },
+        {
+          "pointId": 2,
+          "name": "正向无功总电能",
+          "factor": 0.01,
+          "unit": "kvarh",
+          "value": 42150.3,
+          "description": "累计无功电能"
+        },
+        {
+          "pointId": 3,
+          "name": "今日累计用电量",
+          "factor": 1,
+          "unit": "kWh",
+          "value": 18450,
+          "description": "当日零点起算累计能耗"
+        }
+      ],
+      "teleControls": [
+        {
+          "pointId": 1,
+          "name": "101 断路器分合闸控制",
+          "targetPointId": 1,
+          "options": [
+            {
+              "label": "分闸指令 (0)",
+              "value": 0
+            },
+            {
+              "label": "合闸指令 (1)",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "pointId": 2,
+          "name": "101 自动重合闸压板投退",
+          "options": [
+            {
+              "label": "退出压板 (0)",
+              "value": 0
+            },
+            {
+              "label": "投入压板 (1)",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "pointId": 3,
+          "name": "101 保护信号远方复归",
+          "options": [
+            {
+              "label": "复归信号 (0)",
+              "value": 0
+            }
+          ]
+        }
+      ],
+      "teleRegulations": [
+        {
+          "pointId": 1,
+          "name": "101 过流一段动作电流定值",
+          "unit": "A",
+          "min": 100,
+          "max": 1500,
+          "step": 10,
+          "value": 650
+        },
+        {
+          "pointId": 2,
+          "name": "101 过流一段动作时限",
+          "unit": "s",
+          "min": 0,
+          "max": 5,
+          "step": 0.05,
+          "value": 0.5
+        }
+      ]
+    },
+    {
+      "deviceId": "DEV-102",
+      "deviceName": "1# 主变压器 102 测控保护装置",
+      "deviceType": "主变压器双绕组保护测控",
+      "commStatus": 1,
+      "ipAddress": "192.168.1.102",
+      "telemetries": [
+        {
+          "pointId": 1,
+          "name": "主变高压侧电流",
+          "factor": 1,
+          "unit": "A",
+          "rawValue": 245,
+          "value": 245,
+          "description": "110kV/10kV高压侧线电流"
+        },
+        {
+          "pointId": 2,
+          "name": "主变低压侧电流",
+          "factor": 1,
+          "unit": "A",
+          "rawValue": 1280.5,
+          "value": 1280.5,
+          "description": "10kV侧总输出电流"
+        },
+        {
+          "pointId": 3,
+          "name": "主变顶层油温",
+          "factor": 1,
+          "unit": "℃",
+          "rawValue": 56.4,
+          "value": 56.4,
+          "description": "PT100油面温度传感器测值"
+        },
+        {
+          "pointId": 4,
+          "name": "主变绕组热点温度",
+          "factor": 1,
+          "unit": "℃",
+          "rawValue": 68.2,
+          "value": 68.2,
+          "description": "主变三相绕组最高发热点"
+        },
+        {
+          "pointId": 5,
+          "name": "主变负荷率",
+          "factor": 1,
+          "unit": "%",
+          "rawValue": 64.5,
+          "value": 64.5,
+          "description": "当前出力/额定容量占比"
+        }
+      ],
+      "teleSignals": [
+        {
+          "pointId": 1,
+          "name": "主变高压侧断路器 (0:分/1:合/2:跳)",
+          "value": 1,
+          "statusText": "合闸 (1)"
+        },
+        {
+          "pointId": 2,
+          "name": "主变低压侧断路器 (0:分/1:合/2:跳)",
+          "value": 1,
+          "statusText": "合闸 (1)"
+        },
+        {
+          "pointId": 3,
+          "name": "主变重瓦斯保护跳闸 (0:常/1:动/2:障)",
+          "value": 0,
+          "statusText": "正常 (0)"
+        },
+        {
+          "pointId": 4,
+          "name": "主变轻瓦斯告警 (0:常/1:动/2:障)",
+          "value": 0,
+          "statusText": "正常 (0)"
+        },
+        {
+          "pointId": 5,
+          "name": "主变风冷系统运行 (0:停/1:运/2:障)",
+          "value": 1,
+          "statusText": "运行 (1)"
+        }
+      ],
+      "energies": [
+        {
+          "pointId": 1,
+          "name": "主变供电量累计",
+          "factor": 0.01,
+          "unit": "MWh",
+          "value": 5240.2
+        }
+      ],
+      "teleControls": [
+        {
+          "pointId": 1,
+          "name": "主变冷却风机启停控制",
+          "targetPointId": 5,
+          "options": [
+            {
+              "label": "风机停止 (0)",
+              "value": 0
+            },
+            {
+              "label": "风机启动 (1)",
+              "value": 1
+            }
+          ]
+        }
+      ],
+      "teleRegulations": [
+        {
+          "pointId": 1,
+          "name": "有载调压分接头档位",
+          "unit": "档",
+          "min": 1,
+          "max": 17,
+          "step": 1,
+          "value": 9,
+          "targetYcPointId": 1
+        },
+        {
+          "pointId": 2,
+          "name": "冷却风机自启温控阈值",
+          "unit": "℃",
+          "min": 40,
+          "max": 80,
+          "step": 1,
+          "value": 55,
+          "targetYcPointId": 3
+        }
+      ]
+    },
+    {
+      "deviceId": "DEV-103",
+      "deviceName": "10kV 母联 100 测控备自投装置",
+      "deviceType": "母联测控与备自投单元",
+      "commStatus": 1,
+      "ipAddress": "192.168.1.103",
+      "telemetries": [
+        {
+          "pointId": 1,
+          "name": "母联电流",
+          "factor": 1,
+          "unit": "A",
+          "rawValue": 0,
+          "value": 0
+        },
+        {
+          "pointId": 2,
+          "name": "I段母线电压",
+          "factor": 0.1,
+          "unit": "kV",
+          "rawValue": 102.5,
+          "value": 10.25
+        },
+        {
+          "pointId": 3,
+          "name": "II段母线电压",
+          "factor": 0.1,
+          "unit": "kV",
+          "rawValue": 102.6,
+          "value": 10.26
+        }
+      ],
+      "teleSignals": [
+        {
+          "pointId": 1,
+          "name": "100 母联断路器 (0:分/1:合/2:跳)",
+          "value": 0,
+          "statusText": "分闸备用 (0)"
+        },
+        {
+          "pointId": 2,
+          "name": "备自投装置就绪 (0:未就绪/1:就绪/2:闭锁)",
+          "value": 1,
+          "statusText": "就绪 (1)"
+        },
+        {
+          "pointId": 3,
+          "name": "备自投自锁动作 (0:复归/1:动作/2:障)",
+          "value": 0,
+          "statusText": "正常 (0)"
+        }
+      ],
+      "energies": [
+        {
+          "pointId": 1,
+          "name": "母联累计转移电量",
+          "factor": 0.01,
+          "unit": "kWh",
+          "value": 120
+        }
+      ],
+      "teleControls": [
+        {
+          "pointId": 1,
+          "name": "100 母联断路器分合遥控",
+          "targetPointId": 1,
+          "options": [
+            {
+              "label": "分闸指令 (0)",
+              "value": 0
+            },
+            {
+              "label": "合闸指令 (1)",
+              "value": 1
+            }
+          ]
+        },
+        {
+          "pointId": 2,
+          "name": "备自投功能远方投退",
+          "options": [
+            {
+              "label": "退出备自投 (0)",
+              "value": 0
+            },
+            {
+              "label": "投入备自投 (1)",
+              "value": 1
+            }
+          ]
+        }
+      ],
+      "teleRegulations": [
+        {
+          "pointId": 1,
+          "name": "备自投无压判定延时",
+          "unit": "s",
+          "min": 0.5,
+          "max": 5,
+          "step": 0.1,
+          "value": 1.5
+        }
+      ]
+    },
+    {
+      "deviceId": "DEV-201",
+      "deviceName": "400V 低压综合配电 201 测控单元",
+      "deviceType": "低压智能配电与电能质量",
+      "commStatus": 1,
+      "ipAddress": "192.168.2.201",
+      "telemetries": [
+        {
+          "pointId": 1,
+          "name": "低压Uab线电压",
+          "factor": 1,
+          "unit": "V",
+          "rawValue": 382.4,
+          "value": 382.4
+        },
+        {
+          "pointId": 2,
+          "name": "低压三相总负荷电流",
+          "factor": 1,
+          "unit": "A",
+          "rawValue": 840.5,
+          "value": 840.5
+        },
+        {
+          "pointId": 3,
+          "name": "低压总有功功率",
+          "factor": 1,
+          "unit": "kW",
+          "rawValue": 520.4,
+          "value": 520.4
+        },
+        {
+          "pointId": 4,
+          "name": "低压电缆接头温度",
+          "factor": 1,
+          "unit": "℃",
+          "rawValue": 43.8,
+          "value": 43.8
+        },
+        {
+          "pointId": 5,
+          "name": "电网无功功率",
+          "factor": 1,
+          "unit": "kvar",
+          "rawValue": 85,
+          "value": 85
+        }
+      ],
+      "teleSignals": [
+        {
+          "pointId": 1,
+          "name": "低压主进线断路器 (0:分/1:合/2:跳)",
+          "value": 1,
+          "statusText": "合闸 (1)"
+        },
+        {
+          "pointId": 2,
+          "name": "电容无功自动补偿投入 (0:切除/1:投入/2:障)",
+          "value": 1,
+          "statusText": "投入 (1)"
+        },
+        {
+          "pointId": 3,
+          "name": "低压母线过温告警 (0:常/1:动/2:障)",
+          "value": 0,
+          "statusText": "正常 (0)"
+        }
+      ],
+      "energies": [
+        {
+          "pointId": 1,
+          "name": "低压总用电量累计",
+          "factor": 0.01,
+          "unit": "kWh",
+          "value": 98450
+        }
+      ],
+      "teleControls": [
+        {
+          "pointId": 1,
+          "name": "电容补偿柜投切模式",
+          "options": [
+            {
+              "label": "手动模式 (0)",
+              "value": 0
+            },
+            {
+              "label": "自动模式 (1)",
+              "value": 1
+            }
+          ]
+        }
+      ],
+      "teleRegulations": [
+        {
+          "pointId": 1,
+          "name": "目标功率因数补偿设定",
+          "unit": "",
+          "min": 0.85,
+          "max": 0.99,
+          "step": 0.01,
+          "value": 0.96
+        }
+      ]
+    },
+    {
+      "deviceId": "DEV-301",
+      "deviceName": "厂区分布式光伏并网 301 测控逆变装置",
+      "deviceType": "光伏逆变与防孤岛保护",
+      "commStatus": 1,
+      "ipAddress": "192.168.3.101",
+      "telemetries": [
+        {
+          "pointId": 1,
+          "name": "光伏交流输出有功功率",
+          "factor": 1,
+          "unit": "kW",
+          "rawValue": 1420.8,
+          "value": 1420.8
+        },
+        {
+          "pointId": 2,
+          "name": "光伏直流母线电压",
+          "factor": 1,
+          "unit": "V",
+          "rawValue": 680.5,
+          "value": 680.5
+        },
+        {
+          "pointId": 3,
+          "name": "光伏直流母线电流",
+          "factor": 1,
+          "unit": "A",
+          "rawValue": 2100,
+          "value": 2100
+        },
+        {
+          "pointId": 4,
+          "name": "当日累计光伏发电量",
+          "factor": 1,
+          "unit": "kWh",
+          "rawValue": 12450,
+          "value": 12450
+        },
+        {
+          "pointId": 5,
+          "name": "逆变器机芯转换效率",
+          "factor": 0.1,
+          "unit": "%",
+          "rawValue": 986,
+          "value": 98.6
+        },
+        {
+          "pointId": 6,
+          "name": "厂区太阳能光照辐射强度",
+          "factor": 1,
+          "unit": "W/㎡",
+          "rawValue": 845,
+          "value": 845
+        }
+      ],
+      "teleSignals": [
+        {
+          "pointId": 1,
+          "name": "逆变器并网状态 (0:待机/1:并网/2:故障)",
+          "value": 1,
+          "statusText": "并网发电 (1)"
+        },
+        {
+          "pointId": 2,
+          "name": "防孤岛保护装置状态 (0:未投/1:投运/2:动作)",
+          "value": 1,
+          "statusText": "投运监视 (1)"
+        },
+        {
+          "pointId": 3,
+          "name": "光伏直流侧绝缘阻抗告警 (0:常/1:告警/2:障)",
+          "value": 0,
+          "statusText": "正常 (0)"
+        }
+      ],
+      "energies": [
+        {
+          "pointId": 1,
+          "name": "光伏总累计上网电量",
+          "factor": 0.01,
+          "unit": "kWh",
+          "value": 845200
+        }
+      ],
+      "teleControls": [
+        {
+          "pointId": 1,
+          "name": "光伏逆变器远方启停",
+          "options": [
+            {
+              "label": "远程停机 (0)",
+              "value": 0
+            },
+            {
+              "label": "远程启机 (1)",
+              "value": 1
+            }
+          ]
+        }
+      ],
+      "teleRegulations": [
+        {
+          "pointId": 1,
+          "name": "光伏最大有功功率限制出力",
+          "unit": "kW",
+          "min": 0,
+          "max": 2000,
+          "step": 50,
+          "value": 1500
+        }
+      ]
+    },
+    {
+      "deviceId": "DEV-PV-3501",
+      "deviceName": "35kV 光伏集电进线 301 测控保护装置",
+      "deviceType": "35kV 线路测控保护微机单元",
+      "commStatus": 1,
+      "ipAddress": "192.168.4.101",
+      "telemetries": [
+        {
+          "pointId": 1,
+          "name": "35kV母线AB线电压",
+          "factor": 0.1,
+          "unit": "kV",
+          "rawValue": 352.5,
+          "value": 35.25,
+          "description": "35kV I段母线Uab"
+        },
+        {
+          "pointId": 2,
+          "name": "35kV母线BC线电压",
+          "factor": 0.1,
+          "unit": "kV",
+          "rawValue": 352.8,
+          "value": 35.28,
+          "description": "35kV I段母线Ubc"
+        },
+        {
+          "pointId": 3,
+          "name": "35kV母线CA线电压",
+          "factor": 0.1,
+          "unit": "kV",
+          "rawValue": 352.3,
+          "value": 35.23,
+          "description": "35kV I段母线Uca"
+        },
+        {
+          "pointId": 4,
+          "name": "301集电进线A相电流",
+          "factor": 1,
+          "unit": "A",
+          "rawValue": 135.2,
+          "value": 135.2,
+          "description": "301集电回路Ia"
+        },
+        {
+          "pointId": 5,
+          "name": "301集电进线B相电流",
+          "factor": 1,
+          "unit": "A",
+          "rawValue": 134.8,
+          "value": 134.8,
+          "description": "301集电回路Ib"
+        },
+        {
+          "pointId": 6,
+          "name": "301集电进线C相电流",
+          "factor": 1,
+          "unit": "A",
+          "rawValue": 135.6,
+          "value": 135.6,
+          "description": "301集电回路Ic"
+        },
+        {
+          "pointId": 7,
+          "name": "301集电线路有功功率",
+          "factor": 1,
+          "unit": "kW",
+          "rawValue": 8240.5,
+          "value": 8240.5,
+          "description": "301集电回路总有功功率"
+        },
+        {
+          "pointId": 8,
+          "name": "301集电线路无功功率",
+          "factor": 1,
+          "unit": "kvar",
+          "rawValue": 620.4,
+          "value": 620.4,
+          "description": "301集电回路总无功功率"
+        },
+        {
+          "pointId": 9,
+          "name": "301回路综合功率因数",
+          "factor": 0.01,
+          "unit": "",
+          "rawValue": 99,
+          "value": 0.99,
+          "description": "301集电综合功率因数"
+        },
+        {
+          "pointId": 10,
+          "name": "电网基准系统频率",
+          "factor": 0.01,
+          "unit": "Hz",
+          "rawValue": 5001,
+          "value": 50.01,
+          "description": "电网工频基准"
+        }
+      ],
+      "teleSignals": [
+        {
+          "pointId": 1,
+          "name": "301 真空断路器位置 (0:分/1:合/2:跳)",
+          "value": 1,
+          "statusText": "合闸 (1)"
+        },
+        {
+          "pointId": 2,
+          "name": "301 母线侧隔离手车 (0:试/1:工/2:检)",
+          "value": 1,
+          "statusText": "工作位置 (1)"
+        },
+        {
+          "pointId": 3,
+          "name": "301 出线侧隔离刀闸 (0:分/1:合/2:障)",
+          "value": 1,
+          "statusText": "合闸 (1)"
+        },
+        {
+          "pointId": 4,
+          "name": "301 线路侧快速接地刀 (0:分/1:合/2:障)",
+          "value": 0,
+          "statusText": "分闸 (0)"
+        },
+        {
+          "pointId": 5,
+          "name": "301 弹簧储能状态 (0:已储/1:未储)",
+          "value": 0,
+          "statusText": "已储能 (0)"
+        },
+        {
+          "pointId": 6,
+          "name": "301 微机保护动作总告警 (0:常/1:动)",
+          "value": 0,
+          "statusText": "正常 (0)"
+        }
+      ],
+      "energies": [
+        {
+          "pointId": 1,
+          "name": "301回路反向有功上网电量",
+          "factor": 0.01,
+          "unit": "MWh",
+          "value": 3450.8
+        }
+      ],
+      "teleControls": [
+        {
+          "pointId": 1,
+          "name": "301 断路器分合闸遥控",
+          "targetPointId": 1,
+          "options": [
+            {
+              "label": "分闸指令 (0)",
+              "value": 0
+            },
+            {
+              "label": "合闸指令 (1)",
+              "value": 1
+            }
+          ]
+        }
+      ],
+      "teleRegulations": []
+    },
+    {
+      "deviceId": "DEV-PV-BOX01",
+      "deviceName": "1# 光伏升压箱变 3150kVA 测控装置",
+      "deviceType": "箱式变电站综合测控终端",
+      "commStatus": 1,
+      "ipAddress": "192.168.4.102",
+      "telemetries": [
+        {
+          "pointId": 1,
+          "name": "箱变高压侧线电压",
+          "factor": 0.1,
+          "unit": "kV",
+          "rawValue": 352.4,
+          "value": 35.24
+        },
+        {
+          "pointId": 2,
+          "name": "箱变低压侧Uab电压",
+          "factor": 1,
+          "unit": "V",
+          "rawValue": 805.2,
+          "value": 805.2
+        },
+        {
+          "pointId": 3,
+          "name": "箱变低压侧总输入电流",
+          "factor": 1,
+          "unit": "A",
+          "rawValue": 2250,
+          "value": 2250
+        },
+        {
+          "pointId": 4,
+          "name": "箱变双分裂输出总功率",
+          "factor": 1,
+          "unit": "kW",
+          "rawValue": 3125,
+          "value": 3125
+        },
+        {
+          "pointId": 5,
+          "name": "箱变顶层油温传感器",
+          "factor": 1,
+          "unit": "℃",
+          "rawValue": 54.6,
+          "value": 54.6
+        },
+        {
+          "pointId": 6,
+          "name": "箱变三相绕组热点温度",
+          "factor": 1,
+          "unit": "℃",
+          "rawValue": 62.3,
+          "value": 62.3
+        },
+        {
+          "pointId": 7,
+          "name": "箱变当前视在负荷率",
+          "factor": 1,
+          "unit": "%",
+          "rawValue": 78.5,
+          "value": 78.5
+        },
+        {
+          "pointId": 8,
+          "name": "光伏子阵太阳辐射度",
+          "factor": 1,
+          "unit": "W/㎡",
+          "rawValue": 885,
+          "value": 885
+        },
+        {
+          "pointId": 9,
+          "name": "光伏组件背板电池温度",
+          "factor": 1,
+          "unit": "℃",
+          "rawValue": 42.5,
+          "value": 42.5
+        },
+        {
+          "pointId": 10,
+          "name": "组串逆变器综合效率",
+          "factor": 0.1,
+          "unit": "%",
+          "rawValue": 988,
+          "value": 98.8
+        }
+      ],
+      "teleSignals": [
+        {
+          "pointId": 1,
+          "name": "箱变35kV侧高压真空负荷开关 (0:分/1:合)",
+          "value": 1,
+          "statusText": "合闸 (1)"
+        },
+        {
+          "pointId": 2,
+          "name": "箱变0.8kV低压进线断路器1 (0:分/1:合)",
+          "value": 1,
+          "statusText": "合闸 (1)"
+        },
+        {
+          "pointId": 3,
+          "name": "箱变0.8kV低压进线断路器2 (0:分/1:合)",
+          "value": 1,
+          "statusText": "合闸 (1)"
+        },
+        {
+          "pointId": 4,
+          "name": "箱变重瓦斯跳闸 (0:常/1:动)",
+          "value": 0,
+          "statusText": "正常 (0)"
+        },
+        {
+          "pointId": 5,
+          "name": "箱变油位异常告警 (0:常/1:告警)",
+          "value": 0,
+          "statusText": "正常 (0)"
+        },
+        {
+          "pointId": 6,
+          "name": "箱变压力释放阀动作 (0:常/1:动)",
+          "value": 0,
+          "statusText": "正常 (0)"
+        },
+        {
+          "pointId": 7,
+          "name": "箱变舱内强制风冷启动 (0:停/1:运)",
+          "value": 1,
+          "statusText": "运行 (1)"
+        }
+      ],
+      "energies": [
+        {
+          "pointId": 1,
+          "name": "箱变累计上网电量",
+          "factor": 0.01,
+          "unit": "MWh",
+          "value": 1890.6
+        }
+      ],
+      "teleControls": [],
+      "teleRegulations": []
+    }
+  ],
+  "data": {
+    "timestamp": "09:25:35",
+    "DEV-101_comm": 1,
+    "DEV-101_YC_1": 10.25,
+    "DEV-101_YC_2": 10.28,
+    "DEV-101_YC_3": 10.22,
+    "DEV-101_YC_4": 428.6,
+    "DEV-101_YC_5": 425.1,
+    "DEV-101_YC_6": 431.2,
+    "DEV-101_YC_7": 7620.5,
+    "DEV-101_YC_8": 1210.4,
+    "DEV-101_YC_9": 0.98,
+    "DEV-101_YC_10": 50.02,
+    "DEV-101_YX_1": 1,
+    "DEV-101_YX_2": 1,
+    "DEV-101_YX_3": 1,
+    "DEV-101_YX_4": 0,
+    "DEV-101_YX_5": 0,
+    "DEV-101_YX_6": 0,
+    "DEV-101_YX_7": 0,
+    "DEV-101_DD_1": 284560.8,
+    "DEV-101_DD_2": 42150.3,
+    "DEV-101_DD_3": 18450,
+    "DEV-101_YT_1": 650,
+    "DEV-101_YT_2": 0.5,
+    "DEV-102_comm": 1,
+    "DEV-102_YC_1": 245,
+    "DEV-102_YC_2": 1280.5,
+    "DEV-102_YC_3": 56.4,
+    "DEV-102_YC_4": 68.2,
+    "DEV-102_YC_5": 64.5,
+    "DEV-102_YX_1": 1,
+    "DEV-102_YX_2": 1,
+    "DEV-102_YX_3": 0,
+    "DEV-102_YX_4": 0,
+    "DEV-102_YX_5": 1,
+    "DEV-102_DD_1": 5240.2,
+    "DEV-102_YT_1": 9,
+    "DEV-102_YT_2": 55,
+    "DEV-103_comm": 1,
+    "DEV-103_YC_1": 0,
+    "DEV-103_YC_2": 10.25,
+    "DEV-103_YC_3": 10.26,
+    "DEV-103_YX_1": 0,
+    "DEV-103_YX_2": 1,
+    "DEV-103_YX_3": 0,
+    "DEV-103_DD_1": 120,
+    "DEV-103_YT_1": 1.5,
+    "DEV-201_comm": 1,
+    "DEV-201_YC_1": 382.4,
+    "DEV-201_YC_2": 840.5,
+    "DEV-201_YC_3": 520.4,
+    "DEV-201_YC_4": 43.8,
+    "DEV-201_YC_5": 85,
+    "DEV-201_YX_1": 1,
+    "DEV-201_YX_2": 1,
+    "DEV-201_YX_3": 0,
+    "DEV-201_DD_1": 98450,
+    "DEV-201_YT_1": 0.96,
+    "DEV-301_comm": 1,
+    "DEV-301_YC_1": 1420.8,
+    "DEV-301_YC_2": 680.5,
+    "DEV-301_YC_3": 2100,
+    "DEV-301_YC_4": 12450,
+    "DEV-301_YC_5": 98.6,
+    "DEV-301_YC_6": 845,
+    "DEV-301_YX_1": 1,
+    "DEV-301_YX_2": 1,
+    "DEV-301_YX_3": 0,
+    "DEV-301_DD_1": 845200,
+    "DEV-301_YT_1": 1500,
+    "DEV-PV-3501_comm": 1,
+    "DEV-PV-3501_YC_1": 35.25,
+    "DEV-PV-3501_YC_2": 35.28,
+    "DEV-PV-3501_YC_3": 35.23,
+    "DEV-PV-3501_YC_4": 135.2,
+    "DEV-PV-3501_YC_5": 134.8,
+    "DEV-PV-3501_YC_6": 135.6,
+    "DEV-PV-3501_YC_7": 8240.5,
+    "DEV-PV-3501_YC_8": 620.4,
+    "DEV-PV-3501_YC_9": 0.99,
+    "DEV-PV-3501_YC_10": 50.01,
+    "DEV-PV-3501_YX_1": 1,
+    "DEV-PV-3501_YX_2": 1,
+    "DEV-PV-3501_YX_3": 1,
+    "DEV-PV-3501_YX_4": 0,
+    "DEV-PV-3501_YX_5": 0,
+    "DEV-PV-3501_YX_6": 0,
+    "DEV-PV-3501_DD_1": 3450.8,
+    "DEV-PV-BOX01_comm": 1,
+    "DEV-PV-BOX01_YC_1": 35.24,
+    "DEV-PV-BOX01_YC_2": 805.2,
+    "DEV-PV-BOX01_YC_3": 2250,
+    "DEV-PV-BOX01_YC_4": 3125,
+    "DEV-PV-BOX01_YC_5": 54.6,
+    "DEV-PV-BOX01_YC_6": 62.3,
+    "DEV-PV-BOX01_YC_7": 78.5,
+    "DEV-PV-BOX01_YC_8": 885,
+    "DEV-PV-BOX01_YC_9": 42.5,
+    "DEV-PV-BOX01_YC_10": 98.8,
+    "DEV-PV-BOX01_YX_1": 1,
+    "DEV-PV-BOX01_YX_2": 1,
+    "DEV-PV-BOX01_YX_3": 1,
+    "DEV-PV-BOX01_YX_4": 0,
+    "DEV-PV-BOX01_YX_5": 0,
+    "DEV-PV-BOX01_YX_6": 0,
+    "DEV-PV-BOX01_YX_7": 1,
+    "DEV-PV-BOX01_DD_1": 1890.6,
+    "series_time": [
+      "10:00",
+      "10:05",
+      "10:10",
+      "10:15",
+      "10:20",
+      "10:25",
+      "10:30",
+      "10:35",
+      "10:40",
+      "10:45"
+    ],
+    "series_power": [
+      6800,
+      7100,
+      7450,
+      7620,
+      7580,
+      7620.5,
+      7700,
+      7650,
+      7590,
+      7620.5
+    ],
+    "series_voltage": [
+      10.21,
+      10.23,
+      10.25,
+      10.26,
+      10.24,
+      10.25,
+      10.27,
+      10.26,
+      10.25,
+      10.25
+    ],
+    "series_device_load": [
+      76.2,
+      64.5,
+      32,
+      48.6,
+      82.5
+    ],
+    "series_device_names": [
+      "101进线",
+      "1#主变",
+      "100母联",
+      "201低压",
+      "301光伏"
+    ]
+  },
+  "fields": [
+    {
+      "name": "DEV-101_comm",
+      "type": "number",
+      "label": "[DEV-101] 10kV 进线 101 测控保护装置 通信状态 (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-101_YC_1",
+      "type": "number",
+      "label": "[DEV-101 遥测.1] A相电压 Ua (kV)",
+      "sample": 10.25
+    },
+    {
+      "name": "DEV-101_YC_2",
+      "type": "number",
+      "label": "[DEV-101 遥测.2] B相电压 Ub (kV)",
+      "sample": 10.28
+    },
+    {
+      "name": "DEV-101_YC_3",
+      "type": "number",
+      "label": "[DEV-101 遥测.3] C相电压 Uc (kV)",
+      "sample": 10.22
+    },
+    {
+      "name": "DEV-101_YC_4",
+      "type": "number",
+      "label": "[DEV-101 遥测.4] A相电流 Ia (A)",
+      "sample": 428.6
+    },
+    {
+      "name": "DEV-101_YC_5",
+      "type": "number",
+      "label": "[DEV-101 遥测.5] B相电流 Ib (A)",
+      "sample": 425.1
+    },
+    {
+      "name": "DEV-101_YC_6",
+      "type": "number",
+      "label": "[DEV-101 遥测.6] C相电流 Ic (A)",
+      "sample": 431.2
+    },
+    {
+      "name": "DEV-101_YC_7",
+      "type": "number",
+      "label": "[DEV-101 遥测.7] 有功功率 P (kW)",
+      "sample": 7620.5
+    },
+    {
+      "name": "DEV-101_YC_8",
+      "type": "number",
+      "label": "[DEV-101 遥测.8] 无功功率 Q (kvar)",
+      "sample": 1210.4
+    },
+    {
+      "name": "DEV-101_YC_9",
+      "type": "number",
+      "label": "[DEV-101 遥测.9] 功率因数 CosΦ ()",
+      "sample": 0.98
+    },
+    {
+      "name": "DEV-101_YC_10",
+      "type": "number",
+      "label": "[DEV-101 遥测.10] 电网频率 F (Hz)",
+      "sample": 50.02
+    },
+    {
+      "name": "DEV-101_YX_1",
+      "type": "number",
+      "label": "[DEV-101 遥信.1] 101 断路器位置 (0:分/1:合/2:跳) (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-101_YX_2",
+      "type": "number",
+      "label": "[DEV-101 遥信.2] 101 手车工作位置 (0:试/1:工/2:检) (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-101_YX_3",
+      "type": "number",
+      "label": "[DEV-101 遥信.3] 101 隔离开关位置 (0:分/1:合/2:障) (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-101_YX_4",
+      "type": "number",
+      "label": "[DEV-101 遥信.4] 101 接地刀闸位置 (0:分/1:合/2:障) (0/1/2)",
+      "sample": 0
+    },
+    {
+      "name": "DEV-101_YX_5",
+      "type": "number",
+      "label": "[DEV-101 遥信.5] 101 保护事故总跳闸 (0:常/1:动/2:障) (0/1/2)",
+      "sample": 0
+    },
+    {
+      "name": "DEV-101_YX_6",
+      "type": "number",
+      "label": "[DEV-101 遥信.6] 101 机构弹簧未储能 (0:已储/1:未储/2:障) (0/1/2)",
+      "sample": 0
+    },
+    {
+      "name": "DEV-101_YX_7",
+      "type": "number",
+      "label": "[DEV-101 遥信.7] 101 重合闸动作 (0:复归/1:动作/2:闭锁) (0/1/2)",
+      "sample": 0
+    },
+    {
+      "name": "DEV-101_DD_1",
+      "type": "number",
+      "label": "[DEV-101 电度.1] 正向有功总电能 (kWh)",
+      "sample": 284560.8
+    },
+    {
+      "name": "DEV-101_DD_2",
+      "type": "number",
+      "label": "[DEV-101 电度.2] 正向无功总电能 (kvarh)",
+      "sample": 42150.3
+    },
+    {
+      "name": "DEV-101_DD_3",
+      "type": "number",
+      "label": "[DEV-101 电度.3] 今日累计用电量 (kWh)",
+      "sample": 18450
+    },
+    {
+      "name": "DEV-101_YT_1",
+      "type": "number",
+      "label": "[DEV-101 遥调.1] 101 过流一段动作电流定值 (A)",
+      "sample": 650
+    },
+    {
+      "name": "DEV-101_YT_2",
+      "type": "number",
+      "label": "[DEV-101 遥调.2] 101 过流一段动作时限 (s)",
+      "sample": 0.5
+    },
+    {
+      "name": "DEV-102_comm",
+      "type": "number",
+      "label": "[DEV-102] 1# 主变压器 102 测控保护装置 通信状态 (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-102_YC_1",
+      "type": "number",
+      "label": "[DEV-102 遥测.1] 主变高压侧电流 (A)",
+      "sample": 245
+    },
+    {
+      "name": "DEV-102_YC_2",
+      "type": "number",
+      "label": "[DEV-102 遥测.2] 主变低压侧电流 (A)",
+      "sample": 1280.5
+    },
+    {
+      "name": "DEV-102_YC_3",
+      "type": "number",
+      "label": "[DEV-102 遥测.3] 主变顶层油温 (℃)",
+      "sample": 56.4
+    },
+    {
+      "name": "DEV-102_YC_4",
+      "type": "number",
+      "label": "[DEV-102 遥测.4] 主变绕组热点温度 (℃)",
+      "sample": 68.2
+    },
+    {
+      "name": "DEV-102_YC_5",
+      "type": "number",
+      "label": "[DEV-102 遥测.5] 主变负荷率 (%)",
+      "sample": 64.5
+    },
+    {
+      "name": "DEV-102_YX_1",
+      "type": "number",
+      "label": "[DEV-102 遥信.1] 主变高压侧断路器 (0:分/1:合/2:跳) (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-102_YX_2",
+      "type": "number",
+      "label": "[DEV-102 遥信.2] 主变低压侧断路器 (0:分/1:合/2:跳) (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-102_YX_3",
+      "type": "number",
+      "label": "[DEV-102 遥信.3] 主变重瓦斯保护跳闸 (0:常/1:动/2:障) (0/1/2)",
+      "sample": 0
+    },
+    {
+      "name": "DEV-102_YX_4",
+      "type": "number",
+      "label": "[DEV-102 遥信.4] 主变轻瓦斯告警 (0:常/1:动/2:障) (0/1/2)",
+      "sample": 0
+    },
+    {
+      "name": "DEV-102_YX_5",
+      "type": "number",
+      "label": "[DEV-102 遥信.5] 主变风冷系统运行 (0:停/1:运/2:障) (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-102_DD_1",
+      "type": "number",
+      "label": "[DEV-102 电度.1] 主变供电量累计 (MWh)",
+      "sample": 5240.2
+    },
+    {
+      "name": "DEV-102_YT_1",
+      "type": "number",
+      "label": "[DEV-102 遥调.1] 有载调压分接头档位 (档)",
+      "sample": 9
+    },
+    {
+      "name": "DEV-102_YT_2",
+      "type": "number",
+      "label": "[DEV-102 遥调.2] 冷却风机自启温控阈值 (℃)",
+      "sample": 55
+    },
+    {
+      "name": "DEV-103_comm",
+      "type": "number",
+      "label": "[DEV-103] 10kV 母联 100 测控备自投装置 通信状态 (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-103_YC_1",
+      "type": "number",
+      "label": "[DEV-103 遥测.1] 母联电流 (A)",
+      "sample": 0
+    },
+    {
+      "name": "DEV-103_YC_2",
+      "type": "number",
+      "label": "[DEV-103 遥测.2] I段母线电压 (kV)",
+      "sample": 10.25
+    },
+    {
+      "name": "DEV-103_YC_3",
+      "type": "number",
+      "label": "[DEV-103 遥测.3] II段母线电压 (kV)",
+      "sample": 10.26
+    },
+    {
+      "name": "DEV-103_YX_1",
+      "type": "number",
+      "label": "[DEV-103 遥信.1] 100 母联断路器 (0:分/1:合/2:跳) (0/1/2)",
+      "sample": 0
+    },
+    {
+      "name": "DEV-103_YX_2",
+      "type": "number",
+      "label": "[DEV-103 遥信.2] 备自投装置就绪 (0:未就绪/1:就绪/2:闭锁) (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-103_YX_3",
+      "type": "number",
+      "label": "[DEV-103 遥信.3] 备自投自锁动作 (0:复归/1:动作/2:障) (0/1/2)",
+      "sample": 0
+    },
+    {
+      "name": "DEV-103_DD_1",
+      "type": "number",
+      "label": "[DEV-103 电度.1] 母联累计转移电量 (kWh)",
+      "sample": 120
+    },
+    {
+      "name": "DEV-103_YT_1",
+      "type": "number",
+      "label": "[DEV-103 遥调.1] 备自投无压判定延时 (s)",
+      "sample": 1.5
+    },
+    {
+      "name": "DEV-201_comm",
+      "type": "number",
+      "label": "[DEV-201] 400V 低压综合配电 201 测控单元 通信状态 (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-201_YC_1",
+      "type": "number",
+      "label": "[DEV-201 遥测.1] 低压Uab线电压 (V)",
+      "sample": 382.4
+    },
+    {
+      "name": "DEV-201_YC_2",
+      "type": "number",
+      "label": "[DEV-201 遥测.2] 低压三相总负荷电流 (A)",
+      "sample": 840.5
+    },
+    {
+      "name": "DEV-201_YC_3",
+      "type": "number",
+      "label": "[DEV-201 遥测.3] 低压总有功功率 (kW)",
+      "sample": 520.4
+    },
+    {
+      "name": "DEV-201_YC_4",
+      "type": "number",
+      "label": "[DEV-201 遥测.4] 低压电缆接头温度 (℃)",
+      "sample": 43.8
+    },
+    {
+      "name": "DEV-201_YC_5",
+      "type": "number",
+      "label": "[DEV-201 遥测.5] 电网无功功率 (kvar)",
+      "sample": 85
+    },
+    {
+      "name": "DEV-201_YX_1",
+      "type": "number",
+      "label": "[DEV-201 遥信.1] 低压主进线断路器 (0:分/1:合/2:跳) (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-201_YX_2",
+      "type": "number",
+      "label": "[DEV-201 遥信.2] 电容无功自动补偿投入 (0:切除/1:投入/2:障) (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-201_YX_3",
+      "type": "number",
+      "label": "[DEV-201 遥信.3] 低压母线过温告警 (0:常/1:动/2:障) (0/1/2)",
+      "sample": 0
+    },
+    {
+      "name": "DEV-201_DD_1",
+      "type": "number",
+      "label": "[DEV-201 电度.1] 低压总用电量累计 (kWh)",
+      "sample": 98450
+    },
+    {
+      "name": "DEV-201_YT_1",
+      "type": "number",
+      "label": "[DEV-201 遥调.1] 目标功率因数补偿设定 ()",
+      "sample": 0.96
+    },
+    {
+      "name": "DEV-301_comm",
+      "type": "number",
+      "label": "[DEV-301] 厂区分布式光伏并网 301 测控逆变装置 通信状态 (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-301_YC_1",
+      "type": "number",
+      "label": "[DEV-301 遥测.1] 光伏交流输出有功功率 (kW)",
+      "sample": 1420.8
+    },
+    {
+      "name": "DEV-301_YC_2",
+      "type": "number",
+      "label": "[DEV-301 遥测.2] 光伏直流母线电压 (V)",
+      "sample": 680.5
+    },
+    {
+      "name": "DEV-301_YC_3",
+      "type": "number",
+      "label": "[DEV-301 遥测.3] 光伏直流母线电流 (A)",
+      "sample": 2100
+    },
+    {
+      "name": "DEV-301_YC_4",
+      "type": "number",
+      "label": "[DEV-301 遥测.4] 当日累计光伏发电量 (kWh)",
+      "sample": 12450
+    },
+    {
+      "name": "DEV-301_YC_5",
+      "type": "number",
+      "label": "[DEV-301 遥测.5] 逆变器机芯转换效率 (%)",
+      "sample": 98.6
+    },
+    {
+      "name": "DEV-301_YC_6",
+      "type": "number",
+      "label": "[DEV-301 遥测.6] 厂区太阳能光照辐射强度 (W/㎡)",
+      "sample": 845
+    },
+    {
+      "name": "DEV-301_YX_1",
+      "type": "number",
+      "label": "[DEV-301 遥信.1] 逆变器并网状态 (0:待机/1:并网/2:故障) (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-301_YX_2",
+      "type": "number",
+      "label": "[DEV-301 遥信.2] 防孤岛保护装置状态 (0:未投/1:投运/2:动作) (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-301_YX_3",
+      "type": "number",
+      "label": "[DEV-301 遥信.3] 光伏直流侧绝缘阻抗告警 (0:常/1:告警/2:障) (0/1/2)",
+      "sample": 0
+    },
+    {
+      "name": "DEV-301_DD_1",
+      "type": "number",
+      "label": "[DEV-301 电度.1] 光伏总累计上网电量 (kWh)",
+      "sample": 845200
+    },
+    {
+      "name": "DEV-301_YT_1",
+      "type": "number",
+      "label": "[DEV-301 遥调.1] 光伏最大有功功率限制出力 (kW)",
+      "sample": 1500
+    },
+    {
+      "name": "DEV-PV-3501_comm",
+      "type": "number",
+      "label": "[DEV-PV-3501] 35kV 光伏集电进线 301 测控保护装置 通信状态 (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-PV-3501_YC_1",
+      "type": "number",
+      "label": "[DEV-PV-3501 遥测.1] 35kV母线AB线电压 (kV)",
+      "sample": 35.25
+    },
+    {
+      "name": "DEV-PV-3501_YC_2",
+      "type": "number",
+      "label": "[DEV-PV-3501 遥测.2] 35kV母线BC线电压 (kV)",
+      "sample": 35.28
+    },
+    {
+      "name": "DEV-PV-3501_YC_3",
+      "type": "number",
+      "label": "[DEV-PV-3501 遥测.3] 35kV母线CA线电压 (kV)",
+      "sample": 35.23
+    },
+    {
+      "name": "DEV-PV-3501_YC_4",
+      "type": "number",
+      "label": "[DEV-PV-3501 遥测.4] 301集电进线A相电流 (A)",
+      "sample": 135.2
+    },
+    {
+      "name": "DEV-PV-3501_YC_5",
+      "type": "number",
+      "label": "[DEV-PV-3501 遥测.5] 301集电进线B相电流 (A)",
+      "sample": 134.8
+    },
+    {
+      "name": "DEV-PV-3501_YC_6",
+      "type": "number",
+      "label": "[DEV-PV-3501 遥测.6] 301集电进线C相电流 (A)",
+      "sample": 135.6
+    },
+    {
+      "name": "DEV-PV-3501_YC_7",
+      "type": "number",
+      "label": "[DEV-PV-3501 遥测.7] 301集电线路有功功率 (kW)",
+      "sample": 8240.5
+    },
+    {
+      "name": "DEV-PV-3501_YC_8",
+      "type": "number",
+      "label": "[DEV-PV-3501 遥测.8] 301集电线路无功功率 (kvar)",
+      "sample": 620.4
+    },
+    {
+      "name": "DEV-PV-3501_YC_9",
+      "type": "number",
+      "label": "[DEV-PV-3501 遥测.9] 301回路综合功率因数 ()",
+      "sample": 0.99
+    },
+    {
+      "name": "DEV-PV-3501_YC_10",
+      "type": "number",
+      "label": "[DEV-PV-3501 遥测.10] 电网基准系统频率 (Hz)",
+      "sample": 50.01
+    },
+    {
+      "name": "DEV-PV-3501_YX_1",
+      "type": "number",
+      "label": "[DEV-PV-3501 遥信.1] 301 真空断路器位置 (0:分/1:合/2:跳) (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-PV-3501_YX_2",
+      "type": "number",
+      "label": "[DEV-PV-3501 遥信.2] 301 母线侧隔离手车 (0:试/1:工/2:检) (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-PV-3501_YX_3",
+      "type": "number",
+      "label": "[DEV-PV-3501 遥信.3] 301 出线侧隔离刀闸 (0:分/1:合/2:障) (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-PV-3501_YX_4",
+      "type": "number",
+      "label": "[DEV-PV-3501 遥信.4] 301 线路侧快速接地刀 (0:分/1:合/2:障) (0/1/2)",
+      "sample": 0
+    },
+    {
+      "name": "DEV-PV-3501_YX_5",
+      "type": "number",
+      "label": "[DEV-PV-3501 遥信.5] 301 弹簧储能状态 (0:已储/1:未储) (0/1/2)",
+      "sample": 0
+    },
+    {
+      "name": "DEV-PV-3501_YX_6",
+      "type": "number",
+      "label": "[DEV-PV-3501 遥信.6] 301 微机保护动作总告警 (0:常/1:动) (0/1/2)",
+      "sample": 0
+    },
+    {
+      "name": "DEV-PV-3501_DD_1",
+      "type": "number",
+      "label": "[DEV-PV-3501 电度.1] 301回路反向有功上网电量 (MWh)",
+      "sample": 3450.8
+    },
+    {
+      "name": "DEV-PV-BOX01_comm",
+      "type": "number",
+      "label": "[DEV-PV-BOX01] 1# 光伏升压箱变 3150kVA 测控装置 通信状态 (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-PV-BOX01_YC_1",
+      "type": "number",
+      "label": "[DEV-PV-BOX01 遥测.1] 箱变高压侧线电压 (kV)",
+      "sample": 35.24
+    },
+    {
+      "name": "DEV-PV-BOX01_YC_2",
+      "type": "number",
+      "label": "[DEV-PV-BOX01 遥测.2] 箱变低压侧Uab电压 (V)",
+      "sample": 805.2
+    },
+    {
+      "name": "DEV-PV-BOX01_YC_3",
+      "type": "number",
+      "label": "[DEV-PV-BOX01 遥测.3] 箱变低压侧总输入电流 (A)",
+      "sample": 2250
+    },
+    {
+      "name": "DEV-PV-BOX01_YC_4",
+      "type": "number",
+      "label": "[DEV-PV-BOX01 遥测.4] 箱变双分裂输出总功率 (kW)",
+      "sample": 3125
+    },
+    {
+      "name": "DEV-PV-BOX01_YC_5",
+      "type": "number",
+      "label": "[DEV-PV-BOX01 遥测.5] 箱变顶层油温传感器 (℃)",
+      "sample": 54.6
+    },
+    {
+      "name": "DEV-PV-BOX01_YC_6",
+      "type": "number",
+      "label": "[DEV-PV-BOX01 遥测.6] 箱变三相绕组热点温度 (℃)",
+      "sample": 62.3
+    },
+    {
+      "name": "DEV-PV-BOX01_YC_7",
+      "type": "number",
+      "label": "[DEV-PV-BOX01 遥测.7] 箱变当前视在负荷率 (%)",
+      "sample": 78.5
+    },
+    {
+      "name": "DEV-PV-BOX01_YC_8",
+      "type": "number",
+      "label": "[DEV-PV-BOX01 遥测.8] 光伏子阵太阳辐射度 (W/㎡)",
+      "sample": 885
+    },
+    {
+      "name": "DEV-PV-BOX01_YC_9",
+      "type": "number",
+      "label": "[DEV-PV-BOX01 遥测.9] 光伏组件背板电池温度 (℃)",
+      "sample": 42.5
+    },
+    {
+      "name": "DEV-PV-BOX01_YC_10",
+      "type": "number",
+      "label": "[DEV-PV-BOX01 遥测.10] 组串逆变器综合效率 (%)",
+      "sample": 98.8
+    },
+    {
+      "name": "DEV-PV-BOX01_YX_1",
+      "type": "number",
+      "label": "[DEV-PV-BOX01 遥信.1] 箱变35kV侧高压真空负荷开关 (0:分/1:合) (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-PV-BOX01_YX_2",
+      "type": "number",
+      "label": "[DEV-PV-BOX01 遥信.2] 箱变0.8kV低压进线断路器1 (0:分/1:合) (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-PV-BOX01_YX_3",
+      "type": "number",
+      "label": "[DEV-PV-BOX01 遥信.3] 箱变0.8kV低压进线断路器2 (0:分/1:合) (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-PV-BOX01_YX_4",
+      "type": "number",
+      "label": "[DEV-PV-BOX01 遥信.4] 箱变重瓦斯跳闸 (0:常/1:动) (0/1/2)",
+      "sample": 0
+    },
+    {
+      "name": "DEV-PV-BOX01_YX_5",
+      "type": "number",
+      "label": "[DEV-PV-BOX01 遥信.5] 箱变油位异常告警 (0:常/1:告警) (0/1/2)",
+      "sample": 0
+    },
+    {
+      "name": "DEV-PV-BOX01_YX_6",
+      "type": "number",
+      "label": "[DEV-PV-BOX01 遥信.6] 箱变压力释放阀动作 (0:常/1:动) (0/1/2)",
+      "sample": 0
+    },
+    {
+      "name": "DEV-PV-BOX01_YX_7",
+      "type": "number",
+      "label": "[DEV-PV-BOX01 遥信.7] 箱变舱内强制风冷启动 (0:停/1:运) (0/1/2)",
+      "sample": 1
+    },
+    {
+      "name": "DEV-PV-BOX01_DD_1",
+      "type": "number",
+      "label": "[DEV-PV-BOX01 电度.1] 箱变累计上网电量 (MWh)",
+      "sample": 1890.6
+    }
+  ]
+}
