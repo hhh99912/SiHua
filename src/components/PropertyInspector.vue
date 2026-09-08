@@ -77,7 +77,7 @@ import {
   getFormattedTimestamp,
   ComponentJsonSchemaInfo
 } from '../data/componentJsonSchemas';
-import { resolveComponentDynamicData, parseStrictNumber } from '../utils/scadaResolver';
+import { resolveComponentDynamicData, parseStrictNumber, updateScadaPointTelemetry, resolveDataPointValue } from '../utils/scadaResolver';
 
 interface Props {
   component: ScreenComponent | null;
@@ -96,6 +96,7 @@ const emit = defineEmits<{
   (e: 'update:component', comp: ScreenComponent): void;
   (e: 'update:components', comps: ScreenComponent[]): void;
   (e: 'update:screen', screen: ScreenConfig): void;
+  (e: 'update:datasets', datasets: DatasetItem[]): void;
   (e: 'align:component', type: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'distribute-h' | 'distribute-v' | 'equal-width' | 'equal-height' | 'equal-size' | 'equal-max-size' | 'equal-min-size' | 'make-square'): void;
   (e: 'group', comps?: ScreenComponent[]): void;
   (e: 'ungroup', comp?: ScreenComponent): void;
@@ -307,76 +308,169 @@ const isSystemStatusComponent = computed(() => {
 const currentResolvedBinaryState = computed(() => {
   if (!props.component) return 0;
   const comp = props.component;
+  const sKey = comp.data?.mapping?.stateKey || 
+               comp.data?.mapping?.statusKey || 
+               comp.data?.mapping?.valueKey ||
+               comp.data?.bindings?.state ||
+               comp.data?.bindings?.value;
+
+  if (sKey && comp.data?.useStatic !== true) {
+    const live = resolveDataPointValue(props.datasets, comp.data?.datasetId, sKey, undefined);
+    if (live !== undefined) {
+      if (typeof live === 'number') return live;
+      const str = String(live).toLowerCase();
+      if (str === '1' || str === 'closed' || str === 'on' || str.includes('合')) return 1;
+      if (str === '2' || str.includes('障')) return 2;
+      return 0;
+    }
+  }
+
   const cp = comp.customProps || {};
   const st = comp.style || {};
+  if (comp.activeState !== undefined) {
+    return Number(comp.activeState);
+  }
   if (cp.state !== undefined) {
     if (typeof cp.state === 'string') {
       const lower = cp.state.toLowerCase();
       if (lower === '1' || lower === 'closed' || lower === 'on' || lower.includes('合')) return 1;
+      if (lower === '2' || lower.includes('障')) return 2;
       return 0;
     }
-    return Number(cp.state) === 1 ? 1 : 0;
+    return Number(cp.state);
   }
   if (st.indicatorState !== undefined) {
     if (st.indicatorState === 'normal' || st.indicatorState === 1 || String(st.indicatorState) === '1') return 1;
     return 0;
   }
-  if (comp.activeState !== undefined) {
-    return Number(comp.activeState) === 1 ? 1 : 0;
-  }
   return 0;
 });
+
+const isMultiStateActive = (st: any) => {
+  if (!props.component) return false;
+  const active = props.component.activeState;
+  if (active !== undefined && (String(active) === String(st.id) || String(active) === String(st.matchValue) || String(active) === String(st.stateValue))) {
+    return true;
+  }
+  const currState = props.component.customProps?.state ?? props.component.data?.staticData?.state ?? props.component.data?.staticData?.value;
+  if (currState !== undefined && (String(currState) === String(st.matchValue) || String(currState) === String(st.stateValue) || String(currState) === String(st.id))) {
+    return true;
+  }
+  return false;
+};
 
 const testBinaryState = (val: number) => {
   if (!props.component) return;
   const isElec = ['elec-breaker', 'elec-disconnector', 'elec-grounding'].includes(props.component.type);
-  const stateStr = isElec ? (val === 1 ? 'closed' : 'open') : val;
+  const stateStr = isElec ? (val === 1 ? 'closed' : (val === 2 ? 'fault' : 'open')) : val;
   
-  updateComponentProps({ activeState: val });
-  updateComponentCustomProps({
-    state: stateStr,
-    position: val,
-    status: val
-  });
-  updateComponentStyle({
-    indicatorState: val === 1 ? 'normal' : 'off'
-  });
-  if (props.component.data?.staticData && typeof props.component.data.staticData === 'object') {
-    updateComponentData({
-      staticData: {
-        ...props.component.data.staticData,
-        state: val,
-        value: val
-      }
-    });
-  }
+  // 1. Single atomic update to prevent sequential emit race conditions
+  const updatedComp: ScreenComponent = {
+    ...props.component,
+    activeState: val,
+    customProps: {
+      ...(props.component.customProps || {}),
+      state: stateStr,
+      position: val,
+      status: val,
+      value: val,
+      running: val === 1
+    },
+    style: {
+      ...(props.component.style || {}),
+      indicatorState: val === 1 ? 'normal' : (val === 2 ? 'alarm' : 'off')
+    },
+    data: {
+      ...(props.component.data || { mapping: {} }),
+      staticData: (props.component.data?.staticData && typeof props.component.data.staticData === 'object')
+        ? {
+            ...props.component.data.staticData,
+            state: val,
+            value: val
+          }
+        : val
+    }
+  };
 
-  // Synchronize live telemetry dataset point if bound
-  const sKey = props.component.data?.mapping?.statusKey || props.component.data?.mapping?.stateKey || props.component.data?.mapping?.valueKey;
-  if (sKey && boundDataset.value?.devices) {
-    for (const dev of boundDataset.value.devices) {
-      const sig = dev.teleSignals?.find((s: any) => `${dev.deviceId}_YX_${s.pointId}` === sKey || String(s.pointId) === String(sKey));
-      if (sig) {
-        sig.value = val;
-        sig.statusText = val === 1 ? '合闸 (1)' : '分闸 (0)';
-      }
+  emit('update:component', updatedComp);
+
+  // 2. Synchronize live telemetry dataset point across all datasets & devices if bound
+  const sKey = props.component.data?.mapping?.statusKey || 
+               props.component.data?.mapping?.stateKey || 
+               props.component.data?.mapping?.valueKey ||
+               props.component.data?.bindings?.state ||
+               props.component.data?.bindings?.value;
+
+  if (sKey && props.datasets && props.datasets.length > 0) {
+    const statusText = val === 1 ? '合闸 (1)' : (val === 2 ? '故障 (2)' : '分闸 (0)');
+    const updated = updateScadaPointTelemetry(
+      props.datasets,
+      props.component.data?.datasetId,
+      sKey,
+      val,
+      statusText
+    );
+    if (updated) {
+      emit('update:datasets', [...props.datasets]);
     }
   }
 };
 
 const testMultiState = (stateId: string, matchVal?: any) => {
   if (!props.component) return;
-  updateComponentProps({ activeState: stateId });
-  if (matchVal !== undefined) {
-    updateComponentCustomProps({ state: matchVal });
-    if (props.component.data?.staticData && typeof props.component.data.staticData === 'object') {
-      updateComponentData({
-        staticData: {
-          ...props.component.data.staticData,
-          state: matchVal,
-          value: matchVal
-        }
-      });
+  const targetState = props.component.states?.find(s => String(s.id) === String(stateId));
+  const effectiveVal = matchVal !== undefined 
+    ? matchVal 
+    : (targetState?.matchValue !== undefined ? targetState.matchValue : (targetState?.stateValue !== undefined ? targetState.stateValue : stateId));
+  const numVal = typeof effectiveVal === 'number' 
+    ? effectiveVal 
+    : (!isNaN(Number(effectiveVal)) ? Number(effectiveVal) : 0);
+
+  // 1. Single atomic update
+  const updatedComp: ScreenComponent = {
+    ...props.component,
+    activeState: stateId,
+    customProps: {
+      ...(props.component.customProps || {}),
+      state: effectiveVal,
+      value: effectiveVal
+    },
+    style: {
+      ...(props.component.style || {}),
+      indicatorState: numVal === 1 ? 'normal' : 'off'
+    },
+    data: {
+      ...(props.component.data || { mapping: {} }),
+      staticData: (props.component.data?.staticData && typeof props.component.data.staticData === 'object')
+        ? {
+            ...props.component.data.staticData,
+            state: effectiveVal,
+            value: effectiveVal
+          }
+        : effectiveVal
+    }
+  };
+
+  emit('update:component', updatedComp);
+
+  // 2. Synchronize live telemetry dataset point if bound
+  const sKey = props.component.data?.mapping?.statusKey || 
+               props.component.data?.mapping?.stateKey || 
+               props.component.data?.mapping?.valueKey ||
+               props.component.data?.bindings?.state ||
+               props.component.data?.bindings?.value;
+
+  if (sKey && props.datasets && props.datasets.length > 0) {
+    const statusText = targetState?.name || `状态 (${effectiveVal})`;
+    const updated = updateScadaPointTelemetry(
+      props.datasets,
+      props.component.data?.datasetId,
+      sKey,
+      numVal,
+      statusText
+    );
+    if (updated) {
+      emit('update:datasets', [...props.datasets]);
     }
   }
 };
@@ -3242,15 +3336,15 @@ const toggleBatchVisibility = () => {
                 v-for="st in component.states"
                 :key="st.id"
                 type="button"
-                @click="testMultiState(st.id, st.matchValue)"
+                @click="testMultiState(st.id, st.matchValue ?? st.stateValue)"
                 class="py-1.5 px-2 rounded-lg text-xs font-mono cursor-pointer border transition-all truncate text-left flex items-center justify-between gap-1"
-                :class="String(component.activeState ?? '1') === String(st.id)
+                :class="isMultiStateActive(st)
                   ? 'bg-cyan-500 text-slate-950 font-medium border-cyan-400 shadow-[0_0_10px_rgba(0,242,255,0.4)]'
                   : 'bg-[#050c1c] text-cyan-200 border-cyan-500/30 hover:border-cyan-400 font-light'"
               >
                 <span class="truncate">{{ st.name }}</span>
-                <span class="text-[9px] px-1 rounded font-mono" :class="String(component.activeState ?? '1') === String(st.id) ? 'bg-slate-950/30 text-slate-950' : 'bg-cyan-950 text-cyan-300 border border-cyan-500/40'">
-                  ={{ st.matchValue ?? st.id }}
+                <span class="text-[9px] px-1 rounded font-mono" :class="isMultiStateActive(st) ? 'bg-slate-950/30 text-slate-950 font-bold' : 'bg-cyan-950 text-cyan-300 border border-cyan-500/40'">
+                  ={{ st.matchValue ?? st.stateValue ?? st.id }}
                 </span>
               </button>
             </div>

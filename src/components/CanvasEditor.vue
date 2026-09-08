@@ -26,6 +26,7 @@ interface Props {
   gridSize?: number;
   snapToGrid?: boolean;
   orthogonalLock?: boolean;
+  showRuler?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -34,7 +35,8 @@ const props = withDefaults(defineProps<Props>(), {
   showGrid: true,
   gridSize: 40,
   snapToGrid: false,
-  orthogonalLock: false
+  orthogonalLock: false,
+  showRuler: false
 });
 
 const emit = defineEmits<{
@@ -1679,20 +1681,29 @@ defineExpose({
     ref="containerRef"
     @wheel.prevent="onWheelWorkspace"
     @contextmenu.prevent="handleCanvasContextMenu"
-    class="flex-1 h-full bg-[#0d1f38] relative overflow-hidden select-none flex flex-col"
+    class="flex-1 h-full bg-black relative overflow-hidden select-none flex flex-col"
     :class="{
       'cursor-move': isSpacePressed || isPanning,
       'cursor-crosshair': drawTool !== 'select'
     }"
   >
-    <!-- Rulers on Top & Left -->
+    <!-- Rulers on Top & Left (Toggleable via top switch) -->
     <Ruler
+      v-if="showRuler"
       :width="screen.width"
       :height="screen.height"
       :zoom="zoom"
       :panOffset="panOffset"
       :cursorPos="mousePos"
     />
+
+    <!-- Optional: Floating Polyline Drawing Hint -->
+    <div 
+      v-if="drawTool === 'draw-polyline'" 
+      class="absolute top-4 left-1/2 -translate-x-1/2 z-40 px-3 py-1.5 bg-[#132745]/90 border border-amber-400/70 text-amber-300 rounded-lg text-xs font-mono shadow-xl backdrop-blur-sm pointer-events-none flex items-center gap-2"
+    >
+      <span>⚡ 折线绘制中: 单击添加拐点，双击或回车结束 (ESC取消{{ orthogonalLock ? ', 正交锁定' : '' }})</span>
+    </div>
 
     <!-- Infinite Canvas Viewport Stage -->
     <div 
@@ -1704,7 +1715,7 @@ defineExpose({
         'cursor-default': drawTool === 'select' && !isSpacePressed && !isPanning
       }"
       :style="{
-        backgroundColor: screen.backgroundColor || '#0f223d',
+        backgroundColor: (screen.backgroundColor && screen.backgroundColor !== '#0f223d') ? screen.backgroundColor : '#000000',
         backgroundImage: showGrid 
           ? `radial-gradient(circle, ${effectiveGridColor} 1.2px, transparent 1.2px)` 
           : 'none',
@@ -2500,43 +2511,6 @@ defineExpose({
           </div>
         </div>
       </template>
-    </div>
-
-    <!-- Bottom Status Bar -->
-    <div class="h-7 bg-[#132745] border-t border-cyan-400/50 px-3 flex items-center justify-between text-[11px] font-mono text-cyan-200 z-30 select-none shadow-md">
-      <div class="flex items-center gap-4">
-        <div class="flex items-center gap-1.5 text-cyan-200 font-light">
-          <span class="text-cyan-300">光标坐标:</span>
-          <span>X: {{ mousePos.x }} px, Y: {{ mousePos.y }} px</span>
-          <span v-if="snapToGrid" class="text-emerald-300 text-[10px]">(已吸附{{ gridSize }}px)</span>
-        </div>
-        <div class="h-3 w-[1px] bg-cyan-500/40" />
-        <div class="font-light">
-          <span class="text-cyan-300">画面尺寸:</span>
-          <span class="text-cyan-100 ml-1">{{ screen.width }} × {{ screen.height }}</span>
-        </div>
-        <div v-if="selectedIds.length > 0" class="flex items-center gap-2">
-          <div class="h-3 w-[1px] bg-cyan-500/40" />
-          <span class="text-cyan-300 font-light">选中:</span>
-          <span class="text-cyan-200 font-normal">
-            {{ selectedIds.length === 1 ? primarySelected?.name : `已多选 ${selectedIds.length} 个元件` }}
-          </span>
-          <span v-if="selectedIds.length === 1" class="text-cyan-300 font-light">
-            ({{ Math.round(primarySelected?.width || 0) }} × {{ Math.round(primarySelected?.height || 0) }}, {{ primarySelected?.rotation || 0 }}°)
-          </span>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-3">
-        <span v-if="drawTool === 'draw-polyline'" class="text-amber-300 font-normal animate-pulse">
-          ⚡ 折线绘制中: 单击添加拐点，双击或回车结束 (ESC取消, {{ orthogonalLock ? '正交已锁定' : '按Shift正交' }})
-        </span>
-        <span v-else class="text-cyan-300 font-light">
-          💡 Ctrl/空格+拖拽平移画布 | Ctrl+滚轮缩放 | 点格吸附成图
-        </span>
-        <div class="h-3 w-[1px] bg-cyan-500/40" />
-        <span class="text-cyan-200 font-light">缩放: {{ Math.round(zoom * 100) }}%</span>
-      </div>
     </div>
   </div>
 </template>

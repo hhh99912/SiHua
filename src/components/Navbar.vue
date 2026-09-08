@@ -57,10 +57,10 @@ import {
   Octagon,
   Scaling,
   MoveHorizontal,
-  MoveVertical
+  MoveVertical,
+  Ruler as RulerIcon
 } from 'lucide-vue-next';
 import { ScreenConfig, ScreenComponent } from '../types';
-import { templates } from '../data/templates';
 import { detectPlatform } from '../utils/platform';
 import { currentUser } from '../utils/auth';
 
@@ -78,6 +78,7 @@ interface Props {
   gridSize?: number;
   snapToGrid?: boolean;
   orthogonalLock?: boolean;
+  showRuler?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -88,7 +89,8 @@ const props = withDefaults(defineProps<Props>(), {
   showGrid: true,
   gridSize: 40,
   snapToGrid: false,
-  orthogonalLock: false
+  orthogonalLock: false,
+  showRuler: false
 });
 
 const emit = defineEmits<{
@@ -100,6 +102,7 @@ const emit = defineEmits<{
   (e: 'update:gridSize', value: number): void;
   (e: 'update:snapToGrid', value: boolean): void;
   (e: 'update:orthogonalLock', value: boolean): void;
+  (e: 'update:showRuler', value: boolean): void;
   (e: 'toggle:streaming'): void;
   (e: 'save:screen'): void;
   (e: 'open:preview'): void;
@@ -125,19 +128,6 @@ const emit = defineEmits<{
 
 const currentPlatform = detectPlatform();
 
-const showResolutionMenu = ref(false);
-const showTemplateMenu = ref(false);
-
-const resolutionPresets = [
-  { label: '标准大屏 (1980 × 1100)', w: 1980, h: 1100, tag: '推荐默认' },
-  { label: '1080P 全高清 (1920 × 1080)', w: 1920, h: 1080, tag: '标准 16:9' },
-  { label: '2K 工业宽屏 (2560 × 1440)', w: 2560, h: 1440, tag: '高分屏 16:9' },
-  { label: '4K 超高清 (3840 × 2160)', w: 3840, h: 2160, tag: '4K 巨幕' },
-  { label: '工控触控屏 (1366 × 768)', w: 1366, h: 768, tag: '嵌入式' },
-  { label: '720P 标清 (1280 × 720)', w: 1280, h: 720, tag: '便携屏' },
-  { label: '带鱼环幕屏 (3840 × 1080)', w: 3840, h: 1080, tag: '32:9 展厅' },
-];
-
 // Basic Geometric Primitives Toolbar Data (All compact icon buttons with rich tooltips)
 const basicGeometryTools = [
   { type: 'draw-rect', name: '矩形 / 科技底座', icon: Square, desc: '矩形底座：单击选中后在屏幕确定起始和终止点' },
@@ -157,120 +147,21 @@ const basicGeometryTools = [
   { type: 'draw-text', name: '文本标签 / 标牌', icon: Type, desc: '静态文本与标牌：单击选中后在屏幕确定起始和终止点' },
   { type: 'ctrl-button', name: '控制按钮', icon: ToggleRight, desc: '工业控制按钮：单击选中后在屏幕确定起始和终止点' }
 ];
-
-const handleSelectResolution = (w: number, h: number) => {
-  emit('update:screen', {
-    ...props.screen,
-    width: w,
-    height: h
-  });
-  showResolutionMenu.value = false;
-  emit('fit:screen');
-};
-
-const handleSelectTemplate = (id: string) => {
-  emit('load:template', id);
-  showTemplateMenu.value = false;
-};
 </script>
 
 <template>
   <header class="bg-[#11233e] border-b border-cyan-500/30 px-3 py-1 flex flex-col gap-1 select-none z-40 relative shadow-md">
     <!-- Row 1: Brand, Template, Project Tools, Preview & User Switch -->
     <div class="flex items-center justify-between h-9">
-      <!-- Left: Logo, Name & Screen Preset -->
+      <!-- Left: Logo & Name -->
       <div class="flex items-center gap-2">
         <div class="flex items-center gap-1.5">
           <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-cyan-400 via-sky-500 to-blue-600 flex items-center justify-center shadow-[0_0_12px_rgba(0,242,255,0.4)] border border-cyan-300/40">
             <Monitor class="w-3.5 h-3.5 text-slate-950 font-bold" />
           </div>
-          <div class="flex items-center gap-1.5">
-            <span class="font-mono font-black text-xs tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-sky-100 to-blue-300">
-              GE-SCADA
-            </span>
-            <span class="text-[9px] font-mono px-1 py-0.2 rounded bg-[#173055] border border-cyan-500/40 text-cyan-300 font-semibold">
-              SCADA
-            </span>
-          </div>
-        </div>
-
-        <div class="h-4 w-[1px] bg-cyan-500/30 mx-1" />
-
-        <!-- Resolution Selector Dropdown -->
-        <div class="relative">
-          <button
-            @click="showResolutionMenu = !showResolutionMenu"
-            class="flex items-center gap-1.5 px-2 py-1 rounded bg-[#173055] border border-cyan-400 hover:border-cyan-300 text-[11px] font-mono text-cyan-100 transition-all cursor-pointer shadow-[0_0_8px_rgba(0,242,255,0.15)]"
-            title="选择预设画面分辨率"
-          >
-            <span class="text-cyan-300 font-light">尺寸:</span>
-            <span class="font-normal text-white">{{ screen.width }}×{{ screen.height }}</span>
-            <ChevronDown class="w-3 h-3 text-cyan-300" />
-          </button>
-
-          <!-- Dropdown Menu -->
-          <div
-            v-if="showResolutionMenu"
-            class="absolute top-full left-0 mt-1 w-60 bg-[#132745] border border-cyan-400 rounded-xl shadow-2xl p-1 z-50 backdrop-blur-md"
-          >
-            <div class="text-[10px] font-mono text-cyan-300 font-light px-2 py-0.5 border-b border-cyan-500/30">
-              SCADA 分辨率预设
-            </div>
-            <div class="space-y-0.5 mt-1">
-              <button
-                v-for="res in resolutionPresets"
-                :key="res.label"
-                @click="handleSelectResolution(res.w, res.h)"
-                class="w-full flex items-center justify-between px-2 py-1 rounded text-xs font-mono font-light transition-colors text-left hover:bg-cyan-500/30 text-slate-100 cursor-pointer"
-                :class="{ 'bg-cyan-600/30 text-cyan-200 font-normal border border-cyan-400': screen.width === res.w && screen.height === res.h }"
-              >
-                <div class="flex items-center gap-1">
-                  <Check v-if="screen.width === res.w && screen.height === res.h" class="w-3 h-3 text-cyan-300" />
-                  <span v-else class="w-3" />
-                  <span>{{ res.w }} × {{ res.h }}</span>
-                </div>
-                <span class="text-[9px] px-1 py-0.2 rounded bg-[#173055] border border-cyan-500/40 text-cyan-200 font-mono font-light">
-                  {{ res.tag }}
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Preset Template Switcher -->
-        <div class="relative">
-          <button
-            @click="showTemplateMenu = !showTemplateMenu"
-            class="flex items-center gap-1 px-2 py-1 rounded bg-[#173055] border border-cyan-400 hover:border-cyan-300 text-[11px] font-mono text-cyan-100 transition-all cursor-pointer shadow-[0_0_8px_rgba(0,242,255,0.15)]"
-            title="载入官方 SCADA 工程预设"
-          >
-            <LayoutTemplate class="w-3 h-3 text-cyan-300" />
-            <span class="font-light">模版</span>
-            <ChevronDown class="w-3 h-3 text-cyan-300" />
-          </button>
-
-          <div
-            v-if="showTemplateMenu"
-            class="absolute top-full left-0 mt-1 w-64 bg-[#132745] border border-cyan-400 rounded-xl shadow-2xl p-1 z-50 backdrop-blur-md"
-          >
-            <div class="text-[10px] font-mono text-cyan-300 font-light px-2 py-0.5 border-b border-cyan-500/30">
-              载入官方 SCADA 预设
-            </div>
-            <div class="space-y-0.5 mt-1">
-              <button
-                v-for="tpl in templates"
-                :key="tpl.id"
-                @click="handleSelectTemplate(tpl.id)"
-                class="w-full flex items-start gap-1.5 p-1.5 rounded text-xs font-mono font-light transition-colors text-left hover:bg-cyan-500/30 text-slate-100 cursor-pointer"
-              >
-                <div class="w-1.5 h-1.5 rounded-full bg-cyan-300 mt-1 shrink-0" />
-                <div>
-                  <div class="font-normal text-cyan-100">{{ tpl.name }}</div>
-                  <div class="text-[10px] text-cyan-300/80 line-clamp-1 font-light">{{ tpl.description }}</div>
-                </div>
-              </button>
-            </div>
-          </div>
+          <span class="font-mono font-black text-xs tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-sky-100 to-blue-300">
+            GE-SCADA
+          </span>
         </div>
       </div>
 
@@ -482,6 +373,15 @@ const handleSelectTemplate = (id: string) => {
 
         <!-- Grid & Snapping Controls -->
         <div class="flex items-center bg-[#152e52] p-0.5 rounded-md border border-cyan-500/50 gap-1">
+          <button
+            @click="emit('update:showRuler', !showRuler)"
+            class="p-1 rounded cursor-pointer transition-all"
+            :class="showRuler ? 'bg-cyan-400 text-slate-950 font-bold shadow-[0_0_8px_rgba(0,242,255,0.4)]' : 'text-cyan-200 hover:text-white hover:bg-cyan-900/60'"
+            :title="showRuler ? '刻度标尺: 已开启 (点击关闭)' : '刻度标尺: 已关闭 (点击开启)'"
+          >
+            <RulerIcon class="w-3.5 h-3.5 stroke-[2]" />
+          </button>
+
           <button
             @click="emit('update:showGrid', !showGrid)"
             class="p-1 rounded cursor-pointer transition-all"

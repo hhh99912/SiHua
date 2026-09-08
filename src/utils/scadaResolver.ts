@@ -258,6 +258,91 @@ export function resolveDataPointValue(
 }
 
 /**
+ * Updates a point in datasets and synchronizes fast point index immediately.
+ * Works across both flat ds.data and nested device points (teleSignals, telemetries, etc.)
+ */
+export function updateScadaPointTelemetry(
+  datasets: DatasetItem[] | undefined,
+  datasetId: string | undefined,
+  pointKey: string | undefined,
+  value: any,
+  statusText?: string
+): boolean {
+  if (!pointKey || !datasets || datasets.length === 0) return false;
+
+  let cleanKey = typeof pointKey === 'string' ? pointKey.trim() : String(pointKey);
+  if (cleanKey.startsWith('$bind(') && cleanKey.endsWith(')')) {
+    cleanKey = cleanKey.slice(6, -1).trim();
+  } else if (cleanKey.startsWith('{{') && cleanKey.endsWith('}}')) {
+    cleanKey = cleanKey.slice(2, -2).trim();
+  }
+
+  // Update in global fast index immediately
+  globalPointIndex.set(cleanKey, value);
+
+  let found = false;
+  for (let i = 0; i < datasets.length; i++) {
+    const ds = datasets[i];
+    if (datasetId && ds.id !== datasetId) continue;
+
+    // 1. Update flat data
+    if (ds.data) {
+      ds.data[cleanKey] = value;
+      found = true;
+    }
+
+    // 2. Update devices teleSignals / telemetries
+    if (Array.isArray(ds.devices)) {
+      for (let d = 0; d < ds.devices.length; d++) {
+        const dev = ds.devices[d];
+        const devId = dev.deviceId;
+
+        // teleSignals
+        if (dev.teleSignals) {
+          for (let p = 0; p < dev.teleSignals.length; p++) {
+            const sig = dev.teleSignals[p];
+            const fullKey = `${devId}_YX_${sig.pointId}`;
+            if (fullKey === cleanKey || String(sig.pointId) === cleanKey) {
+              sig.value = value;
+              if (statusText) {
+                sig.statusText = statusText;
+              } else if (sig.enumMapping && sig.enumMapping[value]) {
+                sig.statusText = `${sig.enumMapping[value]} (${value})`;
+              } else if (value === 0) {
+                sig.statusText = '分闸 (0)';
+              } else if (value === 1) {
+                sig.statusText = '合闸 (1)';
+              } else if (value === 2) {
+                sig.statusText = '故障 (2)';
+              }
+              found = true;
+            }
+          }
+        }
+
+        // telemetries
+        if (dev.telemetries) {
+          for (let p = 0; p < dev.telemetries.length; p++) {
+            const tel = dev.telemetries[p];
+            const fullKey = `${devId}_YC_${tel.pointId}`;
+            if (fullKey === cleanKey || String(tel.pointId) === cleanKey) {
+              tel.value = value;
+              found = true;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Force re-indexing on next sync
+  lastIndexedDatasetsRef = null;
+  lastIndexedTimestamp = 0;
+
+  return found;
+}
+
+/**
  * Recursively resolves an object by injecting dynamic live data into bound fields or {{expressions}}.
  * Optimized to avoid unnecessary object cloning.
  */
@@ -363,9 +448,13 @@ export function resolveComponentDynamicData(
     if (!isChart) {
       const hasBinding = !!(valueKey || stateKey);
       const floatVal = typeof value === 'number' ? (isNaN(value) ? 0 : value) : (parseFloat(String(value)) || 0);
+      const numState = typeof state === 'number' ? (isNaN(state) ? 0 : state) : (parseFloat(String(state)) || 0);
       const quality = hasBinding ? 1 : 0;
       return {
-        value: floatVal,
+        value: stateKey && !valueKey ? numState : floatVal,
+        state: numState,
+        unit,
+        label,
         quality
       };
     }
@@ -418,8 +507,11 @@ export function resolveComponentDynamicData(
     } else if (resolved && typeof resolved === 'object' && resolved.quality !== undefined) {
       quality = Number(resolved.quality) === 0 ? 0 : 1;
     }
+    const stateVal = (resolved && typeof resolved === 'object' && resolved.state !== undefined) ? resolved.state : floatVal;
     return {
+      ...(typeof resolved === 'object' && !Array.isArray(resolved) ? resolved : {}),
       value: floatVal,
+      state: stateVal,
       quality
     };
   }

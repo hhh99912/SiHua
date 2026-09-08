@@ -264,7 +264,7 @@ export function loadAllScreensFromDisk(): {
         name: screenName,
         width: 1980,
         height: 1100,
-        backgroundColor: '#0f223d',
+        backgroundColor: '#000000',
         backgroundGrid: true,
         gridSize: 20,
         gridColor: 'rgba(0, 242, 255, 0.22)',
@@ -311,7 +311,7 @@ export function loadAllScreensFromDisk(): {
               id: sid,
               name: sname,
               description: p.description || '',
-              screen: p.screen || { id: sid, name: sname, width: 1980, height: 1100, backgroundColor: '#0f223d' },
+              screen: p.screen || { id: sid, name: sname, width: 1980, height: 1100, backgroundColor: '#000000' },
               components: p.components || []
             });
             validFiles.push(fn);

@@ -21,43 +21,69 @@ const emit = defineEmits<{
 const children = computed<ScreenComponent[]>(() => {
   const { states, activeState, data, customProps } = props.component;
   
-  // 1. Initial fallback: activeState or customProps
-  let resolvedVal: any = activeState !== undefined ? activeState : (customProps?.state ?? customProps?.value ?? undefined);
-
-  // 2. Static JSON payload value
-  if (data?.staticData !== undefined && data?.staticData !== null) {
-    if (typeof data.staticData === 'object' && !Array.isArray(data.staticData)) {
-      if (data.staticData.value !== undefined) resolvedVal = data.staticData.value;
-      else if (data.staticData.state !== undefined) resolvedVal = data.staticData.state;
-    } else if (typeof data.staticData === 'number' || typeof data.staticData === 'string') {
-      resolvedVal = data.staticData;
-    }
-  }
-
-  // 3. Dynamic SCADA binding resolution
-  const ptKey = data?.bindings?.value || data?.bindings?.state || data?.mapping?.stateKey || data?.mapping?.valueKey;
-  if (ptKey && data?.useStatic !== true) {
-    const live = resolveDataPointValue(props.datasets, data?.datasetId, ptKey, undefined);
-    if (live !== undefined) {
-      resolvedVal = live;
-    }
-  }
-
   if (states && states.length > 0) {
-    let matchedState = states[0];
-    if (resolvedVal !== undefined) {
-      const match = states.find(s => 
-        String(s.matchValue ?? s.id) === String(resolvedVal) ||
-        String(s.id) === String(resolvedVal) ||
-        (s.stateValue !== undefined && String(s.stateValue) === String(resolvedVal))
-      );
-      if (match) {
-        matchedState = match;
+    // 1. Check live SCADA telemetry binding if point is mapped
+    const ptKey = data?.bindings?.value || data?.bindings?.state || data?.mapping?.stateKey || data?.mapping?.valueKey;
+    if (ptKey && data?.useStatic !== true) {
+      const live = resolveDataPointValue(props.datasets, data?.datasetId, ptKey, undefined);
+      if (live !== undefined) {
+        const match = states.find(s => 
+          String(s.matchValue ?? s.id) === String(live) ||
+          String(s.id) === String(live) ||
+          (s.stateValue !== undefined && String(s.stateValue) === String(live))
+        );
+        if (match && match.children) {
+          return match.children;
+        }
       }
     }
-    if (matchedState && matchedState.children) {
-      return matchedState.children;
+
+    // 2. Direct activeState (simulation test or editor selection)
+    if (activeState !== undefined && activeState !== null) {
+      const match = states.find(s => 
+        String(s.id) === String(activeState) ||
+        String(s.matchValue ?? s.id) === String(activeState) ||
+        (s.stateValue !== undefined && String(s.stateValue) === String(activeState))
+      );
+      if (match && match.children) {
+        return match.children;
+      }
     }
+
+    // 3. Static JSON payload value
+    let staticVal: any = undefined;
+    if (data?.staticData !== undefined && data?.staticData !== null) {
+      if (typeof data.staticData === 'object' && !Array.isArray(data.staticData)) {
+        staticVal = data.staticData.state !== undefined ? data.staticData.state : data.staticData.value;
+      } else {
+        staticVal = data.staticData;
+      }
+    }
+    if (staticVal !== undefined) {
+      const match = states.find(s => 
+        String(s.matchValue ?? s.id) === String(staticVal) ||
+        String(s.id) === String(staticVal) ||
+        (s.stateValue !== undefined && String(s.stateValue) === String(staticVal))
+      );
+      if (match && match.children) {
+        return match.children;
+      }
+    }
+
+    // 4. CustomProps fallback
+    const cpVal = customProps?.state ?? customProps?.value;
+    if (cpVal !== undefined) {
+      const match = states.find(s => 
+        String(s.matchValue ?? s.id) === String(cpVal) ||
+        String(s.id) === String(cpVal) ||
+        (s.stateValue !== undefined && String(s.stateValue) === String(cpVal))
+      );
+      if (match && match.children) {
+        return match.children;
+      }
+    }
+
+    return states[0]?.children || [];
   }
 
   return props.component.children || props.component.customProps?.children || [];

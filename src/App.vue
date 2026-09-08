@@ -73,6 +73,7 @@ const showGrid = ref<boolean>(true);
 const gridSize = ref<number>(40);
 const snapToGrid = ref<boolean>(false);
 const orthogonalLock = ref<boolean>(false);
+const showRuler = ref<boolean>(false);
 const canvasEditorRef = ref<any>(null);
 const showPropertyInspector = ref<boolean>(false);
 
@@ -1269,6 +1270,7 @@ onBeforeUnmount(() => {
       :gridSize="gridSize"
       :snapToGrid="snapToGrid"
       :orthogonalLock="orthogonalLock"
+      :showRuler="showRuler"
       @update:screen="screen = $event; recordHistory();"
       @update:zoom="zoom = $event"
       @update:drawTool="drawTool = $event"
@@ -1277,6 +1279,7 @@ onBeforeUnmount(() => {
       @update:gridSize="gridSize = $event"
       @update:snapToGrid="snapToGrid = $event"
       @update:orthogonalLock="orthogonalLock = $event"
+      @update:showRuler="showRuler = $event"
       @toggle:streaming="isStreaming = !isStreaming"
       @save:screen="handleSaveCurrentScreenToDisk"
       @open:preview="handleOpenPreview"
@@ -1354,7 +1357,7 @@ onBeforeUnmount(() => {
       />
 
       <!-- Center Workspace (Canvas + Bottom Screen Manager Bar) -->
-      <div class="flex-1 min-w-0 flex flex-col overflow-hidden relative">
+      <div class="flex-1 min-w-0 flex flex-col overflow-hidden relative bg-black">
         <CanvasEditor
           ref="canvasEditorRef"
           :screen="screen"
@@ -1369,6 +1372,7 @@ onBeforeUnmount(() => {
           :gridSize="gridSize"
           :snapToGrid="snapToGrid"
           :orthogonalLock="orthogonalLock"
+          :showRuler="showRuler"
           @update:zoom="zoom = $event"
           @update:screen="screen = $event; recordHistory();"
           @update:drawTool="drawTool = $event"
@@ -1428,6 +1432,7 @@ onBeforeUnmount(() => {
         @close="showPropertyInspector = false"
         @update:component="c => handleUpdateComponent(c, true)"
         @update:components="cs => handleUpdateComponents(cs, true)"
+        @update:datasets="datasets = $event"
         @update:screen="screen = $event; recordHistory();"
         @align:component="handleAlignComponent"
         @group="handleGroup"

@@ -23,8 +23,8 @@ import {
   Type,
   Layers,
   Sparkles,
-  Search,
   Plus,
+  ChevronDown,
   Code,
   CodeXml,
   Zap,
@@ -64,8 +64,6 @@ const emit = defineEmits<{
   (e: 'open:symbol-modal'): void;
 }>();
 
-const activeCategory = ref<ComponentCategory | 'all'>('all');
-const searchQuery = ref('');
 const customSymbols = ref<CustomSymbolDef[]>([]);
 
 const refreshCustomSymbols = () => {
@@ -78,17 +76,16 @@ onMounted(() => {
   window.addEventListener('scada:custom-symbols-updated', refreshCustomSymbols);
 });
 
-const categories: { id: ComponentCategory | 'all'; label: string }[] = [
-  { id: 'all', label: '全部' },
-  { id: 'buttons', label: '🔘 交互控制 / 按钮' },
-  { id: 'status', label: '🟢 状态图元/遥信' },
-  { id: 'metrics', label: '🔢 数值图元/遥测' },
-  { id: 'electrical', label: '⚡ 电力一次系统' },
-  { id: 'industrial', label: '🏭 工业管网/设备' },
-  { id: 'charts', label: '📊 统计图表/曲线' },
-  { id: 'decoration', label: '✨ 科技边框/修饰' },
-  { id: 'basic', label: '📐 基础几何图元' },
-  { id: 'custom', label: '🧩 复合自定义图元' },
+const categories: { id: ComponentCategory; label: string; icon: string }[] = [
+  { id: 'electrical', label: '电力一次系统', icon: '⚡' },
+  { id: 'status', label: '状态图元/遥信', icon: '🟢' },
+  { id: 'metrics', label: '数值图元/遥测', icon: '🔢' },
+  { id: 'buttons', label: '交互控制/按钮', icon: '🔘' },
+  { id: 'industrial', label: '工业管网/设备', icon: '🏭' },
+  { id: 'charts', label: '统计图表/曲线', icon: '📊' },
+  { id: 'decoration', label: '科技边框/修饰', icon: '✨' },
+  { id: 'basic', label: '基础几何图元', icon: '📐' },
+  { id: 'custom', label: '复合自定义图元', icon: '🧩' },
 ];
 
 const iconMap: Record<string, any> = {
@@ -177,27 +174,35 @@ const allComponents = computed<ComponentDefinition[]>(() => {
   return [...COMPONENT_DEFINITIONS, ...symbolDefs];
 });
 
-const filteredComponents = computed(() => {
-  return allComponents.value.filter(c => {
-    let matchCategory = false;
-    if (activeCategory.value === 'all') {
-      matchCategory = true;
-    } else if (activeCategory.value === 'custom') {
-      matchCategory = c.category === 'custom' || c.type === 'composite-symbol' || Boolean(c.defaultCustomProps?.isCustomSymbol);
-    } else if (activeCategory.value === 'buttons') {
-      matchCategory = c.category === 'buttons' || c.type === 'ctrl-button';
-    } else if (activeCategory.value === 'basic') {
-      matchCategory = c.category === 'basic' && c.type !== 'ctrl-button';
-    } else {
-      matchCategory = c.category === activeCategory.value;
-    }
+const matchItemCategory = (c: ComponentDefinition, catId: ComponentCategory): boolean => {
+  if (catId === 'custom') {
+    return c.category === 'custom' || c.type === 'composite-symbol' || Boolean(c.defaultCustomProps?.isCustomSymbol);
+  }
+  if (catId === 'buttons') {
+    return c.category === 'buttons' || c.type === 'ctrl-button';
+  }
+  if (catId === 'basic') {
+    return c.category === 'basic' && c.type !== 'ctrl-button';
+  }
+  return c.category === catId;
+};
 
-    const matchSearch = !searchQuery.value || 
-      c.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      c.nameEn.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      c.description.toLowerCase().includes(searchQuery.value.toLowerCase());
-    return matchCategory && matchSearch;
-  });
+// 折叠展开设计：默认全部折叠 (expandedSections 初始为空对象，所有分类均为 false)
+const expandedSections = ref<Record<string, boolean>>({});
+
+const toggleSection = (catId: string) => {
+  expandedSections.value[catId] = !expandedSections.value[catId];
+};
+
+const groupedComponents = computed(() => {
+  return categories
+    .map(cat => ({
+      id: cat.id,
+      label: cat.label,
+      icon: cat.icon,
+      items: allComponents.value.filter(c => matchItemCategory(c, cat.id))
+    }))
+    .filter(g => g.items.length > 0);
 });
 
 // Native Drag Start for drag-and-drop onto canvas
@@ -222,89 +227,80 @@ const handleDragStart = (e: DragEvent, def: ComponentDefinition) => {
 </script>
 
 <template>
-  <aside class="w-60 shrink-0 h-full bg-[#10213b] border-r border-cyan-400/50 flex flex-col select-none z-30 shadow-xl overflow-hidden font-sans">
-    <!-- Header -->
-    <div class="p-2.5 border-b border-cyan-500/30 bg-[#142c4e]">
-      <div class="flex items-center justify-between mb-2">
-        <div class="flex items-center gap-1.5 font-mono font-medium text-xs text-cyan-200">
-          <Sparkles class="w-3.5 h-3.5 text-cyan-300" />
-          <span class="font-normal tracking-wide">组件物料库</span>
-        </div>
-        <button
-          @click="emit('open:symbol-modal')"
-          class="flex items-center gap-1 text-[10px] font-mono text-cyan-200 bg-[#1c3e6c] hover:bg-cyan-600 hover:text-slate-950 border border-cyan-400/80 px-2 py-0.5 rounded cursor-pointer transition-all shadow-xs"
-          title="管理与制作自定义图元工坊"
-        >
-          <FolderOpen class="w-3 h-3 text-cyan-300" />
-          <span class="font-light">图元工坊</span>
-        </button>
+  <aside class="w-64 shrink-0 h-full bg-[#10213b] border-r border-cyan-400/50 flex flex-col select-none z-30 shadow-xl overflow-hidden font-sans">
+    <!-- Header: Title & Custom Symbol Workshop -->
+    <div class="px-2.5 py-2 border-b border-cyan-500/30 bg-[#142c4e] flex items-center justify-between">
+      <div class="flex items-center gap-1.5 font-mono font-medium text-xs text-cyan-200">
+        <Sparkles class="w-3.5 h-3.5 text-cyan-300" />
+        <span class="font-normal tracking-wide">组件物料库</span>
       </div>
-
-      <!-- Search Input -->
-      <div class="relative">
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="搜索刀闸、断路器、仪表..."
-          class="w-full pl-7 pr-3 py-1.5 bg-[#183761] border border-cyan-500/40 focus:border-cyan-300 rounded-lg text-xs font-mono text-cyan-100 placeholder:text-cyan-300/60 outline-hidden transition-all shadow-inner font-light"
-        />
-        <Search class="w-3.5 h-3.5 text-cyan-300 absolute left-2 top-2" />
-      </div>
-    </div>
-
-    <!-- Category Tabs Filter -->
-    <div class="px-2 py-1.5 border-b border-cyan-500/25 flex items-center gap-1 overflow-x-auto custom-scrollbar bg-[#122644]">
       <button
-        v-for="cat in categories"
-        :key="cat.id"
-        @click="activeCategory = cat.id"
-        class="px-2 py-1 rounded-md text-[11px] font-mono whitespace-nowrap transition-colors cursor-pointer"
-        :class="activeCategory === cat.id 
-          ? 'bg-cyan-500/30 text-cyan-100 font-normal border border-cyan-300 shadow-[0_0_8px_rgba(0,242,255,0.2)]' 
-          : 'text-cyan-300/90 hover:text-white hover:bg-[#183761] border border-transparent font-light'"
+        @click="emit('open:symbol-modal')"
+        class="flex items-center gap-1 text-[10px] font-mono text-cyan-200 bg-[#1c3e6c] hover:bg-cyan-600 hover:text-slate-950 border border-cyan-400/80 px-2 py-0.5 rounded cursor-pointer transition-all shadow-xs"
+        title="管理与制作自定义图元工坊"
       >
-        {{ cat.label }}
+        <FolderOpen class="w-3 h-3 text-cyan-300" />
+        <span class="font-light">图元工坊</span>
       </button>
     </div>
 
-    <!-- Component Item Cards List -->
-    <div class="flex-1 overflow-y-auto p-2 space-y-1.5 custom-scrollbar">
-      <div
-        v-for="item in filteredComponents"
-        :key="item.type + item.name + (item.defaultCustomProps?.symbolId || '')"
-        draggable="true"
-        @dragstart="handleDragStart($event, item)"
-        @click="emit('add:component', item)"
-        class="group p-2 rounded-xl bg-[#142c4e] hover:bg-[#183761] border border-cyan-500/40 hover:border-cyan-300 transition-all cursor-pointer hover:shadow-[0_0_14px_rgba(0,242,255,0.35)] flex items-start gap-2.5 relative"
+    <!-- Component Item Cards List: Collapsible Accordion Sections (Default All Collapsed) -->
+    <div class="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
+      <div 
+        v-for="catGroup in groupedComponents" 
+        :key="catGroup.id" 
+        class="rounded-lg bg-[#142c4e]/50 border border-cyan-500/25 overflow-hidden transition-colors"
       >
-        <!-- Icon preview badge -->
-        <div class="w-9 h-9 rounded-lg bg-[#10213b] border border-cyan-400/60 group-hover:border-cyan-300 flex items-center justify-center text-cyan-300 group-hover:text-cyan-100 shrink-0 shadow-inner group-hover:scale-105 transition-transform">
-          <component :is="getIcon(item.iconName)" class="w-4 h-4 stroke-[2]" />
+        <!-- Category Section Header: Click to expand / collapse -->
+        <div 
+          @click="toggleSection(catGroup.id)"
+          class="flex items-center justify-between px-3 py-2 bg-[#163056] hover:bg-[#1a3864] text-xs font-mono text-cyan-200 cursor-pointer select-none transition-colors sticky top-0 z-10"
+        >
+          <div class="flex items-center gap-2">
+            <span>{{ catGroup.icon }}</span>
+            <span class="font-normal">{{ catGroup.label }}</span>
+            <span class="text-[10px] text-cyan-300/70 font-light">({{ catGroup.items.length }})</span>
+          </div>
+          <ChevronDown 
+            class="w-3.5 h-3.5 text-cyan-300 transition-transform duration-200" 
+            :class="{ '-rotate-90': !expandedSections[catGroup.id] }"
+          />
         </div>
 
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center justify-between">
-            <h4 class="text-xs font-mono font-light text-cyan-100 group-hover:text-cyan-200 transition-colors truncate tracking-wide">
-              {{ item.name }}
-            </h4>
-            <div class="flex items-center gap-1">
-              <Plus class="w-3.5 h-3.5 text-cyan-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+        <!-- Category Section Items (Collapsed by default, shown when expanded) -->
+        <div v-show="expandedSections[catGroup.id]" class="p-2 space-y-1.5 border-t border-cyan-500/20 bg-[#0e1e36]/60">
+          <div
+            v-for="item in catGroup.items"
+            :key="item.type + item.name + (item.defaultCustomProps?.symbolId || '')"
+            draggable="true"
+            @dragstart="handleDragStart($event, item)"
+            @click="emit('add:component', item)"
+            class="group p-2 rounded-xl bg-[#142c4e] hover:bg-[#183761] border border-cyan-500/40 hover:border-cyan-300 transition-all cursor-pointer hover:shadow-[0_0_14px_rgba(0,242,255,0.35)] flex items-start gap-2.5 relative"
+            :title="`拖拽或点击添加「${item.name}」到画布`"
+          >
+            <!-- Icon preview badge -->
+            <div class="w-9 h-9 rounded-lg bg-[#10213b] border border-cyan-400/60 group-hover:border-cyan-300 flex items-center justify-center text-cyan-300 group-hover:text-cyan-100 shrink-0 shadow-inner group-hover:scale-105 transition-transform">
+              <component :is="getIcon(item.iconName)" class="w-4 h-4 stroke-[2]" />
             </div>
-          </div>
-          <!-- High-contrast Dimensions Badge & Category -->
-          <div class="flex items-center gap-1.5 mt-1 text-[10px] font-mono">
-            <span class="px-1.5 py-0.2 rounded bg-[#10213b] text-cyan-300 font-light border border-cyan-500/40 text-[9px]">
-              {{ item.defaultWidth }} × {{ item.defaultHeight }}
-            </span>
-            <span class="text-cyan-300/80 text-[9px] uppercase font-light">{{ item.category }}</span>
+
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between">
+                <h4 class="text-xs font-mono font-light text-cyan-100 group-hover:text-cyan-200 transition-colors truncate tracking-wide">
+                  {{ item.name }}
+                </h4>
+                <Plus class="w-3.5 h-3.5 text-cyan-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+              </div>
+              <!-- High-contrast Dimensions Badge & Category -->
+              <div class="flex items-center gap-1.5 mt-1 text-[10px] font-mono">
+                <span class="px-1.5 py-0.2 rounded bg-[#10213b] text-cyan-300 font-light border border-cyan-500/40 text-[9px]">
+                  {{ item.defaultWidth }} × {{ item.defaultHeight }}
+                </span>
+                <span class="text-cyan-300/80 text-[9px] uppercase font-light">{{ item.category }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-
-    <!-- Bottom Drag/Placement Hint -->
-    <div class="p-2 border-t border-cyan-500/30 text-[10px] font-mono text-cyan-300 text-center bg-[#10213b] font-light">
-      💡 单击选中组件后，在屏幕确定起始和终止点
     </div>
   </aside>
 </template>

@@ -39,7 +39,7 @@ const emit = defineEmits<{
 
 const compType = computed(() => props.component?.type || '');
 const compCategory = computed(() => props.component?.category || '');
-const isComposite = computed(() => props.component?.type === 'composite-symbol' || Boolean(props.component?.children?.length));
+const isComposite = computed(() => props.component?.type === 'composite-symbol' || Boolean(props.component?.children?.length) || Boolean(props.component?.states?.length));
 </script>
 
 <template>
