@@ -213,13 +213,13 @@ const contentBBox = computed(() => {
   };
 });
 
-// Tight canvas dimensions based on minimal bounding box of content
-const canvasWidth = computed(() => contentBBox.value.width);
-const canvasHeight = computed(() => contentBBox.value.height);
-const offsetX = computed(() => -contentBBox.value.minX);
-const offsetY = computed(() => -contentBBox.value.minY);
+// Standard SCADA Fixed Canvas Dimensions (default 1920x1080)
+const canvasWidth = computed(() => props.screen?.width || 1920);
+const canvasHeight = computed(() => props.screen?.height || 1080);
+const offsetX = computed(() => 0);
+const offsetY = computed(() => 0);
 
-// Calculate scale factor
+// Calculate scale factor & Pixel-Perfect 1:1 detection
 const scaleRatio = computed(() => {
   const cw = canvasWidth.value;
   const ch = canvasHeight.value;
@@ -234,6 +234,11 @@ const scaleRatio = computed(() => {
   // 'fit' maintains aspect ratio
   const s = Math.min(sx, sy);
   return { scaleX: s, scaleY: s };
+});
+
+const isExactPixelMatch = computed(() => {
+  return scaleMode.value === 'original' || 
+    (Math.abs(scaleRatio.value.scaleX - 1) < 0.005 && Math.abs(scaleRatio.value.scaleY - 1) < 0.005);
 });
 
 const toggleBrowserFullscreen = () => {
@@ -472,8 +477,8 @@ const handlePreviewContextMenu = (e: MouseEvent, comp?: ScreenComponent) => {
 
   contextMenu.value = {
     visible: true,
-    x: Math.min(window.innerWidth - 220, e.clientX),
-    y: Math.min(window.innerHeight - 340, e.clientY),
+    x: Math.round(Math.min(window.innerWidth - 240, Math.max(10, e.clientX))),
+    y: Math.round(Math.min(window.innerHeight - 340, Math.max(10, e.clientY))),
     targetComponent: comp || null,
     targetDeviceId: targetDev,
     targetPointId: targetPt
@@ -545,19 +550,21 @@ onBeforeUnmount(() => {
     @contextmenu.prevent="handlePreviewContextMenu($event)"
     class="fixed inset-0 bg-[#02050b] z-50 overflow-hidden select-none font-sans"
   >
-    <!-- Scaled Screen Canvas View: Perfectly centered using absolute translate + scale -->
+    <!-- Scaled Screen Canvas View: Perfectly centered without layout jumps -->
     <div
-      class="absolute transition-transform duration-100 ease-out"
+      class="absolute"
       :style="{
         width: `${canvasWidth}px`,
         height: `${canvasHeight}px`,
         left: '50%',
         top: '50%',
-        transform: `translate(-50%, -50%) scale(${scaleRatio.scaleX}, ${scaleRatio.scaleY})`,
+        transform: isExactPixelMatch 
+          ? 'translate(-50%, -50%)' 
+          : `translate(-50%, -50%) scale(${scaleRatio.scaleX}, ${scaleRatio.scaleY})`,
         transformOrigin: 'center center',
         backgroundColor: screen.backgroundColor || '#040810',
         backgroundImage: 'none',
-        boxShadow: '0 0 60px rgba(0,0,0,0.95)'
+        boxShadow: isExactPixelMatch ? 'none' : '0 0 60px rgba(0,0,0,0.95)'
       }"
     >
       <!-- Components in Z-Index Order -->
@@ -574,7 +581,7 @@ onBeforeUnmount(() => {
           top: `${(comp.y || 0) + offsetY}px`,
           width: `${comp.width}px`,
           height: `${comp.height}px`,
-          transform: comp.rotation ? `rotate(${comp.rotation}deg)` : 'translateZ(0)',
+          transform: comp.rotation ? `rotate(${comp.rotation}deg)` : undefined,
           zIndex: comp.zIndex || 1,
           contain: 'layout style paint'
         }"
@@ -593,31 +600,31 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <!-- Hovered Point Information Tooltip (完整显示测点/装置详细遥测遥信参数，紧随光标) -->
+    <!-- Hovered Point Information Tooltip (完整显示测点/装置详细遥测遥信参数，紧随光标，无模糊滤镜) -->
     <div
       v-if="hoverTooltip && hoverTooltip.visible"
-      class="fixed z-50 pointer-events-none bg-[#050c1e]/98 border border-cyan-500/70 p-3 rounded-xl shadow-[0_12px_35px_rgba(0,0,0,0.92)] font-mono text-xs text-white w-76 animate-in fade-in duration-75 backdrop-blur-xl flex flex-col gap-2"
+      class="fixed z-50 pointer-events-none bg-[#091326] border border-cyan-500/70 p-3 rounded-lg shadow-[0_12px_35px_rgba(0,0,0,0.95)] font-mono text-xs text-white w-76 flex flex-col gap-2"
       :style="{
-        left: `${hoverTooltip.x}px`,
-        top: `${hoverTooltip.y}px`
+        left: `${Math.round(hoverTooltip.x)}px`,
+        top: `${Math.round(hoverTooltip.y)}px`
       }"
     >
       <!-- Header: Device & Point Type Badge -->
-      <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
         <div class="flex items-center gap-1.5 truncate">
           <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping shrink-0" />
-          <span class="text-slate-300 font-bold truncate">
+          <span class="text-slate-200 font-bold truncate">
             {{ hoverTooltip.device ? hoverTooltip.device.name : 'SCADA测控装置' }}
           </span>
         </div>
         <span
           class="text-[10px] px-1.5 py-0.5 rounded font-bold uppercase shrink-0"
           :class="{
-            'bg-cyan-950 text-cyan-300 border border-cyan-500/40': hoverTooltip.pointType === 'YC',
-            'bg-emerald-950 text-emerald-300 border border-emerald-500/40': hoverTooltip.pointType === 'YX',
-            'bg-purple-950 text-purple-300 border border-purple-500/40': hoverTooltip.pointType === 'YK',
-            'bg-amber-950 text-amber-300 border border-amber-500/40': hoverTooltip.pointType === 'YT',
-            'bg-blue-950 text-blue-300 border border-blue-500/40': hoverTooltip.pointType === 'DD'
+            'bg-cyan-950 text-cyan-300 border border-cyan-500/50': hoverTooltip.pointType === 'YC',
+            'bg-emerald-950 text-emerald-300 border border-emerald-500/50': hoverTooltip.pointType === 'YX',
+            'bg-purple-950 text-purple-300 border border-purple-500/50': hoverTooltip.pointType === 'YK',
+            'bg-amber-950 text-amber-300 border border-amber-500/50': hoverTooltip.pointType === 'YT',
+            'bg-blue-950 text-blue-300 border border-blue-500/50': hoverTooltip.pointType === 'DD'
           }"
         >
           {{ hoverTooltip.pointType }}_{{ hoverTooltip.pointId }}
@@ -626,72 +633,72 @@ onBeforeUnmount(() => {
 
       <!-- Point Name & Value -->
       <div class="space-y-1">
-        <div class="text-slate-400 text-[11px] truncate">
-          测点名称: <span class="text-slate-100 font-bold">{{ hoverTooltip.pointName || '未命名测点' }}</span>
+        <div class="text-slate-300 text-[11px] truncate">
+          测点名称: <span class="text-white font-bold">{{ hoverTooltip.pointName || '未命名测点' }}</span>
         </div>
 
-        <div class="flex items-center justify-between bg-[#030712]/90 px-2.5 py-1.5 rounded-lg border border-slate-800/80">
-          <span class="text-[11px] text-slate-400">实时数值/状态:</span>
+        <div class="flex items-center justify-between bg-[#040914] px-2.5 py-1.5 rounded-lg border border-slate-800">
+          <span class="text-[11px] text-slate-300 font-medium">实时数值/状态:</span>
           <div class="flex items-center gap-1.5 font-bold">
             <span
               v-if="hoverTooltip.statusText"
               class="px-1.5 py-0.2 rounded text-[11px]"
-              :class="hoverTooltip.currentValue === 1 ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' : (hoverTooltip.currentValue === 2 ? 'bg-rose-950 text-rose-300 border border-rose-500/40' : 'bg-slate-900 text-slate-300 border border-slate-700')"
+              :class="hoverTooltip.currentValue === 1 ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/50 font-bold' : (hoverTooltip.currentValue === 2 ? 'bg-rose-950 text-rose-300 border border-rose-500/50 font-bold' : 'bg-slate-900 text-slate-200 border border-slate-700')"
             >
               {{ hoverTooltip.statusText }} ({{ hoverTooltip.currentValue }})
             </span>
-            <span v-else class="text-cyan-300 text-sm">
+            <span v-else class="text-cyan-300 text-sm font-bold">
               {{ typeof hoverTooltip.currentValue === 'number' ? hoverTooltip.currentValue.toFixed(2) : hoverTooltip.currentValue }}
-              <span v-if="hoverTooltip.unit" class="text-[11px] text-cyan-500 ml-0.5">{{ hoverTooltip.unit }}</span>
+              <span v-if="hoverTooltip.unit" class="text-[11px] text-cyan-400 ml-0.5 font-mono">{{ hoverTooltip.unit }}</span>
             </span>
           </div>
         </div>
       </div>
 
       <!-- Extra SCADA Telemetry & Quality Info -->
-      <div class="pt-1.5 border-t border-slate-800/80 text-[10px] text-slate-400 space-y-1">
+      <div class="pt-1.5 border-t border-slate-800 text-[10px] text-slate-300 space-y-1">
         <div class="flex items-center justify-between">
-          <span>装置编号: <span class="text-slate-300">{{ hoverTooltip.device ? hoverTooltip.device.deviceId : 'DEV-101' }}</span></span>
-          <span class="text-emerald-400 font-mono">品质: 1 (正常在线)</span>
+          <span>装置编号: <span class="text-slate-100 font-mono font-medium">{{ hoverTooltip.device ? hoverTooltip.device.deviceId : 'DEV-101' }}</span></span>
+          <span class="text-emerald-400 font-mono font-semibold">品质: 1 (正常在线)</span>
         </div>
-        <div v-if="hoverTooltip.verifyText" class="text-purple-300 truncate">
+        <div v-if="hoverTooltip.verifyText" class="text-purple-300 truncate font-medium">
           {{ hoverTooltip.verifyText }}
         </div>
       </div>
     </div>
 
-    <!-- Right-Click SCADA Context Menu (右击精简菜单：切换编辑模式、控制底栏显隐、遥控置数、缩放比例、数据流开关) -->
+    <!-- Right-Click SCADA Context Menu (Solid, Ultra-High-Contrast, Razor-Sharp Luminous Menu) -->
     <div
       v-if="contextMenu.visible"
       @click.stop
-      class="fixed z-50 bg-[#060c1c]/95 backdrop-blur-xl border border-cyan-500/40 rounded-xl shadow-[0_15px_45px_rgba(0,0,0,0.9)] w-56 py-1.5 text-xs text-slate-200 font-sans divide-y divide-slate-800/80 animate-in fade-in zoom-in-95 duration-100"
+      class="fixed z-50 bg-[#060c1c] border-2 border-cyan-400 rounded-lg shadow-[0_15px_45px_rgba(0,0,0,0.98)] w-64 py-1.5 text-xs text-white font-sans divide-y divide-cyan-950/70"
       :style="{
-        left: `${contextMenu.x}px`,
-        top: `${contextMenu.y}px`
+        left: `${Math.round(contextMenu.x)}px`,
+        top: `${Math.round(contextMenu.y)}px`
       }"
     >
       <!-- Section 1: Switch to Edit Mode & Fullscreen (切换编辑界面 / 全屏 - 迁移到右击菜单中) -->
       <div class="py-1">
         <button
           @click="handleExitPreview(); closeContextMenu();"
-          class="w-full px-3 py-1.5 text-left hover:bg-rose-950/80 text-rose-300 flex items-center justify-between cursor-pointer group font-bold"
+          class="w-full px-3 py-1.5 text-left bg-[#200a10] hover:bg-rose-600 text-rose-200 hover:text-white border-y border-rose-500/40 flex items-center justify-between cursor-pointer group font-normal transition-colors"
         >
           <span class="flex items-center gap-2">
-            <Edit3 class="w-4 h-4 text-rose-400 group-hover:scale-110 transition-transform" />
-            <span>切换编辑界面 / 退出监控</span>
+            <Edit3 class="w-4 h-4 text-rose-300 group-hover:text-white" />
+            <span class="text-rose-100 group-hover:text-white font-normal tracking-wide text-xs">切换编辑界面 / 退出监控</span>
           </span>
-          <span class="text-[10px] text-rose-500 font-mono">ESC</span>
+          <span class="text-[10px] text-rose-300 font-mono font-normal">ESC</span>
         </button>
 
         <button
           @click="toggleBrowserFullscreen(); closeContextMenu();"
-          class="w-full px-3 py-1.5 text-left hover:bg-cyan-950/80 text-cyan-200 hover:text-cyan-100 flex items-center justify-between cursor-pointer group"
+          class="w-full px-3 py-1.5 text-left hover:bg-[#112444] text-white hover:text-cyan-100 flex items-center justify-between cursor-pointer group transition-colors mt-0.5"
         >
           <span class="flex items-center gap-2">
-            <component :is="isBrowserFullscreen ? Minimize : Maximize" class="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
-            <span>{{ isBrowserFullscreen ? '退出全屏显示' : '进入全屏大屏模式' }}</span>
+            <component :is="isBrowserFullscreen ? Minimize : Maximize" class="w-4 h-4 text-cyan-300" />
+            <span class="text-white group-hover:text-cyan-100 font-normal tracking-wide text-xs">{{ isBrowserFullscreen ? '退出全屏显示' : '进入全屏大屏模式' }}</span>
           </span>
-          <span class="text-[10px] text-cyan-500 font-mono">F11</span>
+          <span class="text-[10px] text-cyan-300 font-mono">F11</span>
         </button>
       </div>
 
@@ -699,13 +706,13 @@ onBeforeUnmount(() => {
       <div class="py-1">
         <button
           @click="handleOpenControlFromMenu"
-          class="w-full px-3 py-1.5 text-left hover:bg-cyan-950/80 text-cyan-300 flex items-center justify-between cursor-pointer group"
+          class="w-full px-3 py-1.5 text-left bg-[#1f1505] hover:bg-amber-500 hover:text-slate-950 text-amber-200 hover:text-slate-950 border border-amber-500/50 rounded-md flex items-center justify-between cursor-pointer group transition-colors"
         >
-          <span class="flex items-center gap-2 font-bold">
-            <Zap class="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
-            <span>SCADA 遥控/遥调置数</span>
+          <span class="flex items-center gap-2">
+            <Zap class="w-4 h-4 text-amber-300 group-hover:text-slate-950" />
+            <span class="text-amber-100 group-hover:text-slate-950 font-normal tracking-wide text-xs">SCADA 遥控/遥调置数</span>
           </span>
-          <span class="text-[10px] text-cyan-500 font-mono">YK/YT</span>
+          <span class="text-[10px] text-amber-300 group-hover:text-slate-950 font-mono font-normal">YK/YT</span>
         </button>
       </div>
 
@@ -713,14 +720,14 @@ onBeforeUnmount(() => {
       <div class="py-1">
         <button
           @click="showBottomBar = !showBottomBar; closeContextMenu();"
-          class="w-full px-3 py-1.5 text-left hover:bg-slate-800/80 flex items-center justify-between cursor-pointer group"
-          :class="showBottomBar ? 'text-cyan-300 font-bold bg-cyan-950/40' : 'text-slate-300'"
+          class="w-full px-3 py-1.5 text-left hover:bg-[#112444] flex items-center justify-between cursor-pointer group transition-colors"
+          :class="showBottomBar ? 'text-cyan-300 font-normal bg-[#0e2242]' : 'text-white hover:text-cyan-100'"
         >
           <span class="flex items-center gap-2">
-            <PanelBottom class="w-4 h-4 text-cyan-400" />
-            <span>{{ showBottomBar ? '隐藏底部工具栏' : '显示底部工具栏' }}</span>
+            <PanelBottom class="w-4 h-4 text-cyan-300" />
+            <span class="text-white group-hover:text-cyan-100 font-normal tracking-wide text-xs">{{ showBottomBar ? '隐藏底部工具栏' : '显示底部工具栏' }}</span>
           </span>
-          <component :is="showBottomBar ? CheckSquare : Square" class="w-3.5 h-3.5 text-cyan-400" />
+          <component :is="showBottomBar ? CheckSquare : Square" class="w-3.5 h-3.5 text-cyan-300" />
         </button>
       </div>
 
@@ -728,38 +735,38 @@ onBeforeUnmount(() => {
       <div class="py-1">
         <button
           @click="emit('toggle:streaming'); closeContextMenu();"
-          class="w-full px-3 py-1.5 text-left hover:bg-slate-800/80 flex items-center justify-between cursor-pointer"
-          :class="isStreaming ? 'text-emerald-400' : 'text-slate-400'"
+          class="w-full px-3 py-1.5 text-left hover:bg-[#112444] flex items-center justify-between cursor-pointer transition-colors"
+          :class="isStreaming ? 'text-emerald-300' : 'text-slate-300'"
         >
-          <span class="flex items-center gap-2">
-            <Pause v-if="isStreaming" class="w-3.5 h-3.5" />
-            <Play v-else class="w-3.5 h-3.5" />
-            <span>{{ isStreaming ? '暂停实时数据流' : '恢复实时数据流' }}</span>
+          <span class="flex items-center gap-2 font-normal">
+            <Pause v-if="isStreaming" class="w-3.5 h-3.5 text-emerald-300" />
+            <Play v-else class="w-3.5 h-3.5 text-slate-400" />
+            <span :class="isStreaming ? 'text-emerald-200 font-normal tracking-wide text-xs' : 'text-slate-200 font-normal tracking-wide text-xs'">{{ isStreaming ? '暂停实时数据流' : '恢复实时数据流' }}</span>
           </span>
         </button>
 
         <!-- Scale Mode Submenu / Toggle -->
-        <div class="px-3 py-1 flex items-center justify-between text-[11px] text-slate-400">
-          <span>显示比例:</span>
+        <div class="px-3 py-1.5 flex items-center justify-between text-[11px] text-slate-200">
+          <span class="font-normal text-slate-200">显示比例:</span>
           <div class="flex items-center gap-1 font-mono">
             <button
               @click="scaleMode = 'fit'"
-              class="px-1.5 py-0.5 rounded text-[10px]"
-              :class="scaleMode === 'fit' ? 'bg-cyan-500/30 text-cyan-300 font-bold' : 'hover:text-white'"
+              class="px-2 py-0.5 rounded text-[10px] font-normal border transition-colors cursor-pointer"
+              :class="scaleMode === 'fit' ? 'bg-cyan-500 text-slate-950 border-cyan-300 font-medium' : 'bg-[#0e2242] text-white border-cyan-500/40 hover:text-cyan-200'"
             >
               自适应
             </button>
             <button
               @click="scaleMode = 'fill'"
-              class="px-1.5 py-0.5 rounded text-[10px]"
-              :class="scaleMode === 'fill' ? 'bg-cyan-500/30 text-cyan-300 font-bold' : 'hover:text-white'"
+              class="px-2 py-0.5 rounded text-[10px] font-normal border transition-colors cursor-pointer"
+              :class="scaleMode === 'fill' ? 'bg-cyan-500 text-slate-950 border-cyan-300 font-medium' : 'bg-[#0e2242] text-white border-cyan-500/40 hover:text-cyan-200'"
             >
               铺满
             </button>
             <button
               @click="scaleMode = 'original'"
-              class="px-1.5 py-0.5 rounded text-[10px]"
-              :class="scaleMode === 'original' ? 'bg-cyan-500/30 text-cyan-300 font-bold' : 'hover:text-white'"
+              class="px-2 py-0.5 rounded text-[10px] font-normal border transition-colors cursor-pointer"
+              :class="scaleMode === 'original' ? 'bg-cyan-500 text-slate-950 border-cyan-300 font-medium' : 'bg-[#0e2242] text-white border-cyan-500/40 hover:text-cyan-200'"
             >
               1:1
             </button>

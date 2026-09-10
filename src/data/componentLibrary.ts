@@ -1245,5 +1245,65 @@ export const COMPONENT_DEFINITIONS: ComponentDefinition[] = [
       borderStyle: 'deco-border-scada-card'
     },
     defaultData: { mapping: {} }
+  },
+
+  // ==========================================
+  // 11. Media & Video Surveillance (多媒体图片与工业视频监控)
+  // ==========================================
+  {
+    type: 'media-image',
+    category: 'media',
+    name: '图片展示 / 拓扑底图',
+    nameEn: 'Image / Picture Frame',
+    iconName: 'Image',
+    description: '支持本地图片上传、Base64离线工程自适应、凝思Linux深度适配',
+    defaultWidth: 320,
+    defaultHeight: 200,
+    defaultStyle: {
+      stroke: 'transparent',
+      strokeWidth: 0,
+      borderRadius: 0,
+      borderColor: 'transparent',
+      borderWidth: 0,
+      fill: 'transparent'
+    },
+    defaultCustomProps: {
+      src: '',
+      objectFit: 'contain',
+      imageFilter: 'none',
+      linxCompat: true
+    },
+    defaultData: { mapping: {} }
+  },
+  {
+    type: 'media-video',
+    category: 'media',
+    name: '工业视频监控 / 摄像机',
+    nameEn: 'Video / Camera Stream',
+    iconName: 'Video',
+    description: '工业现场摄像头监视画面、本地视频上传、凝思Linux硬解循环播放',
+    defaultWidth: 400,
+    defaultHeight: 240,
+    defaultStyle: {
+      stroke: 'transparent',
+      strokeWidth: 0,
+      borderRadius: 0,
+      borderColor: 'transparent',
+      borderWidth: 0,
+      backgroundColor: '#040812'
+    },
+    defaultCustomProps: {
+      src: '',
+      cameraTitle: '110kV 主变场地视频监视',
+      channelId: 'CAM-01',
+      autoplay: true,
+      loop: true,
+      muted: true,
+      showControls: false,
+      showOverlay: true,
+      objectFit: 'cover',
+      linxCompat: true
+    },
+    defaultData: { mapping: {} }
   }
 ];

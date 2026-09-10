@@ -3,29 +3,46 @@ import path from 'path';
 import fs from 'fs';
 import net from 'net';
 
-// Linux & 老工控机/凝思系统稳定性兼容参数
+// ==============================================================================
+// 凝思安全操作系统 (Linx OS 4.9.x) / Intel 2代核显 (i915) / 96DPI VGA 屏幕高清抗模糊专用配置
+// ==============================================================================
 if (process.platform === 'linux') {
+  // 1. 基础安全沙箱与共享内存稳定性
   app.commandLine.appendSwitch('no-sandbox');
   app.commandLine.appendSwitch('disable-gpu-sandbox');
-  app.commandLine.appendSwitch('disable-dev-shm-usage'); // 关键：解决共享内存不足导致的渲染器崩溃
+  app.commandLine.appendSwitch('disable-dev-shm-usage'); // 解决共享内存不足导致的渲染器崩溃
   app.commandLine.appendSwitch('disable-gpu-process-crash-limit');
-  
-  // 字体清晰度与色彩配置文件 (凝思系统/Linux LCD 亚像素高清渲染核心优化)
-  app.commandLine.appendSwitch('enable-font-antialiasing');
-  app.commandLine.appendSwitch('enable-lcd-text'); // 开启 LCD RGB 次像素文字渲染，杜绝灰度抗锯齿导致的字体模糊发虚
-  app.commandLine.appendSwitch('font-render-hinting', process.env.SCADA_FONT_HINTING || 'slight'); // Linux CJK 字体最优微调模式
-  app.commandLine.appendSwitch('force-device-scale-factor', process.env.SCADA_SCALE_FACTOR || '1');
+
+  // 2. 核心抗模糊：锁定 1:1 像素比，彻底防止 VGA 480x270mm EDID 导致 Chromium 自动计算 1.05x/1.1x 模糊缩放
+  const customScale = process.env.SCADA_SCALE_FACTOR || '1';
+  app.commandLine.appendSwitch('force-device-scale-factor', customScale);
   app.commandLine.appendSwitch('high-dpi-support', '1');
   app.commandLine.appendSwitch('force-color-profile', 'srgb');
 
-  // 图像与 2D Canvas 矢量硬加速优化
-  app.commandLine.appendSwitch('enable-features', 'Accelerated2dCanvas,OverlayScrollbar,CanvasOopRasterization');
+  // 3. 字体清晰度与 FreeType 亚像素渲染 (针对 96 DPI VGA 屏幕深度调优)
+  app.commandLine.appendSwitch('enable-font-antialiasing');
+  app.commandLine.appendSwitch('enable-lcd-text'); // 开启 LCD RGB 次像素文字微调，消除灰度抗锯齿导致的字体发虚发灰
+  
+  // 关键：Linux 96 DPI 屏幕下，medium/full hinting 将汉字横平竖直笔画对齐到物理屏幕整数像素，彻底消除模糊
+  const hintingMode = process.env.SCADA_FONT_HINTING || (process.argv.includes('--hinting-full') ? 'full' : 'medium');
+  app.commandLine.appendSwitch('font-render-hinting', hintingMode);
 
-  // 关键优化：解决凝思系统 SwiftShader 软件渲染下的 Passthrough 报错，并启用校验解码器提升平移/旋转帧率
+  // 4. 视频硬解与显卡内存优化 (解决 Linux 纯 CPU 软解视频占用高、卡顿问题)
+  app.commandLine.appendSwitch('ignore-gpu-blocklist');
+  app.commandLine.appendSwitch('enable-gpu-rasterization');
+  app.commandLine.appendSwitch('enable-zero-copy');
+  app.commandLine.appendSwitch('enable-accelerated-video-decode');
+  app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,Accelerated2dCanvas,OverlayScrollbar');
+
+  // 5. 校验解码器与命令流平滑
   app.commandLine.appendSwitch('use-cmd-decoder', 'validating');
 
-  // 如果遇到显卡驱动不支持（如 ANGLE/Mesa 0x0500 报错），允许通过 --disable-gpu 或环境变量强制纯软件渲染
-  if (process.argv.includes('--disable-gpu') || process.env.SCADA_DISABLE_GPU === '1') {
+  // 如果用户手动传入 --disable-gpu 或 --software-render，彻底启用 CPU 纯软渲染
+  if (
+    process.argv.includes('--disable-gpu') || 
+    process.argv.includes('--software-render') || 
+    process.env.SCADA_DISABLE_GPU === '1'
+  ) {
     app.disableHardwareAcceleration();
     app.commandLine.appendSwitch('disable-gpu');
     app.commandLine.appendSwitch('disable-gpu-compositing');

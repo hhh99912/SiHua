@@ -64,7 +64,12 @@ import {
   ArrowDownToLine,
   Eye,
   EyeOff,
-  Paintbrush
+  Paintbrush,
+  Image as ImageIcon,
+  Video,
+  UploadCloud,
+  Camera,
+  Film
 } from 'lucide-vue-next';
 import { ScreenComponent, ScreenConfig, DatasetItem, ScreenItem, ScadaDeviceItem } from '../types';
 import {
@@ -105,10 +110,11 @@ const emit = defineEmits<{
   (e: 'delete', ids: string[]): void;
   (e: 'open:batch:points'): void;
   (e: 'open:control', deviceId: string): void;
+  (e: 'open:data-association', component?: ScreenComponent): void;
   (e: 'close'): void;
 }>();
 
-const activeTab = ref<'geometry' | 'style' | 'data' | 'interaction'>('geometry');
+const activeTab = ref<'geometry' | 'style' | 'interaction'>('geometry');
 
 // Unified SCADA & JSON Data Association State
 const targetBindProperty = ref<string>('value');
@@ -284,28 +290,138 @@ const isChartComponent = computed(() => {
 });
 
 // 样式分类判定 (精准匹配当前组件相关样式，排除非相关样式、排除形态切换和双态颜色)
+const isCustomOrStatusComponent = computed(() => {
+  if (!props.component) return false;
+  const t = props.component.type;
+  const c = props.component.category;
+  if (t === 'composite-symbol' || c === 'custom' || props.component.customProps?.isCustomSymbol || props.component.customProps?.symbolId || (props.component.states && props.component.states.length > 0)) {
+    return true;
+  }
+  if (isSystemStatusComponent.value) {
+    return true;
+  }
+  return false;
+});
+
+const isMediaImageComponent = computed(() => {
+  if (!props.component) return false;
+  return props.component.type === 'media-image';
+});
+
+const isMediaVideoComponent = computed(() => {
+  if (!props.component) return false;
+  return props.component.type === 'media-video';
+});
+
 const isNoStyleComponent = computed(() => {
   if (!props.component) return false;
   const t = props.component.type;
   const c = props.component.category;
-  // 自定义图元、复合图元、多状态图元
-  if (t === 'composite-symbol' || c === 'custom' || props.component.customProps?.isCustomSymbol || props.component.customProps?.symbolId || (props.component.states && props.component.states.length > 0)) {
+  if (isCustomOrStatusComponent.value) {
     return true;
   }
-  // 图标组件与多媒体图元
-  if (t.startsWith('icon-') || t === 'icon' || c === 'media') {
+  // 多媒体图片与视频拥有专属高级配置，不作为普通无样式组件
+  if (isMediaImageComponent.value || isMediaVideoComponent.value) {
+    return false;
+  }
+  // 图标组件
+  if (t.startsWith('icon-') || t === 'icon') {
     return true;
   }
   // 电力一次系统固定结构矢量设备 (主变、互感器、避雷器)
   if (['elec-transformer', 'elec-ct', 'elec-pt', 'elec-arrester'].includes(t)) {
     return true;
   }
-  // 状态指示灯与开关设备 (已移除双态颜色与指示灯形态切换，均为专属工程拓扑图元)
-  if (['ctrl-indicator', 'elec-breaker', 'elec-disconnector', 'elec-grounding', 'elec-handcart'].includes(t)) {
-    return true;
-  }
   return false;
 });
+
+// Image Upload Handler for Property Inspector (Local Upload Only)
+const handleInspectorImageUpload = (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    alert('请选择有效的图片文件 (PNG, JPG, JPEG, SVG, WebP, GIF, BMP)');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const result = event.target?.result as string;
+    updateComponentProps({
+      customProps: {
+        ...(props.component?.customProps || {}),
+        src: result,
+        fileName: file.name,
+        fileSize: (file.size / 1024).toFixed(1) + ' KB'
+      },
+      style: {
+        ...(props.component?.style || {}),
+        stroke: 'transparent',
+        strokeWidth: 0,
+        borderRadius: 0,
+        borderColor: 'transparent',
+        borderWidth: 0
+      }
+    });
+  };
+  reader.readAsDataURL(file);
+};
+
+const handleClearInspectorImage = () => {
+  updateComponentProps({
+    customProps: {
+      ...(props.component?.customProps || {}),
+      src: '',
+      fileName: '',
+      fileSize: ''
+    }
+  });
+};
+
+// Video Upload Handler for Property Inspector (Local Upload Only)
+const handleInspectorVideoUpload = (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith('video/')) {
+    alert('请选择有效的视频文件 (MP4, WebM, OGG, AVI, MOV)');
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const result = event.target?.result as string;
+    updateComponentProps({
+      customProps: {
+        ...(props.component?.customProps || {}),
+        src: result,
+        fileName: file.name,
+        fileSize: (file.size / (1024 * 1024)).toFixed(2) + ' MB'
+      },
+      style: {
+        ...(props.component?.style || {}),
+        stroke: 'transparent',
+        strokeWidth: 0,
+        borderRadius: 0,
+        borderColor: 'transparent',
+        borderWidth: 0
+      }
+    });
+  };
+  reader.readAsDataURL(file);
+};
+
+const handleClearInspectorVideo = () => {
+  updateComponentProps({
+    customProps: {
+      ...(props.component?.customProps || {}),
+      src: '',
+      fileName: '',
+      fileSize: ''
+    }
+  });
+};
 
 const isNumericMetricComponent = computed(() => {
   if (!props.component) return false;
@@ -2259,14 +2375,6 @@ const toggleBatchVisibility = () => {
           <span>样式</span>
         </button>
         <button
-          @click="activeTab = 'data'"
-          class="flex-1 py-2.5 text-xs font-normal flex items-center justify-center gap-1 transition-colors cursor-pointer border-b-2"
-          :class="activeTab === 'data' ? 'border-cyan-400 text-cyan-200 bg-[#183761] font-normal' : 'border-transparent text-cyan-300/80 hover:text-cyan-100 font-light'"
-        >
-          <Database class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
-          <span>数据</span>
-        </button>
-        <button
           @click="activeTab = 'interaction'"
           class="flex-1 py-2.5 text-xs font-normal flex items-center justify-center gap-1 transition-colors cursor-pointer border-b-2"
           :class="activeTab === 'interaction' ? 'border-cyan-400 text-cyan-200 bg-[#183761] font-normal' : 'border-transparent text-cyan-300/80 hover:text-cyan-100 font-light'"
@@ -2410,12 +2518,337 @@ const toggleBatchVisibility = () => {
 
         <!-- TAB 2: STYLE & PALETTE -->
         <div v-if="activeTab === 'style'" class="space-y-4">
-          <!-- 1. 专属预设图元 (无需配置基础样式: 自定义图元、复合图元、图标、固定拓扑电气设备、开关与指示灯) -->
-          <div v-if="isNoStyleComponent" class="p-8 text-center rounded-xl bg-[#050c1c] border border-cyan-500/20 text-xs font-mono text-cyan-300/60 font-light space-y-2">
+          <!-- 0. 设备状态模拟测试 (针对状态图元与自定义多状态图元) -->
+          <div v-if="(component.states && component.states.length > 0) || isSystemStatusComponent" class="p-3 rounded-xl bg-cyan-950/40 border border-cyan-400/50 space-y-2.5 shadow-sm">
+            <div class="flex items-center justify-between text-xs font-bold text-cyan-300">
+              <span class="flex items-center gap-1.5">
+                <Workflow class="w-4 h-4 text-cyan-400" />
+                <span class="font-normal text-cyan-200">
+                  {{ component.states && component.states.length > 0 ? '自定义图元多状态测试' : '设备状态模拟测试 (0/1切换)' }}
+                </span>
+              </span>
+              <span class="text-[10px] font-mono font-light text-cyan-300 px-1.5 py-0.5 rounded bg-[#050c1c] border border-cyan-500/30">
+                当前: {{ component.states && component.states.length > 0 ? (component.activeState ?? '1') : currentResolvedBinaryState }}
+              </span>
+            </div>
+
+            <!-- Case A: Custom Multi-State Symbols -->
+            <div v-if="component.states && component.states.length > 0" class="grid grid-cols-2 gap-1.5 pt-0.5">
+              <button
+                v-for="st in component.states"
+                :key="st.id"
+                type="button"
+                @click="testMultiState(st.id, st.matchValue ?? st.stateValue)"
+                class="py-1.5 px-2 rounded-lg text-xs font-mono cursor-pointer border transition-all truncate text-left flex items-center justify-between gap-1"
+                :class="isMultiStateActive(st)
+                  ? 'bg-cyan-500 text-slate-950 font-medium border-cyan-400 shadow-[0_0_10px_rgba(0,242,255,0.4)]'
+                  : 'bg-[#050c1c] text-cyan-200 border-cyan-500/30 hover:border-cyan-400 font-light'"
+              >
+                <span class="truncate">{{ st.name }}</span>
+                <span class="text-[9px] px-1 rounded font-mono" :class="isMultiStateActive(st) ? 'bg-slate-950/30 text-slate-950 font-bold' : 'bg-cyan-950 text-cyan-300 border border-cyan-500/40'">
+                  ={{ st.matchValue ?? st.stateValue ?? st.id }}
+                </span>
+              </button>
+            </div>
+
+            <!-- Case B: Standard System Stateful Components (0 / 1 切换) -->
+            <div v-else-if="isSystemStatusComponent" class="grid grid-cols-2 gap-2 pt-0.5">
+              <button
+                type="button"
+                @click="testBinaryState(0)"
+                class="py-2 px-2.5 rounded-lg text-xs font-light cursor-pointer border transition-all flex items-center justify-center gap-2"
+                :class="currentResolvedBinaryState === 0
+                  ? 'bg-slate-700 text-white font-medium border-slate-300 shadow-[0_0_12px_rgba(148,163,184,0.4)]'
+                  : 'bg-[#050c1c] text-slate-300 border-cyan-500/30 hover:border-slate-400'"
+              >
+                <span class="w-2.5 h-2.5 rounded-full" :style="{ backgroundColor: component.customProps?.color0 || '#00e676' }"></span>
+                <span>0: 分闸 / 断开 / 常态</span>
+              </button>
+
+              <button
+                type="button"
+                @click="testBinaryState(1)"
+                class="py-2 px-2.5 rounded-lg text-xs font-light cursor-pointer border transition-all flex items-center justify-center gap-2"
+                :class="currentResolvedBinaryState === 1
+                  ? 'bg-emerald-500 text-slate-950 font-medium border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.4)]'
+                  : 'bg-[#050c1c] text-emerald-300 border-cyan-500/30 hover:border-emerald-400'"
+              >
+                <span class="w-2.5 h-2.5 rounded-full" :style="{ backgroundColor: component.customProps?.color1 || '#ff2233' }"></span>
+                <span>1: 合闸 / 导通 / 动作</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 1. 自定义图元与状态图元 (已在上文展示状态模拟测试，无需展示任何基础外观样式) -->
+          <template v-if="isCustomOrStatusComponent">
+            <!-- 专属工程图元与状态图元无需配置基础外观样式 -->
+          </template>
+
+          <!-- 2. 图片展示图元专属属性配置 (Media Image) - 仅本地上传 & 无边框 -->
+          <div v-else-if="isMediaImageComponent" class="space-y-3">
+            <div class="p-3 rounded-xl bg-[#050e1f] border border-cyan-500/40 space-y-3 shadow-sm">
+              <div class="flex items-center justify-between text-xs font-bold text-cyan-300">
+                <div class="flex items-center gap-1.5">
+                  <ImageIcon class="w-4 h-4 text-cyan-400" />
+                  <span class="font-normal text-cyan-200">图片资源与外观参数配置</span>
+                </div>
+                <span class="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/40 text-[10px] font-mono font-light">
+                  本地上传 / Base64离线工程
+                </span>
+              </div>
+
+              <!-- Dedicated Local Image File Upload Area -->
+              <div class="space-y-2">
+                <label class="text-xs font-normal text-cyan-200 block">本地图片文件上传</label>
+                
+                <div v-if="component.customProps?.src" class="p-2.5 rounded-lg bg-[#09152b] border border-cyan-500/30 flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <img 
+                      :src="component.customProps.src" 
+                      class="w-10 h-10 object-contain rounded bg-black/50 border border-cyan-500/30 shrink-0" 
+                      alt="Thumbnail" 
+                    />
+                    <div class="min-w-0">
+                      <div class="text-xs text-cyan-100 font-mono truncate">
+                        {{ component.customProps?.fileName || '已上传本地图片' }}
+                      </div>
+                      <div class="text-[10px] text-cyan-400 font-mono">
+                        {{ component.customProps?.fileSize || 'Base64 工程内联' }}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <label class="px-2 py-1 rounded bg-[#142c4e] hover:bg-cyan-600 hover:text-slate-950 text-cyan-200 border border-cyan-500/50 hover:border-cyan-300 text-xs cursor-pointer transition-all flex items-center gap-1" title="更换本地图片">
+                      <UploadCloud class="w-3.5 h-3.5" />
+                      <span>更换</span>
+                      <input type="file" accept="image/*" @change="handleInspectorImageUpload" class="hidden" />
+                    </label>
+                    <button
+                      type="button"
+                      @click="handleClearInspectorImage"
+                      class="p-1 rounded hover:bg-red-950 text-red-400 hover:text-red-200 border border-red-500/30 hover:border-red-400 transition-colors cursor-pointer"
+                      title="清除图片"
+                    >
+                      <Trash2 class="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <label 
+                  v-else 
+                  class="border-2 border-dashed border-cyan-500/40 hover:border-cyan-300 bg-[#09152b]/60 hover:bg-cyan-950/40 rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all group"
+                >
+                  <div class="w-9 h-9 rounded-full bg-cyan-950 border border-cyan-500/50 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <UploadCloud class="w-4 h-4 text-cyan-300" />
+                  </div>
+                  <div class="text-center">
+                    <span class="text-xs font-normal text-cyan-200 group-hover:text-white">点击选择本地图片上传</span>
+                    <p class="text-[10px] text-cyan-400/80 font-mono mt-0.5">支持 PNG, JPG, JPEG, SVG, WebP, GIF, BMP</p>
+                  </div>
+                  <input type="file" accept="image/*" @change="handleInspectorImageUpload" class="hidden" />
+                </label>
+              </div>
+
+              <!-- Object Fit & Filter -->
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-normal text-cyan-200 block mb-1">缩放填充模式</label>
+                  <select
+                    :value="component.customProps?.objectFit || 'contain'"
+                    @change="updateComponentProps({ customProps: { ...(component.customProps || {}), objectFit: ($event.target as HTMLSelectElement).value } })"
+                    class="w-full bg-[#09152b] border border-cyan-500/50 focus:border-cyan-300 rounded-lg px-2 py-1.5 text-cyan-100 font-light text-xs outline-hidden"
+                  >
+                    <option value="contain">等比完整 (contain)</option>
+                    <option value="cover">等比填满剪裁 (cover)</option>
+                    <option value="fill">拉伸全满 (fill)</option>
+                    <option value="scale-down">保持原寸 (scale-down)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="text-xs font-normal text-cyan-200 block mb-1">工业滤镜渲染</label>
+                  <select
+                    :value="component.customProps?.imageFilter || 'none'"
+                    @change="updateComponentProps({ customProps: { ...(component.customProps || {}), imageFilter: ($event.target as HTMLSelectElement).value } })"
+                    class="w-full bg-[#09152b] border border-cyan-500/50 focus:border-cyan-300 rounded-lg px-2 py-1.5 text-cyan-100 font-light text-xs outline-hidden"
+                  >
+                    <option value="none">原色 (None)</option>
+                    <option value="hud-dark">暗色科技 HUD</option>
+                    <option value="cyan-tint">青色工控单色</option>
+                    <option value="grayscale">黑白单色 (Gray)</option>
+                    <option value="high-contrast">高对比度清晰</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Linx Linux notice -->
+              <div class="p-2 rounded bg-cyan-950/60 border border-cyan-500/30 text-[10px] text-cyan-300 flex items-start gap-1.5">
+                <ShieldCheck class="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+                <span>凝思 Linux 深度适配：本地上传的图片将以内联 Base64 保存于工程 JSON 中，完全离线运行、迁移无丢图风险。</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. 工业视频监控图元专属属性配置 (Media Video) - 仅本地上传 & 无边框 -->
+          <div v-else-if="isMediaVideoComponent" class="space-y-3">
+            <div class="p-3 rounded-xl bg-[#050e1f] border border-cyan-500/40 space-y-3 shadow-sm">
+              <div class="flex items-center justify-between text-xs font-bold text-cyan-300">
+                <div class="flex items-center gap-1.5">
+                  <Video class="w-4 h-4 text-cyan-400" />
+                  <span class="font-normal text-cyan-200">工业视频监控与摄像机配置</span>
+                </div>
+                <span class="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/40 text-[10px] font-mono font-light">
+                  本地上传 / 凝思硬解
+                </span>
+              </div>
+
+              <!-- Dedicated Local Video File Upload Area -->
+              <div class="space-y-2">
+                <label class="text-xs font-normal text-cyan-200 block">本地视频文件上传</label>
+                
+                <div v-if="component.customProps?.src" class="p-2.5 rounded-lg bg-[#09152b] border border-cyan-500/30 flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <div class="w-10 h-10 rounded bg-black/60 border border-cyan-500/30 flex items-center justify-center shrink-0">
+                      <Video class="w-5 h-5 text-cyan-300" />
+                    </div>
+                    <div class="min-w-0">
+                      <div class="text-xs text-cyan-100 font-mono truncate">
+                        {{ component.customProps?.fileName || '已上传本地视频' }}
+                      </div>
+                      <div class="text-[10px] text-cyan-400 font-mono">
+                        {{ component.customProps?.fileSize || '本地视频媒体流' }}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <label class="px-2 py-1 rounded bg-[#142c4e] hover:bg-cyan-600 hover:text-slate-950 text-cyan-200 border border-cyan-500/50 hover:border-cyan-300 text-xs cursor-pointer transition-all flex items-center gap-1" title="更换本地视频">
+                      <UploadCloud class="w-3.5 h-3.5" />
+                      <span>更换</span>
+                      <input type="file" accept="video/*" @change="handleInspectorVideoUpload" class="hidden" />
+                    </label>
+                    <button
+                      type="button"
+                      @click="handleClearInspectorVideo"
+                      class="p-1 rounded hover:bg-red-950 text-red-400 hover:text-red-200 border border-red-500/30 hover:border-red-400 transition-colors cursor-pointer"
+                      title="清除视频"
+                    >
+                      <Trash2 class="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <label 
+                  v-else 
+                  class="border-2 border-dashed border-cyan-500/40 hover:border-cyan-300 bg-[#09152b]/60 hover:bg-cyan-950/40 rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all group"
+                >
+                  <div class="w-9 h-9 rounded-full bg-cyan-950 border border-cyan-500/50 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <UploadCloud class="w-4 h-4 text-cyan-300" />
+                  </div>
+                  <div class="text-center">
+                    <span class="text-xs font-normal text-cyan-200 group-hover:text-white">点击选择本地视频上传</span>
+                    <p class="text-[10px] text-cyan-400/80 font-mono mt-0.5">支持 MP4, WebM, OGG, AVI, MOV 等格式</p>
+                  </div>
+                  <input type="file" accept="video/*" @change="handleInspectorVideoUpload" class="hidden" />
+                </label>
+              </div>
+
+              <!-- Camera Title & Channel Tag -->
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs font-normal text-cyan-200 block mb-1">监控通道名称</label>
+                  <input
+                    type="text"
+                    :value="component.customProps?.cameraTitle || component.name || ''"
+                    @input="updateComponentProps({ name: ($event.target as HTMLInputElement).value, customProps: { ...(component.customProps || {}), cameraTitle: ($event.target as HTMLInputElement).value } })"
+                    placeholder="主变场地监控"
+                    class="w-full bg-[#09152b] border border-cyan-500/50 focus:border-cyan-300 rounded-lg px-2.5 py-1.5 text-cyan-100 font-light text-xs outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label class="text-xs font-normal text-cyan-200 block mb-1">通道编号 (Channel)</label>
+                  <input
+                    type="text"
+                    :value="component.customProps?.channelId || 'CAM-01'"
+                    @input="updateComponentProps({ customProps: { ...(component.customProps || {}), channelId: ($event.target as HTMLInputElement).value } })"
+                    placeholder="CAM-01"
+                    class="w-full bg-[#09152b] border border-cyan-500/50 focus:border-cyan-300 rounded-lg px-2.5 py-1.5 text-cyan-100 font-light text-xs outline-hidden font-mono"
+                  />
+                </div>
+              </div>
+
+              <!-- Playback Controls -->
+              <div class="grid grid-cols-2 gap-2 text-xs pt-1">
+                <label class="flex items-center gap-1.5 cursor-pointer text-cyan-200">
+                  <input
+                    type="checkbox"
+                    :checked="component.customProps?.autoplay !== false"
+                    @change="updateComponentProps({ customProps: { ...(component.customProps || {}), autoplay: ($event.target as HTMLInputElement).checked } })"
+                    class="rounded accent-cyan-400"
+                  />
+                  <span>自动循环播放</span>
+                </label>
+
+                <label class="flex items-center gap-1.5 cursor-pointer text-cyan-200">
+                  <input
+                    type="checkbox"
+                    :checked="component.customProps?.muted !== false"
+                    @change="updateComponentProps({ customProps: { ...(component.customProps || {}), muted: ($event.target as HTMLInputElement).checked } })"
+                    class="rounded accent-cyan-400"
+                  />
+                  <span>静音 (凝思免手势)</span>
+                </label>
+
+                <label class="flex items-center gap-1.5 cursor-pointer text-cyan-200">
+                  <input
+                    type="checkbox"
+                    :checked="component.customProps?.showOverlay !== false"
+                    @change="updateComponentProps({ customProps: { ...(component.customProps || {}), showOverlay: ($event.target as HTMLInputElement).checked } })"
+                    class="rounded accent-cyan-400"
+                  />
+                  <span>显示 SCADA HUD 角标</span>
+                </label>
+
+                <label class="flex items-center gap-1.5 cursor-pointer text-cyan-200">
+                  <input
+                    type="checkbox"
+                    :checked="Boolean(component.customProps?.showControls)"
+                    @change="updateComponentProps({ customProps: { ...(component.customProps || {}), showControls: ($event.target as HTMLInputElement).checked } })"
+                    class="rounded accent-cyan-400"
+                  />
+                  <span>显示原生控制栏</span>
+                </label>
+              </div>
+
+              <!-- Object Fit -->
+              <div>
+                <label class="text-xs font-normal text-cyan-200 block mb-1">画面填充比例</label>
+                <select
+                  :value="component.customProps?.objectFit || 'cover'"
+                  @change="updateComponentProps({ customProps: { ...(component.customProps || {}), objectFit: ($event.target as HTMLSelectElement).value } })"
+                  class="w-full bg-[#09152b] border border-cyan-500/50 focus:border-cyan-300 rounded-lg px-2 py-1.5 text-cyan-100 font-light text-xs outline-hidden"
+                >
+                  <option value="cover">等比剪裁填满 (cover)</option>
+                  <option value="contain">等比完整显示 (contain)</option>
+                  <option value="fill">拉伸填满 (fill)</option>
+                </select>
+              </div>
+
+              <!-- Linx Linux Hardware Decode notice -->
+              <div class="p-2 rounded bg-cyan-950/60 border border-cyan-500/30 text-[10px] text-cyan-300 flex items-start gap-1.5">
+                <ShieldCheck class="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+                <span>凝思 Linux 深度适配：支持 H.264/WebM 原生硬件加速，离线工程自包含，无外部网络依赖。</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. 其他无状态的工程预设图元 (如无状态固定拓扑变压器/互感器/避雷器/图标等) -->
+          <div v-else-if="isNoStyleComponent" class="p-8 text-center rounded-xl bg-[#050c1c] border border-cyan-500/20 text-xs font-mono text-cyan-300/60 font-light space-y-2">
             <Info class="w-6 h-6 mx-auto text-cyan-400/50" />
             <div class="text-cyan-200 font-normal text-xs">专属预设图元组件</div>
             <div class="text-[11px] text-cyan-400/60 leading-relaxed">
-              当前图元为专属预设组件（如自定义图元、拓扑图标或标准工程开关），无需额外配置基础样式。
+              当前图元为专属预设组件（如拓扑图标或固定结构工程设备），无需额外配置基础外观样式。
             </div>
           </div>
 
@@ -3820,477 +4253,7 @@ const toggleBatchVisibility = () => {
           </div>
         </div>
 
-        <!-- TAB 3: DATA BINDING -->
-        <div v-if="activeTab === 'data'" class="space-y-4">
-          <!-- Consolidated State Simulation Test (支持自定义多状态图元与普通系统自带0/1状态图元) -->
-          <div v-if="(component.states && component.states.length > 0) || isSystemStatusComponent" class="p-3 rounded-xl bg-cyan-950/40 border border-cyan-400/50 space-y-2.5">
-            <div class="flex items-center justify-between text-xs font-bold text-cyan-300">
-              <span class="flex items-center gap-1.5">
-                <Workflow class="w-4 h-4 text-cyan-400" />
-                <span class="font-normal text-cyan-200">
-                  {{ component.states && component.states.length > 0 ? '自定义图元多状态测试' : '设备状态模拟测试 (0/1切换)' }}
-                </span>
-              </span>
-              <span class="text-[10px] font-mono font-light text-cyan-300 px-1.5 py-0.5 rounded bg-[#050c1c] border border-cyan-500/30">
-                当前: {{ component.states && component.states.length > 0 ? (component.activeState ?? '1') : currentResolvedBinaryState }}
-              </span>
-            </div>
-
-            <!-- Case A: Custom Multi-State Symbols -->
-            <div v-if="component.states && component.states.length > 0" class="grid grid-cols-2 gap-1.5 pt-0.5">
-              <button
-                v-for="st in component.states"
-                :key="st.id"
-                type="button"
-                @click="testMultiState(st.id, st.matchValue ?? st.stateValue)"
-                class="py-1.5 px-2 rounded-lg text-xs font-mono cursor-pointer border transition-all truncate text-left flex items-center justify-between gap-1"
-                :class="isMultiStateActive(st)
-                  ? 'bg-cyan-500 text-slate-950 font-medium border-cyan-400 shadow-[0_0_10px_rgba(0,242,255,0.4)]'
-                  : 'bg-[#050c1c] text-cyan-200 border-cyan-500/30 hover:border-cyan-400 font-light'"
-              >
-                <span class="truncate">{{ st.name }}</span>
-                <span class="text-[9px] px-1 rounded font-mono" :class="isMultiStateActive(st) ? 'bg-slate-950/30 text-slate-950 font-bold' : 'bg-cyan-950 text-cyan-300 border border-cyan-500/40'">
-                  ={{ st.matchValue ?? st.stateValue ?? st.id }}
-                </span>
-              </button>
-            </div>
-
-            <!-- Case B: Standard System Stateful Components (0 / 1 切换) -->
-            <div v-else-if="isSystemStatusComponent" class="grid grid-cols-2 gap-2 pt-0.5">
-              <button
-                type="button"
-                @click="testBinaryState(0)"
-                class="py-2 px-2.5 rounded-lg text-xs font-light cursor-pointer border transition-all flex items-center justify-center gap-2"
-                :class="currentResolvedBinaryState === 0
-                  ? 'bg-slate-700 text-white font-medium border-slate-300 shadow-[0_0_12px_rgba(148,163,184,0.4)]'
-                  : 'bg-[#050c1c] text-slate-300 border-cyan-500/30 hover:border-slate-400'"
-              >
-                <span class="w-2.5 h-2.5 rounded-full" :style="{ backgroundColor: component.customProps?.color0 || '#00e676' }"></span>
-                <span>0: 分闸 / 断开 / 常态</span>
-              </button>
-
-              <button
-                type="button"
-                @click="testBinaryState(1)"
-                class="py-2 px-2.5 rounded-lg text-xs font-light cursor-pointer border transition-all flex items-center justify-center gap-2"
-                :class="currentResolvedBinaryState === 1
-                  ? 'bg-emerald-500 text-slate-950 font-medium border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.4)]'
-                  : 'bg-[#050c1c] text-emerald-300 border-cyan-500/30 hover:border-emerald-400'"
-              >
-                <span class="w-2.5 h-2.5 rounded-full" :style="{ backgroundColor: component.customProps?.color1 || '#ff2233' }"></span>
-                <span>1: 合闸 / 导通 / 动作</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- 1. 当前测点关联状态 (Current Binding Overview) -->
-          <div class="p-3 rounded-xl bg-[#050c1c] border border-cyan-500/40 space-y-2.5 shadow-sm">
-            <div class="flex items-center justify-between border-b border-cyan-500/20 pb-2">
-              <div class="flex items-center gap-2">
-                <div
-                  class="w-2.5 h-2.5 rounded-full"
-                  :class="currentBindingDetails.isBound ? 'bg-emerald-400 shadow-[0_0_8px_#10b981] animate-pulse' : 'bg-slate-600'"
-                ></div>
-                <span class="font-normal text-xs text-cyan-200">
-                  {{ currentBindingDetails.isBound ? '当前已关联 SCADA 测点' : '测点关联状态 (未绑定)' }}
-                </span>
-              </div>
-              <!-- Unbind Button -->
-              <button
-                v-if="currentBindingDetails.isBound"
-                @click="handleUnbindPoint"
-                class="px-2 py-0.5 rounded text-[11px] bg-rose-950/70 hover:bg-rose-900 text-rose-300 border border-rose-500/40 font-light flex items-center gap-1 cursor-pointer transition-all shadow-xs"
-                title="清除测点关联"
-              >
-                <Unlink class="w-3 h-3" />
-                <span>解绑测点</span>
-              </button>
-            </div>
-
-            <!-- Bound Point Summary Details -->
-            <div v-if="currentBindingDetails.isBound" class="space-y-2 text-xs font-light">
-              <div class="grid grid-cols-2 gap-2 bg-[#030814] p-2 rounded-lg border border-cyan-500/20">
-                <div>
-                  <span class="text-[10px] text-cyan-400/70 block">关联测控装置</span>
-                  <span class="text-cyan-100 font-light truncate block" :title="currentBindingDetails.deviceName">
-                    {{ currentBindingDetails.deviceName }}
-                  </span>
-                </div>
-                <div>
-                  <span class="text-[10px] text-cyan-400/70 block">关联点名与点号</span>
-                  <span class="text-cyan-100 font-light truncate block" :title="currentBindingDetails.pointName">
-                    #{{ currentBindingDetails.pointId }} {{ currentBindingDetails.pointName }}
-                  </span>
-                </div>
-                <div>
-                  <span class="text-[10px] text-cyan-400/70 block">四遥分类</span>
-                  <span :class="['px-1.5 py-0.2 rounded text-[10px] font-mono border inline-block mt-0.5', currentBindingDetails.categoryBadgeColor]">
-                    {{ currentBindingDetails.categoryLabel }}
-                  </span>
-                </div>
-                <div>
-                  <span class="text-[10px] text-cyan-400/70 block">当前实时数值</span>
-                  <span class="text-emerald-400 font-mono font-medium block mt-0.5">
-                    {{ currentBindingDetails.currentDisplayValue }}
-                  </span>
-                </div>
-              </div>
-
-              <!-- Communication Quality Status (Strictly Read-Only 0/1) -->
-              <div class="flex items-center justify-between px-2 py-1.5 rounded-lg bg-[#030814] border border-cyan-500/20">
-                <span class="text-[11px] text-cyan-300 flex items-center gap-1">
-                  <span>通信品质质量:</span>
-                  <span class="text-[10px] text-cyan-400/70 font-mono">[只读/系统维护]</span>
-                </span>
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  <span>1 (通信正常 / 良好)</span>
-                </span>
-              </div>
-            </div>
-
-            <!-- Unbound State Notice -->
-            <div v-else class="p-2.5 rounded-lg bg-[#030814] border border-cyan-500/20 space-y-2 text-center text-xs font-light">
-              <div class="text-cyan-300/80">
-                当前图元未关联 SCADA 测点。请在下方测点列表中选择对应点，即可自动关联其实时值。
-              </div>
-              <div class="flex items-center justify-center gap-2">
-                <span class="text-[11px] text-cyan-400/70">通信品质:</span>
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-slate-400 border border-slate-700">
-                  0 (未连通 / 初始状态)
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <!-- 2. SCADA 点表与四遥通道选择 (Point Selector) -->
-          <div class="space-y-3 pt-1">
-              <!-- Step 1: Substation & IED Device -->
-              <div class="space-y-1.5">
-                <div class="flex items-center justify-between">
-                  <label class="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
-                    <span class="w-4 h-4 rounded-full bg-cyan-500/20 text-cyan-400 text-[10px] flex items-center justify-center font-mono font-bold">1</span>
-                    <span class="font-normal text-cyan-200">受控间隔与测控装置 (IED Device)</span>
-                  </label>
-                  <span class="text-[10px] text-emerald-400 font-mono flex items-center gap-1 font-light">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    通信在线
-                  </span>
-                </div>
-                <select
-                  v-model="selectedDeviceId"
-                  class="w-full bg-[#050c1c] border border-cyan-500/30 focus:border-cyan-400 rounded-lg px-2.5 py-1.5 text-cyan-200 font-light text-xs outline-hidden cursor-pointer"
-                >
-                  <option v-for="dev in currentDatasetDevices" :key="dev.deviceId" :value="dev.deviceId">
-                    [{{ dev.deviceId }}] {{ dev.deviceName }} ({{ dev.deviceType || '测控保护' }})
-                  </option>
-                </select>
-              </div>
-
-              <!-- Step 2: Telemetry Classification (四遥严格分流) -->
-              <div class="space-y-1.5">
-                <div class="flex items-center justify-between">
-                  <label class="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
-                    <span class="w-4 h-4 rounded-full bg-cyan-500/20 text-cyan-400 text-[10px] flex items-center justify-center font-mono font-bold">2</span>
-                    <span class="font-normal text-cyan-200">四遥测点分类 (Tele-Category)</span>
-                  </label>
-                  <span class="text-[10px] text-cyan-400/70 font-mono font-light">
-                    共 {{ selectedDevice ? (selectedDevice.telemetries?.length || 0) + (selectedDevice.teleSignals?.length || 0) + (selectedDevice.energies?.length || 0) + (selectedDevice.teleControls?.length || 0) + (selectedDevice.teleRegulations?.length || 0) : 0 }} 个测点
-                  </span>
-                </div>
-
-                <div class="grid grid-cols-5 gap-1 bg-[#050c1c] p-1 rounded-lg border border-cyan-500/30 text-[11px] font-light">
-                  <button
-                    @click="selectedTeleCategory = 'yc'"
-                    class="py-1.5 rounded text-center cursor-pointer transition-all flex flex-col items-center justify-center"
-                    :class="selectedTeleCategory === 'yc' ? 'bg-cyan-500 text-slate-950 font-medium shadow-xs' : 'text-cyan-300 hover:text-white'"
-                  >
-                    <span>遥测 YC</span>
-                    <span class="text-[9px] font-mono opacity-80">模拟量 ({{ selectedDevice?.telemetries?.length || 0 }})</span>
-                  </button>
-                  <button
-                    @click="selectedTeleCategory = 'yx'"
-                    class="py-1.5 rounded text-center cursor-pointer transition-all flex flex-col items-center justify-center"
-                    :class="selectedTeleCategory === 'yx' ? 'bg-emerald-500 text-slate-950 font-medium shadow-xs' : 'text-emerald-300 hover:text-white'"
-                  >
-                    <span>遥信 YX</span>
-                    <span class="text-[9px] font-mono opacity-80">状态量 ({{ selectedDevice?.teleSignals?.length || 0 }})</span>
-                  </button>
-                  <button
-                    @click="selectedTeleCategory = 'dd'"
-                    class="py-1.5 rounded text-center cursor-pointer transition-all flex flex-col items-center justify-center"
-                    :class="selectedTeleCategory === 'dd' ? 'bg-amber-500 text-slate-950 font-medium shadow-xs' : 'text-amber-300 hover:text-white'"
-                  >
-                    <span>电度 DD</span>
-                    <span class="text-[9px] font-mono opacity-80">电能量 ({{ selectedDevice?.energies?.length || 0 }})</span>
-                  </button>
-                  <button
-                    @click="selectedTeleCategory = 'yk'"
-                    class="py-1.5 rounded text-center cursor-pointer transition-all flex flex-col items-center justify-center"
-                    :class="selectedTeleCategory === 'yk' ? 'bg-purple-500 text-white font-medium shadow-xs' : 'text-purple-300 hover:text-white'"
-                  >
-                    <span>遥控 YK</span>
-                    <span class="text-[9px] font-mono opacity-80">控制 ({{ selectedDevice?.teleControls?.length || 0 }})</span>
-                  </button>
-                  <button
-                    @click="selectedTeleCategory = 'yt'"
-                    class="py-1.5 rounded text-center cursor-pointer transition-all flex flex-col items-center justify-center"
-                    :class="selectedTeleCategory === 'yt' ? 'bg-blue-500 text-white font-medium shadow-xs' : 'text-cyan-300 hover:text-white'"
-                  >
-                    <span>遥调 YT</span>
-                    <span class="text-[9px] font-mono opacity-80">定值 ({{ selectedDevice?.teleRegulations?.length || 0 }})</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Step 3: SCADA Point Table Mapping (标准工业点表，点击直接关联测点值) -->
-              <div class="space-y-2">
-                <div class="flex items-center justify-between">
-                  <label class="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
-                    <span class="w-4 h-4 rounded-full bg-cyan-500/20 text-cyan-400 text-[10px] flex items-center justify-center font-mono font-bold">3</span>
-                    <span class="font-normal text-cyan-200">选择测点关联对应值 (点击行绑定/解绑)</span>
-                  </label>
-                  <span class="text-[10px] text-cyan-400 font-mono font-light">共 {{ filteredPoints.length }} 个测点</span>
-                </div>
-
-                <!-- Search Input -->
-                <div class="relative">
-                  <Search class="w-3.5 h-3.5 text-cyan-400 absolute left-2.5 top-2" />
-                  <input
-                    type="text"
-                    v-model="pointSearchQuery"
-                    placeholder="按点号、中文点名、规约标识搜索..."
-                    class="w-full bg-[#050c1c] border border-cyan-500/30 focus:border-cyan-400 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-cyan-100 outline-hidden font-light"
-                  />
-                </div>
-
-                <!-- Scrollable Point List -->
-                <div class="space-y-1.5 max-h-56 overflow-y-auto custom-scrollbar pr-0.5">
-                  <div
-                    v-for="pt in filteredPoints"
-                    :key="pt.pointId"
-                    :id="`scada-point-row-${pt.pointId}`"
-                    @click="handleBindPointToComponent(pt)"
-                    class="p-2 rounded-lg bg-[#050c1c] border text-xs cursor-pointer transition-all flex items-center justify-between group font-light"
-                    :class="[
-                      currentBindingDetails.isBound &&
-                      currentBindingDetails.deviceId === selectedDevice?.deviceId &&
-                      currentBindingDetails.category === selectedTeleCategory &&
-                      String(currentBindingDetails.pointId) === String(pt.pointId)
-                        ? 'border-cyan-400 bg-cyan-950/40 shadow-[0_0_12px_rgba(0,242,255,0.25)] ring-1 ring-cyan-400'
-                        : 'border-cyan-500/30 hover:border-cyan-400 hover:bg-cyan-950/30'
-                    ]"
-                  >
-                    <div class="flex items-center gap-2 overflow-hidden">
-                      <span class="font-mono text-cyan-400 text-[11px] shrink-0 font-light">#{{ pt.pointId }}</span>
-                      <div class="truncate">
-                        <div class="flex items-center gap-1.5">
-                          <span class="font-light text-cyan-100 block truncate group-hover:text-cyan-300">{{ pt.name }}</span>
-                          <span
-                            v-if="currentBindingDetails.isBound && currentBindingDetails.deviceId === selectedDevice?.deviceId && currentBindingDetails.category === selectedTeleCategory && String(currentBindingDetails.pointId) === String(pt.pointId)"
-                            class="px-1.5 py-0.2 rounded text-[9px] bg-cyan-500 text-slate-950 font-medium shrink-0 flex items-center gap-1"
-                          >
-                            <span>已关联</span>
-                            <span class="text-[8px] opacity-70">(点击解绑)</span>
-                          </span>
-                        </div>
-                        <span class="text-[10px] text-cyan-400/70 block truncate font-mono">
-                          {{ selectedDevice?.deviceId }}_{{ selectedTeleCategory.toUpperCase() }}_{{ pt.pointId }}
-                        </span>
-                      </div>
-                    </div>
-
-                    <!-- Right Side: Value Display -->
-                    <div class="text-right shrink-0 pl-2 flex items-center gap-2">
-                      <!-- Case YC / DD -->
-                      <span
-                        v-if="selectedTeleCategory === 'yc' || selectedTeleCategory === 'dd'"
-                        class="font-mono text-emerald-400 text-xs block font-light"
-                      >
-                        {{ pt.value }} <span class="text-[10px] text-cyan-300 font-normal">{{ pt.unit || '' }}</span>
-                      </span>
-
-                      <!-- Case YX -->
-                      <span
-                        v-else-if="selectedTeleCategory === 'yx'"
-                        class="px-1.5 py-0.5 rounded text-[10px] font-mono inline-block font-light"
-                        :class="pt.value === 1 ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/40' : (pt.value === 2 ? 'bg-amber-950 text-amber-300 border border-amber-500/40' : 'bg-[#050c1c] text-cyan-400 border border-cyan-500/30')"
-                      >
-                        {{ pt.value }} ({{ pt.statusText || (pt.value === 1 ? '合闸' : '分闸') }})
-                      </span>
-
-                      <!-- Case YK -->
-                      <div v-else-if="selectedTeleCategory === 'yk'" class="space-y-0.5">
-                        <span class="inline-block px-1.5 py-0.2 rounded text-[9px] font-mono font-light bg-purple-950/80 text-purple-300 border border-purple-500/40">
-                          控制输出
-                        </span>
-                      </div>
-
-                      <!-- Case YT -->
-                      <div v-else-if="selectedTeleCategory === 'yt'" class="space-y-0.5">
-                        <span class="inline-block px-1.5 py-0.2 rounded text-[9px] font-mono font-light bg-blue-950/80 text-blue-300 border border-blue-500/40">
-                          定值输出
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div v-if="filteredPoints.length === 0" class="p-4 text-center text-xs text-cyan-400/70 font-light">
-                    未找到符合条件的规约测点
-                  </div>
-                </div>
-              </div>
-
-              <!-- Step 4: Closed-Loop Verification & Safety Interlock (针对遥控遥调的闭环校验) -->
-              <div
-                v-if="component.data.action?.type === 'tele-control' || component.data.action?.type === 'tele-regulation' || selectedTeleCategory === 'yk' || selectedTeleCategory === 'yt'"
-                class="p-3 rounded-xl bg-purple-950/30 border border-purple-500/50 space-y-2.5"
-              >
-                <div class="flex items-center justify-between text-xs font-bold text-purple-300">
-                  <span class="flex items-center gap-1.5">
-                    <span class="w-4 h-4 rounded-full bg-purple-500/20 text-purple-400 text-[10px] flex items-center justify-center font-mono font-bold">4</span>
-                    <ShieldCheck class="w-4 h-4 text-purple-400" />
-                    <span class="font-normal text-purple-200">闭环校验点设定 (Closed-Loop Verification)</span>
-                  </span>
-                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-purple-900/60 text-purple-200 border border-purple-400/40 font-mono">
-                    {{ (component.data.action?.type === 'tele-control' || selectedTeleCategory === 'yk') ? '遥控 ➔ 校验遥信 (YX)' : '遥调 ➔ 校验遥测 (YC)' }}
-                  </span>
-                </div>
-
-                <div class="text-[11px] text-cyan-200/90 leading-relaxed font-light">
-                  SCADA 规约要求：下发控制指令后通过现场测点校验闭环。图元画面状态与显示数值将自动同步该校验点：
-                </div>
-
-                <!-- Select corresponding YX for YK -->
-                <div v-if="component.data.action?.type === 'tele-control' || selectedTeleCategory === 'yk'">
-                  <label class="text-[11px] font-light text-purple-300 block mb-1">
-                    对应状态校验遥信点 (YX)
-                  </label>
-                  <select
-                    :value="component.data.action?.targetPointId ?? component.data.mapping?.targetYxPointId ?? selectedDevice?.teleSignals?.[0]?.pointId ?? ''"
-                    @change="handleSetVerificationPoint(Number(($event.target as HTMLSelectElement).value))"
-                    class="w-full bg-[#050c1c] border border-purple-500/40 focus:border-purple-300 rounded-lg px-2.5 py-1.5 text-purple-200 font-mono font-light text-xs outline-hidden cursor-pointer"
-                  >
-                    <option v-for="yx in selectedDevice?.teleSignals || []" :key="yx.pointId" :value="yx.pointId">
-                      [YX_{{ yx.pointId }}] {{ yx.name }} (实时反馈: {{ yx.value }} - {{ yx.statusText || (yx.value === 1 ? '合闸' : '分闸') }})
-                    </option>
-                  </select>
-                </div>
-
-                <!-- Select corresponding YC for YT -->
-                <div v-if="component.data.action?.type === 'tele-regulation' || selectedTeleCategory === 'yt'">
-                  <label class="text-[11px] font-light text-cyan-300 block mb-1">
-                    对应实测校验遥测点 (YC)
-                  </label>
-                  <select
-                    :value="component.data.action?.targetPointId ?? component.data.mapping?.targetYcPointId ?? selectedDevice?.telemetries?.[0]?.pointId ?? ''"
-                    @change="handleSetVerificationPoint(Number(($event.target as HTMLSelectElement).value))"
-                    class="w-full bg-[#050c1c] border border-cyan-500/40 focus:border-cyan-300 rounded-lg px-2.5 py-1.5 text-cyan-200 font-mono font-light text-xs outline-hidden cursor-pointer"
-                  >
-                    <option v-for="yc in selectedDevice?.telemetries || []" :key="yc.pointId" :value="yc.pointId">
-                      [YC_{{ yc.pointId }}] {{ yc.name }} (现场实测: {{ yc.value }} {{ yc.unit || '' }})
-                    </option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <!-- SPECIAL SECTION: Chart Binding Explanation & Presets (仅图表曲线类保留) -->
-            <div v-if="isChartComponent" class="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/40 space-y-2.5">
-              <div class="flex items-center gap-1.5 text-xs font-bold text-cyan-300">
-                <BarChart2 class="w-4 h-4 text-cyan-400" />
-                <span class="font-normal text-cyan-200">图表数据绑定与时序曲线预设</span>
-              </div>
-
-              <!-- Quick Presets for Charts -->
-              <div class="space-y-1.5 pt-1">
-                <label class="text-[11px] font-light text-cyan-300 block">一键绑定 SCADA 实时时序与负荷曲线：</label>
-                <div class="grid grid-cols-1 gap-1.5">
-                  <button
-                    @click="handleBindChartPreset('power-trend')"
-                    class="py-1.5 px-2 rounded-lg bg-[#050c1c] hover:bg-cyan-950 border border-cyan-500/30 hover:border-cyan-400 text-left text-xs font-light text-cyan-200 hover:text-cyan-300 cursor-pointer flex items-center justify-between transition-colors"
-                  >
-                    <span>📈 绑定进线有功功率 24h 时序曲线</span>
-                    <span class="text-[10px] text-cyan-400 font-mono">series_power</span>
-                  </button>
-
-                  <button
-                    @click="handleBindChartPreset('voltage-trend')"
-                    class="py-1.5 px-2 rounded-lg bg-[#050c1c] hover:bg-cyan-950 border border-cyan-500/30 hover:border-cyan-400 text-left text-xs font-light text-cyan-200 hover:text-cyan-300 cursor-pointer flex items-center justify-between transition-colors"
-                  >
-                    <span>📉 绑定母线电压 24h 波动曲线</span>
-                    <span class="text-[10px] text-cyan-400 font-mono">series_voltage</span>
-                  </button>
-
-                  <button
-                    @click="handleBindChartPreset('load-bar')"
-                    class="py-1.5 px-2 rounded-lg bg-[#050c1c] hover:bg-cyan-950 border border-cyan-500/30 hover:border-cyan-400 text-left text-xs font-light text-cyan-200 hover:text-cyan-300 cursor-pointer flex items-center justify-between transition-colors"
-                  >
-                    <span>📊 绑定各装置实时负荷对比柱状图</span>
-                    <span class="text-[10px] text-cyan-400 font-mono">series_device_load</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Chart Custom JSON Editor -->
-              <div class="space-y-1.5 pt-2 border-t border-cyan-500/20">
-                <div class="flex items-center justify-between text-xs">
-                  <label class="text-cyan-200 font-light">图表自定义 JSON 数据 (时序多曲线):</label>
-                  <button
-                    @click="handleFormatJson"
-                    class="text-[10px] text-cyan-400 hover:text-cyan-300 cursor-pointer font-light"
-                  >
-                    格式化
-                  </button>
-                </div>
-                <textarea
-                  :value="staticJsonInput"
-                  @input="handleJsonInput(($event.target as HTMLTextAreaElement).value)"
-                  placeholder="请输入图表自定义 JSON 数据..."
-                  rows="6"
-                  class="w-full bg-[#050c1c] border focus:border-cyan-400 rounded-lg p-2 text-xs font-mono font-light outline-hidden resize-y leading-relaxed text-cyan-200"
-                  :class="jsonValidationStatus === 'invalid' ? 'border-red-500 text-red-300' : 'border-cyan-500/30'"
-                ></textarea>
-              </div>
-            </div>
-
-          <!-- 3. 实时数据 JSON 格式预览 (极简 { value, quality: 0/1 }) -->
-          <div class="p-3 rounded-xl bg-[#050c1c] border border-cyan-500/40 space-y-2.5">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-1.5">
-                <Activity class="w-3.5 h-3.5 text-cyan-400" />
-                <span class="text-xs font-normal text-cyan-200">
-                  {{ isChartComponent ? '图表数据 JSON 预览' : '数据 JSON 格式 (极简契约)' }}
-                </span>
-              </div>
-
-              <div class="flex items-center gap-2">
-                <span class="text-[10px] text-emerald-400 font-mono font-light flex items-center gap-1">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  LIVE
-                </span>
-                <button
-                  @click="handleCopyJson"
-                  class="text-[10px] text-cyan-300 hover:text-white bg-[#030814] px-2 py-0.5 rounded border border-cyan-500/30 cursor-pointer"
-                >
-                  复制 JSON
-                </button>
-              </div>
-            </div>
-
-            <div v-if="!isChartComponent" class="text-[11px] text-cyan-400/70 font-light">
-              契约结构已极简统一：仅保存数值/浮点数 <code class="text-cyan-300">value</code> 与系统只读品质码 <code class="text-cyan-300">quality</code> (1: 在线良好, 0: 未连通)。
-            </div>
-
-            <pre class="w-full max-h-40 overflow-y-auto bg-[#030814] border border-cyan-500/30 rounded-lg p-2.5 text-[11px] font-mono text-cyan-200 custom-scrollbar leading-relaxed font-light">{{ JSON.stringify(liveDynamicData, null, 2) }}</pre>
-
-            <div v-if="staticJsonMsg" class="text-xs font-light text-emerald-400">
-              {{ staticJsonMsg }}
-            </div>
-          </div>
-        </div>
-
-        <!-- TAB 4: INTERACTION & SCREEN NAVIGATION -->
+        <!-- TAB 3: INTERACTION & SCREEN NAVIGATION -->
         <div v-if="activeTab === 'interaction'" class="space-y-4">
           <div>
             <label class="text-xs font-light text-cyan-200 block mb-1">点击触发行为 (Action)</label>

@@ -53,7 +53,9 @@ import {
   RotateCw,
   Sliders,
   Users,
-  Power
+  Power,
+  Image as ImageIcon,
+  Video
 } from 'lucide-vue-next';
 import { ComponentCategory, ComponentType, CustomSymbolDef } from '../types';
 import { COMPONENT_DEFINITIONS, ComponentDefinition } from '../data/componentLibrary';
@@ -81,6 +83,7 @@ const categories: { id: ComponentCategory; label: string; icon: string }[] = [
   { id: 'status', label: '状态图元/遥信', icon: '🟢' },
   { id: 'metrics', label: '数值图元/遥测', icon: '🔢' },
   { id: 'buttons', label: '交互控制/按钮', icon: '🔘' },
+  { id: 'media', label: '多媒体/视频监控', icon: '🎬' },
   { id: 'industrial', label: '工业管网/设备', icon: '🏭' },
   { id: 'charts', label: '统计图表/曲线', icon: '📊' },
   { id: 'decoration', label: '科技边框/修饰', icon: '✨' },
@@ -89,6 +92,8 @@ const categories: { id: ComponentCategory; label: string; icon: string }[] = [
 ];
 
 const iconMap: Record<string, any> = {
+  Image: ImageIcon,
+  Video,
   LineChart,
   BarChart3,
   PieChart,

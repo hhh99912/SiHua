@@ -6,7 +6,8 @@ import {
   Lock, Unlock, BookmarkPlus, RotateCw, Radio,
   AlignLeft, AlignCenter, AlignRight, AlignVerticalJustifyStart,
   AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
-  Crosshair, Sliders, Workflow
+  Crosshair, Sliders, Workflow, Database,
+  Image as ImageIcon, Video
 } from 'lucide-vue-next';
 import { ScreenComponent, ScreenConfig, DatasetConfig } from '../types';
 import WidgetRenderer from './widgets/WidgetRenderer.vue';
@@ -65,6 +66,7 @@ const emit = defineEmits<{
   (e: 'redo'): void;
   (e: 'open:control-modal', deviceId?: string): void;
   (e: 'open:property-inspector'): void;
+  (e: 'open:data-association', component?: ScreenComponent): void;
   (e: 'commit:history'): void;
 }>();
 
@@ -210,6 +212,7 @@ const marqueeBox = ref<{ startX: number; startY: number; x: number; y: number; w
 // Dragging & Resizing & Rotating state
 const isDragging = ref(false);
 const hasMovedDrag = ref(false);
+const dragOffset = ref<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
 const dragStartPositions = ref<Map<string, { x: number; y: number }>>(new Map());
 const dragStartMouse = ref({ x: 0, y: 0 });
 
@@ -624,46 +627,28 @@ const processMouseMove = (e: MouseEvent) => {
     return;
   }
 
-  // 5. Batch Component Dragging (高性能帧级平移，过滤无效零位移更新)
+  // 5. Batch Component Dragging (超低 CPU 零重绘极速帧级平移)
   if (isDragging.value && props.selectedIds.length > 0) {
-    let dx = (e.clientX - dragStartMouse.value.x) / (props.zoom || 1);
-    let dy = (e.clientY - dragStartMouse.value.y) / (props.zoom || 1);
+    const rawDx = (e.clientX - dragStartMouse.value.x) / (props.zoom || 1);
+    const rawDy = (e.clientY - dragStartMouse.value.y) / (props.zoom || 1);
+
+    let dx = rawDx;
+    let dy = rawDy;
 
     if (snapToGrid.value && gridSize.value > 0) {
-      dx = Math.round(dx / gridSize.value) * gridSize.value;
-      dy = Math.round(dy / gridSize.value) * gridSize.value;
+      dx = Math.round(rawDx / gridSize.value) * gridSize.value;
+      dy = Math.round(rawDy / gridSize.value) * gridSize.value;
+    } else {
+      dx = Math.round(rawDx);
+      dy = Math.round(rawDy);
     }
 
-    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+    if (Math.abs(rawDx) > 1 || Math.abs(rawDy) > 1) {
       hasMovedDrag.value = true;
     }
 
-    const updatedComps = props.components
-      .filter(c => props.selectedIds.includes(c.id) && !c.locked && dragStartPositions.value.has(c.id))
-      .map(c => {
-        const startPos = dragStartPositions.value.get(c.id)!;
-        let newX = Math.round(startPos.x + dx);
-        let newY = Math.round(startPos.y + dy);
-        if (snapToGrid.value && gridSize.value > 0) {
-          newX = Math.round(newX / gridSize.value) * gridSize.value;
-          newY = Math.round(newY / gridSize.value) * gridSize.value;
-        }
-        return {
-          ...c,
-          x: newX,
-          y: newY
-        };
-      });
-
-    if (updatedComps.length > 0) {
-      // 避免当组件实际坐标未变时重复 emit 产生冗余重绘
-      const isChanged = updatedComps.some(uc => {
-        const orig = props.components.find(c => c.id === uc.id);
-        return !orig || orig.x !== uc.x || orig.y !== uc.y;
-      });
-      if (isChanged) {
-        emit('update:components', updatedComps);
-      }
+    if (dragOffset.value.dx !== dx || dragOffset.value.dy !== dy) {
+      dragOffset.value = { dx, dy };
     }
     return;
   }
@@ -799,19 +784,35 @@ const handleMouseUpWorkspace = () => {
   if (isDragging.value) {
     suppressNextCanvasClick.value = true;
     lastInteractionTime.value = Date.now();
-    if (hasMovedDrag.value) {
-      emit('commit:history');
-      setTimeout(() => {
-        suppressNextCanvasClick.value = false;
-        hasMovedDrag.value = false;
-      }, 200);
-    } else {
-      hasMovedDrag.value = false;
-      setTimeout(() => {
-        suppressNextCanvasClick.value = false;
-      }, 200);
+    const finalDx = dragOffset.value.dx;
+    const finalDy = dragOffset.value.dy;
+
+    if (hasMovedDrag.value && (finalDx !== 0 || finalDy !== 0)) {
+      const updatedComps = props.components
+        .filter(c => props.selectedIds.includes(c.id) && !c.locked && dragStartPositions.value.has(c.id))
+        .map(c => {
+          const startPos = dragStartPositions.value.get(c.id)!;
+          return {
+            ...c,
+            x: Math.round(startPos.x + finalDx),
+            y: Math.round(startPos.y + finalDy)
+          };
+        });
+
+      if (updatedComps.length > 0) {
+        emit('update:components', updatedComps);
+        emit('commit:history');
+      }
     }
+
     isDragging.value = false;
+    hasMovedDrag.value = false;
+    dragOffset.value = { dx: 0, dy: 0 };
+    dragStartPositions.value.clear();
+
+    setTimeout(() => {
+      suppressNextCanvasClick.value = false;
+    }, 200);
   }
 
   if (isResizing.value) {
@@ -882,6 +883,7 @@ const handleStartDrag = (e: MouseEvent, comp: ScreenComponent) => {
 
   isDragging.value = true;
   hasMovedDrag.value = false;
+  dragOffset.value = { dx: 0, dy: 0 };
   dragStartMouse.value = { x: e.clientX, y: e.clientY };
   
   const map = new Map<string, { x: number; y: number }>();
@@ -1237,6 +1239,103 @@ const handleDrop = (e: DragEvent) => {
   e.preventDefault();
   e.stopPropagation();
   if (!e.dataTransfer) return;
+
+  // 1. 深度适配 Linux (凝思等) 桌面与外部拖拽媒体文件至画布
+  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    const file = e.dataTransfer.files[0];
+    const coords = getCanvasCoords(e.clientX, e.clientY);
+    let x = coords.x;
+    let y = coords.y;
+
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        const w = 480;
+        const h = 320;
+        let posX = x - Math.round(w / 2);
+        let posY = y - Math.round(h / 2);
+        if (snapToGrid.value && gridSize.value > 0) {
+          posX = Math.round(posX / gridSize.value) * gridSize.value;
+          posY = Math.round(posY / gridSize.value) * gridSize.value;
+        }
+        emit('add:component:at', {
+          name: file.name.replace(/\.[^/.]+$/, '') || '图片展示',
+          type: 'media-image',
+          category: 'media',
+          width: w,
+          height: h,
+          style: {
+            borderColor: 'transparent',
+            borderWidth: 0,
+            borderRadius: 0,
+            stroke: 'transparent',
+            strokeWidth: 0,
+            backgroundColor: 'transparent'
+          },
+          customProps: {
+            src: base64,
+            objectFit: 'contain',
+            imageFilter: 'none',
+            linxCompat: true
+          }
+        }, posX, posY);
+      };
+      reader.readAsDataURL(file);
+      return;
+    } else if (file.type.startsWith('video/')) {
+      const handleVideoUrl = (src: string) => {
+        const w = 540;
+        const h = 360;
+        let posX = x - Math.round(w / 2);
+        let posY = y - Math.round(h / 2);
+        if (snapToGrid.value && gridSize.value > 0) {
+          posX = Math.round(posX / gridSize.value) * gridSize.value;
+          posY = Math.round(posY / gridSize.value) * gridSize.value;
+        }
+        emit('add:component:at', {
+          name: file.name.replace(/\.[^/.]+$/, '') || '工业视频监控',
+          type: 'media-video',
+          category: 'media',
+          width: w,
+          height: h,
+          style: {
+            borderColor: 'transparent',
+            borderWidth: 0,
+            borderRadius: 0,
+            stroke: 'transparent',
+            strokeWidth: 0,
+            backgroundColor: '#040812'
+          },
+          customProps: {
+            src,
+            autoplay: true,
+            loop: true,
+            muted: true,
+            showControls: false,
+            showOverlay: true,
+            cameraTitle: file.name.replace(/\.[^/.]+$/, '') || '现场工业监视',
+            channelId: 'CAM-01',
+            linxCompat: true
+          }
+        }, posX, posY);
+      };
+
+      if (file.size < 15 * 1024 * 1024) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          handleVideoUrl(event.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        const objUrl = URL.createObjectURL(file);
+        handleVideoUrl(objUrl);
+      }
+      return;
+    }
+  }
+
+  // 2. 左侧组件面板拖放
   const rawData = e.dataTransfer.getData('application/json');
   if (!rawData) return;
 
@@ -1278,8 +1377,8 @@ const handleContextMenu = (e: MouseEvent, compId: string | null) => {
   const winWidth = window.innerWidth;
   const winHeight = window.innerHeight;
 
-  let x = e.clientX;
-  let y = e.clientY;
+  let x = Math.round(e.clientX);
+  let y = Math.round(e.clientY);
 
   // Prevent right edge overflow (flip to left or clamp within screen)
   if (x + menuWidth > winWidth - 10) {
@@ -1292,10 +1391,10 @@ const handleContextMenu = (e: MouseEvent, compId: string | null) => {
 
   contextMenu.value = {
     visible: true,
-    x,
-    y,
-    canvasX: coords.x,
-    canvasY: coords.y,
+    x: Math.round(x),
+    y: Math.round(y),
+    canvasX: Math.round(coords.x),
+    canvasY: Math.round(coords.y),
     targetCompId: compId
   };
 };
@@ -1343,6 +1442,22 @@ const effectivePrimaryComponent = computed(() => {
     return props.components.find(c => c.id === contextMenu.value.targetCompId) || effectiveContextMenuComponents.value[0];
   }
   return primarySelected.value || effectiveContextMenuComponents.value[0];
+});
+
+// 仅具备 SCADA 数据测点绑定意义的组件（电气一次、状态、遥测/数值、工业SCADA、图表、自定义复合多状态等）支持右键关联测点
+// 基础几何形状、科技边框装饰、按钮等不展示“关联测点数据”菜单项
+const canEffectivePrimaryAssociateData = computed(() => {
+  const comp = effectivePrimaryComponent.value;
+  if (!comp) return false;
+
+  if (comp.category === 'basic' || comp.category === 'decoration' || comp.category === 'buttons' || comp.category === 'drawing') {
+    return false;
+  }
+  if (comp.type.startsWith('draw-') || comp.type.startsWith('deco-') || comp.type === 'ctrl-button') {
+    return false;
+  }
+
+  return true;
 });
 
 const isAnyEffectiveLocked = computed(() => {
@@ -1757,17 +1872,16 @@ defineExpose({
             'cursor-default': comp.locked && drawTool === 'select'
           }"
           :style="{
-            left: `${comp.x}px`,
-            top: `${comp.y}px`,
+            left: `${comp.x + (isDragging && !comp.locked && selectedSet.has(comp.id) ? dragOffset.dx : 0)}px`,
+            top: `${comp.y + (isDragging && !comp.locked && selectedSet.has(comp.id) ? dragOffset.dy : 0)}px`,
             width: `${Math.max(2, comp.width)}px`,
             height: `${Math.max(2, comp.height)}px`,
             minWidth: '4px',
             minHeight: '4px',
-            transform: comp.rotation ? `rotate(${comp.rotation}deg)` : 'translateZ(0)',
+            transform: comp.rotation ? `rotate(${comp.rotation}deg)` : undefined,
             transformOrigin: 'center center',
             zIndex: comp.zIndex || 1,
-            contain: 'layout style',
-            willChange: selectedIds.includes(comp.id) ? 'transform' : 'auto'
+            contain: 'layout style'
           }"
         >
           <!-- Invisible Expanded Hit Area for thin/line/bus widgets to guarantee effortless hovering and dragging -->
@@ -1807,8 +1921,8 @@ defineExpose({
             @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
             class="absolute pointer-events-none selection-box"
             :style="{
-              left: `${comp.x}px`,
-              top: `${comp.y}px`,
+              left: `${comp.x + (isDragging && !comp.locked ? dragOffset.dx : 0)}px`,
+              top: `${comp.y + (isDragging && !comp.locked ? dragOffset.dy : 0)}px`,
               width: `${Math.max(4, comp.width)}px`,
               height: `${Math.max(4, comp.height)}px`,
               transform: comp.rotation ? `rotate(${comp.rotation}deg)` : 'translateZ(0)',
@@ -1963,10 +2077,10 @@ defineExpose({
         <!-- Overall Multi-Selection Group Bounding Box (Visual Only, No Floating Menu) -->
         <div
           v-if="drawTool === 'select' && selectedGroupBBox && selectedIds.length > 1"
-          class="absolute border-2 border-dashed border-cyan-300/80 bg-cyan-400/[0.04] pointer-events-none z-45 shadow-[0_0_25px_rgba(0,242,255,0.25)] rounded-xs transition-all duration-75"
+          class="absolute border-2 border-dashed border-cyan-300/80 bg-cyan-400/[0.04] pointer-events-none z-45 shadow-[0_0_25px_rgba(0,242,255,0.25)] rounded-xs"
           :style="{
-            left: `${selectedGroupBBox.minX - 4}px`,
-            top: `${selectedGroupBBox.minY - 4}px`,
+            left: `${selectedGroupBBox.minX - 4 + (isDragging ? dragOffset.dx : 0)}px`,
+            top: `${selectedGroupBBox.minY - 4 + (isDragging ? dragOffset.dy : 0)}px`,
             width: `${selectedGroupBBox.width + 8}px`,
             height: `${selectedGroupBBox.height + 8}px`
           }"
@@ -2246,267 +2360,279 @@ defineExpose({
       </div>
     </div>
 
-    <!-- Right-Click Context Menu -->
+    <!-- Right-Click Context Menu (Solid, Ultra-High-Contrast, Razor-Sharp Luminous Menu) -->
     <div
       v-if="contextMenu.visible"
-      class="fixed bg-[#132745] border border-cyan-400/60 rounded-xl shadow-[0_10px_35px_rgba(0,0,0,0.9)] p-1.5 z-50 backdrop-blur-md w-56 max-h-[calc(100vh-20px)] overflow-y-auto custom-scrollbar text-xs font-sans text-cyan-100"
-      :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
+      class="fixed bg-[#060c1c] border-2 border-cyan-400 rounded-lg shadow-[0_12px_45px_rgba(0,0,0,0.98)] p-1.5 z-50 w-64 max-h-[calc(100vh-20px)] overflow-y-auto custom-scrollbar text-xs font-sans text-white divide-y divide-cyan-950/70"
+      :style="{ left: `${Math.round(contextMenu.x)}px`, top: `${Math.round(contextMenu.y)}px` }"
       @click.stop
       @contextmenu.stop.prevent
     >
       <template v-if="effectiveContextMenuIds.length > 0">
         <!-- Multi-Selection or Single Selection Header -->
-        <div class="px-2.5 py-1.5 text-xs font-light text-cyan-300 border-b border-cyan-500/30 flex items-center justify-between">
+        <div class="px-2.5 py-1.5 text-xs font-normal text-cyan-300 flex items-center justify-between pb-1.5 tracking-wide">
           <span class="truncate">{{ effectiveContextMenuIds.length === 1 ? effectivePrimaryComponent?.name : `已选中 ${effectiveContextMenuIds.length} 个元件` }}</span>
-          <span v-if="effectiveContextMenuIds.length === 1" class="text-[11px] text-cyan-300 font-mono">{{ effectivePrimaryComponent?.rotation || 0 }}°</span>
+          <span v-if="effectiveContextMenuIds.length === 1" class="text-[11px] text-cyan-300 font-mono font-normal">{{ effectivePrimaryComponent?.rotation || 0 }}°</span>
         </div>
 
         <div class="py-1 space-y-0.5">
+          <!-- Associate SCADA Data Point (关联测点数据：厂站/装置/五遥/测点) -->
+          <button
+            v-if="canEffectivePrimaryAssociateData"
+            @click="emit('open:data-association', effectivePrimaryComponent || undefined); closeContextMenu();"
+            class="w-full text-left px-2.5 py-1.5 bg-[#0e2242] hover:bg-cyan-400 hover:text-slate-950 rounded-md text-cyan-200 hover:text-slate-950 cursor-pointer flex items-center justify-between group transition-colors border border-cyan-400/60 shadow-sm"
+          >
+            <div class="flex items-center gap-2">
+              <Database class="w-3.5 h-3.5 text-cyan-300 group-hover:text-slate-950 stroke-[2]" />
+              <span class="font-normal text-white group-hover:text-slate-950 tracking-wide text-xs">关联测点数据</span>
+            </div>
+            <span class="text-[10px] text-cyan-300 group-hover:text-slate-950 font-mono font-normal tracking-wide">级联选择</span>
+          </button>
+
           <!-- View / Edit Properties Inspector (选中右击查看属性) -->
           <button
             @click="emit('open:property-inspector'); closeContextMenu();"
-            class="w-full text-left px-2.5 py-1.5 bg-[#1c3a66] hover:bg-cyan-600 hover:text-slate-950 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group transition-colors border border-cyan-400/50"
+            class="w-full text-left px-2.5 py-1.5 bg-[#0b172d] hover:bg-cyan-500 hover:text-slate-950 rounded-md text-white hover:text-slate-950 cursor-pointer flex items-center justify-between group transition-colors border border-cyan-500/40"
           >
-            <div class="flex items-center gap-2 font-normal">
-              <Sliders class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
-              <span>查看/编辑属性面板</span>
+            <div class="flex items-center gap-2">
+              <Sliders class="w-3.5 h-3.5 text-cyan-300 group-hover:text-slate-950 stroke-[2]" />
+              <span class="font-normal text-white group-hover:text-slate-950 tracking-wide text-xs">查看/编辑属性面板</span>
             </div>
-            <span class="text-[10px] text-cyan-300 font-mono font-light">打开</span>
+            <span class="text-[10px] text-cyan-300 group-hover:text-slate-950 font-mono">打开</span>
           </button>
 
           <!-- Copy (Ctrl+C) -->
           <button
             @click="emit('copy', effectiveContextMenuComponents); closeContextMenu();"
-            class="w-full text-left px-2.5 py-1.5 hover:bg-cyan-950/60 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group transition-colors"
+            class="w-full text-left px-2.5 py-1.5 hover:bg-[#112444] rounded-md text-white hover:text-cyan-200 cursor-pointer flex items-center justify-between group transition-colors"
           >
-            <div class="flex items-center gap-2 font-light">
+            <div class="flex items-center gap-2">
               <Copy class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
-              <span>复制</span>
+              <span class="font-normal text-white group-hover:text-cyan-100 tracking-wide text-xs">复制</span>
             </div>
-            <span class="text-[10px] text-cyan-300 font-mono group-hover:text-cyan-100 font-light">Ctrl+C</span>
+            <span class="text-[10px] text-cyan-300 font-mono group-hover:text-cyan-100">Ctrl+C</span>
           </button>
 
           <!-- Cut (Ctrl+X) -->
           <button
             @click="emit('cut', effectiveContextMenuComponents); closeContextMenu();"
-            class="w-full text-left px-2.5 py-1.5 hover:bg-cyan-950/60 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group transition-colors"
+            class="w-full text-left px-2.5 py-1.5 hover:bg-[#112444] rounded-md text-white hover:text-amber-200 cursor-pointer flex items-center justify-between group transition-colors"
           >
-            <div class="flex items-center gap-2 font-light">
+            <div class="flex items-center gap-2">
               <Scissors class="w-3.5 h-3.5 text-amber-300 stroke-[2]" />
-              <span>剪切</span>
+              <span class="font-normal text-white group-hover:text-amber-100 tracking-wide text-xs">剪切</span>
             </div>
-            <span class="text-[10px] text-cyan-300 font-mono group-hover:text-cyan-100 font-light">Ctrl+X</span>
+            <span class="text-[10px] text-amber-300 font-mono group-hover:text-amber-100">Ctrl+X</span>
           </button>
 
           <!-- Paste (Ctrl+V) -->
           <button
             v-if="canPaste"
             @click="emit('paste', { x: contextMenu.canvasX, y: contextMenu.canvasY }); closeContextMenu();"
-            class="w-full text-left px-2.5 py-1.5 hover:bg-cyan-950/60 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group transition-colors"
+            class="w-full text-left px-2.5 py-1.5 hover:bg-[#112444] rounded-md text-emerald-300 hover:text-emerald-100 cursor-pointer flex items-center justify-between group transition-colors"
           >
-            <div class="flex items-center gap-2 font-light">
+            <div class="flex items-center gap-2">
               <Clipboard class="w-3.5 h-3.5 text-emerald-300 stroke-[2]" />
-              <span>粘贴到此处</span>
+              <span class="font-normal text-emerald-200 group-hover:text-emerald-100 tracking-wide text-xs">粘贴到此处</span>
             </div>
-            <span class="text-[10px] text-cyan-300 font-mono group-hover:text-cyan-100 font-light">Ctrl+V</span>
+            <span class="text-[10px] text-emerald-300 font-mono group-hover:text-emerald-100">Ctrl+V</span>
           </button>
 
           <!-- Duplicate (Ctrl+D) -->
           <button
             @click="emit('duplicate', effectiveContextMenuComponents); closeContextMenu();"
-            class="w-full text-left px-2.5 py-1.5 hover:bg-cyan-950/60 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group transition-colors"
+            class="w-full text-left px-2.5 py-1.5 hover:bg-[#112444] rounded-md text-white hover:text-cyan-200 cursor-pointer flex items-center justify-between group transition-colors"
           >
-            <div class="flex items-center gap-2 font-light">
+            <div class="flex items-center gap-2">
               <Copy class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
-              <span>创建副本</span>
+              <span class="font-normal text-white group-hover:text-cyan-100 tracking-wide text-xs">创建副本</span>
             </div>
-            <span class="text-[10px] text-cyan-300 font-mono group-hover:text-cyan-100 font-light">Ctrl+D</span>
+            <span class="text-[10px] text-cyan-300 font-mono group-hover:text-cyan-100">Ctrl+D</span>
           </button>
         </div>
 
-        <div class="h-[1px] bg-cyan-500/30 my-1" />
-
-        <div class="py-0.5 space-y-0.5">
+        <div class="py-1 space-y-0.5">
           <!-- SCADA YK/YT Execution -->
           <button
             v-if="primarySelectedHasControl"
             @click="emit('open:control-modal', effectivePrimaryComponent?.data?.mapping?.deviceId); closeContextMenu();"
-            class="w-full text-left px-2.5 py-1.5 hover:bg-amber-500/20 rounded-md hover:text-amber-200 cursor-pointer text-amber-300 font-normal flex items-center justify-between group transition-colors"
+            class="w-full text-left px-2.5 py-1.5 bg-[#1f1505] hover:bg-amber-500 hover:text-slate-950 rounded-md text-amber-200 hover:text-slate-950 cursor-pointer border border-amber-500/50 flex items-center justify-between group transition-colors"
           >
             <div class="flex items-center gap-2">
-              <Radio class="w-3.5 h-3.5 text-amber-300 stroke-[2]" />
-              <span>执行遥控遥调操作 (YK / YT)</span>
+              <Radio class="w-3.5 h-3.5 text-amber-300 group-hover:text-slate-950 stroke-[2]" />
+              <span class="font-normal text-amber-100 group-hover:text-slate-950 tracking-wide text-xs">执行遥控遥调操作 (YK / YT)</span>
             </div>
-            <span class="text-[10px] text-amber-300 font-mono font-light">SCADA控制</span>
+            <span class="text-[10px] text-amber-300 group-hover:text-slate-950 font-mono font-normal">SCADA控制</span>
           </button>
 
           <!-- Group components (Ctrl+G) -->
           <button
             v-if="effectiveContextMenuIds.length >= 2"
             @click="emit('group', effectiveContextMenuComponents); closeContextMenu();"
-            class="w-full text-left px-2.5 py-1.5 hover:bg-cyan-950/60 rounded-md hover:text-cyan-100 cursor-pointer text-cyan-200 font-normal flex items-center justify-between transition-colors"
+            class="w-full text-left px-2.5 py-1.5 hover:bg-[#112444] rounded-md text-white hover:text-cyan-100 cursor-pointer flex items-center justify-between transition-colors"
           >
-            <div class="flex items-center gap-2 font-light">
-              <span>🧩 组合为群组</span>
+            <div class="flex items-center gap-2">
+              <span class="text-white font-normal tracking-wide text-xs">🧩 组合为群组</span>
             </div>
-            <span class="text-[10px] text-cyan-300 font-mono font-light">Ctrl+G</span>
+            <span class="text-[10px] text-cyan-300 font-mono">Ctrl+G</span>
           </button>
 
           <!-- Ungroup component (Ctrl+U) -->
           <button
             v-if="effectiveContextMenuIds.length === 1 && (effectivePrimaryComponent?.children?.length || effectivePrimaryComponent?.type === 'composite-symbol')"
             @click="emit('ungroup', effectivePrimaryComponent!);"
-            class="w-full text-left px-2.5 py-1.5 hover:bg-amber-500/20 rounded-md hover:text-amber-200 cursor-pointer text-amber-300 font-normal flex items-center justify-between transition-colors"
+            class="w-full text-left px-2.5 py-1.5 hover:bg-[#1f1505] rounded-md text-amber-200 hover:text-white cursor-pointer flex items-center justify-between transition-colors"
           >
-            <div class="flex items-center gap-2 font-light">
-              <span>🔓 取消组合为散装图元</span>
+            <div class="flex items-center gap-2">
+              <span class="text-amber-200 font-normal tracking-wide text-xs">🔓 取消组合为散装图元</span>
             </div>
-            <span class="text-[10px] text-amber-300 font-mono font-light">Ctrl+U</span>
+            <span class="text-[10px] text-amber-300 font-mono">Ctrl+U</span>
           </button>
 
           <button
             @click="emit('save:symbol', effectiveContextMenuComponents); closeContextMenu();"
-            class="w-full text-left px-2.5 py-1.5 hover:bg-emerald-500/20 rounded-md hover:text-emerald-200 cursor-pointer text-emerald-300 font-light flex items-center gap-2 transition-colors"
+            class="w-full text-left px-2.5 py-1.5 hover:bg-[#0c2419] rounded-md text-emerald-200 hover:text-white cursor-pointer flex items-center gap-2 transition-colors"
           >
-            <BookmarkPlus class="w-3.5 h-3.5 stroke-[2]" />
-            <span>封装为自定义图元</span>
+            <BookmarkPlus class="w-3.5 h-3.5 stroke-[2] text-emerald-300" />
+            <span class="text-emerald-200 font-normal tracking-wide text-xs">封装为自定义图元</span>
           </button>
 
           <!-- Lock / Unlock component (锁定/解锁图元) -->
           <button
             @click="handleToggleLockContext"
-            class="w-full text-left px-2.5 py-1.5 hover:bg-cyan-950/60 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center gap-2 font-light transition-colors"
+            class="w-full text-left px-2.5 py-1.5 hover:bg-[#112444] rounded-md text-white hover:text-cyan-100 cursor-pointer flex items-center gap-2 transition-colors"
           >
             <Lock class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
-            <span>{{ isAnyEffectiveLocked ? '解锁图元' : '锁定图元' }}</span>
+            <span class="text-white font-normal tracking-wide text-xs">{{ isAnyEffectiveLocked ? '解锁图元' : '锁定图元' }}</span>
           </button>
         </div>
 
         <!-- Layer Ordering -->
-        <div class="h-[1px] bg-cyan-500/30 my-1" />
-        <div class="px-2 py-0.5 text-[10px] text-cyan-300 font-light">图层层级</div>
-        <div class="py-0.5 space-y-0.5">
+        <div class="py-1 space-y-0.5">
+          <div class="px-2 py-0.5 text-[10px] text-cyan-300 font-normal uppercase tracking-wider">图层层级</div>
           <button
             @click="emit('bring:front', effectiveContextMenuIds); closeContextMenu();"
-            class="w-full text-left px-2.5 py-1 hover:bg-cyan-950/60 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group transition-colors"
+            class="w-full text-left px-2.5 py-1 hover:bg-[#112444] rounded-md text-white hover:text-cyan-100 cursor-pointer flex items-center justify-between group transition-colors"
           >
-            <div class="flex items-center gap-2 font-light">
+            <div class="flex items-center gap-2">
               <ArrowUpToLine class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
-              <span>置于顶层</span>
+              <span class="text-white group-hover:text-cyan-100 font-normal tracking-wide text-xs">置于顶层</span>
             </div>
-            <span class="text-[10px] text-cyan-300 font-mono group-hover:text-cyan-100 font-light">Ctrl+Shift+]</span>
+            <span class="text-[10px] text-cyan-300 font-mono group-hover:text-cyan-100">Ctrl+Shift+]</span>
           </button>
           <button
             @click="emit('move:up', effectiveContextMenuIds); closeContextMenu();"
-            class="w-full text-left px-2.5 py-1 hover:bg-cyan-950/60 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group transition-colors"
+            class="w-full text-left px-2.5 py-1 hover:bg-[#112444] rounded-md text-white hover:text-cyan-100 cursor-pointer flex items-center justify-between group transition-colors"
           >
-            <div class="flex items-center gap-2 font-light">
+            <div class="flex items-center gap-2">
               <ChevronUp class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
-              <span>上移一层</span>
+              <span class="text-white group-hover:text-cyan-100 font-normal tracking-wide text-xs">上移一层</span>
             </div>
-            <span class="text-[10px] text-cyan-300 font-mono group-hover:text-cyan-100 font-light">Ctrl+]</span>
+            <span class="text-[10px] text-cyan-300 font-mono group-hover:text-cyan-100">Ctrl+]</span>
           </button>
           <button
             @click="emit('move:down', effectiveContextMenuIds); closeContextMenu();"
-            class="w-full text-left px-2.5 py-1 hover:bg-cyan-950/60 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group transition-colors"
+            class="w-full text-left px-2.5 py-1 hover:bg-[#112444] rounded-md text-white hover:text-cyan-100 cursor-pointer flex items-center justify-between group transition-colors"
           >
-            <div class="flex items-center gap-2 font-light">
+            <div class="flex items-center gap-2">
               <ChevronDown class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
-              <span>下移一层</span>
+              <span class="text-white group-hover:text-cyan-100 font-normal tracking-wide text-xs">下移一层</span>
             </div>
-            <span class="text-[10px] text-cyan-300 font-mono group-hover:text-cyan-100 font-light">Ctrl+[</span>
+            <span class="text-[10px] text-cyan-300 font-mono group-hover:text-cyan-100">Ctrl+[</span>
           </button>
           <button
             @click="emit('send:back', effectiveContextMenuIds); closeContextMenu();"
-            class="w-full text-left px-2.5 py-1 hover:bg-cyan-950/60 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group transition-colors"
+            class="w-full text-left px-2.5 py-1 hover:bg-[#112444] rounded-md text-white hover:text-cyan-100 cursor-pointer flex items-center justify-between group transition-colors"
           >
-            <div class="flex items-center gap-2 font-light">
+            <div class="flex items-center gap-2">
               <ArrowDownToLine class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
-              <span>置于底层</span>
+              <span class="text-white group-hover:text-cyan-100 font-normal tracking-wide text-xs">置于底层</span>
             </div>
-            <span class="text-[10px] text-cyan-300 font-mono group-hover:text-cyan-100 font-light">Ctrl+Shift+[</span>
+            <span class="text-[10px] text-cyan-300 font-mono group-hover:text-cyan-100">Ctrl+Shift+[</span>
           </button>
         </div>
 
         <!-- Multi-Item Alignment & Equal Size Options -->
         <template v-if="effectiveContextMenuIds.length > 1">
-          <div class="h-[1px] bg-cyan-500/30 my-1" />
-          <div class="px-2 py-0.5 text-[10px] text-cyan-300 font-light flex items-center justify-between">
-            <span>尺寸统一 (等大小)</span>
-          </div>
-          <div class="grid grid-cols-3 gap-1 px-1 py-1">
-            <button @click="emit('align', 'equal-width'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-cyan-600 hover:text-slate-950 border border-cyan-500/40 text-cyan-200 text-center text-[11px] font-light cursor-pointer" title="所有选中元件统一为相同宽度 (以主选为主)">等宽</button>
-            <button @click="emit('align', 'equal-height'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-cyan-600 hover:text-slate-950 border border-cyan-500/40 text-cyan-200 text-center text-[11px] font-light cursor-pointer" title="所有选中元件统一为相同高度 (以主选为主)">等高</button>
-            <button @click="emit('align', 'equal-size'); closeContextMenu();" class="p-1 rounded bg-cyan-500/30 hover:bg-cyan-500 hover:text-slate-950 border border-cyan-400 text-cyan-100 text-center text-[11px] font-medium cursor-pointer" title="所有选中元件统一为相同宽高 (完全等大小)">等大小</button>
-          </div>
+          <div class="py-1">
+            <div class="px-2 py-0.5 text-[10px] text-cyan-300 font-normal flex items-center justify-between tracking-wider">
+              <span>尺寸统一 (等大小)</span>
+            </div>
+            <div class="grid grid-cols-3 gap-1 px-1 py-1">
+              <button @click="emit('align', 'equal-width'); closeContextMenu();" class="p-1 rounded bg-[#0e2242] hover:bg-cyan-500 hover:text-slate-950 border border-cyan-500/60 text-white hover:text-slate-950 text-center text-[11px] font-normal cursor-pointer transition-colors" title="所有选中元件统一为相同宽度 (以主选为主)">等宽</button>
+              <button @click="emit('align', 'equal-height'); closeContextMenu();" class="p-1 rounded bg-[#0e2242] hover:bg-cyan-500 hover:text-slate-950 border border-cyan-500/60 text-white hover:text-slate-950 text-center text-[11px] font-normal cursor-pointer transition-colors" title="所有选中元件统一为相同高度 (以主选为主)">等高</button>
+              <button @click="emit('align', 'equal-size'); closeContextMenu();" class="p-1 rounded bg-cyan-500 hover:bg-cyan-400 text-slate-950 border border-cyan-300 text-center text-[11px] font-medium cursor-pointer transition-colors" title="所有选中元件统一为相同宽高 (完全等大小)">等大小</button>
+            </div>
 
-          <div class="px-2 py-0.5 text-[10px] text-cyan-300 font-light mt-0.5">对齐与等间距分布</div>
-          <div class="grid grid-cols-4 gap-1 px-1 py-1">
-            <button @click="emit('align', 'left'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-[#1f4273] border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="左对齐">左对齐</button>
-            <button @click="emit('align', 'center'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-[#1f4273] border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="水平居中">居中</button>
-            <button @click="emit('align', 'right'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-[#1f4273] border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="右对齐">右对齐</button>
-            <button @click="emit('align', 'distribute-h'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-[#1f4273] border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="水平等间距分布">水平均布</button>
+            <div class="px-2 py-0.5 text-[10px] text-cyan-300 font-normal mt-1 tracking-wider">对齐与等间距分布</div>
+            <div class="grid grid-cols-4 gap-1 px-1 py-1">
+              <button @click="emit('align', 'left'); closeContextMenu();" class="p-1 rounded bg-[#0e2242] hover:bg-cyan-600 hover:text-white border border-cyan-500/40 text-white text-center text-[11px] font-normal cursor-pointer transition-colors" title="左对齐">左对齐</button>
+              <button @click="emit('align', 'center'); closeContextMenu();" class="p-1 rounded bg-[#0e2242] hover:bg-cyan-600 hover:text-white border border-cyan-500/40 text-white text-center text-[11px] font-normal cursor-pointer transition-colors" title="水平居中">居中</button>
+              <button @click="emit('align', 'right'); closeContextMenu();" class="p-1 rounded bg-[#0e2242] hover:bg-cyan-600 hover:text-white border border-cyan-500/40 text-white text-center text-[11px] font-normal cursor-pointer transition-colors" title="右对齐">右对齐</button>
+              <button @click="emit('align', 'distribute-h'); closeContextMenu();" class="p-1 rounded bg-[#0e2242] hover:bg-cyan-600 hover:text-white border border-cyan-500/40 text-white text-center text-[11px] font-normal cursor-pointer transition-colors" title="水平等间距分布">水平均布</button>
 
-            <button @click="emit('align', 'top'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-[#1f4273] border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="顶对齐">顶对齐</button>
-            <button @click="emit('align', 'middle'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-[#1f4273] border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="垂直居中">垂直居中</button>
-            <button @click="emit('align', 'bottom'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-[#1f4273] border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="底对齐">底对齐</button>
-            <button @click="emit('align', 'distribute-v'); closeContextMenu();" class="p-1 rounded bg-[#173055] hover:bg-[#1f4273] border border-cyan-500/40 text-cyan-200 hover:text-white text-center text-[11px] font-light cursor-pointer" title="垂直等间距分布">垂直均布</button>
+              <button @click="emit('align', 'top'); closeContextMenu();" class="p-1 rounded bg-[#0e2242] hover:bg-cyan-600 hover:text-white border border-cyan-500/40 text-white text-center text-[11px] font-normal cursor-pointer transition-colors" title="顶对齐">顶对齐</button>
+              <button @click="emit('align', 'middle'); closeContextMenu();" class="p-1 rounded bg-[#0e2242] hover:bg-cyan-600 hover:text-white border border-cyan-500/40 text-white text-center text-[11px] font-normal cursor-pointer transition-colors" title="垂直居中">垂直居中</button>
+              <button @click="emit('align', 'bottom'); closeContextMenu();" class="p-1 rounded bg-[#0e2242] hover:bg-cyan-600 hover:text-white border border-cyan-500/40 text-white text-center text-[11px] font-normal cursor-pointer transition-colors" title="底对齐">底对齐</button>
+              <button @click="emit('align', 'distribute-v'); closeContextMenu();" class="p-1 rounded bg-[#0e2242] hover:bg-cyan-600 hover:text-white border border-cyan-500/40 text-white text-center text-[11px] font-normal cursor-pointer transition-colors" title="垂直等间距分布">垂直均布</button>
+            </div>
           </div>
         </template>
 
-        <div class="h-[1px] bg-cyan-500/30 my-1" />
-        <button
-          @click="emit('delete', effectiveContextMenuIds); closeContextMenu();"
-          class="w-full text-left px-2.5 py-1.5 hover:bg-red-950/80 text-rose-300 rounded-md cursor-pointer flex items-center justify-between font-light transition-colors"
-        >
-          <div class="flex items-center gap-2">
-            <Trash2 class="w-3.5 h-3.5 text-rose-400 stroke-[2]" />
-            <span>删除选中元件</span>
-          </div>
-          <span class="text-[10px] text-rose-400 font-mono">Del</span>
-        </button>
+        <div class="py-1">
+          <button
+            @click="emit('delete', effectiveContextMenuIds); closeContextMenu();"
+            class="w-full text-left px-2.5 py-1.5 bg-[#200a10] hover:bg-rose-600 text-rose-200 hover:text-white border border-rose-500/50 rounded-md cursor-pointer flex items-center justify-between font-normal transition-colors"
+          >
+            <div class="flex items-center gap-2">
+              <Trash2 class="w-3.5 h-3.5 text-rose-300 stroke-[2]" />
+              <span class="text-rose-100 group-hover:text-white font-normal tracking-wide text-xs">删除选中元件</span>
+            </div>
+            <span class="text-[10px] text-rose-300 font-mono font-normal">Del</span>
+          </button>
+        </div>
       </template>
       <template v-else>
         <!-- Canvas Blank Area Context Menu -->
-        <div class="px-2.5 py-1.5 text-xs font-light text-cyan-300 border-b border-cyan-500/30">
+        <div class="px-2.5 py-1.5 text-xs font-normal text-cyan-300 pb-1.5 tracking-wide">
           画布全局操作
         </div>
         <div class="py-1 space-y-0.5">
           <button
             v-if="canPaste"
             @click="emit('paste', { x: contextMenu.canvasX, y: contextMenu.canvasY }); closeContextMenu();"
-            class="w-full text-left px-2.5 py-1.5 hover:bg-cyan-950/60 rounded-md text-emerald-300 hover:text-emerald-200 cursor-pointer flex items-center justify-between group font-light transition-colors"
+            class="w-full text-left px-2.5 py-1.5 hover:bg-[#112444] rounded-md text-emerald-300 hover:text-emerald-100 cursor-pointer flex items-center justify-between group font-normal transition-colors"
           >
             <div class="flex items-center gap-2">
               <Clipboard class="w-3.5 h-3.5 text-emerald-300 stroke-[2]" />
-              <span>粘贴图元到此处</span>
+              <span class="text-emerald-200 group-hover:text-emerald-100 font-normal tracking-wide text-xs">粘贴图元到此处</span>
             </div>
-            <span class="text-[10px] text-cyan-300 font-mono group-hover:text-emerald-300 font-light">Ctrl+V</span>
+            <span class="text-[10px] text-emerald-300 font-mono group-hover:text-emerald-100">Ctrl+V</span>
           </button>
           
           <button
             v-if="components.length > 0"
             @click="emit('select', components.map(c => c.id)); closeContextMenu();"
-            class="w-full text-left px-2.5 py-1.5 hover:bg-cyan-950/60 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group font-light transition-colors"
+            class="w-full text-left px-2.5 py-1.5 hover:bg-[#112444] rounded-md text-white hover:text-cyan-100 cursor-pointer flex items-center justify-between group font-normal transition-colors"
           >
             <div class="flex items-center gap-2">
               <CheckSquare class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
-              <span>全选画布图元</span>
+              <span class="text-white group-hover:text-cyan-100 font-normal tracking-wide text-xs">全选画布图元</span>
             </div>
-            <span class="text-[10px] text-cyan-300 font-mono group-hover:text-cyan-100 font-light">Ctrl+A</span>
+            <span class="text-[10px] text-cyan-300 font-mono group-hover:text-cyan-100">Ctrl+A</span>
           </button>
 
           <button
             @click="handleAlignToOrigin(); closeContextMenu();"
-            class="w-full text-left px-2.5 py-1.5 hover:bg-cyan-950/60 rounded-md text-cyan-200 hover:text-white cursor-pointer flex items-center justify-between group font-light transition-colors"
+            class="w-full text-left px-2.5 py-1.5 hover:bg-[#112444] rounded-md text-white hover:text-cyan-100 cursor-pointer flex items-center justify-between group font-normal transition-colors"
           >
             <div class="flex items-center gap-2">
               <Crosshair class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
-              <span>一键定位原点 (0, 0)</span>
+              <span class="text-white group-hover:text-cyan-100 font-normal tracking-wide text-xs">一键定位原点 (0, 0)</span>
             </div>
           </button>
 
-          <div class="px-2.5 py-1 text-[11px] text-cyan-300/80 font-light">
+          <div class="px-2.5 py-1.5 text-[11px] text-slate-200 font-normal leading-relaxed border-t border-cyan-950/60 mt-1">
             按住 Ctrl 或 空格 键拖拽平移无限画布，按住 Ctrl + 滚轮缩放
           </div>
         </div>

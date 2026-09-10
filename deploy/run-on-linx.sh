@@ -47,15 +47,15 @@ else
       -e GTK_IM_MODULE="fcitx" \
       -e QT_IM_MODULE="fcitx" \
       -v /tmp:/tmp \
-      `# --- 3. Mesa 多核软渲染与清晰度环境变量 ---` \
+      `# --- 3. Mesa 多核软渲染与高清抗模糊核心环境变量 ---` \
       -e LIBGL_ALWAYS_SOFTWARE=1 \
       -e GALLIUM_DRIVER=llvmpipe \
       -e LP_NUM_THREADS=$CPU_CORES \
       -e GDK_SCALE=${GDK_SCALE:-1} \
       -e GDK_DPI_SCALE=${GDK_DPI_SCALE:-1} \
       -e SCADA_SCALE_FACTOR=${SCADA_SCALE_FACTOR:-1} \
-      -e SCADA_FONT_HINTING=${SCADA_FONT_HINTING:-slight} \
-      -e FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=0 type1:no-stem-darkening=0 autofitter:warping=1" \
+      -e SCADA_FONT_HINTING=${SCADA_FONT_HINTING:-medium} \
+      -e FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=1 type1:no-stem-darkening=1 autofitter:warping=1" \
       --privileged \
       ${IMAGE_NAME} >/dev/null 2>&1
 fi

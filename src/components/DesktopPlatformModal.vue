@@ -27,7 +27,98 @@ onMounted(async () => {
   }
 });
 
-const activeTab = ref<'desktop' | 'docker'>('docker');
+const activeTab = ref<'linx-hd' | 'desktop' | 'docker'>('linx-hd');
+
+const linxHdCommands = [
+  {
+    title: '【方案 A · 极清直出推荐】凝思原生目录启动 (解决 1080p VGA 96DPI 文字发虚与输入法)',
+    desc: '针对 Intel 2代核显 (i915) 锁定 1:1 物理像素比 + Fcitx/IBus 智能桥接 + FreeType Medium 亚像素微调 + 禁用 FBO 双线性模糊过滤',
+    cmd: `export DISPLAY=\${DISPLAY:-:0}
+export LANG="zh_CN.UTF-8"
+export LC_ALL="zh_CN.UTF-8"
+export LC_CTYPE="zh_CN.UTF-8"
+[ -z "$DBUS_SESSION_BUS_ADDRESS" ] && [ -e "/run/user/$(id -u)/bus" ] && export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
+export XMODIFIERS="@im=fcitx"
+export GTK_IM_MODULE="fcitx"
+export QT_IM_MODULE="fcitx"
+export GDK_SCALE=1
+export GDK_DPI_SCALE=1
+export SCADA_SCALE_FACTOR=1
+export SCADA_FONT_HINTING=medium
+export FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=1 type1:no-stem-darkening=1 autofitter:warping=1"
+
+./ge-scada \\
+  --no-sandbox \\
+  --disable-gpu-sandbox \\
+  --disable-dev-shm-usage \\
+  --force-device-scale-factor=1 \\
+  --high-dpi-support=1 \\
+  --font-render-hinting=medium \\
+  --enable-lcd-text \\
+  --enable-font-antialiasing \\
+  --disable-features=CanvasOopRasterization,UseSkiaRendererByDefaultForOOPR \\
+  --disable-gpu-rasterization \\
+  --force-color-profile=srgb`
+  },
+  {
+    title: '【方案 B · 纯 CPU Skia 软渲染】老旧显卡终极清晰模式',
+    desc: '如果显卡驱动有异常，使用 Skia CPU 2D 纯软渲染，文字和图标笔画最锐利黑实',
+    cmd: `export DISPLAY=\${DISPLAY:-:0}
+export LANG="zh_CN.UTF-8"
+export XMODIFIERS="@im=fcitx"
+export GTK_IM_MODULE="fcitx"
+export QT_IM_MODULE="fcitx"
+export GDK_SCALE=1
+export GDK_DPI_SCALE=1
+export SCADA_SCALE_FACTOR=1
+export SCADA_FONT_HINTING=medium
+export FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=1 type1:no-stem-darkening=1 autofitter:warping=1"
+
+./ge-scada \\
+  --no-sandbox \\
+  --disable-gpu-sandbox \\
+  --disable-dev-shm-usage \\
+  --disable-gpu \\
+  --disable-gpu-compositing \\
+  --disable-gpu-rasterization \\
+  --force-device-scale-factor=1 \\
+  --font-render-hinting=medium \\
+  --enable-lcd-text \\
+  --enable-font-antialiasing`
+  },
+  {
+    title: '【一键脚本】创建 run-crisp.sh 启动脚本',
+    desc: '在 /home/scada/linux-unpacked/ 下一键生成带输入法自动检测与抗模糊参数的启动脚本',
+    cmd: `cat > run-crisp.sh << 'EOF'
+#!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+export DISPLAY=\${DISPLAY:-:0}
+export LANG="zh_CN.UTF-8"
+export LC_ALL="zh_CN.UTF-8"
+export LC_CTYPE="zh_CN.UTF-8"
+[ -z "$DBUS_SESSION_BUS_ADDRESS" ] && [ -e "/run/user/$(id -u)/bus" ] && export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
+if pgrep -x ibus-daemon >/dev/null 2>&1; then
+  export XMODIFIERS="@im=ibus"
+  export GTK_IM_MODULE="ibus"
+  export QT_IM_MODULE="ibus"
+else
+  export XMODIFIERS="@im=fcitx"
+  export GTK_IM_MODULE="fcitx"
+  export QT_IM_MODULE="fcitx"
+  export CLUTTER_IM_MODULE="fcitx"
+fi
+export GDK_SCALE=1
+export GDK_DPI_SCALE=1
+export SCADA_SCALE_FACTOR=1
+export SCADA_FONT_HINTING=medium
+export FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=1 type1:no-stem-darkening=1 autofitter:warping=1"
+exec ./ge-scada --no-sandbox --disable-gpu-sandbox --disable-dev-shm-usage --disable-renderer-backgrounding --disable-background-timer-throttling --disable-backgrounding-occluded-windows --force-device-scale-factor=1 --high-dpi-support=1 --font-render-hinting=medium --enable-lcd-text --enable-font-antialiasing --disable-features=CanvasOopRasterization,UseSkiaRendererByDefaultForOOPR --disable-gpu-rasterization --force-color-profile=srgb "$@"
+EOF
+chmod +x run-crisp.sh
+./run-crisp.sh`
+  }
+];
 
 const packagingCommands = [
   {
@@ -278,6 +369,16 @@ const copyCommand = (cmd: string, index: number | string) => {
         <!-- Tab Selector -->
         <div class="flex items-center gap-2 p-1 bg-slate-950 rounded-xl border border-slate-800">
           <button
+            @click="activeTab = 'linx-hd'"
+            class="flex-1 py-2 px-3 rounded-lg text-xs font-mono font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+            :class="activeTab === 'linx-hd' 
+              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.2)]' 
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'"
+          >
+            <Sparkles class="w-3.5 h-3.5 text-amber-400" />
+            <span>凝思/Intel 2代核显 1080p 高清抗模糊启动指令 (推荐)</span>
+          </button>
+          <button
             @click="activeTab = 'docker'"
             class="flex-1 py-2 px-3 rounded-lg text-xs font-mono font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
             :class="activeTab === 'docker' 
@@ -285,7 +386,7 @@ const copyCommand = (cmd: string, index: number | string) => {
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'"
           >
             <Terminal class="w-3.5 h-3.5 text-cyan-400" />
-            <span>凝思/国产低版本工控机 Docker 镜像制作与部署 (推荐)</span>
+            <span>凝思 Docker 镜像部署</span>
           </button>
           <button
             @click="activeTab = 'desktop'"
@@ -295,12 +396,52 @@ const copyCommand = (cmd: string, index: number | string) => {
               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'"
           >
             <Laptop class="w-3.5 h-3.5 text-cyan-400" />
-            <span>常规桌面端打包指令 (Win / Linux 原生)</span>
+            <span>常规打包指令 (Win/Linux)</span>
           </button>
         </div>
 
-        <!-- TAB 1: Docker for Linx OS / 凝思 -->
-        <div v-if="activeTab === 'docker'" class="space-y-4">
+        <!-- TAB 1: Linx OS & Intel 2nd Gen i915 HD Anti-Blur Commands -->
+        <div v-if="activeTab === 'linx-hd'" class="space-y-4">
+          <div class="p-3.5 rounded-xl bg-amber-950/20 border border-amber-500/40 text-slate-300 leading-relaxed text-[11px]">
+            <div class="text-amber-300 font-bold mb-1.5 flex items-center gap-1.5">
+              <ShieldCheck class="w-4 h-4 text-amber-400" />
+              <span>凝思系统 (Linx 9 / Linux 4.9) + Intel 2代核显 (Sandy Bridge i915) 模糊根因与优化方案</span>
+            </div>
+            <div class="space-y-1 text-slate-300 text-[11px]">
+              <div>• <strong class="text-amber-200">DPI 自动计算偏差修复</strong>：VGA 接口报告 480mm x 270mm 尺寸易导致 Chromium 自动按 1.05x 模糊插值放大，强制锁定 <code class="text-cyan-300">--force-device-scale-factor=1</code> 达到 100% 物理点对点像素直出。</div>
+              <div>• <strong class="text-amber-200">字体亚像素微调</strong>：96 DPI 显示屏下启用 <code class="text-cyan-300">--enable-lcd-text</code> 与 <code class="text-cyan-300">--font-render-hinting=medium</code>，汉字笔画严格对齐物理像素网格。</div>
+              <div>• <strong class="text-amber-200">禁用 FBO 显存双线性重采样</strong>：老旧 Intel 核显缺少完整 GLES3，禁用 GPU OOPR 双线性过滤，采用 Skia 2D 原生像素级精准光栅化，杜绝线条发虚。</div>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <div 
+              v-for="(item, idx) in linxHdCommands"
+              :key="item.title"
+              class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-amber-500/40 transition-colors"
+            >
+              <div class="flex items-center justify-between mb-2">
+                <div>
+                  <span class="text-white font-bold text-xs">{{ item.title }}</span>
+                  <span class="text-[11px] text-slate-400 ml-2">{{ item.desc }}</span>
+                </div>
+                <button
+                  @click="copyCommand(item.cmd, 'linx-' + idx)"
+                  class="flex items-center gap-1 px-3 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-amber-300 transition-colors cursor-pointer text-[11px] shrink-0"
+                >
+                  <Check v-if="copiedIndex === 'linx-' + idx" class="w-3.5 h-3.5 text-emerald-400" />
+                  <Copy v-else class="w-3.5 h-3.5" />
+                  <span>{{ copiedIndex === 'linx-' + idx ? '已复制' : '复制命令' }}</span>
+                </button>
+              </div>
+
+              <pre class="font-mono text-[11px] text-amber-300 bg-[#030712] p-2.5 rounded-lg border border-amber-500/20 overflow-x-auto whitespace-pre-wrap">{{ item.cmd }}</pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: Docker for Linx OS / 凝思 -->
+        <div v-else-if="activeTab === 'docker'" class="space-y-4">
           <div class="p-3.5 rounded-xl bg-cyan-950/20 border border-cyan-500/30 text-slate-300 leading-relaxed text-[11px]">
             <div class="text-cyan-300 font-bold mb-1 flex items-center gap-1.5">
               <ShieldCheck class="w-4 h-4 text-cyan-400" />

@@ -3092,180 +3092,180 @@ const handleFileChange = async (e: Event) => {
     <!-- ==================== FLOATING WORKSHOP CONTEXT MENU ==================== -->
     <div
       v-if="contextMenu.visible && currentMode === 'editor'"
-      class="fixed z-[9999] bg-[#070d1e]/95 backdrop-blur-md border border-cyan-500/30 rounded-xl shadow-2xl py-1.5 min-w-[200px] text-xs font-mono select-none"
+      class="fixed z-[9999] bg-[#060c1c] border-2 border-cyan-400 rounded-lg shadow-[0_15px_45px_rgba(0,0,0,0.98)] py-1.5 min-w-[210px] text-xs font-sans text-white select-none divide-y divide-cyan-950/70"
       :style="{
-        left: `${contextMenu.x}px`,
-        top: `${contextMenu.y}px`
+        left: `${Math.round(contextMenu.x)}px`,
+        top: `${Math.round(contextMenu.y)}px`
       }"
       @click.stop
       @contextmenu.prevent
     >
       <!-- Target Primitive Name Header if Right-Clicked on Comp -->
-      <div v-if="contextMenu.targetCompId" class="px-3 py-1 text-[10px] text-cyan-400 font-bold border-b border-slate-800/80 mb-1 flex items-center gap-1.5 truncate">
-        <Sliders class="w-3 h-3 text-cyan-400 shrink-0" />
+      <div v-if="contextMenu.targetCompId" class="px-3 py-1 text-xs text-cyan-300 font-normal pb-1.5 flex items-center gap-1.5 truncate">
+        <Sliders class="w-3.5 h-3.5 text-cyan-300 shrink-0" />
         <span class="truncate">{{ currentEditingComponents.find(c => c.id === contextMenu.targetCompId)?.name || '图元组件' }}</span>
       </div>
 
-      <!-- Copy -->
-      <button
-        @click="handleCopySelected(); closeContextMenu();"
-        :disabled="selectedCompIds.length === 0"
-        class="w-full px-3 py-1.5 flex items-center justify-between text-left transition-colors cursor-pointer"
-        :class="selectedCompIds.length > 0 ? 'text-slate-200 hover:bg-cyan-500/20 hover:text-cyan-200' : 'text-slate-600 cursor-not-allowed'"
-      >
-        <span class="flex items-center gap-2">
-          <Copy class="w-3.5 h-3.5 text-slate-400" />
-          <span>复制</span>
-        </span>
-        <kbd class="text-[10px] text-slate-500 bg-slate-900 px-1 py-0.5 rounded border border-slate-800">Ctrl+C</kbd>
-      </button>
-
-      <!-- Cut -->
-      <button
-        @click="handleCutSelected(); closeContextMenu();"
-        :disabled="selectedCompIds.length === 0"
-        class="w-full px-3 py-1.5 flex items-center justify-between text-left transition-colors cursor-pointer"
-        :class="selectedCompIds.length > 0 ? 'text-slate-200 hover:bg-cyan-500/20 hover:text-cyan-200' : 'text-slate-600 cursor-not-allowed'"
-      >
-        <span class="flex items-center gap-2">
-          <Scissors class="w-3.5 h-3.5 text-slate-400" />
-          <span>剪切</span>
-        </span>
-        <kbd class="text-[10px] text-slate-500 bg-slate-900 px-1 py-0.5 rounded border border-slate-800">Ctrl+X</kbd>
-      </button>
-
-      <!-- Paste -->
-      <button
-        @click="handlePastePrimitives(contextMenu.canvasX, contextMenu.canvasY); closeContextMenu();"
-        :disabled="symbolClipboard.length === 0"
-        class="w-full px-3 py-1.5 flex items-center justify-between text-left transition-colors cursor-pointer"
-        :class="symbolClipboard.length > 0 ? 'text-slate-200 hover:bg-cyan-500/20 hover:text-cyan-200' : 'text-slate-600 cursor-not-allowed'"
-      >
-        <span class="flex items-center gap-2">
-          <Clipboard class="w-3.5 h-3.5 text-slate-400" />
-          <span>粘贴在此处</span>
-        </span>
-        <kbd class="text-[10px] text-slate-500 bg-slate-900 px-1 py-0.5 rounded border border-slate-800">Ctrl+V</kbd>
-      </button>
-
-      <!-- Duplicate -->
-      <button
-        @click="handleDuplicateSelected(); closeContextMenu();"
-        :disabled="selectedCompIds.length === 0"
-        class="w-full px-3 py-1.5 flex items-center justify-between text-left transition-colors cursor-pointer"
-        :class="selectedCompIds.length > 0 ? 'text-slate-200 hover:bg-cyan-500/20 hover:text-cyan-200' : 'text-slate-600 cursor-not-allowed'"
-      >
-        <span class="flex items-center gap-2">
-          <Copy class="w-3.5 h-3.5 text-cyan-400" />
-          <span>创建副本</span>
-        </span>
-        <kbd class="text-[10px] text-slate-500 bg-slate-900 px-1 py-0.5 rounded border border-slate-800">Ctrl+D</kbd>
-      </button>
-
-      <div class="h-px bg-slate-800/80 my-1 mx-2" />
-
-      <!-- Select All -->
-      <button
-        @click="handleSelectAll(); closeContextMenu();"
-        :disabled="currentEditingComponents.length === 0"
-        class="w-full px-3 py-1.5 flex items-center justify-between text-left transition-colors cursor-pointer"
-        :class="currentEditingComponents.length > 0 ? 'text-slate-200 hover:bg-cyan-500/20 hover:text-cyan-200' : 'text-slate-600 cursor-not-allowed'"
-      >
-        <span class="flex items-center gap-2">
-          <CheckSquare class="w-3.5 h-3.5 text-slate-400" />
-          <span>全选图元</span>
-        </span>
-        <kbd class="text-[10px] text-slate-500 bg-slate-900 px-1 py-0.5 rounded border border-slate-800">Ctrl+A</kbd>
-      </button>
-
-      <!-- Rotate -->
-      <button
-        @click="handleRotateSelected(90); closeContextMenu();"
-        :disabled="selectedCompIds.length === 0"
-        class="w-full px-3 py-1.5 flex items-center justify-between text-left transition-colors cursor-pointer"
-        :class="selectedCompIds.length > 0 ? 'text-slate-200 hover:bg-cyan-500/20 hover:text-cyan-200' : 'text-slate-600 cursor-not-allowed'"
-      >
-        <span class="flex items-center gap-2">
-          <RotateCw class="w-3.5 h-3.5 text-slate-400" />
-          <span>顺时针旋转 90°</span>
-        </span>
-        <kbd class="text-[10px] text-slate-500 bg-slate-900 px-1 py-0.5 rounded border border-slate-800">R</kbd>
-      </button>
-
-      <!-- Snap to Grid -->
-      <button
-        @click="handleSnapSelectedToGrid(); closeContextMenu();"
-        :disabled="selectedCompIds.length === 0"
-        class="w-full px-3 py-1.5 flex items-center justify-between text-left transition-colors cursor-pointer"
-        :class="selectedCompIds.length > 0 ? 'text-slate-200 hover:bg-cyan-500/20 hover:text-cyan-200' : 'text-slate-600 cursor-not-allowed'"
-      >
-        <span class="flex items-center gap-2">
-          <Magnet class="w-3.5 h-3.5 text-slate-400" />
-          <span>对齐到点格</span>
-        </span>
-      </button>
-
-      <div class="h-px bg-slate-800/80 my-1 mx-2" />
-
-      <!-- Layer Ordering -->
-      <div v-if="selectedCompIds.length > 0" class="space-y-0.5">
+      <div class="py-1 space-y-0.5">
+        <!-- Copy -->
         <button
-          @click="handleMoveLayer('top'); closeContextMenu();"
-          class="w-full px-3 py-1 text-slate-300 hover:bg-slate-800/80 flex items-center justify-between text-left cursor-pointer"
+          @click="handleCopySelected(); closeContextMenu();"
+          :disabled="selectedCompIds.length === 0"
+          class="w-full px-3 py-1.5 flex items-center justify-between text-left transition-colors cursor-pointer"
+          :class="selectedCompIds.length > 0 ? 'text-white hover:bg-[#112444] hover:text-cyan-100' : 'text-slate-600 cursor-not-allowed'"
         >
           <span class="flex items-center gap-2">
-            <ArrowUp class="w-3 h-3 text-cyan-400" />
-            <span>置于顶层</span>
+            <Copy class="w-3.5 h-3.5 text-cyan-300" />
+            <span class="font-normal tracking-wide text-xs">复制</span>
           </span>
-          <kbd class="text-[9px] text-slate-500 bg-slate-900 px-1 rounded">Shift+]</kbd>
+          <kbd class="text-[10px] text-cyan-300 font-mono">Ctrl+C</kbd>
         </button>
+
+        <!-- Cut -->
         <button
-          @click="handleMoveLayer('bottom'); closeContextMenu();"
-          class="w-full px-3 py-1 text-slate-300 hover:bg-slate-800/80 flex items-center justify-between text-left cursor-pointer"
+          @click="handleCutSelected(); closeContextMenu();"
+          :disabled="selectedCompIds.length === 0"
+          class="w-full px-3 py-1.5 flex items-center justify-between text-left transition-colors cursor-pointer"
+          :class="selectedCompIds.length > 0 ? 'text-white hover:bg-[#112444] hover:text-amber-100' : 'text-slate-600 cursor-not-allowed'"
         >
           <span class="flex items-center gap-2">
-            <ArrowDown class="w-3 h-3 text-cyan-400" />
-            <span>置于底层</span>
+            <Scissors class="w-3.5 h-3.5 text-amber-300" />
+            <span class="font-normal tracking-wide text-xs">剪切</span>
           </span>
-          <kbd class="text-[9px] text-slate-500 bg-slate-900 px-1 rounded">Shift+[</kbd>
+          <kbd class="text-[10px] text-amber-300 font-mono">Ctrl+X</kbd>
         </button>
+
+        <!-- Paste -->
         <button
-          @click="handleMoveLayer('up'); closeContextMenu();"
-          class="w-full px-3 py-1 text-slate-300 hover:bg-slate-800/80 flex items-center justify-between text-left cursor-pointer"
+          @click="handlePastePrimitives(contextMenu.canvasX, contextMenu.canvasY); closeContextMenu();"
+          :disabled="symbolClipboard.length === 0"
+          class="w-full px-3 py-1.5 flex items-center justify-between text-left transition-colors cursor-pointer"
+          :class="symbolClipboard.length > 0 ? 'text-emerald-300 hover:bg-[#112444] hover:text-emerald-100' : 'text-slate-600 cursor-not-allowed'"
         >
           <span class="flex items-center gap-2">
-            <ArrowUp class="w-3 h-3 text-slate-400" />
-            <span>上移一层</span>
+            <Clipboard class="w-3.5 h-3.5 text-emerald-300" />
+            <span class="font-normal tracking-wide text-xs">粘贴在此处</span>
           </span>
-          <kbd class="text-[9px] text-slate-500 bg-slate-900 px-1 rounded">]</kbd>
+          <kbd class="text-[10px] text-emerald-300 font-mono">Ctrl+V</kbd>
         </button>
+
+        <!-- Duplicate -->
         <button
-          @click="handleMoveLayer('down'); closeContextMenu();"
-          class="w-full px-3 py-1 text-slate-300 hover:bg-slate-800/80 flex items-center justify-between text-left cursor-pointer"
+          @click="handleDuplicateSelected(); closeContextMenu();"
+          :disabled="selectedCompIds.length === 0"
+          class="w-full px-3 py-1.5 flex items-center justify-between text-left transition-colors cursor-pointer"
+          :class="selectedCompIds.length > 0 ? 'text-white hover:bg-[#112444] hover:text-cyan-100' : 'text-slate-600 cursor-not-allowed'"
         >
           <span class="flex items-center gap-2">
-            <ArrowDown class="w-3 h-3 text-slate-400" />
-            <span>下移一层</span>
+            <Copy class="w-3.5 h-3.5 text-cyan-300" />
+            <span class="font-normal tracking-wide text-xs">创建副本</span>
           </span>
-          <kbd class="text-[9px] text-slate-500 bg-slate-900 px-1 rounded">[</kbd>
+          <kbd class="text-[10px] text-cyan-300 font-mono">Ctrl+D</kbd>
         </button>
       </div>
 
-      <div class="h-px bg-slate-800/80 my-1 mx-2" />
+      <div class="py-1 space-y-0.5">
+        <!-- Select All -->
+        <button
+          @click="handleSelectAll(); closeContextMenu();"
+          :disabled="currentEditingComponents.length === 0"
+          class="w-full px-3 py-1.5 flex items-center justify-between text-left transition-colors cursor-pointer"
+          :class="currentEditingComponents.length > 0 ? 'text-white hover:bg-[#112444] hover:text-cyan-100' : 'text-slate-600 cursor-not-allowed'"
+        >
+          <span class="flex items-center gap-2">
+            <CheckSquare class="w-3.5 h-3.5 text-cyan-300" />
+            <span class="font-normal tracking-wide text-xs">全选图元</span>
+          </span>
+          <kbd class="text-[10px] text-cyan-300 font-mono">Ctrl+A</kbd>
+        </button>
+
+        <!-- Rotate -->
+        <button
+          @click="handleRotateSelected(90); closeContextMenu();"
+          :disabled="selectedCompIds.length === 0"
+          class="w-full px-3 py-1.5 flex items-center justify-between text-left transition-colors cursor-pointer"
+          :class="selectedCompIds.length > 0 ? 'text-white hover:bg-[#112444] hover:text-cyan-100' : 'text-slate-600 cursor-not-allowed'"
+        >
+          <span class="flex items-center gap-2">
+            <RotateCw class="w-3.5 h-3.5 text-cyan-300" />
+            <span class="font-normal tracking-wide text-xs">顺时针旋转 90°</span>
+          </span>
+          <kbd class="text-[10px] text-cyan-300 font-mono">R</kbd>
+        </button>
+
+        <!-- Snap to Grid -->
+        <button
+          @click="handleSnapSelectedToGrid(); closeContextMenu();"
+          :disabled="selectedCompIds.length === 0"
+          class="w-full px-3 py-1.5 flex items-center justify-between text-left transition-colors cursor-pointer"
+          :class="selectedCompIds.length > 0 ? 'text-white hover:bg-[#112444] hover:text-cyan-100' : 'text-slate-600 cursor-not-allowed'"
+        >
+          <span class="flex items-center gap-2">
+            <Magnet class="w-3.5 h-3.5 text-cyan-300" />
+            <span class="font-normal tracking-wide text-xs">对齐到点格</span>
+          </span>
+        </button>
+      </div>
+
+      <!-- Layer Ordering -->
+      <div v-if="selectedCompIds.length > 0" class="py-1 space-y-0.5">
+        <button
+          @click="handleMoveLayer('top'); closeContextMenu();"
+          class="w-full px-3 py-1 text-white hover:bg-[#112444] hover:text-cyan-100 flex items-center justify-between text-left cursor-pointer"
+        >
+          <span class="flex items-center gap-2">
+            <ArrowUp class="w-3 h-3 text-cyan-300" />
+            <span class="font-normal tracking-wide text-xs">置于顶层</span>
+          </span>
+          <kbd class="text-[10px] text-cyan-300 font-mono">Shift+]</kbd>
+        </button>
+        <button
+          @click="handleMoveLayer('bottom'); closeContextMenu();"
+          class="w-full px-3 py-1 text-white hover:bg-[#112444] hover:text-cyan-100 flex items-center justify-between text-left cursor-pointer"
+        >
+          <span class="flex items-center gap-2">
+            <ArrowDown class="w-3 h-3 text-cyan-300" />
+            <span class="font-normal tracking-wide text-xs">置于底层</span>
+          </span>
+          <kbd class="text-[10px] text-cyan-300 font-mono">Shift+[</kbd>
+        </button>
+        <button
+          @click="handleMoveLayer('up'); closeContextMenu();"
+          class="w-full px-3 py-1 text-white hover:bg-[#112444] hover:text-cyan-100 flex items-center justify-between text-left cursor-pointer"
+        >
+          <span class="flex items-center gap-2">
+            <ArrowUp class="w-3 h-3 text-cyan-300" />
+            <span class="font-normal tracking-wide text-xs">上移一层</span>
+          </span>
+          <kbd class="text-[10px] text-cyan-300 font-mono">]</kbd>
+        </button>
+        <button
+          @click="handleMoveLayer('down'); closeContextMenu();"
+          class="w-full px-3 py-1 text-white hover:bg-[#112444] hover:text-cyan-100 flex items-center justify-between text-left cursor-pointer"
+        >
+          <span class="flex items-center gap-2">
+            <ArrowDown class="w-3 h-3 text-cyan-300" />
+            <span class="font-normal tracking-wide text-xs">下移一层</span>
+          </span>
+          <kbd class="text-[10px] text-cyan-300 font-mono">[</kbd>
+        </button>
+      </div>
 
       <!-- Delete -->
-      <button
-        @click="handleDeleteSelectedPrimitives(); closeContextMenu();"
-        :disabled="selectedCompIds.length === 0"
-        class="w-full px-3 py-1.5 flex items-center justify-between text-left transition-colors cursor-pointer"
-        :class="selectedCompIds.length > 0 ? 'text-rose-400 hover:bg-rose-950/60 hover:text-rose-200' : 'text-slate-600 cursor-not-allowed'"
-      >
-        <span class="flex items-center gap-2">
-          <Trash2 class="w-3.5 h-3.5 text-rose-400" />
-          <span>删除基础图元</span>
-        </span>
-        <kbd class="text-[10px] text-rose-400/80 bg-rose-950/40 px-1 py-0.5 rounded border border-rose-800/40">Del</kbd>
-      </button>
+      <div class="py-1">
+        <button
+          @click="handleDeleteSelectedPrimitives(); closeContextMenu();"
+          :disabled="selectedCompIds.length === 0"
+          class="w-full px-3 py-1.5 flex items-center justify-between text-left transition-colors cursor-pointer rounded-md"
+          :class="selectedCompIds.length > 0 ? 'bg-[#200a10] text-rose-200 hover:bg-rose-600 hover:text-white border border-rose-500/50' : 'text-slate-600 cursor-not-allowed'"
+        >
+          <span class="flex items-center gap-2">
+            <Trash2 class="w-3.5 h-3.5 text-rose-300" />
+            <span class="font-normal tracking-wide text-xs">删除基础图元</span>
+          </span>
+          <kbd class="text-[10px] text-rose-300 font-mono">Del</kbd>
+        </button>
+      </div>
     </div>
   </div>
 </template>

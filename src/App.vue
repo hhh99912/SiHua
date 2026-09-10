@@ -29,6 +29,7 @@ import PreviewScreen from './components/PreviewScreen.vue';
 import DesktopPlatformModal from './components/DesktopPlatformModal.vue';
 import ScadaControlModal from './components/ScadaControlModal.vue';
 import ScadaBatchPointModal from './components/ScadaBatchPointModal.vue';
+import DataAssociationModal from './components/DataAssociationModal.vue';
 import LoginModal from './components/LoginModal.vue';
 import ScadaPvLogin from './components/ScadaPvLogin.vue';
 import DiskStorageModal from './components/DiskStorageModal.vue';
@@ -94,6 +95,8 @@ const showSymbolModal = ref(false);
 const showSaveSymbolModal = ref(false);
 const showPlatformModal = ref(false);
 const showBatchPointModal = ref(false);
+const showDataAssociationModal = ref(false);
+const associationTargetComponent = ref<ScreenComponent | null>(null);
 const showLoginModal = ref(false);
 const showDiskStorageModal = ref(false);
 const loginNotice = ref('');
@@ -999,6 +1002,198 @@ const handleBatchBindPoints = (bindings: Array<{ compId: string; point: any; cat
   recordHistory();
 };
 
+// Component Data Association Modal Flow (右键菜单级联关联测点：厂站/装置/五遥/测点)
+const handleOpenDataAssociation = (comp?: ScreenComponent) => {
+  if (comp) {
+    associationTargetComponent.value = comp;
+  } else if (selectedComponent.value) {
+    associationTargetComponent.value = selectedComponent.value;
+  } else if (components.value.length > 0) {
+    associationTargetComponent.value = components.value[0];
+  } else {
+    associationTargetComponent.value = null;
+  }
+  if (associationTargetComponent.value) {
+    showDataAssociationModal.value = true;
+  }
+};
+
+const handleDataAssociationSubmit = (payload: {
+  componentId: string;
+  unbind?: boolean;
+  datasetId?: string;
+  deviceId?: string;
+  deviceName?: string;
+  category?: 'yc' | 'yx' | 'dd' | 'yk' | 'yt';
+  point?: any;
+  targetVerificationPointId?: number | string;
+}) => {
+  const comp = components.value.find(c => c.id === payload.componentId);
+  if (!comp) {
+    showDataAssociationModal.value = false;
+    return;
+  }
+
+  if (payload.unbind) {
+    // 解绑测点
+    if (!comp.data) comp.data = { mapping: {} };
+    comp.data.mapping = {};
+    if (comp.data.bindings) {
+      delete comp.data.bindings.value;
+      delete comp.data.bindings.state;
+    }
+    if (comp.data.action && (comp.data.action.type === 'tele-control' || comp.data.action.type === 'tele-regulation')) {
+      delete comp.data.action;
+    }
+    showDataAssociationModal.value = false;
+    recordHistory();
+    return;
+  }
+
+  if (!comp.data) comp.data = { mapping: {} };
+  if (!comp.data.mapping) comp.data.mapping = {};
+  if (!comp.data.bindings) comp.data.bindings = {};
+
+  const datasetId = payload.datasetId || 'ds-substation-scada';
+  const deviceId = payload.deviceId || '';
+  const point = payload.point || {};
+  const pointId = point.pointId;
+  const pointName = point.name || '';
+  const category = payload.category || 'yc';
+
+  comp.data.datasetId = datasetId;
+
+  if (category === 'yc') {
+    const pointKey = `${deviceId}_YC_${pointId}`;
+    comp.data.mapping = {
+      ...comp.data.mapping,
+      deviceId,
+      deviceName: payload.deviceName,
+      pointCategory: 'telemetry',
+      pointId,
+      pointName,
+      valueKey: pointKey,
+      unit: point.unit || comp.data.unit || ''
+    };
+    comp.data.bindings = {
+      ...comp.data.bindings,
+      value: pointKey
+    };
+    if (point.value !== undefined) {
+      comp.data.value = point.value;
+    }
+    if (point.unit) {
+      comp.data.unit = point.unit;
+      if (comp.customProps) {
+        comp.customProps.unit = point.unit;
+      }
+    }
+  } else if (category === 'yx') {
+    const pointKey = `${deviceId}_YX_${pointId}`;
+    comp.data.mapping = {
+      ...comp.data.mapping,
+      deviceId,
+      deviceName: payload.deviceName,
+      pointCategory: 'teleSignal',
+      pointId,
+      pointName,
+      stateKey: pointKey
+    };
+    comp.data.bindings = {
+      ...comp.data.bindings,
+      state: pointKey
+    };
+    if (point.value !== undefined) {
+      comp.data.state = point.value;
+      comp.data.value = point.value;
+      if (comp.states && comp.states.length > 0) {
+        comp.activeState = String(point.value);
+      }
+    }
+  } else if (category === 'dd') {
+    const pointKey = `${deviceId}_DD_${pointId}`;
+    comp.data.mapping = {
+      ...comp.data.mapping,
+      deviceId,
+      deviceName: payload.deviceName,
+      pointCategory: 'energy',
+      pointId,
+      pointName,
+      valueKey: pointKey,
+      unit: point.unit || comp.data.unit || ''
+    };
+    comp.data.bindings = {
+      ...comp.data.bindings,
+      value: pointKey
+    };
+    if (point.value !== undefined) {
+      comp.data.value = point.value;
+    }
+    if (point.unit) {
+      comp.data.unit = point.unit;
+      if (comp.customProps) {
+        comp.customProps.unit = point.unit;
+      }
+    }
+  } else if (category === 'yk') {
+    const ykKey = `${deviceId}_YK_${pointId}`;
+    comp.data.mapping = {
+      ...comp.data.mapping,
+      deviceId,
+      deviceName: payload.deviceName,
+      pointCategory: 'teleControl',
+      pointId,
+      ykPointId: pointId,
+      pointName
+    };
+    comp.data.action = {
+      type: 'tele-control',
+      deviceId,
+      pointId,
+      command: point.command || 'trip-close',
+      targetPointId: payload.targetVerificationPointId
+    };
+    if (payload.targetVerificationPointId) {
+      const yxKey = `${deviceId}_YX_${payload.targetVerificationPointId}`;
+      comp.data.mapping.targetYxPointId = payload.targetVerificationPointId;
+      comp.data.mapping.stateKey = yxKey;
+      comp.data.bindings = {
+        ...comp.data.bindings,
+        state: yxKey
+      };
+    }
+  } else if (category === 'yt') {
+    const ytKey = `${deviceId}_YT_${pointId}`;
+    comp.data.mapping = {
+      ...comp.data.mapping,
+      deviceId,
+      deviceName: payload.deviceName,
+      pointCategory: 'teleRegulation',
+      pointId,
+      ytPointId: pointId,
+      pointName
+    };
+    comp.data.action = {
+      type: 'tele-regulation',
+      deviceId,
+      pointId,
+      targetPointId: payload.targetVerificationPointId
+    };
+    if (payload.targetVerificationPointId) {
+      const ycKey = `${deviceId}_YC_${payload.targetVerificationPointId}`;
+      comp.data.mapping.targetYcPointId = payload.targetVerificationPointId;
+      comp.data.mapping.valueKey = ycKey;
+      comp.data.bindings = {
+        ...comp.data.bindings,
+        value: ycKey
+      };
+    }
+  }
+
+  showDataAssociationModal.value = false;
+  recordHistory();
+};
+
 // Save as Custom Symbol Flow
 const handleOpenSaveSymbolModal = (comps: ScreenComponent[]) => {
   if (comps.length === 0) return;
@@ -1397,6 +1592,7 @@ onBeforeUnmount(() => {
           @redo="handleRedo"
           @finish:draw="drawTool = 'select'; activePlacementDef = null; activeShapeType = '';"
           @open:property-inspector="showPropertyInspector = true"
+          @open:data-association="handleOpenDataAssociation"
           @open:control-modal="(devId) => { controlInitialDeviceId = devId; showControlModal = true; }"
           @commit:history="recordHistory"
         />
@@ -1440,6 +1636,7 @@ onBeforeUnmount(() => {
         @save:symbol="handleOpenSaveSymbolModal"
         @delete="handleDeleteBatch"
         @open:batch:points="showBatchPointModal = true"
+        @open:data-association="handleOpenDataAssociation"
         @open:control="(devId) => { controlInitialDeviceId = devId; showControlModal = true; }"
       />
     </div>
@@ -1450,6 +1647,15 @@ onBeforeUnmount(() => {
       :datasets="datasets"
       @close="showDatasetsModal = false"
       @update:datasets="datasets = $event; recordHistory();"
+    />
+
+    <!-- 1.4. SCADA Component Point Association Cascading Modal (右键大弹框级联选择：厂站/装置/五遥/测点) -->
+    <DataAssociationModal
+      :visible="showDataAssociationModal"
+      :component="associationTargetComponent"
+      :datasets="datasets"
+      @close="showDataAssociationModal = false; associationTargetComponent = null;"
+      @submit="handleDataAssociationSubmit"
     />
 
     <!-- 1.5. SCADA Tele-Control Center Modal (主界面遥控分合闸与遥调指令执行) -->

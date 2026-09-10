@@ -114,7 +114,11 @@ export type ComponentType =
 
   // 10. Vector Pen Drawing
   | 'draw-pen-path'
-  | 'draw-svg-icon';
+  | 'draw-svg-icon'
+
+  // 11. Media & Video Surveillance (多媒体与视频监控)
+  | 'media-image'
+  | 'media-video';
 
 export interface StyleConfig {
   fill?: string;
