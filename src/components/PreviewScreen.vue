@@ -671,34 +671,38 @@ onBeforeUnmount(() => {
     <div
       v-if="contextMenu.visible"
       @click.stop
-      class="fixed z-50 bg-[#060c1c] border-2 border-cyan-400 rounded-lg shadow-[0_15px_45px_rgba(0,0,0,0.98)] w-64 py-1.5 text-xs text-white font-sans divide-y divide-cyan-950/70"
+      class="fixed z-50 bg-[#060c1c] border border-cyan-400/80 rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.95)] w-64 py-1.5 text-[13px] text-white font-sans divide-y divide-cyan-950/60"
       :style="{
         left: `${Math.round(contextMenu.x)}px`,
-        top: `${Math.round(contextMenu.y)}px`
+        top: `${Math.round(contextMenu.y)}px`,
+        WebkitFontSmoothing: 'antialiased',
+        MozOsxFontSmoothing: 'grayscale',
+        textRendering: 'geometricPrecision',
+        transform: 'translateZ(0)'
       }"
     >
       <!-- Section 1: Switch to Edit Mode & Fullscreen (切换编辑界面 / 全屏 - 迁移到右击菜单中) -->
       <div class="py-1">
         <button
           @click="handleExitPreview(); closeContextMenu();"
-          class="w-full px-3 py-1.5 text-left bg-[#200a10] hover:bg-rose-600 text-rose-200 hover:text-white border-y border-rose-500/40 flex items-center justify-between cursor-pointer group font-normal transition-colors"
+          class="w-full px-3 py-1.5 text-left bg-transparent hover:bg-rose-500/20 text-rose-300 hover:text-rose-100 flex items-center justify-between cursor-pointer group font-normal transition-colors"
         >
           <span class="flex items-center gap-2">
-            <Edit3 class="w-4 h-4 text-rose-300 group-hover:text-white" />
-            <span class="text-rose-100 group-hover:text-white font-normal tracking-wide text-xs">切换编辑界面 / 退出监控</span>
+            <Edit3 class="w-4 h-4 text-rose-300 stroke-[1.75]" />
+            <span class="text-rose-200 group-hover:text-rose-100 font-normal tracking-wide text-[13px]">切换编辑界面 / 退出监控</span>
           </span>
-          <span class="text-[10px] text-rose-300 font-mono font-normal">ESC</span>
+          <span class="text-[11px] text-rose-300/80 font-mono">ESC</span>
         </button>
 
         <button
           @click="toggleBrowserFullscreen(); closeContextMenu();"
-          class="w-full px-3 py-1.5 text-left hover:bg-[#112444] text-white hover:text-cyan-100 flex items-center justify-between cursor-pointer group transition-colors mt-0.5"
+          class="w-full px-3 py-1.5 text-left bg-transparent hover:bg-cyan-500/20 text-slate-100 hover:text-white flex items-center justify-between cursor-pointer group transition-colors mt-0.5"
         >
           <span class="flex items-center gap-2">
-            <component :is="isBrowserFullscreen ? Minimize : Maximize" class="w-4 h-4 text-cyan-300" />
-            <span class="text-white group-hover:text-cyan-100 font-normal tracking-wide text-xs">{{ isBrowserFullscreen ? '退出全屏显示' : '进入全屏大屏模式' }}</span>
+            <component :is="isBrowserFullscreen ? Minimize : Maximize" class="w-4 h-4 text-cyan-300 stroke-[1.75]" />
+            <span class="text-slate-100 group-hover:text-white font-normal tracking-wide text-[13px]">{{ isBrowserFullscreen ? '退出全屏显示' : '进入全屏大屏模式' }}</span>
           </span>
-          <span class="text-[10px] text-cyan-300 font-mono">F11</span>
+          <span class="text-[11px] text-cyan-300/80 font-mono">F11</span>
         </button>
       </div>
 
@@ -706,13 +710,13 @@ onBeforeUnmount(() => {
       <div class="py-1">
         <button
           @click="handleOpenControlFromMenu"
-          class="w-full px-3 py-1.5 text-left bg-[#1f1505] hover:bg-amber-500 hover:text-slate-950 text-amber-200 hover:text-slate-950 border border-amber-500/50 rounded-md flex items-center justify-between cursor-pointer group transition-colors"
+          class="w-full px-3 py-1.5 text-left bg-transparent hover:bg-amber-500/20 text-amber-200 hover:text-amber-100 flex items-center justify-between cursor-pointer group transition-colors"
         >
           <span class="flex items-center gap-2">
-            <Zap class="w-4 h-4 text-amber-300 group-hover:text-slate-950" />
-            <span class="text-amber-100 group-hover:text-slate-950 font-normal tracking-wide text-xs">SCADA 遥控/遥调置数</span>
+            <Zap class="w-4 h-4 text-amber-300 stroke-[1.75]" />
+            <span class="text-amber-100 group-hover:text-white font-normal tracking-wide text-[13px]">SCADA 遥控/遥调置数</span>
           </span>
-          <span class="text-[10px] text-amber-300 group-hover:text-slate-950 font-mono font-normal">YK/YT</span>
+          <span class="text-[11px] text-amber-300/80 font-mono font-normal">YK/YT</span>
         </button>
       </div>
 
@@ -720,12 +724,12 @@ onBeforeUnmount(() => {
       <div class="py-1">
         <button
           @click="showBottomBar = !showBottomBar; closeContextMenu();"
-          class="w-full px-3 py-1.5 text-left hover:bg-[#112444] flex items-center justify-between cursor-pointer group transition-colors"
-          :class="showBottomBar ? 'text-cyan-300 font-normal bg-[#0e2242]' : 'text-white hover:text-cyan-100'"
+          class="w-full px-3 py-1.5 text-left bg-transparent hover:bg-cyan-500/20 flex items-center justify-between cursor-pointer group transition-colors"
+          :class="showBottomBar ? 'text-cyan-300' : 'text-slate-100 hover:text-white'"
         >
           <span class="flex items-center gap-2">
-            <PanelBottom class="w-4 h-4 text-cyan-300" />
-            <span class="text-white group-hover:text-cyan-100 font-normal tracking-wide text-xs">{{ showBottomBar ? '隐藏底部工具栏' : '显示底部工具栏' }}</span>
+            <PanelBottom class="w-4 h-4 text-cyan-300 stroke-[1.75]" />
+            <span class="text-slate-100 group-hover:text-white font-normal tracking-wide text-[13px]">{{ showBottomBar ? '隐藏底部工具栏' : '显示底部工具栏' }}</span>
           </span>
           <component :is="showBottomBar ? CheckSquare : Square" class="w-3.5 h-3.5 text-cyan-300" />
         </button>
@@ -735,38 +739,38 @@ onBeforeUnmount(() => {
       <div class="py-1">
         <button
           @click="emit('toggle:streaming'); closeContextMenu();"
-          class="w-full px-3 py-1.5 text-left hover:bg-[#112444] flex items-center justify-between cursor-pointer transition-colors"
+          class="w-full px-3 py-1.5 text-left bg-transparent hover:bg-emerald-500/20 flex items-center justify-between cursor-pointer transition-colors"
           :class="isStreaming ? 'text-emerald-300' : 'text-slate-300'"
         >
           <span class="flex items-center gap-2 font-normal">
-            <Pause v-if="isStreaming" class="w-3.5 h-3.5 text-emerald-300" />
-            <Play v-else class="w-3.5 h-3.5 text-slate-400" />
-            <span :class="isStreaming ? 'text-emerald-200 font-normal tracking-wide text-xs' : 'text-slate-200 font-normal tracking-wide text-xs'">{{ isStreaming ? '暂停实时数据流' : '恢复实时数据流' }}</span>
+            <Pause v-if="isStreaming" class="w-3.5 h-3.5 text-emerald-300 stroke-[1.75]" />
+            <Play v-else class="w-3.5 h-3.5 text-slate-400 stroke-[1.75]" />
+            <span :class="isStreaming ? 'text-emerald-200' : 'text-slate-300'" class="font-normal tracking-wide text-[13px]">{{ isStreaming ? '暂停实时数据流' : '恢复实时数据流' }}</span>
           </span>
         </button>
 
-        <!-- Scale Mode Submenu / Toggle -->
-        <div class="px-3 py-1.5 flex items-center justify-between text-[11px] text-slate-200">
+        <!-- Scale Mode Submenu / Toggle (No heavy boxes) -->
+        <div class="px-3 py-1.5 flex items-center justify-between text-[12px] text-slate-200">
           <span class="font-normal text-slate-200">显示比例:</span>
           <div class="flex items-center gap-1 font-mono">
             <button
               @click="scaleMode = 'fit'"
-              class="px-2 py-0.5 rounded text-[10px] font-normal border transition-colors cursor-pointer"
-              :class="scaleMode === 'fit' ? 'bg-cyan-500 text-slate-950 border-cyan-300 font-medium' : 'bg-[#0e2242] text-white border-cyan-500/40 hover:text-cyan-200'"
+              class="px-2 py-0.5 rounded text-[11px] font-normal transition-colors cursor-pointer"
+              :class="scaleMode === 'fit' ? 'bg-cyan-500/30 text-cyan-200 border border-cyan-400/60' : 'bg-transparent text-slate-300 hover:text-white hover:bg-cyan-500/10 border border-transparent'"
             >
               自适应
             </button>
             <button
               @click="scaleMode = 'fill'"
-              class="px-2 py-0.5 rounded text-[10px] font-normal border transition-colors cursor-pointer"
-              :class="scaleMode === 'fill' ? 'bg-cyan-500 text-slate-950 border-cyan-300 font-medium' : 'bg-[#0e2242] text-white border-cyan-500/40 hover:text-cyan-200'"
+              class="px-2 py-0.5 rounded text-[11px] font-normal transition-colors cursor-pointer"
+              :class="scaleMode === 'fill' ? 'bg-cyan-500/30 text-cyan-200 border border-cyan-400/60' : 'bg-transparent text-slate-300 hover:text-white hover:bg-cyan-500/10 border border-transparent'"
             >
               铺满
             </button>
             <button
               @click="scaleMode = 'original'"
-              class="px-2 py-0.5 rounded text-[10px] font-normal border transition-colors cursor-pointer"
-              :class="scaleMode === 'original' ? 'bg-cyan-500 text-slate-950 border-cyan-300 font-medium' : 'bg-[#0e2242] text-white border-cyan-500/40 hover:text-cyan-200'"
+              class="px-2 py-0.5 rounded text-[11px] font-normal transition-colors cursor-pointer"
+              :class="scaleMode === 'original' ? 'bg-cyan-500/30 text-cyan-200 border border-cyan-400/60' : 'bg-transparent text-slate-300 hover:text-white hover:bg-cyan-500/10 border border-transparent'"
             >
               1:1
             </button>

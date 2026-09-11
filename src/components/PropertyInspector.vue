@@ -66,10 +66,7 @@ import {
   EyeOff,
   Paintbrush,
   Image as ImageIcon,
-  Video,
-  UploadCloud,
-  Camera,
-  Film
+  UploadCloud
 } from 'lucide-vue-next';
 import { ScreenComponent, ScreenConfig, DatasetItem, ScreenItem, ScadaDeviceItem } from '../types';
 import {
@@ -308,11 +305,6 @@ const isMediaImageComponent = computed(() => {
   return props.component.type === 'media-image';
 });
 
-const isMediaVideoComponent = computed(() => {
-  if (!props.component) return false;
-  return props.component.type === 'media-video';
-});
-
 const isNoStyleComponent = computed(() => {
   if (!props.component) return false;
   const t = props.component.type;
@@ -320,8 +312,8 @@ const isNoStyleComponent = computed(() => {
   if (isCustomOrStatusComponent.value) {
     return true;
   }
-  // 多媒体图片与视频拥有专属高级配置，不作为普通无样式组件
-  if (isMediaImageComponent.value || isMediaVideoComponent.value) {
+  // 多媒体图片拥有专属高级配置，不作为普通无样式组件
+  if (isMediaImageComponent.value) {
     return false;
   }
   // 图标组件
@@ -369,50 +361,6 @@ const handleInspectorImageUpload = (e: Event) => {
 };
 
 const handleClearInspectorImage = () => {
-  updateComponentProps({
-    customProps: {
-      ...(props.component?.customProps || {}),
-      src: '',
-      fileName: '',
-      fileSize: ''
-    }
-  });
-};
-
-// Video Upload Handler for Property Inspector (Local Upload Only)
-const handleInspectorVideoUpload = (e: Event) => {
-  const target = e.target as HTMLInputElement;
-  const file = target.files?.[0];
-  if (!file) return;
-  if (!file.type.startsWith('video/')) {
-    alert('请选择有效的视频文件 (MP4, WebM, OGG, AVI, MOV)');
-    return;
-  }
-
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    const result = event.target?.result as string;
-    updateComponentProps({
-      customProps: {
-        ...(props.component?.customProps || {}),
-        src: result,
-        fileName: file.name,
-        fileSize: (file.size / (1024 * 1024)).toFixed(2) + ' MB'
-      },
-      style: {
-        ...(props.component?.style || {}),
-        stroke: 'transparent',
-        strokeWidth: 0,
-        borderRadius: 0,
-        borderColor: 'transparent',
-        borderWidth: 0
-      }
-    });
-  };
-  reader.readAsDataURL(file);
-};
-
-const handleClearInspectorVideo = () => {
   updateComponentProps({
     customProps: {
       ...(props.component?.customProps || {}),
@@ -2686,159 +2634,6 @@ const toggleBatchVisibility = () => {
               <div class="p-2 rounded bg-cyan-950/60 border border-cyan-500/30 text-[10px] text-cyan-300 flex items-start gap-1.5">
                 <ShieldCheck class="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
                 <span>凝思 Linux 深度适配：本地上传的图片将以内联 Base64 保存于工程 JSON 中，完全离线运行、迁移无丢图风险。</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- 3. 工业视频监控图元专属属性配置 (Media Video) - 仅本地上传 & 无边框 -->
-          <div v-else-if="isMediaVideoComponent" class="space-y-3">
-            <div class="p-3 rounded-xl bg-[#050e1f] border border-cyan-500/40 space-y-3 shadow-sm">
-              <div class="flex items-center justify-between text-xs font-bold text-cyan-300">
-                <div class="flex items-center gap-1.5">
-                  <Video class="w-4 h-4 text-cyan-400" />
-                  <span class="font-normal text-cyan-200">工业视频监控与摄像机配置</span>
-                </div>
-                <span class="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/40 text-[10px] font-mono font-light">
-                  本地上传 / 凝思硬解
-                </span>
-              </div>
-
-              <!-- Dedicated Local Video File Upload Area -->
-              <div class="space-y-2">
-                <label class="text-xs font-normal text-cyan-200 block">本地视频文件上传</label>
-                
-                <div v-if="component.customProps?.src" class="p-2.5 rounded-lg bg-[#09152b] border border-cyan-500/30 flex items-center justify-between gap-2">
-                  <div class="flex items-center gap-2 min-w-0">
-                    <div class="w-10 h-10 rounded bg-black/60 border border-cyan-500/30 flex items-center justify-center shrink-0">
-                      <Video class="w-5 h-5 text-cyan-300" />
-                    </div>
-                    <div class="min-w-0">
-                      <div class="text-xs text-cyan-100 font-mono truncate">
-                        {{ component.customProps?.fileName || '已上传本地视频' }}
-                      </div>
-                      <div class="text-[10px] text-cyan-400 font-mono">
-                        {{ component.customProps?.fileSize || '本地视频媒体流' }}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="flex items-center gap-1.5 shrink-0">
-                    <label class="px-2 py-1 rounded bg-[#142c4e] hover:bg-cyan-600 hover:text-slate-950 text-cyan-200 border border-cyan-500/50 hover:border-cyan-300 text-xs cursor-pointer transition-all flex items-center gap-1" title="更换本地视频">
-                      <UploadCloud class="w-3.5 h-3.5" />
-                      <span>更换</span>
-                      <input type="file" accept="video/*" @change="handleInspectorVideoUpload" class="hidden" />
-                    </label>
-                    <button
-                      type="button"
-                      @click="handleClearInspectorVideo"
-                      class="p-1 rounded hover:bg-red-950 text-red-400 hover:text-red-200 border border-red-500/30 hover:border-red-400 transition-colors cursor-pointer"
-                      title="清除视频"
-                    >
-                      <Trash2 class="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                <label 
-                  v-else 
-                  class="border-2 border-dashed border-cyan-500/40 hover:border-cyan-300 bg-[#09152b]/60 hover:bg-cyan-950/40 rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all group"
-                >
-                  <div class="w-9 h-9 rounded-full bg-cyan-950 border border-cyan-500/50 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <UploadCloud class="w-4 h-4 text-cyan-300" />
-                  </div>
-                  <div class="text-center">
-                    <span class="text-xs font-normal text-cyan-200 group-hover:text-white">点击选择本地视频上传</span>
-                    <p class="text-[10px] text-cyan-400/80 font-mono mt-0.5">支持 MP4, WebM, OGG, AVI, MOV 等格式</p>
-                  </div>
-                  <input type="file" accept="video/*" @change="handleInspectorVideoUpload" class="hidden" />
-                </label>
-              </div>
-
-              <!-- Camera Title & Channel Tag -->
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <label class="text-xs font-normal text-cyan-200 block mb-1">监控通道名称</label>
-                  <input
-                    type="text"
-                    :value="component.customProps?.cameraTitle || component.name || ''"
-                    @input="updateComponentProps({ name: ($event.target as HTMLInputElement).value, customProps: { ...(component.customProps || {}), cameraTitle: ($event.target as HTMLInputElement).value } })"
-                    placeholder="主变场地监控"
-                    class="w-full bg-[#09152b] border border-cyan-500/50 focus:border-cyan-300 rounded-lg px-2.5 py-1.5 text-cyan-100 font-light text-xs outline-hidden"
-                  />
-                </div>
-                <div>
-                  <label class="text-xs font-normal text-cyan-200 block mb-1">通道编号 (Channel)</label>
-                  <input
-                    type="text"
-                    :value="component.customProps?.channelId || 'CAM-01'"
-                    @input="updateComponentProps({ customProps: { ...(component.customProps || {}), channelId: ($event.target as HTMLInputElement).value } })"
-                    placeholder="CAM-01"
-                    class="w-full bg-[#09152b] border border-cyan-500/50 focus:border-cyan-300 rounded-lg px-2.5 py-1.5 text-cyan-100 font-light text-xs outline-hidden font-mono"
-                  />
-                </div>
-              </div>
-
-              <!-- Playback Controls -->
-              <div class="grid grid-cols-2 gap-2 text-xs pt-1">
-                <label class="flex items-center gap-1.5 cursor-pointer text-cyan-200">
-                  <input
-                    type="checkbox"
-                    :checked="component.customProps?.autoplay !== false"
-                    @change="updateComponentProps({ customProps: { ...(component.customProps || {}), autoplay: ($event.target as HTMLInputElement).checked } })"
-                    class="rounded accent-cyan-400"
-                  />
-                  <span>自动循环播放</span>
-                </label>
-
-                <label class="flex items-center gap-1.5 cursor-pointer text-cyan-200">
-                  <input
-                    type="checkbox"
-                    :checked="component.customProps?.muted !== false"
-                    @change="updateComponentProps({ customProps: { ...(component.customProps || {}), muted: ($event.target as HTMLInputElement).checked } })"
-                    class="rounded accent-cyan-400"
-                  />
-                  <span>静音 (凝思免手势)</span>
-                </label>
-
-                <label class="flex items-center gap-1.5 cursor-pointer text-cyan-200">
-                  <input
-                    type="checkbox"
-                    :checked="component.customProps?.showOverlay !== false"
-                    @change="updateComponentProps({ customProps: { ...(component.customProps || {}), showOverlay: ($event.target as HTMLInputElement).checked } })"
-                    class="rounded accent-cyan-400"
-                  />
-                  <span>显示 SCADA HUD 角标</span>
-                </label>
-
-                <label class="flex items-center gap-1.5 cursor-pointer text-cyan-200">
-                  <input
-                    type="checkbox"
-                    :checked="Boolean(component.customProps?.showControls)"
-                    @change="updateComponentProps({ customProps: { ...(component.customProps || {}), showControls: ($event.target as HTMLInputElement).checked } })"
-                    class="rounded accent-cyan-400"
-                  />
-                  <span>显示原生控制栏</span>
-                </label>
-              </div>
-
-              <!-- Object Fit -->
-              <div>
-                <label class="text-xs font-normal text-cyan-200 block mb-1">画面填充比例</label>
-                <select
-                  :value="component.customProps?.objectFit || 'cover'"
-                  @change="updateComponentProps({ customProps: { ...(component.customProps || {}), objectFit: ($event.target as HTMLSelectElement).value } })"
-                  class="w-full bg-[#09152b] border border-cyan-500/50 focus:border-cyan-300 rounded-lg px-2 py-1.5 text-cyan-100 font-light text-xs outline-hidden"
-                >
-                  <option value="cover">等比剪裁填满 (cover)</option>
-                  <option value="contain">等比完整显示 (contain)</option>
-                  <option value="fill">拉伸填满 (fill)</option>
-                </select>
-              </div>
-
-              <!-- Linx Linux Hardware Decode notice -->
-              <div class="p-2 rounded bg-cyan-950/60 border border-cyan-500/30 text-[10px] text-cyan-300 flex items-start gap-1.5">
-                <ShieldCheck class="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
-                <span>凝思 Linux 深度适配：支持 H.264/WebM 原生硬件加速，离线工程自包含，无外部网络依赖。</span>
               </div>
             </div>
           </div>

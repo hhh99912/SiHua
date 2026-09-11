@@ -1248,7 +1248,7 @@ export const COMPONENT_DEFINITIONS: ComponentDefinition[] = [
   },
 
   // ==========================================
-  // 11. Media & Video Surveillance (多媒体图片与工业视频监控)
+  // 11. Media (多媒体图片素材)
   // ==========================================
   {
     type: 'media-image',
@@ -1271,37 +1271,6 @@ export const COMPONENT_DEFINITIONS: ComponentDefinition[] = [
       src: '',
       objectFit: 'contain',
       imageFilter: 'none',
-      linxCompat: true
-    },
-    defaultData: { mapping: {} }
-  },
-  {
-    type: 'media-video',
-    category: 'media',
-    name: '工业视频监控 / 摄像机',
-    nameEn: 'Video / Camera Stream',
-    iconName: 'Video',
-    description: '工业现场摄像头监视画面、本地视频上传、凝思Linux硬解循环播放',
-    defaultWidth: 400,
-    defaultHeight: 240,
-    defaultStyle: {
-      stroke: 'transparent',
-      strokeWidth: 0,
-      borderRadius: 0,
-      borderColor: 'transparent',
-      borderWidth: 0,
-      backgroundColor: '#040812'
-    },
-    defaultCustomProps: {
-      src: '',
-      cameraTitle: '110kV 主变场地视频监视',
-      channelId: 'CAM-01',
-      autoplay: true,
-      loop: true,
-      muted: true,
-      showControls: false,
-      showOverlay: true,
-      objectFit: 'cover',
       linxCompat: true
     },
     defaultData: { mapping: {} }

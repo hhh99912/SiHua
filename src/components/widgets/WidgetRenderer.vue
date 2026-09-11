@@ -24,7 +24,6 @@ import StatusIndicator from './StatusIndicator.vue';
 import CompositeSymbol from './CompositeSymbol.vue';
 import TimeClockWidget from './TimeClockWidget.vue';
 import MediaImageWidget from './MediaImageWidget.vue';
-import MediaVideoWidget from './MediaVideoWidget.vue';
 
 interface Props {
   component: ScreenComponent;
@@ -201,14 +200,9 @@ const isComposite = computed(() => props.component?.type === 'composite-symbol' 
       </div>
     </div>
 
-    <!-- 13. Media Image & Video Surveillance (多媒体图片与视频监控) -->
+    <!-- 13. Media Image (多媒体图片素材) -->
     <MediaImageWidget
       v-else-if="compType === 'media-image'"
-      :component="component"
-      :preview-mode="previewMode"
-    />
-    <MediaVideoWidget
-      v-else-if="compType === 'media-video'"
       :component="component"
       :preview-mode="previewMode"
     />

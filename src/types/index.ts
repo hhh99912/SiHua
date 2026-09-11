@@ -116,9 +116,8 @@ export type ComponentType =
   | 'draw-pen-path'
   | 'draw-svg-icon'
 
-  // 11. Media & Video Surveillance (多媒体与视频监控)
-  | 'media-image'
-  | 'media-video';
+  // 11. Media (多媒体图片素材)
+  | 'media-image';
 
 export interface StyleConfig {
   fill?: string;
