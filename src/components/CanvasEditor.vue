@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { 
   Copy, Scissors, Clipboard, Trash2, Layers, CheckSquare, 
   ArrowUpToLine, ArrowDownToLine, ChevronUp, ChevronDown, 
-  Lock, Unlock, BookmarkPlus, RotateCw, Radio,
+  Lock, Unlock, BookmarkPlus, RotateCw, Radio, Move,
   AlignLeft, AlignCenter, AlignRight, AlignVerticalJustifyStart,
   AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
   Crosshair, Sliders, Workflow, Database,
@@ -13,6 +13,14 @@ import { ScreenComponent, ScreenConfig, DatasetConfig } from '../types';
 import WidgetRenderer from './widgets/WidgetRenderer.vue';
 import Ruler from './Ruler.vue';
 import { useCanvasEngine } from '../composables/useCanvasEngine';
+import { 
+  isLineComponent, 
+  isCyberBorderComponent,
+  isHollowComponent, 
+  getPolylineSvgPath, 
+  getStraightLinePoints, 
+  getPolylinePoints 
+} from '../utils/linePathUtils';
 
 interface Props {
   screen: ScreenConfig;
@@ -232,6 +240,29 @@ const resizeStart = ref<{ mouseX: number; mouseY: number; x: number; y: number; 
 const isRotating = ref(false);
 const hasMovedRotate = ref(false);
 const rotateStart = ref({ cx: 0, cy: 0, initialAngle: 0, startRotation: 0 });
+
+// Line / Polyline / Arrow Vertex Node Drag & Stretch State
+const isDraggingVertex = ref(false);
+const hasMovedVertex = ref(false);
+const activeVertexCompId = ref<string | null>(null);
+const activeVertexIdx = ref<number | null>(null);
+const vertexDragStart = ref<{
+  mouseX: number;
+  mouseY: number;
+  compX: number;
+  compY: number;
+  compW: number;
+  compH: number;
+  points: Array<{ x: number; y: number }>;
+}>({
+  mouseX: 0,
+  mouseY: 0,
+  compX: 0,
+  compY: 0,
+  compW: 0,
+  compH: 0,
+  points: []
+});
 
 // Interactive Drawing Tool State (折线走线绘制)
 const polylineDrawing = ref<{
@@ -719,6 +750,66 @@ const processMouseMove = (e: MouseEvent) => {
     return;
   }
 
+  // 6.5 Vertex / Node Dragging on Line/Polyline/Arrow (节点选中拉伸)
+  if (isDraggingVertex.value && activeVertexCompId.value && activeVertexIdx.value !== null) {
+    const comp = props.components.find(c => c.id === activeVertexCompId.value);
+    if (!comp || comp.locked) return;
+
+    let targetX = coords.rawX;
+    let targetY = coords.rawY;
+
+    if (props.snapToGrid && props.gridSize > 0) {
+      targetX = Math.round(targetX / props.gridSize) * props.gridSize;
+      targetY = Math.round(targetY / props.gridSize) * props.gridSize;
+    }
+
+    // Orthogonal snap support for straight lines & arrows
+    if ((props.orthogonalLock || e.shiftKey) && (comp.type === 'draw-line' || comp.type === 'draw-arrow' || comp.type === 'straight-line')) {
+      const otherIdx = 1 - activeVertexIdx.value;
+      const otherPt = vertexDragStart.value.points[otherIdx];
+      if (otherPt) {
+        const ortho = calculateOrthogonalPoint(otherPt.x, otherPt.y, targetX, targetY);
+        targetX = ortho.x;
+        targetY = ortho.y;
+      }
+    }
+
+    const newAbsPts = vertexDragStart.value.points.map((p, idx) => {
+      if (idx === activeVertexIdx.value) {
+        return { x: targetX, y: targetY };
+      }
+      return { x: p.x, y: p.y };
+    });
+
+    const minX = Math.min(...newAbsPts.map(p => p.x));
+    const minY = Math.min(...newAbsPts.map(p => p.y));
+    const maxX = Math.max(...newAbsPts.map(p => p.x));
+    const maxY = Math.max(...newAbsPts.map(p => p.y));
+    const newW = Math.max(8, maxX - minX);
+    const newH = Math.max(8, maxY - minY);
+
+    const newRelativePoints = newAbsPts.map(p => ({
+      xRatio: newW > 0 ? (p.x - minX) / newW : 0,
+      yRatio: newH > 0 ? (p.y - minY) / newH : 0,
+      x: p.x - minX,
+      y: p.y - minY
+    }));
+
+    hasMovedVertex.value = true;
+    emit('update:component', {
+      ...comp,
+      x: minX,
+      y: minY,
+      width: newW,
+      height: newH,
+      customProps: {
+        ...(comp.customProps || {}),
+        points: newRelativePoints
+      }
+    });
+    return;
+  }
+
   // 7. Free Rotation Handle Drag (高性能丝滑旋转，过滤同度数更新)
   if (isRotating.value && primarySelected.value && !primarySelected.value.locked) {
     const curX = coords.rawX;
@@ -834,6 +925,21 @@ const handleMouseUpWorkspace = () => {
     }
     isResizing.value = false;
     resizeHandle.value = null;
+    setTimeout(() => {
+      suppressNextCanvasClick.value = false;
+    }, 200);
+  }
+
+  if (isDraggingVertex.value) {
+    suppressNextCanvasClick.value = true;
+    lastInteractionTime.value = Date.now();
+    if (hasMovedVertex.value) {
+      emit('commit:history');
+      hasMovedVertex.value = false;
+    }
+    isDraggingVertex.value = false;
+    activeVertexCompId.value = null;
+    activeVertexIdx.value = null;
     setTimeout(() => {
       suppressNextCanvasClick.value = false;
     }, 200);
@@ -1238,6 +1344,50 @@ const handleStartRotate = (e: MouseEvent) => {
     cy,
     initialAngle: 0,
     startRotation: comp.rotation || 0
+  };
+};
+
+// Start Dragging/Stretching a specific Vertex Node on Line/Polyline/Arrow (折线、箭头、直线节点拖动拉伸)
+const handleStartVertexDrag = (e: MouseEvent, comp: ScreenComponent, vertexIndex: number) => {
+  if (isSpacePressed.value || e.ctrlKey || e.metaKey) {
+    e.preventDefault();
+    startPan(e.clientX, e.clientY);
+    return;
+  }
+  e.stopPropagation();
+  e.preventDefault();
+  lastInteractionTime.value = Date.now();
+  suppressNextCanvasClick.value = true;
+  if (comp.locked) return;
+
+  if (!props.selectedIds.includes(comp.id)) {
+    emit('select', [comp.id]);
+  }
+
+  let absPts: Array<{ x: number; y: number }> = [];
+  if (comp.type === 'draw-polyline' || comp.type === 'polyline') {
+    const localPts = getPolylinePoints(comp);
+    absPts = localPts.map(p => ({ x: comp.x + p.x, y: comp.y + p.y }));
+  } else {
+    const linePts = getStraightLinePoints(comp);
+    absPts = [
+      { x: comp.x + linePts.x1, y: comp.y + linePts.y1 },
+      { x: comp.x + linePts.x2, y: comp.y + linePts.y2 }
+    ];
+  }
+
+  isDraggingVertex.value = true;
+  hasMovedVertex.value = false;
+  activeVertexCompId.value = comp.id;
+  activeVertexIdx.value = vertexIndex;
+  vertexDragStart.value = {
+    mouseX: e.clientX,
+    mouseY: e.clientY,
+    compX: comp.x,
+    compY: comp.y,
+    compW: comp.width,
+    compH: comp.height,
+    points: absPts
   };
 };
 
@@ -1795,6 +1945,7 @@ defineExpose({
       ref="infinitePlaneRef"
       class="flex-1 w-full h-full relative overflow-hidden infinite-canvas-plane"
       :class="{
+        'drawing-mode-active': drawTool !== 'select',
         'cursor-crosshair': drawTool !== 'select',
         'cursor-move': isSpacePressed || isPanning,
         'cursor-default': drawTool === 'select' && !isSpacePressed && !isPanning
@@ -1837,9 +1988,9 @@ defineExpose({
           @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
           class="absolute group component-node select-none"
           :class="{
-            'cursor-move': drawTool === 'select' && !comp.locked,
-            'pointer-events-auto': drawTool === 'select' && comp.visible !== false,
-            'pointer-events-none': drawTool !== 'select' || comp.visible === false,
+            'cursor-move': drawTool === 'select' && !comp.locked && !isLineComponent(comp.type) && !isHollowComponent(comp),
+            'pointer-events-auto': drawTool === 'select' && comp.visible !== false && !isLineComponent(comp.type) && !isHollowComponent(comp),
+            'pointer-events-none': drawTool !== 'select' || comp.visible === false || isLineComponent(comp.type) || isHollowComponent(comp),
             'opacity-40': comp.visible === false,
             'cursor-default': comp.locked && drawTool === 'select'
           }"
@@ -1863,13 +2014,6 @@ defineExpose({
             willChange: selectedSet.has(comp.id) && !comp.locked ? 'transform' : undefined
           }"
         >
-          <!-- Invisible Expanded Hit Area for thin/line/bus widgets to guarantee effortless hovering and dragging -->
-          <div 
-            v-if="drawTool === 'select' && (comp.width <= 32 || comp.height <= 32 || ['straight-line', 'draw-arrow', 'polyline', 'electrical-bus', 'bus', 'pipe-flow', 'pipe'].includes(comp.type))"
-            class="absolute -inset-x-4 -inset-y-4 pointer-events-auto cursor-move z-10"
-            title="点击选中或拖拽移动"
-          />
-
           <!-- Component Content -->
           <WidgetRenderer
             :component="comp"
@@ -1916,21 +2060,109 @@ defineExpose({
               willChange: !comp.locked ? 'transform' : undefined
             }"
           >
-            <!-- 1. Single Selection Active State: 4 Edge Hit Bars + 8 Resizers + Rotation Grip + Border -->
-            <div 
-              v-if="selectedIds.length === 1"
-              class="absolute -inset-0.5 border-2 border-cyan-400 pointer-events-none rounded-xs shadow-[0_0_14px_rgba(0,242,255,0.75)]"
-            >
-              <!-- Dedicated Move / Drag Plane across whole selection box (active below handles for effortless dragging) -->
-              <div 
-                v-if="!comp.locked"
-                @mousedown.stop="handleStartDrag($event, comp)"
-                @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
-                class="absolute -inset-3 pointer-events-auto cursor-move z-20"
-                title="拖拽移动组件"
-              />
+            <!-- 1. Line / Polyline Dedicated Selection & Transform State (No rectangular outer box) -->
+            <template v-if="isLineComponent(comp.type)">
+              <svg 
+                class="w-full h-full overflow-visible pointer-events-none absolute inset-0"
+                :viewBox="`0 0 ${comp.width} ${comp.height}`"
+                preserveAspectRatio="none"
+              >
+                <!-- Glowing Polyline Aura -->
+                <path
+                  v-if="comp.type === 'draw-polyline' || comp.type === 'polyline'"
+                  :d="getPolylineSvgPath(comp)"
+                  fill="none"
+                  stroke="#00f2ff"
+                  stroke-width="5"
+                  stroke-opacity="0.6"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  vector-effect="non-scaling-stroke"
+                  class="pointer-events-none"
+                />
+                <!-- Glowing Straight Line Aura -->
+                <line
+                  v-else-if="comp.type === 'draw-line' || comp.type === 'draw-arrow' || comp.type === 'straight-line'"
+                  :x1="getStraightLinePoints(comp).x1"
+                  :y1="getStraightLinePoints(comp).y1"
+                  :x2="getStraightLinePoints(comp).x2"
+                  :y2="getStraightLinePoints(comp).y2"
+                  stroke="#00f2ff"
+                  stroke-width="5"
+                  stroke-opacity="0.6"
+                  stroke-linecap="round"
+                  vector-effect="non-scaling-stroke"
+                  class="pointer-events-none"
+                />
+              </svg>
 
-              <!-- Top Rotation Handle (自由旋转控件) -->
+              <!-- Polyline Vertex Control Node Handles (Inflection points & endpoints) -->
+              <template v-if="comp.type === 'draw-polyline' || comp.type === 'polyline'">
+                <div
+                  v-for="(pt, idx) in getPolylinePoints(comp)"
+                  :key="idx"
+                  class="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto flex items-center justify-center group/node cursor-crosshair z-50"
+                  :style="{ left: `${pt.x}px`, top: `${pt.y}px`, width: '22px', height: '22px' }"
+                  @mousedown="handleStartVertexDrag($event, comp, idx)"
+                  :title="`拖动拐点/端点 ${idx + 1} 进行拉伸调整`"
+                >
+                  <div 
+                    class="w-3.5 h-3.5 rounded-full bg-cyan-400 border-2 border-slate-950 shadow-[0_0_8px_rgba(0,242,255,0.9)] group-hover/node:scale-130 group-hover/node:bg-amber-400 active:scale-140 transition-transform"
+                  />
+                </div>
+              </template>
+
+              <!-- Straight Line / Arrow Endpoint Handles -->
+              <template v-else-if="comp.type === 'draw-line' || comp.type === 'draw-arrow' || comp.type === 'straight-line'">
+                <!-- Start Node -->
+                <div
+                  class="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto flex items-center justify-center group/node cursor-crosshair z-50"
+                  :style="{ left: `${getStraightLinePoints(comp).x1}px`, top: `${getStraightLinePoints(comp).y1}px`, width: '22px', height: '22px' }"
+                  @mousedown="handleStartVertexDrag($event, comp, 0)"
+                  title="拖动起点进行拉伸调整"
+                >
+                  <div 
+                    class="w-3.5 h-3.5 rounded-full bg-cyan-400 border-2 border-slate-950 shadow-[0_0_8px_rgba(0,242,255,0.9)] group-hover/node:scale-130 group-hover/node:bg-amber-400 active:scale-140 transition-transform"
+                  />
+                </div>
+                <!-- End Node -->
+                <div
+                  class="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto flex items-center justify-center group/node cursor-crosshair z-50"
+                  :style="{ left: `${getStraightLinePoints(comp).x2}px`, top: `${getStraightLinePoints(comp).y2}px`, width: '22px', height: '22px' }"
+                  @mousedown="handleStartVertexDrag($event, comp, 1)"
+                  title="拖动终点进行拉伸调整"
+                >
+                  <div 
+                    class="w-3.5 h-3.5 rounded-full bg-cyan-400 border-2 border-slate-950 shadow-[0_0_8px_rgba(0,242,255,0.9)] group-hover/node:scale-130 group-hover/node:bg-amber-400 active:scale-140 transition-transform"
+                  />
+                </div>
+              </template>
+
+              <!-- Line Rotation Grip -->
+              <div v-if="!comp.locked" class="absolute -top-8 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-auto z-50">
+                <div 
+                  @mousedown="handleStartRotate"
+                  class="w-6 h-6 bg-cyan-400 text-slate-950 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg hover:scale-115 transition-transform"
+                  title="按住旋转 (按Shift吸附15°)"
+                >
+                  <RotateCw class="w-3.5 h-3.5 stroke-[2.5]" />
+                </div>
+                <div class="w-[1.5px] h-2 bg-cyan-400" />
+              </div>
+            </template>
+
+            <!-- 2. Non-Line Components Single Selection: Clean Corner & Edge Grips without rectangular solid border -->
+            <div 
+              v-else-if="selectedIds.length === 1"
+              class="absolute inset-0 pointer-events-none"
+            >
+              <!-- 4 Subtle Corner Accent Markers (No full solid rectangular border) -->
+              <div class="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-cyan-400 pointer-events-none" />
+              <div class="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-cyan-400 pointer-events-none" />
+              <div class="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-cyan-400 pointer-events-none" />
+              <div class="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-cyan-400 pointer-events-none" />
+
+              <!-- Top Rotation Handle -->
               <template v-if="!comp.locked">
                 <div class="absolute -top-8 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-auto z-50">
                   <div 
@@ -1943,37 +2175,69 @@ defineExpose({
                   <div class="w-[1.5px] h-2 bg-cyan-400" />
                 </div>
 
-                <!-- 4 Interactive Edge Resize Bars (四边框超大易触发拉伸区域, 仅在足够宽度/高度时显示以避免挤占窄线) -->
-                <!-- Top Edge -->
-                <div 
-                  v-if="comp.height >= 24"
-                  @mousedown="handleStartResize($event, 'n')"
-                  class="pointer-events-auto absolute -top-2 left-2 right-2 h-4 cursor-ns-resize z-40 group/edge hover:bg-cyan-400/20 rounded-xs transition-colors"
-                  title="拖动调整高度 (上边框)"
-                />
-                <!-- Bottom Edge -->
-                <div 
-                  v-if="comp.height >= 24"
-                  @mousedown="handleStartResize($event, 's')"
-                  class="pointer-events-auto absolute -bottom-2 left-2 right-2 h-4 cursor-ns-resize z-40 group/edge hover:bg-cyan-400/20 rounded-xs transition-colors"
-                  title="拖动调整高度 (下边框)"
-                />
-                <!-- Left Edge -->
-                <div 
-                  v-if="comp.width >= 24"
-                  @mousedown="handleStartResize($event, 'w')"
-                  class="pointer-events-auto absolute top-2 bottom-2 -left-2 w-4 cursor-ew-resize z-40 group/edge hover:bg-cyan-400/20 rounded-xs transition-colors"
-                  title="拖动调整宽度 (左边框)"
-                />
-                <!-- Right Edge -->
-                <div 
-                  v-if="comp.width >= 24"
-                  @mousedown="handleStartResize($event, 'e')"
-                  class="pointer-events-auto absolute top-2 bottom-2 -right-2 w-4 cursor-ew-resize z-40 group/edge hover:bg-cyan-400/20 rounded-xs transition-colors"
-                  title="拖动调整宽度 (右边框)"
-                />
+                <!-- 4 Interactive Edge Resize Bars (For Solid Components) -->
+                <template v-if="!isHollowComponent(comp)">
+                  <div 
+                    v-if="comp.height >= 24"
+                    @mousedown="handleStartResize($event, 'n')"
+                    class="pointer-events-auto absolute -top-2 left-2 right-2 h-4 cursor-ns-resize z-40 group/edge hover:bg-cyan-400/20 rounded-xs transition-colors"
+                    title="拖动调整高度 (上边框)"
+                  />
+                  <div 
+                    v-if="comp.height >= 24"
+                    @mousedown="handleStartResize($event, 's')"
+                    class="pointer-events-auto absolute -bottom-2 left-2 right-2 h-4 cursor-ns-resize z-40 group/edge hover:bg-cyan-400/20 rounded-xs transition-colors"
+                    title="拖动调整高度 (下边框)"
+                  />
+                  <div 
+                    v-if="comp.width >= 24"
+                    @mousedown="handleStartResize($event, 'w')"
+                    class="pointer-events-auto absolute top-2 bottom-2 -left-2 w-4 cursor-ew-resize z-40 group/edge hover:bg-cyan-400/20 rounded-xs transition-colors"
+                    title="拖动调整宽度 (左边框)"
+                  />
+                  <div 
+                    v-if="comp.width >= 24"
+                    @mousedown="handleStartResize($event, 'e')"
+                    class="pointer-events-auto absolute top-2 bottom-2 -right-2 w-4 cursor-ew-resize z-40 group/edge hover:bg-cyan-400/20 rounded-xs transition-colors"
+                    title="拖动调整宽度 (右边框)"
+                  />
+                </template>
 
-                <!-- 8 Resize Corner & Mid-point Handles (扩展20px高灵敏度触控热区) -->
+                <!-- For Hollow / Cyber Border Components: 4 Edge Drag Strips & Move Grip so the selected border is effortless to drag -->
+                <template v-else>
+                  <div 
+                    @mousedown.stop="handleStartDrag($event, comp)"
+                    class="pointer-events-auto absolute -top-2.5 left-4 right-4 h-5 cursor-move z-30 group/edge-drag hover:bg-cyan-400/20 transition-colors"
+                    title="按住边框拖动位置"
+                  />
+                  <div 
+                    @mousedown.stop="handleStartDrag($event, comp)"
+                    class="pointer-events-auto absolute -bottom-2.5 left-4 right-4 h-5 cursor-move z-30 group/edge-drag hover:bg-cyan-400/20 transition-colors"
+                    title="按住边框拖动位置"
+                  />
+                  <div 
+                    @mousedown.stop="handleStartDrag($event, comp)"
+                    class="pointer-events-auto absolute top-4 bottom-4 -left-2.5 w-5 cursor-move z-30 group/edge-drag hover:bg-cyan-400/20 transition-colors"
+                    title="按住边框拖动位置"
+                  />
+                  <div 
+                    @mousedown.stop="handleStartDrag($event, comp)"
+                    class="pointer-events-auto absolute top-4 bottom-4 -right-2.5 w-5 cursor-move z-30 group/edge-drag hover:bg-cyan-400/20 transition-colors"
+                    title="按住边框拖动位置"
+                  />
+
+                  <!-- Dedicated Floating Move Grip Badge for Cyber Border -->
+                  <div 
+                    @mousedown.stop="handleStartDrag($event, comp)"
+                    class="pointer-events-auto absolute -top-7 left-3 px-2 py-0.5 rounded-t bg-cyan-950/95 text-cyan-300 border border-b-0 border-cyan-500/60 text-[11px] font-mono flex items-center gap-1.5 cursor-move shadow-md z-40 hover:bg-cyan-900 transition-colors select-none"
+                    title="按住拖动科技边框"
+                  >
+                    <Move class="w-3 h-3 text-cyan-400" />
+                    <span>边框拖动</span>
+                  </div>
+                </template>
+
+                <!-- 8 Resize Corner & Mid-point Handles -->
                 <!-- NW (Top-Left) -->
                 <div 
                   @mousedown="handleStartResize($event, 'nw')"
@@ -2052,11 +2316,16 @@ defineExpose({
               </template>
             </div>
 
-            <!-- 2. Multi-Selection Active State: Clean crisp cyan outline, without individual floating tags or markers -->
+            <!-- 3. Multi-Selection Active State: Clean subtle corner accents, no enclosing box or tint -->
             <div 
               v-else
-              class="absolute -inset-0.5 border border-cyan-400/90 bg-cyan-400/10 pointer-events-none rounded-xs shadow-[0_0_8px_rgba(0,242,255,0.4)]"
-            />
+              class="absolute inset-0 pointer-events-none"
+            >
+              <div class="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-cyan-400/80 pointer-events-none" />
+              <div class="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-cyan-400/80 pointer-events-none" />
+              <div class="absolute -bottom-1 -left-1 w-2 h-2 border-b-2 border-l-2 border-cyan-400/80 pointer-events-none" />
+              <div class="absolute -bottom-1 -right-1 w-2 h-2 border-b-2 border-r-2 border-cyan-400/80 pointer-events-none" />
+            </div>
           </div>
         </div>
 
@@ -2635,3 +2904,16 @@ defineExpose({
     </div>
   </div>
 </template>
+
+<style scoped>
+.drawing-mode-active,
+.drawing-mode-active * {
+  cursor: crosshair !important;
+}
+
+.drawing-mode-active .component-node,
+.drawing-mode-active .component-node * {
+  pointer-events: none !important;
+  cursor: crosshair !important;
+}
+</style>

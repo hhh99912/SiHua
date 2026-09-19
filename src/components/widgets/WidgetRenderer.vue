@@ -24,6 +24,7 @@ import StatusIndicator from './StatusIndicator.vue';
 import CompositeSymbol from './CompositeSymbol.vue';
 import TimeClockWidget from './TimeClockWidget.vue';
 import MediaImageWidget from './MediaImageWidget.vue';
+import { isLineComponent } from '../../utils/linePathUtils';
 
 interface Props {
   component: ScreenComponent;
@@ -41,10 +42,15 @@ const emit = defineEmits<{
 const compType = computed(() => props.component?.type || '');
 const compCategory = computed(() => props.component?.category || '');
 const isComposite = computed(() => props.component?.type === 'composite-symbol' || Boolean(props.component?.children?.length) || Boolean(props.component?.states?.length));
+const isLineType = computed(() => isLineComponent(compType.value));
 </script>
 
 <template>
-  <div v-if="component" class="w-full h-full relative overflow-hidden pointer-events-none">
+  <div 
+    v-if="component" 
+    class="w-full h-full relative pointer-events-none"
+    :class="{ 'overflow-visible': isLineType, 'overflow-hidden': !isLineType }"
+  >
     <!-- 1. Float Metric Fast Route (Most Common SCADA Component - 400+ points fast-path) -->
     <FloatMetric 
       v-if="compType === 'metric-float'"
@@ -74,14 +80,14 @@ const isComposite = computed(() => props.component?.type === 'composite-symbol' 
 
     <!-- 4. Straight Electrical Conductor Line & Arrows -->
     <StraightLine
-      v-else-if="compType === 'draw-line' || compType === 'draw-arrow'"
+      v-else-if="compType === 'draw-line' || compType === 'draw-arrow' || compType === 'straight-line'"
       :component="component"
       :datasets="datasets"
     />
 
     <!-- 5. Polyline / Orthogonal Bus Routing -->
     <PolyLine
-      v-else-if="compType === 'draw-polyline'"
+      v-else-if="compType === 'draw-polyline' || compType === 'polyline'"
       :component="component"
       :datasets="datasets"
     />
