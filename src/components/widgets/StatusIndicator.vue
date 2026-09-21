@@ -44,7 +44,7 @@ const indicatorState = computed(() => {
 
   // 2. If SCADA live telemetry point is bound and not static override
   if (props.component.data?.useStatic !== true && sKey && (dyn.state === undefined && dyn.value === undefined)) {
-    const resolved = resolveTeleSignalState(props.datasets, props.component.data?.datasetId, sKey, rawState);
+    const resolved = resolveTeleSignalState(props.datasets, props.component.data?.datasetId, sKey, rawState, props.component);
     effectiveState = resolved.numericValue;
   } else {
     // 3. Static or direct JSON injection parsing with strict numeric safety

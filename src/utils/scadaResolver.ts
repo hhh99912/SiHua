@@ -1,17 +1,20 @@
 import { DatasetItem, ScreenComponent, ScadaDeviceItem } from '../types';
 import {
   scadaFacilities,
+  rawYcValues,
+  rawYxValues,
+  rawYcQuality,
+  rawYxQuality,
+  scadaLiveTick,
   cachedRealtimeYc,
   cachedRealtimeYx,
   getScadaPointLiveValue
 } from './scadaClient';
 
+export { scadaLiveTick };
+
 /**
- * Smart Component & Asset Unique Duplicate Name Generator (智能唯一去重与自动递增命名)
- * 彻底消除重复追加 "(副本)" 导致的长名称问题，智能识别并递增序号:
- * 例: "遥测数值" -> "遥测数值_1" -> "遥测数值_2" -> ...
- * 例: "断路器_1" -> "断路器_2"
- * 例: "开关 (副本)" -> "开关_1" (自动清洗历史副本后缀并重置为整洁编号)
+ * Smart Component & Asset Unique Duplicate Name Generator
  */
 export function generateUniqueDuplicateName(
   originalName: string,
@@ -20,7 +23,6 @@ export function generateUniqueDuplicateName(
 ): string {
   const cleanOriginal = (originalName || '').trim() || fallbackBase;
 
-  // 1. 彻底清洗所有历史堆叠的 "(副本)", "（副本）", " (副本 2)", "_copy", " - 副本"
   let base = cleanOriginal
     .replace(/(?:[\s\-_]*[\(（]?(?:副本|copy)[\)）]?[\s\-_]*\d*)+$/gi, '')
     .trim();
@@ -29,7 +31,6 @@ export function generateUniqueDuplicateName(
     base = fallbackBase;
   }
 
-  // 2. 检查名称末尾是否已自带编号规则 (如 `_1`, `_01`, ` 1`, `(1)`, `（1）`, `#1`)
   let separator = '_';
   let hasExistingIndex = false;
   let baseRoot = base;
@@ -45,7 +46,6 @@ export function generateUniqueDuplicateName(
 
   const existingSet = new Set(existingNames.map(n => (n || '').trim().toLowerCase()));
 
-  // 3. 寻找下一个未占用的序号
   let index = hasExistingIndex ? startNumber : 1;
   let candidate = `${baseRoot}${separator}${index}`;
 
@@ -58,11 +58,7 @@ export function generateUniqueDuplicateName(
 }
 
 /**
- * Direct Truncation Number Formatter (向零直接截断指定小数位数，绝不四舍五入)
- * 例: 0.98 保留 1 位小数 => 0.9
- * @param num 输入数值
- * @param decimals 最大保留小数位数 (0-6)
- * @param trimZeros 是否自动去除末尾无效 0 (默认 true)
+ * Direct Truncation Number Formatter (Direct Truncation without rounding)
  */
 export function formatTruncatedNumber(num: number, decimals: number, trimZeros: boolean = true): string {
   if (isNaN(num) || !isFinite(num)) return '0';
@@ -74,10 +70,8 @@ export function formatTruncatedNumber(num: number, decimals: number, trimZeros: 
     return Object.is(intVal, -0) ? '0' : String(intVal);
   }
 
-  // 转换为字符串进行直接截断，避免浮点数乘除精度误差
   const str = String(num);
   
-  // 检查是否包含科学计数法 (如 1e-7)
   if (str.includes('e') || str.includes('E')) {
     const factor = Math.pow(10, clampedDecimals);
     const truncated = Math.trunc(num * factor) / factor;
@@ -99,7 +93,6 @@ export function formatTruncatedNumber(num: number, decimals: number, trimZeros: 
   }
 
   const intPart = str.slice(0, dotIndex);
-  // 直接截取指定长度的小数位，不做任何四舍五入
   const rawDecPart = str.slice(dotIndex + 1, dotIndex + 1 + clampedDecimals);
 
   if (trimZeros) {
@@ -113,8 +106,6 @@ export function formatTruncatedNumber(num: number, decimals: number, trimZeros: 
 
 /**
  * Strict Numeric Sanitizer & Parser
- * Enforces pure numeric parsing for all numeric components and fields.
- * Strictly strips any text/letters/symbols (except minus sign and decimal dot).
  */
 export function parseStrictNumber(val: any, fallback = 0): number {
   if (val === null || val === undefined) return fallback;
@@ -127,11 +118,9 @@ export function parseStrictNumber(val: any, fallback = 0): number {
   if (typeof val === 'string') {
     const trimmed = val.trim();
     if (!trimmed) return fallback;
-    // Fast path: if already pure numeric string, use native parseFloat
     const parsedDirect = Number(trimmed);
     if (!isNaN(parsedDirect)) return parsedDirect;
 
-    // Strip everything except digits, negative sign, and decimal point
     const sanitized = trimmed.replace(/[^0-9.-]/g, '');
     if (!sanitized || sanitized === '-' || sanitized === '.') return fallback;
     const parsed = parseFloat(sanitized);
@@ -142,110 +131,150 @@ export function parseStrictNumber(val: any, fallback = 0): number {
 
 /**
  * Global High-Performance SCADA Point Hash Cache (O(1) Direct Lookup)
- * Eliminates repeated O(N) array traversals across hundreds of devices & components.
  */
 const globalPointIndex = new Map<string, any>();
 let lastIndexedDatasetsRef: DatasetItem[] | null = null;
 let lastIndexedTimestamp = 0;
 
 /**
- * Indexes datasets into a flat O(1) point map if dataset reference changed
+ * Universal ultra-fast SCADA point key parser.
+ * Handles all point key variations accurately without regex false-matches on device IDs:
+ * - "7000001_YC_62000001" -> pointId: 62000001, category: 'yc'
+ * - "7000001_YX_61000001" -> pointId: 61000001, category: 'yx'
+ * - "DEV-101_YC_1" -> pointId: 1, category: 'yc'
+ * - "DEV-101_YX_2" -> pointId: 2, category: 'yx'
+ * - "$bind(7000001_YC_62000001)" -> pointId: 62000001, category: 'yc'
+ * - "{{7000001_YC_62000001}}" -> pointId: 62000001, category: 'yc'
+ * - "62000001" -> pointId: 62000001, category: 'none'
  */
-export function syncDatasetFastIndex(datasets?: DatasetItem[]) {
-  // 1. Index SCADA facilities standard hierarchy & realtime caches
-  if (scadaFacilities.value && scadaFacilities.value.length > 0) {
-    for (let f = 0; f < scadaFacilities.value.length; f++) {
-      const fac = scadaFacilities.value[f];
-      const facId = fac.fac_id;
-      for (let b = 0; b < (fac.bays || []).length; b++) {
-        const bay = fac.bays[b];
-        const bayId = bay.bay_id;
-        for (let d = 0; d < (bay.devices || []).length; d++) {
-          const dev = bay.devices[d];
-          const devId = dev.dev_id;
-
-          // Index YC points
-          for (let p = 0; p < (dev.yc_list || []).length; p++) {
-            const yc = dev.yc_list[p];
-            const live = cachedRealtimeYc.get(yc.id);
-            const val = live ? live.val : (yc.val ?? 0);
-            globalPointIndex.set(String(yc.id), val);
-            globalPointIndex.set(`YC_${yc.id}`, val);
-            globalPointIndex.set(`${devId}_YC_${yc.id}`, val);
-            globalPointIndex.set(`${facId}_${bayId}_${devId}_YC_${yc.id}`, val);
-          }
-
-          // Index YX points
-          for (let p = 0; p < (dev.yx_list || []).length; p++) {
-            const yx = dev.yx_list[p];
-            const live = cachedRealtimeYx.get(yx.id);
-            const val = live ? live.val : (yx.val ?? 0);
-            globalPointIndex.set(String(yx.id), val);
-            globalPointIndex.set(`YX_${yx.id}`, val);
-            globalPointIndex.set(`${devId}_YX_${yx.id}`, val);
-            globalPointIndex.set(`${facId}_${bayId}_${devId}_YX_${yx.id}`, val);
-          }
-        }
-      }
-    }
+export function parseScadaPointKey(keyOrId: any): {
+  pointId: number;
+  category: 'yc' | 'yx' | 'dd' | 'yt' | 'none';
+  rawKey: string;
+} {
+  if (keyOrId === null || keyOrId === undefined) {
+    return { pointId: -1, category: 'none', rawKey: '' };
+  }
+  if (typeof keyOrId === 'number') {
+    return { pointId: keyOrId, category: 'none', rawKey: String(keyOrId) };
   }
 
-  if (!datasets || datasets.length === 0) return;
-  // If same array reference and not invalidated, skip indexing
-  if (datasets === lastIndexedDatasetsRef && Date.now() - lastIndexedTimestamp < 200) {
+  let str = String(keyOrId).trim();
+  if (str.charCodeAt(0) === 36 /* '$' */ && str.startsWith('$bind(') && str.endsWith(')')) {
+    str = str.slice(6, -1).trim();
+  } else if (str.charCodeAt(0) === 123 /* '{' */ && str.startsWith('{{') && str.endsWith('}}')) {
+    str = str.slice(2, -2).trim();
+  }
+
+  const ycMatch = str.match(/(?:^|_)YC_(\d+)/i);
+  if (ycMatch && ycMatch[1]) {
+    return { pointId: parseInt(ycMatch[1], 10), category: 'yc', rawKey: str };
+  }
+  const yxMatch = str.match(/(?:^|_)YX_(\d+)/i);
+  if (yxMatch && yxMatch[1]) {
+    return { pointId: parseInt(yxMatch[1], 10), category: 'yx', rawKey: str };
+  }
+  const ddMatch = str.match(/(?:^|_)DD_(\d+)/i);
+  if (ddMatch && ddMatch[1]) {
+    return { pointId: parseInt(ddMatch[1], 10), category: 'dd', rawKey: str };
+  }
+  const ytMatch = str.match(/(?:^|_)YT_(\d+)/i);
+  if (ytMatch && ytMatch[1]) {
+    return { pointId: parseInt(ytMatch[1], 10), category: 'yt', rawKey: str };
+  }
+
+  if (/^\d+$/.test(str)) {
+    return { pointId: parseInt(str, 10), category: 'none', rawKey: str };
+  }
+
+  const tailMatch = str.match(/_(\d+)$/);
+  if (tailMatch && tailMatch[1]) {
+    return { pointId: parseInt(tailMatch[1], 10), category: 'none', rawKey: str };
+  }
+
+  return { pointId: -1, category: 'none', rawKey: str };
+}
+
+/**
+ * Indexes datasets into a flat O(1) point map and populates raw memory maps
+ */
+export function syncDatasetFastIndex(datasets?: DatasetItem[]) {
+  if (datasets && datasets === lastIndexedDatasetsRef && Date.now() - lastIndexedTimestamp < 400) {
     return;
   }
 
-  lastIndexedDatasetsRef = datasets;
-  lastIndexedTimestamp = Date.now();
+  if (datasets && datasets.length > 0) {
+    lastIndexedDatasetsRef = datasets;
+    lastIndexedTimestamp = Date.now();
 
-  for (let i = 0; i < datasets.length; i++) {
-    const ds = datasets[i];
-    if (!ds) continue;
-    
-    // Index flat data
-    if (ds.data) {
-      const dataKeys = Object.keys(ds.data);
-      for (let k = 0; k < dataKeys.length; k++) {
-        const key = dataKeys[k];
-        globalPointIndex.set(key, ds.data[key]);
+    for (let i = 0; i < datasets.length; i++) {
+      const ds = datasets[i];
+      if (!ds) continue;
+      
+      if (ds.data) {
+        const dataKeys = Object.keys(ds.data);
+        for (let k = 0; k < dataKeys.length; k++) {
+          const key = dataKeys[k];
+          const val = ds.data[key];
+          globalPointIndex.set(key, val);
+          const parsed = parseScadaPointKey(key);
+          if (parsed.pointId > 0 && typeof val === 'number') {
+            if (parsed.category === 'yx') {
+              rawYxValues.set(parsed.pointId, val);
+            } else {
+              rawYcValues.set(parsed.pointId, val);
+            }
+          }
+        }
       }
-    }
 
-    // Index device points directly
-    if (Array.isArray(ds.devices)) {
-      for (let d = 0; d < ds.devices.length; d++) {
-        const dev = ds.devices[d];
-        const devId = dev.deviceId;
+      if (Array.isArray(ds.devices)) {
+        for (let d = 0; d < ds.devices.length; d++) {
+          const dev = ds.devices[d];
+          const devId = dev.deviceId;
 
-        // Telemetries
-        if (dev.telemetries) {
-          for (let p = 0; p < dev.telemetries.length; p++) {
-            const pt = dev.telemetries[p];
-            globalPointIndex.set(`${devId}_YC_${pt.pointId}`, pt.value);
-            globalPointIndex.set(String(pt.pointId), pt.value);
+          if (dev.telemetries) {
+            for (let p = 0; p < dev.telemetries.length; p++) {
+              const pt = dev.telemetries[p];
+              const ptId = Number(pt.pointId);
+              const numVal = Number(pt.value) || 0;
+              globalPointIndex.set(`${devId}_YC_${pt.pointId}`, numVal);
+              globalPointIndex.set(String(pt.pointId), numVal);
+              if (!isNaN(ptId) && ptId > 0) {
+                rawYcValues.set(ptId, numVal);
+                rawYcQuality.set(ptId, 1);
+              }
+            }
           }
-        }
-        // TeleSignals
-        if (dev.teleSignals) {
-          for (let p = 0; p < dev.teleSignals.length; p++) {
-            const pt = dev.teleSignals[p];
-            globalPointIndex.set(`${devId}_YX_${pt.pointId}`, pt.value);
-            globalPointIndex.set(String(pt.pointId), pt.value);
+          if (dev.teleSignals) {
+            for (let p = 0; p < dev.teleSignals.length; p++) {
+              const pt = dev.teleSignals[p];
+              const ptId = Number(pt.pointId);
+              const numVal = Number(pt.value) || 0;
+              globalPointIndex.set(`${devId}_YX_${pt.pointId}`, numVal);
+              globalPointIndex.set(String(pt.pointId), numVal);
+              if (!isNaN(ptId) && ptId > 0) {
+                rawYxValues.set(ptId, numVal);
+                rawYxQuality.set(ptId, 1);
+              }
+            }
           }
-        }
-        // Energies
-        if (dev.energies) {
-          for (let p = 0; p < dev.energies.length; p++) {
-            const pt = dev.energies[p];
-            globalPointIndex.set(`${devId}_DD_${pt.pointId}`, pt.value);
+          if (dev.energies) {
+            for (let p = 0; p < dev.energies.length; p++) {
+              const pt = dev.energies[p];
+              const ptId = Number(pt.pointId);
+              const numVal = Number(pt.value) || 0;
+              globalPointIndex.set(`${devId}_DD_${pt.pointId}`, numVal);
+              if (!isNaN(ptId) && ptId > 0) {
+                rawYcValues.set(ptId, numVal);
+              }
+            }
           }
-        }
-        // Regulations
-        if (dev.teleRegulations) {
-          for (let p = 0; p < dev.teleRegulations.length; p++) {
-            const pt = dev.teleRegulations[p];
-            globalPointIndex.set(`${devId}_YT_${pt.pointId}`, pt.value);
+          if (dev.teleRegulations) {
+            for (let p = 0; p < dev.teleRegulations.length; p++) {
+              const pt = dev.teleRegulations[p];
+              globalPointIndex.set(`${devId}_YT_${pt.pointId}`, pt.value);
+            }
           }
         }
       }
@@ -255,7 +284,6 @@ export function syncDatasetFastIndex(datasets?: DatasetItem[]) {
 
 /**
  * Resolves a telemetry/tele-signal/energy value from bound dataset or point key.
- * Features O(1) high-speed lookup, expression unwrapping, and fallback handling.
  */
 export function resolveDataPointValue(
   datasets: DatasetItem[] | undefined,
@@ -263,346 +291,349 @@ export function resolveDataPointValue(
   keyOrExpr: string | undefined,
   fallbackVal: any = undefined
 ): any {
-  if (!keyOrExpr) {
+  if (keyOrExpr === null || keyOrExpr === undefined || keyOrExpr === '') {
     return fallbackVal;
   }
 
-  // Extract clean point key from expression if wrapped in {{...}} or $bind(...)
-  let cleanKey = typeof keyOrExpr === 'string' ? keyOrExpr.trim() : String(keyOrExpr);
-  if (cleanKey.charCodeAt(0) === 36 /* '$' */ && cleanKey.startsWith('$bind(') && cleanKey.endsWith(')')) {
-    cleanKey = cleanKey.slice(6, -1).trim();
-  } else if (cleanKey.charCodeAt(0) === 123 /* '{' */ && cleanKey.startsWith('{{') && cleanKey.endsWith('}}')) {
-    cleanKey = cleanKey.slice(2, -2).trim();
+  const parsed = parseScadaPointKey(keyOrExpr);
+  const cleanKey = parsed.rawKey;
+
+  // 1. Fast direct integer lookup in raw memory maps (<10ns)
+  if (parsed.pointId > 0) {
+    if (parsed.category === 'yc') {
+      const v = rawYcValues.get(parsed.pointId);
+      if (v !== undefined) return v;
+    } else if (parsed.category === 'yx') {
+      const v = rawYxValues.get(parsed.pointId);
+      if (v !== undefined) return v;
+    } else if (parsed.category === 'dd') {
+      const v = rawYcValues.get(parsed.pointId);
+      if (v !== undefined) return v;
+    } else {
+      if (rawYcValues.has(parsed.pointId)) {
+        return rawYcValues.get(parsed.pointId);
+      }
+      if (rawYxValues.has(parsed.pointId)) {
+        return rawYxValues.get(parsed.pointId);
+      }
+    }
   }
 
-  // 1. Direct SCADA Realtime Live Cache Check (YC & YX IDs e.g. 62000001, 61000001, YC_62000001)
-  const numId = parseInt(cleanKey.replace(/^.*?([0-9]{5,})/i, '$1'), 10);
-  if (!isNaN(numId)) {
-    if (cachedRealtimeYc.has(numId)) {
-      return cachedRealtimeYc.get(numId)!.val;
-    }
-    if (cachedRealtimeYx.has(numId)) {
-      return cachedRealtimeYx.get(numId)!.val;
-    }
-  }
-
-  // Fast O(1) hash map lookup
-  if (globalPointIndex.has(cleanKey)) {
+  // 2. Fast O(1) hash map lookup
+  if (cleanKey && globalPointIndex.has(cleanKey)) {
     return globalPointIndex.get(cleanKey);
   }
 
-  // If not yet indexed, update index now
-  syncDatasetFastIndex(datasets);
-  if (globalPointIndex.has(cleanKey)) {
-    return globalPointIndex.get(cleanKey);
-  }
+  // 3. Search in datasets
+  if (datasets && datasets.length > 0) {
+    const primaryDs = datasetId ? datasets.find(d => d.id === datasetId || String(d.id).includes(datasetId)) : datasets[0];
+    const searchOrder = primaryDs ? [primaryDs, ...datasets.filter(d => d !== primaryDs)] : datasets;
 
-  if (!datasets) return fallbackVal;
+    for (let i = 0; i < searchOrder.length; i++) {
+      const ds = searchOrder[i];
+      if (!ds) continue;
 
-  const effectiveDatasetId = datasetId || datasets[0]?.id;
-  const ds = datasets.find(d => d.id === effectiveDatasetId) || datasets[0];
-  if (!ds) return fallbackVal;
+      if (ds.data && ds.data[cleanKey] !== undefined) {
+        globalPointIndex.set(cleanKey, ds.data[cleanKey]);
+        return ds.data[cleanKey];
+      }
 
-  // Direct match in dataset.data
-  if (ds.data && ds.data[cleanKey] !== undefined) {
-    globalPointIndex.set(cleanKey, ds.data[cleanKey]);
-    return ds.data[cleanKey];
+      if (Array.isArray(ds.devices)) {
+        for (let d = 0; d < ds.devices.length; d++) {
+          const dev = ds.devices[d];
+          const devId = dev.deviceId;
+
+          if (dev.telemetries) {
+            for (let p = 0; p < dev.telemetries.length; p++) {
+              const yc = dev.telemetries[p];
+              if (
+                cleanKey === `${devId}_YC_${yc.pointId}` ||
+                cleanKey === String(yc.pointId) ||
+                (parsed.pointId > 0 && yc.pointId === parsed.pointId)
+              ) {
+                globalPointIndex.set(cleanKey, yc.value);
+                return yc.value;
+              }
+            }
+          }
+
+          if (dev.teleSignals) {
+            for (let p = 0; p < dev.teleSignals.length; p++) {
+              const yx = dev.teleSignals[p];
+              if (
+                cleanKey === `${devId}_YX_${yx.pointId}` ||
+                cleanKey === String(yx.pointId) ||
+                (parsed.pointId > 0 && yx.pointId === parsed.pointId)
+              ) {
+                globalPointIndex.set(cleanKey, yx.value);
+                return yx.value;
+              }
+            }
+          }
+
+          if (dev.energies) {
+            for (let p = 0; p < dev.energies.length; p++) {
+              const dd = dev.energies[p];
+              if (
+                cleanKey === `${devId}_DD_${dd.pointId}` ||
+                cleanKey === String(dd.pointId) ||
+                (parsed.pointId > 0 && dd.pointId === parsed.pointId)
+              ) {
+                globalPointIndex.set(cleanKey, dd.value);
+                return dd.value;
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   return fallbackVal;
 }
 
 /**
- * Updates a point in datasets and synchronizes fast point index immediately.
- * Works across both flat ds.data and nested device points (teleSignals, telemetries, etc.)
+ * Updates a point in datasets
  */
 export function updateScadaPointTelemetry(
   datasets: DatasetItem[] | undefined,
   datasetId: string | undefined,
-  pointKey: string | undefined,
-  value: any,
-  statusText?: string
+  pointKey: string,
+  newValue: any
 ): boolean {
-  if (!pointKey || !datasets || datasets.length === 0) return false;
+  if (!datasets || !pointKey) return false;
+  let updated = false;
 
-  let cleanKey = typeof pointKey === 'string' ? pointKey.trim() : String(pointKey);
-  if (cleanKey.startsWith('$bind(') && cleanKey.endsWith(')')) {
-    cleanKey = cleanKey.slice(6, -1).trim();
-  } else if (cleanKey.startsWith('{{') && cleanKey.endsWith('}}')) {
-    cleanKey = cleanKey.slice(2, -2).trim();
+  const parsed = parseScadaPointKey(pointKey);
+  if (parsed.pointId > 0) {
+    const numVal = Number(newValue) || 0;
+    if (parsed.category === 'yx') {
+      rawYxValues.set(parsed.pointId, numVal);
+    } else {
+      rawYcValues.set(parsed.pointId, numVal);
+    }
   }
 
-  // Update in global fast index immediately
-  globalPointIndex.set(cleanKey, value);
+  globalPointIndex.set(pointKey, newValue);
 
-  let found = false;
-  for (let i = 0; i < datasets.length; i++) {
-    const ds = datasets[i];
-    if (datasetId && ds.id !== datasetId) continue;
-
-    // 1. Update flat data
-    if (ds.data) {
-      ds.data[cleanKey] = value;
-      found = true;
-    }
-
-    // 2. Update devices teleSignals / telemetries
-    if (Array.isArray(ds.devices)) {
-      for (let d = 0; d < ds.devices.length; d++) {
-        const dev = ds.devices[d];
-        const devId = dev.deviceId;
-
-        // teleSignals
-        if (dev.teleSignals) {
-          for (let p = 0; p < dev.teleSignals.length; p++) {
-            const sig = dev.teleSignals[p];
-            const fullKey = `${devId}_YX_${sig.pointId}`;
-            if (fullKey === cleanKey || String(sig.pointId) === cleanKey) {
-              sig.value = value;
-              if (statusText) {
-                sig.statusText = statusText;
-              } else if (sig.enumMapping && sig.enumMapping[value]) {
-                sig.statusText = `${sig.enumMapping[value]} (${value})`;
-              } else if (value === 0) {
-                sig.statusText = '分闸 (0)';
-              } else if (value === 1) {
-                sig.statusText = '合闸 (1)';
-              } else if (value === 2) {
-                sig.statusText = '故障 (2)';
-              }
-              found = true;
+  datasets.forEach(ds => {
+    if (!datasetId || ds.id === datasetId) {
+      if (ds.data && ds.data[pointKey] !== undefined) {
+        ds.data[pointKey] = newValue;
+        updated = true;
+      }
+      if (Array.isArray(ds.devices)) {
+        ds.devices.forEach(dev => {
+          (dev.telemetries || []).forEach(yc => {
+            if (String(yc.pointId) === pointKey || `${dev.deviceId}_YC_${yc.pointId}` === pointKey) {
+              yc.value = newValue;
+              updated = true;
             }
-          }
-        }
-
-        // telemetries
-        if (dev.telemetries) {
-          for (let p = 0; p < dev.telemetries.length; p++) {
-            const tel = dev.telemetries[p];
-            const fullKey = `${devId}_YC_${tel.pointId}`;
-            if (fullKey === cleanKey || String(tel.pointId) === cleanKey) {
-              tel.value = value;
-              found = true;
+          });
+          (dev.teleSignals || []).forEach(yx => {
+            if (String(yx.pointId) === pointKey || `${dev.deviceId}_YX_${yx.pointId}` === pointKey) {
+              yx.value = newValue;
+              yx.statusText = newValue === 1 ? '合闸 (1)' : (newValue === 2 ? '故障 (2)' : '分闸 (0)');
+              updated = true;
             }
-          }
-        }
+          });
+        });
       }
     }
-  }
+  });
 
-  // Force re-indexing on next sync
-  lastIndexedDatasetsRef = null;
-  lastIndexedTimestamp = 0;
-
-  return found;
+  return updated;
 }
 
 /**
- * Recursively resolves an object by injecting dynamic live data into bound fields or {{expressions}}.
- * Optimized to avoid unnecessary object cloning.
+ * Evaluates safe dynamic math/status expressions
  */
-function resolveDynamicObjectValues(
-  obj: any,
+export function evaluateDynamicExpression(
+  expression: string,
+  datasets: DatasetItem[] | undefined,
+  datasetId?: string,
+  fallbackVal: any = undefined
+): any {
+  if (!expression || typeof expression !== 'string') return fallbackVal;
+
+  const trimmed = expression.trim();
+  if (trimmed.startsWith('$bind(') && trimmed.endsWith(')')) {
+    const key = trimmed.slice(6, -1).trim();
+    return resolveDataPointValue(datasets, datasetId, key, fallbackVal);
+  }
+
+  if (trimmed.startsWith('{{') && trimmed.endsWith('}}')) {
+    const key = trimmed.slice(2, -2).trim();
+    return resolveDataPointValue(datasets, datasetId, key, fallbackVal);
+  }
+
+  return resolveDataPointValue(datasets, datasetId, trimmed, fallbackVal);
+}
+
+/**
+ * Resolves a dynamic object with property bindings
+ */
+export function resolveDynamicObjectValues(
+  baseObject: any,
   bindings: Record<string, string> | undefined,
   datasets: DatasetItem[] | undefined,
-  datasetId: string | undefined
+  datasetId?: string
 ): any {
-  if (obj === null || obj === undefined) return obj;
-
-  if (Array.isArray(obj)) {
-    return obj.map(item => resolveDynamicObjectValues(item, bindings, datasets, datasetId));
+  if (!baseObject || typeof baseObject !== 'object') {
+    return baseObject;
   }
 
-  if (typeof obj === 'object') {
-    const result: Record<string, any> = {};
-    const keys = Object.keys(obj);
-    for (let i = 0; i < keys.length; i++) {
-      const key = keys[i];
-      const val = obj[key];
-      // 1. Check if direct property binding exists in bindings
-      if (bindings && bindings[key]) {
-        const boundKey = bindings[key];
-        const liveVal = resolveDataPointValue(datasets, datasetId, boundKey, val);
-        result[key] = liveVal !== undefined ? liveVal : val;
-      } else if (typeof val === 'string') {
-        // 2. Check if string contains template expressions like {{DEV-101_YC_1}} or $bind(...)
-        if (val.startsWith('$bind(') && val.endsWith(')')) {
-          const pointKey = val.slice(6, -1).trim();
-          result[key] = resolveDataPointValue(datasets, datasetId, pointKey, val);
-        } else if (val.includes('{{') && val.includes('}}')) {
-          const resolvedStr = val.replace(/\{\{([^}]+)\}\}/g, (_, pointKey) => {
-            const resolved = resolveDataPointValue(datasets, datasetId, pointKey.trim(), pointKey);
-            return resolved !== undefined ? String(resolved) : '';
-          });
-          if (/^\{\{[^}]+\}\}$/.test(val)) {
-            const pointKey = val.slice(2, -2).trim();
-            const resolvedNum = resolveDataPointValue(datasets, datasetId, pointKey, undefined);
-            if (typeof resolvedNum === 'number') {
-              result[key] = resolvedNum;
-              continue;
-            }
-          }
-          result[key] = resolvedStr;
-        } else {
-          result[key] = val;
+  const result = Array.isArray(baseObject) ? [...baseObject] : { ...baseObject };
+
+  if (bindings && typeof bindings === 'object') {
+    Object.keys(bindings).forEach(propPath => {
+      const bindingExpr = bindings[propPath];
+      if (bindingExpr) {
+        const resolvedVal = evaluateDynamicExpression(bindingExpr, datasets, datasetId, undefined);
+        if (resolvedVal !== undefined) {
+          result[propPath] = resolvedVal;
         }
-      } else if (typeof val === 'object') {
-        result[key] = resolveDynamicObjectValues(val, bindings, datasets, datasetId);
-      } else {
-        result[key] = val;
       }
-    }
-    return result;
+    });
   }
 
-  return obj;
+  return result;
 }
 
 /**
- * Unified Component Dynamic Data Resolver
- * High-performance resolution with zero-allocation fast path for standard telemetry & metrics.
+ * Comprehensive Component Live Value Resolver
  */
-export function resolveComponentDynamicData(
+export function getComponentLiveValue(
   component: ScreenComponent,
   datasets?: DatasetItem[]
-): Record<string, any> {
-  if (datasets) {
-    syncDatasetFastIndex(datasets);
-  }
+): any {
+  const _tick = scadaLiveTick.value;
+  if (!component) return { value: 0, state: 0, unit: '', label: '', quality: 0 };
 
   const dataConfig = component.data;
+  const mapping = dataConfig?.mapping || {};
+  const bindings = dataConfig?.bindings || {};
   const datasetId = dataConfig?.datasetId;
-  const mapping = dataConfig?.mapping || ({} as any);
-  const bindings = dataConfig?.bindings;
 
-  // Ultra-Fast Path for standard SCADA telemetry components without complex static JSON trees
-  if (!dataConfig?.staticData) {
-    const valueKey = bindings?.value || mapping.valueKey;
-    const stateKey = bindings?.state || mapping.stateKey;
-    const unitKey = bindings?.unit || mapping.unitKey;
+  const valueKey = bindings.value || mapping.valueKey || (mapping.pointCategory === 'telemetry' ? mapping.pointId : undefined);
+  const stateKey = bindings.state || mapping.stateKey || (mapping.pointCategory === 'teleSignal' ? mapping.pointId : undefined);
+  const unit = (mapping as any).unit || component.customProps?.unit || '';
+  const label = mapping.pointName || mapping.deviceName || component.name || '';
 
-    let value = component.customProps?.value ?? 0;
-    let state = component.customProps?.state ?? 0;
-    let unit = component.customProps?.unit || component.style?.unit || '';
-    let label = component.customProps?.label || component.name || '';
+  let value: any = undefined;
+  let state: any = undefined;
 
-    if (valueKey) {
-      const resolved = resolveDataPointValue(datasets, datasetId, valueKey, undefined);
-      if (resolved !== undefined) value = resolved;
-    }
-    if (stateKey) {
-      const resolved = resolveDataPointValue(datasets, datasetId, stateKey, undefined);
-      if (resolved !== undefined) state = resolved;
-    }
-    if (unitKey) {
-      const resolved = resolveDataPointValue(datasets, datasetId, unitKey, undefined);
-      if (resolved !== undefined) unit = resolved;
-    }
-
-    const isChart = ['chart-line', 'chart-bar', 'chart-pie', 'chart-gauge', 'chart-radar', 'gauge-dashboard'].includes(component.type);
-    if (!isChart) {
-      const hasBinding = !!(valueKey || stateKey);
-      const floatVal = typeof value === 'number' ? (isNaN(value) ? 0 : value) : (parseFloat(String(value)) || 0);
-      const numState = typeof state === 'number' ? (isNaN(state) ? 0 : state) : (parseFloat(String(state)) || 0);
-      const quality = hasBinding ? 1 : 0;
-      return {
-        value: stateKey && !valueKey ? numState : floatVal,
-        state: numState,
-        unit,
-        label,
-        quality
-      };
-    }
-
-    return {
-      value,
-      state,
-      unit,
-      label
-    };
+  if (valueKey !== undefined && valueKey !== null && valueKey !== '') {
+    value = resolveDataPointValue(datasets, datasetId, String(valueKey), undefined);
+  }
+  if (stateKey !== undefined && stateKey !== null && stateKey !== '') {
+    state = resolveDataPointValue(datasets, datasetId, String(stateKey), undefined);
   }
 
-  // Fallback for complex structured staticData objects
-  const combinedBindings: Record<string, string> = { ...(bindings || {}) };
-  if (mapping.valueKey && !combinedBindings.value) combinedBindings.value = mapping.valueKey;
-  if (mapping.stateKey && !combinedBindings.state) combinedBindings.state = mapping.stateKey;
-  if (mapping.unitKey && !combinedBindings.unit) combinedBindings.unit = mapping.unitKey;
-
-  const baseData = typeof dataConfig.staticData === 'object' 
-    ? (Array.isArray(dataConfig.staticData) ? [...dataConfig.staticData] : { ...dataConfig.staticData }) 
-    : { value: dataConfig.staticData };
-
-  const resolved = resolveDynamicObjectValues(baseData, combinedBindings, datasets, datasetId);
-
-  if (mapping.valueKey && resolved.value === undefined) {
-    resolved.value = resolveDataPointValue(datasets, datasetId, mapping.valueKey, component.customProps?.value ?? 0);
+  if (value === undefined && component.customProps?.value !== undefined) {
+    value = component.customProps.value;
   }
-  if (mapping.stateKey && resolved.state === undefined) {
-    resolved.state = resolveDataPointValue(datasets, datasetId, mapping.stateKey, component.customProps?.state ?? 0);
+  if (state === undefined && component.customProps?.state !== undefined) {
+    state = component.customProps.state;
   }
+
+  if (value === undefined && state === undefined && dataConfig?.staticData !== undefined) {
+    if (typeof dataConfig.staticData === 'object' && dataConfig.staticData !== null) {
+      value = dataConfig.staticData.value;
+      state = dataConfig.staticData.state;
+    } else {
+      value = dataConfig.staticData;
+    }
+  }
+
+  if (value === undefined) value = 0;
+  if (state === undefined) state = value;
 
   const isChart = ['chart-line', 'chart-bar', 'chart-pie', 'chart-gauge', 'chart-radar', 'gauge-dashboard'].includes(component.type);
   if (!isChart) {
-    let floatVal = 0;
-    if (resolved && typeof resolved === 'object' && !Array.isArray(resolved)) {
-      if (resolved.value !== undefined) {
-        floatVal = typeof resolved.value === 'number' ? (isNaN(resolved.value) ? 0 : resolved.value) : (parseFloat(String(resolved.value)) || 0);
-      } else if (resolved.state !== undefined) {
-        floatVal = typeof resolved.state === 'number' ? (isNaN(resolved.state) ? 0 : resolved.state) : (parseFloat(String(resolved.state)) || 0);
-      }
-    } else if (typeof resolved === 'number') {
-      floatVal = isNaN(resolved) ? 0 : resolved;
-    } else if (typeof resolved === 'string') {
-      floatVal = parseFloat(resolved) || 0;
-    }
-    const hasBinding = !!(combinedBindings.value || combinedBindings.state || mapping.valueKey || mapping.stateKey);
-    let quality = 0;
-    if (hasBinding) {
-      quality = 1;
-    } else if (resolved && typeof resolved === 'object' && resolved.quality !== undefined) {
-      quality = Number(resolved.quality) === 0 ? 0 : 1;
-    }
-    const stateVal = (resolved && typeof resolved === 'object' && resolved.state !== undefined) ? resolved.state : floatVal;
+    const hasBinding = !!(valueKey || stateKey);
+    const floatVal = typeof value === 'number' ? (isNaN(value) ? 0 : value) : (parseFloat(String(value)) || 0);
+    const numState = typeof state === 'number' ? (isNaN(state) ? 0 : state) : (parseFloat(String(state)) || 0);
+    const quality = hasBinding ? 1 : 0;
     return {
-      ...(typeof resolved === 'object' && !Array.isArray(resolved) ? resolved : {}),
-      value: floatVal,
-      state: stateVal,
+      value: stateKey && !valueKey ? numState : floatVal,
+      state: numState,
+      unit,
+      label,
       quality
     };
   }
 
-  return resolved;
+  return {
+    value,
+    state,
+    unit,
+    label
+  };
 }
 
 /**
- * Strict Live Numeric Extractor for Numeric Components
- * Guarantees that only pure numeric values are returned with direct O(1) point resolution.
+ * Alias for getComponentLiveValue
+ */
+export const resolveComponentDynamicData = getComponentLiveValue;
+
+/**
+ * Ultra-Fast Direct Numeric Extractor for Numeric Components
+ * Guarantees direct O(1) integer lookup in raw memory with seamless fallback to dataset lookup.
  */
 export function getComponentLiveNumericValue(
   component: ScreenComponent,
   datasets?: DatasetItem[],
   fallback = 0
 ): number {
-  if (datasets) {
-    syncDatasetFastIndex(datasets);
-  }
+  const _tick = scadaLiveTick.value;
+  if (!component) return fallback;
 
-  // Fast direct resolution without building any intermediate objects
-  const valueKey = component.data?.bindings?.value || component.data?.mapping?.valueKey;
-  if (valueKey) {
-    const liveVal = resolveDataPointValue(datasets, component.data?.datasetId, valueKey, undefined);
-    if (liveVal !== undefined) {
-      return parseStrictNumber(liveVal, fallback);
+  // 1. If static override mode is explicitly set
+  if (component.data?.useStatic === true) {
+    if (component.data.staticData !== undefined) {
+      if (typeof component.data.staticData === 'object' && component.data.staticData !== null) {
+        return parseStrictNumber(component.data.staticData.value ?? component.data.staticData.state, fallback);
+      }
+      return parseStrictNumber(component.data.staticData, fallback);
+    }
+    if (component.customProps?.value !== undefined) {
+      return parseStrictNumber(component.customProps.value, fallback);
     }
   }
 
-  const customPropVal = component.customProps?.value;
-  if (customPropVal !== undefined) {
-    return parseStrictNumber(customPropVal, fallback);
+  // 2. Check for dynamic data bindings / mapping keys
+  const valKey = component.data?.bindings?.value ||
+                 component.data?.mapping?.valueKey ||
+                 component.data?.mapping?.pointId ||
+                 component.data?.bindings?.state ||
+                 component.data?.mapping?.stateKey;
+  const datasetId = component.data?.datasetId;
+
+  if (valKey !== undefined && valKey !== null && valKey !== '') {
+    // Fast path A: if numeric pointId is stored directly in mapping
+    if (component.data?.mapping?.pointId !== undefined && component.data?.mapping?.pointId !== null && component.data.mapping.pointId !== '') {
+      const pid = Number(component.data.mapping.pointId);
+      if (!isNaN(pid) && pid > 0) {
+        if (rawYcValues.has(pid)) {
+          return rawYcValues.get(pid)!;
+        }
+        if (rawYxValues.has(pid)) {
+          return rawYxValues.get(pid)!;
+        }
+      }
+    }
+
+    // Fast path B: resolve via resolveDataPointValue
+    const resolved = resolveDataPointValue(datasets, datasetId, String(valKey), undefined);
+    if (resolved !== undefined && resolved !== null) {
+      return parseStrictNumber(resolved, fallback);
+    }
   }
 
-  if (component.data?.staticData !== undefined) {
-    if (typeof component.data.staticData === 'object' && component.data.staticData !== null) {
+  // 3. Fallback: staticData / customProps / component.data.value
+  if (component.data?.staticData !== undefined && component.data?.staticData !== null) {
+    if (typeof component.data.staticData === 'object') {
       if (component.data.staticData.value !== undefined) {
         return parseStrictNumber(component.data.staticData.value, fallback);
       }
@@ -612,6 +643,14 @@ export function getComponentLiveNumericValue(
     } else {
       return parseStrictNumber(component.data.staticData, fallback);
     }
+  }
+
+  if (component.customProps?.value !== undefined) {
+    return parseStrictNumber(component.customProps.value, fallback);
+  }
+
+  if ((component.data as any)?.value !== undefined) {
+    return parseStrictNumber((component.data as any).value, fallback);
   }
 
   return fallback;
@@ -624,7 +663,8 @@ export function resolveTeleSignalState(
   datasets: DatasetItem[] | undefined,
   datasetId: string | undefined,
   stateKey: string | undefined,
-  defaultVal: number | string = 0
+  defaultVal: number | string = 0,
+  component?: ScreenComponent
 ): {
   numericValue: number;
   statusText: string;
@@ -635,32 +675,76 @@ export function resolveTeleSignalState(
   isWorking: boolean;
   color: string;
 } {
-  const raw = resolveDataPointValue(datasets, datasetId, stateKey, defaultVal);
-  let num = 0;
-  if (typeof raw === 'number') {
-    num = isNaN(raw) ? 0 : raw;
-  } else if (typeof raw === 'boolean') {
-    num = raw ? 1 : 0;
-  } else if (typeof raw === 'string') {
-    const parsed = parseInt(raw, 10);
-    if (!isNaN(parsed)) {
-      num = parsed;
+  const _tick = scadaLiveTick.value;
+  let num: number | undefined = undefined;
+
+  const effStateKey = stateKey ||
+                      component?.data?.bindings?.state ||
+                      component?.data?.mapping?.stateKey ||
+                      component?.data?.mapping?.pointId ||
+                      component?.data?.bindings?.value ||
+                      component?.data?.mapping?.valueKey;
+  const effDatasetId = datasetId || component?.data?.datasetId;
+
+  // 1. Direct pointId check from component mapping
+  if (component?.data?.mapping?.pointId !== undefined && component?.data?.mapping?.pointId !== null && component.data.mapping.pointId !== '') {
+    const pid = Number(component.data.mapping.pointId);
+    if (!isNaN(pid) && pid > 0) {
+      if (rawYxValues.has(pid)) {
+        num = rawYxValues.get(pid);
+      } else if (rawYcValues.has(pid)) {
+        num = rawYcValues.get(pid);
+      }
+    }
+  }
+
+  // 2. Resolve through resolveDataPointValue if not yet resolved
+  if (num === undefined && effStateKey) {
+    const raw = resolveDataPointValue(datasets, effDatasetId, String(effStateKey), undefined);
+    if (raw !== undefined && raw !== null) {
+      if (typeof raw === 'number') {
+        num = isNaN(raw) ? 0 : raw;
+      } else if (typeof raw === 'boolean') {
+        num = raw ? 1 : 0;
+      } else if (typeof raw === 'string') {
+        const parsed = parseInt(raw, 10);
+        if (!isNaN(parsed)) {
+          num = parsed;
+        } else {
+          const lower = raw.toLowerCase();
+          if (lower.includes('合') || lower.includes('close') || lower.includes('run') || lower === 'on') num = 1;
+          else if (lower.includes('分') || lower.includes('open') || lower.includes('stop') || lower === 'off') num = 0;
+          else if (lower.includes('障') || lower.includes('fault') || lower.includes('trip') || lower.includes('err')) num = 2;
+          else if (lower.includes('试') || lower.includes('test')) num = 3;
+          else if (lower.includes('工') || lower.includes('work')) num = 4;
+        }
+      }
+    }
+  }
+
+  // 3. Fallback to customProps / staticData / defaultVal
+  if (num === undefined) {
+    const fallbackRaw = component?.customProps?.state ??
+                        component?.customProps?.value ??
+                        component?.data?.staticData?.state ??
+                        component?.data?.staticData?.value ??
+                        defaultVal;
+    if (typeof fallbackRaw === 'number') {
+      num = isNaN(fallbackRaw) ? 0 : fallbackRaw;
+    } else if (typeof fallbackRaw === 'boolean') {
+      num = fallbackRaw ? 1 : 0;
     } else {
-      const lower = raw.toLowerCase();
-      if (lower.includes('合') || lower.includes('close') || lower.includes('run') || lower === 'on') num = 1;
-      else if (lower.includes('分') || lower.includes('open') || lower.includes('stop') || lower === 'off') num = 0;
-      else if (lower.includes('障') || lower.includes('fault') || lower.includes('trip') || lower.includes('err')) num = 2;
-      else if (lower.includes('试') || lower.includes('test')) num = 3;
-      else if (lower.includes('工') || lower.includes('work')) num = 4;
+      const parsed = parseInt(String(fallbackRaw), 10);
+      num = isNaN(parsed) ? 0 : parsed;
     }
   }
 
   let statusText = `状态 (${num})`;
-  let isClosed = num === 1;
-  let isOpen = num === 0;
-  let isFault = num === 2;
-  let isTest = num === 3;
-  let isWorking = num === 4 || num === 1;
+  const isClosed = num === 1;
+  const isOpen = num === 0;
+  const isFault = num === 2;
+  const isTest = num === 3;
+  const isWorking = num === 4 || num === 1;
 
   let color = '#10b981'; // Green for normal/open/0 state
   if (isClosed || isWorking) {

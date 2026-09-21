@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import {
   X,
   Maximize,
@@ -40,7 +40,8 @@ import {
   fetchScadaRealtime,
   getAssociatedPointIdsFromComponents,
   getAllPointIdsFromFacilities,
-  scadaFacilities
+  scadaFacilities,
+  invalidateAssociatedPointsCache
 } from '../utils/scadaClient';
 import WidgetRenderer from './widgets/WidgetRenderer.vue';
 import HistoryCurveModal from './HistoryCurveModal.vue';
@@ -172,62 +173,6 @@ const handleTriggerScadaRealtime = async () => {
     }, 1500);
   }
 };
-
-// Strict Content Bounding Box Calculation for Preview
-const contentBBox = computed(() => {
-  const visible = (props.components || []).filter(c => c.visible !== false);
-  if (visible.length === 0) {
-    return { minX: 0, minY: 0, width: props.screen.width || 1920, height: props.screen.height || 1080 };
-  }
-
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-
-  visible.forEach(c => {
-    const x = c.x ?? 0;
-    const y = c.y ?? 0;
-    const w = Math.max(1, c.width ?? 0);
-    const h = Math.max(1, c.height ?? 0);
-
-    let left = x;
-    let top = y;
-    let right = x + w;
-    let bottom = y + h;
-
-    if (c.rotation) {
-      const rad = (c.rotation * Math.PI) / 180;
-      const cos = Math.abs(Math.cos(rad));
-      const sin = Math.abs(Math.sin(rad));
-      const rotatedHalfW = (w / 2) * cos + (h / 2) * sin;
-      const rotatedHalfH = (w / 2) * sin + (h / 2) * cos;
-      const centerX = x + w / 2;
-      const centerY = y + h / 2;
-      left = centerX - rotatedHalfW;
-      top = centerY - rotatedHalfH;
-      right = centerX + rotatedHalfW;
-      bottom = centerY + rotatedHalfH;
-    }
-
-    if (left < minX) minX = left;
-    if (top < minY) minY = top;
-    if (right > maxX) maxX = right;
-    if (bottom > maxY) maxY = bottom;
-  });
-
-  if (!isFinite(minX)) minX = 0;
-  if (!isFinite(minY)) minY = 0;
-  if (!isFinite(maxX)) maxX = 1920;
-  if (!isFinite(maxY)) maxY = 1080;
-
-  return {
-    minX: Math.round(minX),
-    minY: Math.round(minY),
-    width: Math.max(20, Math.round(maxX - minX)),
-    height: Math.max(20, Math.round(maxY - minY))
-  };
-});
 
 // Standard SCADA Fixed Canvas Dimensions (default 1920x1080)
 const canvasWidth = computed(() => props.screen?.width || 1920);
@@ -534,6 +479,19 @@ const handleGlobalControl = (e: any) => {
   }
 };
 
+// Watch activeScreenId changes to immediately reset hover/context state and trigger instant telemetry polling
+watch(
+  () => props.activeScreenId,
+  () => {
+    hoverTooltip.value = null;
+    contextMenu.value.visible = false;
+    clearTimeout(hoverTimer);
+    invalidateAssociatedPointsCache();
+    // Immediate poll so newly switched screen has fresh telemetry without waiting 1s
+    pollAssociatedRealtimeData();
+  }
+);
+
 onMounted(() => {
   window.addEventListener('resize', handleResize);
   window.addEventListener('keydown', handleKeyDown);
@@ -582,7 +540,7 @@ onBeforeUnmount(() => {
         transformOrigin: 'center center',
         backgroundColor: screen.backgroundColor || '#040810',
         backgroundImage: 'none',
-        boxShadow: isExactPixelMatch ? 'none' : '0 0 60px rgba(0,0,0,0.95)'
+        boxShadow: 'none'
       }"
     >
       <!-- Components in Z-Index Order -->
@@ -630,7 +588,7 @@ onBeforeUnmount(() => {
       <!-- Header: Device & Point Type Badge -->
       <div class="flex items-center justify-between border-b border-slate-800 pb-2">
         <div class="flex items-center gap-1.5 truncate">
-          <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping shrink-0" />
+          <span class="w-2 h-2 rounded-full bg-cyan-400 shrink-0" />
           <span class="text-slate-200 font-bold truncate">
             {{ hoverTooltip.device ? hoverTooltip.device.name : 'SCADA测控装置' }}
           </span>
@@ -956,6 +914,7 @@ onBeforeUnmount(() => {
 
     <!-- Realtime Alarm & Event Stream Modal -->
     <RealtimeAlarmModal
+      v-if="showAlarmModal"
       :visible="showAlarmModal"
       @close="showAlarmModal = false"
     />

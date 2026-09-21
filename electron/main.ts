@@ -27,12 +27,12 @@ if (process.platform === 'linux') {
   const hintingMode = process.env.SCADA_FONT_HINTING || (process.argv.includes('--hinting-full') ? 'full' : 'medium');
   app.commandLine.appendSwitch('font-render-hinting', hintingMode);
 
-  // 4. 视频硬解与显卡内存优化 (解决 Linux 纯 CPU 软解视频占用高、卡顿问题)
+  // 4. 显卡与图形光栅化调优 (适配 Intel 2代核显 i915 / Mesa Linux 4.9)
   app.commandLine.appendSwitch('ignore-gpu-blocklist');
-  app.commandLine.appendSwitch('enable-gpu-rasterization');
+  app.commandLine.appendSwitch('disable-gpu-vsync'); // 避免 VGA 60Hz 垂直同步锁频等待导致的掉帧与刷新卡顿
   app.commandLine.appendSwitch('enable-zero-copy');
-  app.commandLine.appendSwitch('enable-accelerated-video-decode');
-  app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,Accelerated2dCanvas,OverlayScrollbar');
+  app.commandLine.appendSwitch('enable-features', 'OverlayScrollbar');
+  app.commandLine.appendSwitch('disable-features', 'CanvasOopRasterization,UseSkiaRendererByDefaultForOOPR');
 
   // 5. 校验解码器与命令流平滑
   app.commandLine.appendSwitch('use-cmd-decoder', 'validating');

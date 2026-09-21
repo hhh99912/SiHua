@@ -1,4 +1,4 @@
-import { ref, reactive, shallowRef } from 'vue';
+import { ref, shallowRef } from 'vue';
 import {
   ScadaFacilityNode,
   ScadaBayNode,
@@ -108,164 +108,185 @@ export const PRESET_SCADA_FACILITIES: ScadaFacilityNode[] = [
   }
 ];
 
+// ---------------------------------------------------------------------------
+// High-Performance Primitive Raw Telemetry Storage (Zero Vue Proxy Overhead)
+// ---------------------------------------------------------------------------
+// Direct Map<number, number> provides 10-nanosecond O(1) lookups on weak CPUs
+export const rawYcValues = new Map<number, number>();
+export const rawYxValues = new Map<number, number>();
+export const rawYcQuality = new Map<number, number>();
+export const rawYxQuality = new Map<number, number>();
+
+// Single reactive pulse ticker: triggers all 300+ canvas widgets in ONE single Vue tick
+export const scadaLiveTick = ref<number>(0);
+
+// Backward-compatible structures
+export const cachedRealtimeYc = new Map<number, ScadaRealtimeYcItem>();
+export const cachedRealtimeYx = new Map<number, ScadaRealtimeYxItem>();
+
+// Initialize default zero points
+PRESET_SCADA_FACILITIES.forEach(fac => {
+  fac.bays?.forEach(bay => {
+    bay.devices?.forEach(dev => {
+      dev.yc_list?.forEach(yc => {
+        rawYcValues.set(yc.id, 0);
+        rawYcQuality.set(yc.id, 1);
+        cachedRealtimeYc.set(yc.id, { id: yc.id, val: 0, status: 1 });
+      });
+      dev.yx_list?.forEach(yx => {
+        rawYxValues.set(yx.id, 0);
+        rawYxQuality.set(yx.id, 1);
+        cachedRealtimeYx.set(yx.id, { id: yx.id, val: 0, status: 1, q: 0 });
+      });
+    });
+  });
+});
+
+// Fast Getter Helpers (Zero GC, Zero String Allocation)
+export function getFastLiveYc(pointId: number): number | undefined {
+  return rawYcValues.get(pointId);
+}
+
+export function getFastLiveYx(pointId: number): number | undefined {
+  return rawYxValues.get(pointId);
+}
+
+// Global SCADA Facilities State (ShallowRef to prevent deep proxy traversal)
+export const scadaFacilities = shallowRef<ScadaFacilityNode[]>([...PRESET_SCADA_FACILITIES]);
+
+// Request Status State
+export const isConfigLoading = ref<boolean>(false);
+export const isRealtimeLoading = ref<boolean>(false);
+export const scadaApiConnStatus = ref<'connected' | 'disconnected' | 'idle'>('idle');
+export const scadaApiErrorMessage = ref<string>('');
+export const lastRealtimeSyncTime = ref<string>('');
+
 /**
- * Sanitizes facilities to the most lightweight structure:
- * Keeps only essential fields to ensure 60FPS fluid UI interaction and minimal memory usage.
+ * Sanitize facility tree to bare minimum lightweight objects
  */
-export function sanitizeFacilities(rawFacs: any[]): ScadaFacilityNode[] {
-  if (!Array.isArray(rawFacs)) return PRESET_SCADA_FACILITIES;
-  return rawFacs.map(fac => ({
-    fac_id: fac.fac_id,
-    fac_name: fac.fac_name || `厂站 ${fac.fac_id}`,
-    bays: (fac.bays || []).map((bay: any) => ({
-      bay_id: bay.bay_id,
-      bay_name: bay.bay_name || `间隔 ${bay.bay_id}`,
-      devices: (bay.devices || []).map((dev: any) => ({
-        dev_id: dev.dev_id,
-        dev_name: dev.dev_name || `装置 ${dev.dev_id}`,
-        cbty: dev.cbty ?? 0,
-        yc_list: (dev.yc_list || []).map((yc: any) => ({
-          id: yc.id,
-          name: yc.name || `yc_${yc.id}`,
-          type: yc.type ?? 0
-        })),
-        yx_list: (dev.yx_list || []).map((yx: any) => ({
-          id: yx.id,
-          name: yx.name || `yx_${yx.id}`,
-          type: yx.type ?? 0
+export function sanitizeFacilities(rawList: any[]): ScadaFacilityNode[] {
+  if (!Array.isArray(rawList)) return [];
+  return rawList.map(fac => ({
+    fac_id: Number(fac.fac_id) || 0,
+    fac_name: String(fac.fac_name || '未命名厂站'),
+    bays: Array.isArray(fac.bays)
+      ? fac.bays.map((bay: any) => ({
+          bay_id: Number(bay.bay_id) || 0,
+          bay_name: String(bay.bay_name || '未命名间隔'),
+          devices: Array.isArray(bay.devices)
+            ? bay.devices.map((dev: any) => ({
+                dev_id: Number(dev.dev_id) || 0,
+                dev_name: String(dev.dev_name || '未命名装置'),
+                cbty: Number(dev.cbty ?? 0),
+                yc_list: Array.isArray(dev.yc_list)
+                  ? dev.yc_list.map((yc: any) => ({
+                      id: Number(yc.id) || 0,
+                      name: String(yc.name || ''),
+                      type: Number(yc.type ?? 0)
+                    }))
+                  : [],
+                yx_list: Array.isArray(dev.yx_list)
+                  ? dev.yx_list.map((yx: any) => ({
+                      id: Number(yx.id) || 0,
+                      name: String(yx.name || ''),
+                      type: Number(yx.type ?? 0)
+                    }))
+                  : []
+              }))
+            : []
         }))
-      }))
-    }))
+      : []
   }));
 }
 
-// Global SCADA Facilities State
-export const scadaFacilities = ref<ScadaFacilityNode[]>(PRESET_SCADA_FACILITIES);
-export const cachedRealtimeYc = reactive<Map<number, ScadaRealtimeYcItem>>(new Map());
-export const cachedRealtimeYx = reactive<Map<number, ScadaRealtimeYxItem>>(new Map());
-
-export const isConfigLoading = ref(false);
-export const isRealtimeLoading = ref(false);
-export const lastRealtimeSyncTime = ref<string>('');
-export const scadaApiConnStatus = ref<'connected' | 'disconnected' | 'idle'>('idle');
-export const scadaApiErrorMessage = ref<string>('');
-
 /**
- * Load local scada_config.json once at application startup.
+ * Load local scada_config.json on startup (Only once!)
  */
 export async function loadLocalScadaConfigFile(): Promise<boolean> {
-  // 1. In Electron environment: load via IPC from data/scada_config.json
-  const electronApi = (window as any).electronAPI;
-  if (electronApi?.scada?.getConfigFile) {
-    try {
-      const res = await electronApi.scada.getConfigFile();
-      if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
-        scadaFacilities.value = sanitizeFacilities(res.data);
-        syncPointCacheDefaults();
-        return true;
-      }
-    } catch (err) {
-      console.warn('[SCADA Client] Failed to load local scada_config.json via Electron IPC:', err);
-    }
-  }
+  try {
+    if (typeof window !== 'undefined' && (window as any).electron?.scada?.getConfigFile) {
+      const res = await (window as any).electron.scada.getConfigFile();
+      if (res && res.success && res.data) {
+        let parsedData: any = null;
+        if (typeof res.data === 'string') {
+          parsedData = JSON.parse(res.data);
+        } else if (Array.isArray(res.data)) {
+          parsedData = res.data;
+        } else if (res.data.data && Array.isArray(res.data.data)) {
+          parsedData = res.data.data;
+        }
 
-  // 2. In Browser environment: try localStorage or static /data/scada_config.json
-  if (typeof window !== 'undefined' && window.localStorage) {
-    const saved = window.localStorage.getItem(STORAGE_KEY_SCADA_CONFIG);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          scadaFacilities.value = sanitizeFacilities(parsed);
-          syncPointCacheDefaults();
+        if (Array.isArray(parsedData) && parsedData.length > 0) {
+          const cleanFacs = sanitizeFacilities(parsedData);
+          scadaFacilities.value = cleanFacs;
+          // Seed raw maps with 0
+          cleanFacs.forEach(fac => {
+            fac.bays?.forEach(bay => {
+              bay.devices?.forEach(dev => {
+                dev.yc_list?.forEach(yc => {
+                  if (!rawYcValues.has(yc.id)) {
+                    rawYcValues.set(yc.id, 0);
+                    rawYcQuality.set(yc.id, 1);
+                  }
+                });
+                dev.yx_list?.forEach(yx => {
+                  if (!rawYxValues.has(yx.id)) {
+                    rawYxValues.set(yx.id, 0);
+                    rawYxQuality.set(yx.id, 1);
+                  }
+                });
+              });
+            });
+          });
           return true;
         }
-      } catch {}
-    }
-  }
-
-  // Fallback: try fetching /data/scada_config.json
-  try {
-    const res = await fetch('/data/scada_config.json');
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        scadaFacilities.value = sanitizeFacilities(data);
-        syncPointCacheDefaults();
-        return true;
       }
     }
-  } catch {}
 
-  // Fallback: sync preset
-  syncPointCacheDefaults();
+    // Fallback: localStorage
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const savedStr = window.localStorage.getItem(STORAGE_KEY_SCADA_CONFIG);
+      if (savedStr) {
+        const parsed = JSON.parse(savedStr);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          scadaFacilities.value = sanitizeFacilities(parsed);
+          return true;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[SCADA] 读取本地 scada_config.json 失败:', err);
+  }
   return false;
 }
 
 /**
- * Persist scada_config.json to local disk (Electron) and localStorage (Browser).
+ * Persist config to local scada_config.json
  */
-export async function saveLocalScadaConfigFile(data: ScadaFacilityNode[]): Promise<boolean> {
-  const sanitized = sanitizeFacilities(data);
-  const jsonStr = JSON.stringify(sanitized, null, 2);
+export async function saveLocalScadaConfigFile(facilities: ScadaFacilityNode[]): Promise<boolean> {
+  try {
+    const cleanData = sanitizeFacilities(facilities);
+    const jsonStr = JSON.stringify(cleanData, null, 2);
 
-  // 1. In Electron environment
-  const electronApi = (window as any).electronAPI;
-  if (electronApi?.scada?.saveConfigFile) {
-    try {
-      await electronApi.scada.saveConfigFile({ data: sanitized });
-    } catch (err) {
-      console.error('[SCADA Client] Failed to save scada_config.json via Electron IPC:', err);
+    if (typeof window !== 'undefined' && (window as any).electron?.scada?.saveConfigFile) {
+      const res = await (window as any).electron.scada.saveConfigFile(jsonStr);
+      if (res && res.success) {
+        return true;
+      }
     }
-  }
 
-  // 2. In Browser environment
-  if (typeof window !== 'undefined' && window.localStorage) {
-    try {
+    if (typeof window !== 'undefined' && window.localStorage) {
       window.localStorage.setItem(STORAGE_KEY_SCADA_CONFIG, jsonStr);
-    } catch {}
+      return true;
+    }
+  } catch (err) {
+    console.warn('[SCADA] 写入本地 scada_config.json 失败:', err);
   }
-
-  return true;
+  return false;
 }
 
 /**
- * Reset all cached points to default 0 state (No mock numbers)
- */
-function syncPointCacheDefaults(): void {
-  scadaFacilities.value.forEach(fac => {
-    (fac.bays || []).forEach(bay => {
-      (bay.devices || []).forEach(dev => {
-        (dev.yc_list || []).forEach(yc => {
-          if (!cachedRealtimeYc.has(yc.id)) {
-            cachedRealtimeYc.set(yc.id, {
-              id: yc.id,
-              status: 1,
-              val: 0
-            });
-          }
-        });
-        (dev.yx_list || []).forEach(yx => {
-          if (!cachedRealtimeYx.has(yx.id)) {
-            cachedRealtimeYx.set(yx.id, {
-              id: yx.id,
-              q: 0,
-              status: 0,
-              val: 0
-            });
-          }
-        });
-      });
-    });
-  });
-}
-
-// Initial sync
-syncPointCacheDefaults();
-
-/**
- * Fetch SCADA Configuration Hierarchy: GET /api/scada/config
- * After fetching, automatically writes to local scada_config.json!
+ * Fetch SCADA Config: GET /api/scada/config
  */
 export async function fetchScadaConfig(apiUrl?: string): Promise<{
   success: boolean;
@@ -284,9 +305,7 @@ export async function fetchScadaConfig(apiUrl?: string): Promise<{
 
     const response = await fetch(url, {
       method: 'GET',
-      headers: {
-        'Accept': 'application/json'
-      },
+      headers: { 'Accept': 'application/json' },
       signal: controller.signal
     });
 
@@ -298,22 +317,40 @@ export async function fetchScadaConfig(apiUrl?: string): Promise<{
 
     const resJson: ScadaConfigResponse = await response.json();
     if (resJson && resJson.code === 200 && Array.isArray(resJson.data)) {
-      const sanitized = sanitizeFacilities(resJson.data);
-      scadaFacilities.value = sanitized;
-      syncPointCacheDefaults();
+      const cleanList = sanitizeFacilities(resJson.data);
+      scadaFacilities.value = cleanList;
+      rebuildScadaPointLookupMap();
 
-      // Automatically sync and persist to local scada_config.json file
-      await saveLocalScadaConfigFile(sanitized);
+      cleanList.forEach(fac => {
+        fac.bays?.forEach(bay => {
+          bay.devices?.forEach(dev => {
+            dev.yc_list?.forEach(yc => {
+              if (!rawYcValues.has(yc.id)) {
+                rawYcValues.set(yc.id, 0);
+                rawYcQuality.set(yc.id, 1);
+              }
+            });
+            dev.yx_list?.forEach(yx => {
+              if (!rawYxValues.has(yx.id)) {
+                rawYxValues.set(yx.id, 0);
+                rawYxQuality.set(yx.id, 1);
+              }
+            });
+          });
+        });
+      });
+
+      // Synchronously write to local JSON file
+      await saveLocalScadaConfigFile(cleanList);
 
       scadaApiConnStatus.value = 'connected';
       scadaApiErrorMessage.value = '';
-
-      return { success: true, data: sanitized };
+      return { success: true, data: cleanList };
     } else {
-      throw new Error(resJson?.msg || 'SCADA 接口返回异常状态码');
+      throw new Error(resJson?.msg || 'SCADA 配置返回格式错误');
     }
   } catch (err: any) {
-    const msg = err?.name === 'AbortError' ? '请求超时 (6秒)' : (err?.message || '无法连接到 SCADA 接口');
+    const msg = err?.name === 'AbortError' ? '请求配置超时' : (err?.message || '无法连接 SCADA 配置接口');
     scadaApiConnStatus.value = 'disconnected';
     scadaApiErrorMessage.value = msg;
     return { success: false, error: msg };
@@ -324,8 +361,7 @@ export async function fetchScadaConfig(apiUrl?: string): Promise<{
 
 /**
  * Fetch SCADA Realtime Data: POST /api/scada/realtime
- * Request: { yc_ids: number[], yx_ids: number[] }
- * Response: { code: 200, msg: "success", data: { yc: [...], yx: [...] } }
+ * High-performance batch update: directly mutates raw typed maps and fires a SINGLE reactive pulse tick.
  */
 export async function fetchScadaRealtime(
   req: ScadaRealtimeRequest,
@@ -342,7 +378,7 @@ export async function fetchScadaRealtime(
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
 
     const response = await fetch(url, {
       method: 'POST',
@@ -367,13 +403,25 @@ export async function fetchScadaRealtime(
     if (resJson && resJson.code === 200 && resJson.data) {
       const { yc = [], yx = [] } = resJson.data;
 
-      // Update cached maps
-      yc.forEach(item => {
+      // Tight synchronous loop for maximum CPU cache locality & performance
+      for (let i = 0; i < yc.length; i++) {
+        const item = yc[i];
+        const val = item.val ?? 0;
+        rawYcValues.set(item.id, val);
+        if (item.status !== undefined) rawYcQuality.set(item.id, item.status);
         cachedRealtimeYc.set(item.id, item);
-      });
-      yx.forEach(item => {
+      }
+
+      for (let i = 0; i < yx.length; i++) {
+        const item = yx[i];
+        const val = item.val ?? 0;
+        rawYxValues.set(item.id, val);
+        if (item.status !== undefined) rawYxQuality.set(item.id, item.status);
         cachedRealtimeYx.set(item.id, item);
-      });
+      }
+
+      // Single batched tick to update all bound components at once
+      scadaLiveTick.value++;
 
       lastRealtimeSyncTime.value = new Date().toLocaleTimeString();
       scadaApiConnStatus.value = 'connected';
@@ -403,22 +451,92 @@ export function getScadaPointLiveValue(pointId: number | string): {
   status: number;
   q?: number;
 } {
-  const numId = typeof pointId === 'number' ? pointId : parseInt(String(pointId).replace(/[^0-9]/g, ''), 10);
-  if (!isNaN(numId)) {
-    if (cachedRealtimeYc.has(numId)) {
-      const pt = cachedRealtimeYc.get(numId)!;
-      return { found: true, type: 'yc', value: pt.val ?? 0, status: pt.status ?? 1 };
+  let numId = typeof pointId === 'number' ? pointId : -1;
+  let category: 'yc' | 'yx' | 'none' = 'none';
+
+  if (numId === -1 && typeof pointId === 'string') {
+    const ycMatch = pointId.match(/(?:^|_)YC_(\d+)/i);
+    if (ycMatch) {
+      numId = parseInt(ycMatch[1], 10);
+      category = 'yc';
+    } else {
+      const yxMatch = pointId.match(/(?:^|_)YX_(\d+)/i);
+      if (yxMatch) {
+        numId = parseInt(yxMatch[1], 10);
+        category = 'yx';
+      } else {
+        const pureMatch = pointId.match(/^\d+$/) || pointId.match(/_(\d+)$/);
+        if (pureMatch) {
+          numId = parseInt(pureMatch[0].replace(/^_/, ''), 10);
+        }
+      }
     }
-    if (cachedRealtimeYx.has(numId)) {
-      const pt = cachedRealtimeYx.get(numId)!;
-      return { found: true, type: 'yx', value: pt.val ?? 0, status: pt.status ?? 0, q: pt.q ?? 0 };
+  }
+
+  if (numId > 0) {
+    if (category === 'yc') {
+      if (rawYcValues.has(numId)) {
+        return { found: true, type: 'yc', value: rawYcValues.get(numId) ?? 0, status: rawYcQuality.get(numId) ?? 1 };
+      }
+    } else if (category === 'yx') {
+      if (rawYxValues.has(numId)) {
+        return { found: true, type: 'yx', value: rawYxValues.get(numId) ?? 0, status: rawYxQuality.get(numId) ?? 0, q: 0 };
+      }
+    } else {
+      if (rawYcValues.has(numId)) {
+        return { found: true, type: 'yc', value: rawYcValues.get(numId) ?? 0, status: rawYcQuality.get(numId) ?? 1 };
+      }
+      if (rawYxValues.has(numId)) {
+        return { found: true, type: 'yx', value: rawYxValues.get(numId) ?? 0, status: rawYxQuality.get(numId) ?? 0, q: 0 };
+      }
     }
   }
   return { found: false, type: 'none', value: 0, status: 0 };
 }
 
+// ---------------------------------------------------------------------------
+// High-Speed O(1) Point Lookup Hash Index
+// ---------------------------------------------------------------------------
+const scadaPointLookupMap = new Map<number, {
+  facility: ScadaFacilityNode;
+  bay: ScadaBayNode;
+  device: ScadaDeviceNode;
+  point: ScadaYcItem | ScadaYxItem;
+  category: 'yc' | 'yx';
+}>();
+
+export function rebuildScadaPointLookupMap() {
+  scadaPointLookupMap.clear();
+  const facs = scadaFacilities.value || [];
+  for (let f = 0; f < facs.length; f++) {
+    const fac = facs[f];
+    const bays = fac.bays || [];
+    for (let b = 0; b < bays.length; b++) {
+      const bay = bays[b];
+      const devs = bay.devices || [];
+      for (let d = 0; d < devs.length; d++) {
+        const dev = devs[d];
+        const ycs = dev.yc_list || [];
+        for (let y = 0; y < ycs.length; y++) {
+          const yc = ycs[y];
+          if (typeof yc.id === 'number') {
+            scadaPointLookupMap.set(yc.id, { facility: fac, bay, device: dev, point: yc, category: 'yc' });
+          }
+        }
+        const yxs = dev.yx_list || [];
+        for (let x = 0; x < yxs.length; x++) {
+          const yx = yxs[x];
+          if (typeof yx.id === 'number') {
+            scadaPointLookupMap.set(yx.id, { facility: fac, bay, device: dev, point: yx, category: 'yx' });
+          }
+        }
+      }
+    }
+  }
+}
+
 /**
- * Find point definition in loaded facilities
+ * Find point definition in loaded facilities with O(1) performance
  */
 export function findScadaPointDef(pointId: number | string): {
   facility?: ScadaFacilityNode;
@@ -430,19 +548,13 @@ export function findScadaPointDef(pointId: number | string): {
   const numId = typeof pointId === 'number' ? pointId : parseInt(String(pointId).replace(/[^0-9]/g, ''), 10);
   if (isNaN(numId)) return { category: 'none' };
 
-  for (const fac of scadaFacilities.value) {
-    for (const bay of fac.bays || []) {
-      for (const dev of bay.devices || []) {
-        const yc = (dev.yc_list || []).find(p => p.id === numId);
-        if (yc) {
-          return { facility: fac, bay, device: dev, point: yc, category: 'yc' };
-        }
-        const yx = (dev.yx_list || []).find(p => p.id === numId);
-        if (yx) {
-          return { facility: fac, bay, device: dev, point: yx, category: 'yx' };
-        }
-      }
-    }
+  if (scadaPointLookupMap.size === 0 && (scadaFacilities.value?.length || 0) > 0) {
+    rebuildScadaPointLookupMap();
+  }
+
+  const found = scadaPointLookupMap.get(numId);
+  if (found) {
+    return found;
   }
 
   return { category: 'none' };
@@ -471,27 +583,42 @@ export function getAllPointIdsFromFacilities(facs: ScadaFacilityNode[] = scadaFa
   return { yc_ids, yx_ids };
 }
 
+// Memoized associated point cache to prevent array scanning on every 1s tick
+let cachedAssociatedResult: { yc_ids: number[]; yx_ids: number[] } | null = null;
+let lastComponentsRef: any = null;
+
+export function invalidateAssociatedPointsCache() {
+  cachedAssociatedResult = null;
+  lastComponentsRef = null;
+}
+
 /**
  * Extract all unique bound/associated YC and YX point IDs from ScreenComponents
- * Only returns points that are actively associated/bound with components on the screen!
  */
 export function getAssociatedPointIdsFromComponents(
   components: any[] = [],
   extraScreens: any[] = []
 ): { yc_ids: number[]; yx_ids: number[] } {
+  if (cachedAssociatedResult && components === lastComponentsRef) {
+    return cachedAssociatedResult;
+  }
+
   const ycSet = new Set<number>();
   const yxSet = new Set<number>();
 
   const allComps: any[] = [...(components || [])];
-  if (Array.isArray(extraScreens)) {
-    for (const scr of extraScreens) {
+  if (Array.isArray(extraScreens) && extraScreens.length > 0) {
+    for (let s = 0; s < extraScreens.length; s++) {
+      const scr = extraScreens[s];
       if (Array.isArray(scr?.components)) {
         allComps.push(...scr.components);
       }
     }
   }
 
-  for (const comp of allComps) {
+  const totalLen = allComps.length;
+  for (let i = 0; i < totalLen; i++) {
+    const comp = allComps[i];
     if (!comp) continue;
     const data = comp.data || {};
     const mapping = data.mapping || {};
@@ -524,7 +651,8 @@ export function getAssociatedPointIdsFromComponents(
       mapping.pointKey
     ];
 
-    for (const str of candidateStrings) {
+    for (let s = 0; s < candidateStrings.length; s++) {
+      const str = candidateStrings[s];
       if (typeof str === 'string' && str) {
         const ycMatch = str.match(/(?:^|_)YC_(\d+)/i);
         if (ycMatch && ycMatch[1]) {
@@ -556,10 +684,13 @@ export function getAssociatedPointIdsFromComponents(
     }
   }
 
-  return {
+  cachedAssociatedResult = {
     yc_ids: Array.from(ycSet),
     yx_ids: Array.from(yxSet)
   };
+  lastComponentsRef = components;
+
+  return cachedAssociatedResult;
 }
 
 /**
@@ -572,19 +703,18 @@ export function convertFacilitiesToDatasets(facilities: ScadaFacilityNode[] = sc
     fac.bays.forEach(bay => {
       bay.devices.forEach(dev => {
         const telemetries = (dev.yc_list || []).map(yc => {
-          const live = cachedRealtimeYc.get(yc.id);
+          const val = rawYcValues.get(yc.id) ?? 0;
           return {
             pointId: yc.id,
             name: yc.name,
             factor: 1.0,
             unit: '',
-            value: live ? live.val : 0
+            value: val
           };
         });
 
         const teleSignals = (dev.yx_list || []).map(yx => {
-          const live = cachedRealtimeYx.get(yx.id);
-          const val = live ? live.val : 0;
+          const val = rawYxValues.get(yx.id) ?? 0;
           return {
             pointId: yx.id,
             name: yx.name,

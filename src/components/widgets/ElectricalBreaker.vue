@@ -24,7 +24,7 @@ const breakerState = computed(() => {
     defaultVal = customProps.state;
   }
 
-  const resolved = resolveTeleSignalState(props.datasets, data?.datasetId, sKey, defaultVal);
+  const resolved = resolveTeleSignalState(props.datasets, data?.datasetId, sKey, defaultVal, props.component);
 
   const isClosed = resolved.isClosed || resolved.numericValue === 1;
   const status = resolved.isFault ? 'fault' : (isClosed ? 'closed' : 'open');

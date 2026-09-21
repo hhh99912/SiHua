@@ -10,7 +10,7 @@ import {
   CustomSymbolDef
 } from './types';
 import { INITIAL_DATASETS, tickDataset, executeSimulatedTeleControl, executeSimulatedTeleRegulation } from './data/presetDatasets';
-import { syncDatasetFastIndex, generateUniqueDuplicateName } from './utils/scadaResolver';
+import { syncDatasetFastIndex, generateUniqueDuplicateName, resolveDataPointValue, scadaLiveTick } from './utils/scadaResolver';
 import { PRESET_MULTI_SCREENS } from './data/presetMultiScreens';
 import { PRESET_TEMPLATES } from './data/templates';
 import { COMPONENT_DEFINITIONS } from './data/componentLibrary';
@@ -42,7 +42,7 @@ import {
   setIndexScreen
 } from './utils/screenFileService';
 import { fetchAllDatasetsFromDisk } from './utils/datasetFileService';
-import { loadLocalScadaConfigFile } from './utils/scadaClient';
+import { loadLocalScadaConfigFile, invalidateAssociatedPointsCache } from './utils/scadaClient';
 import { currentUser, canEditCanvas, isLoggedIn, logoutUser } from './utils/auth';
 import { Sparkles, Layers, Box, Zap, HardDrive } from 'lucide-vue-next';
 
@@ -124,8 +124,8 @@ const showDiskNotification = (msg: string) => {
 const syncActiveScreenToProject = () => {
   const target = screens.value.find(s => s.id === activeScreenId.value);
   if (target) {
-    target.screen = JSON.parse(JSON.stringify(screen.value));
-    target.components = JSON.parse(JSON.stringify(components.value));
+    target.screen = { ...screen.value };
+    target.components = components.value;
   }
 };
 
@@ -138,12 +138,17 @@ const handleSwitchScreen = async (screenId: string) => {
   if (!target) return;
 
   activeScreenId.value = screenId;
-  screen.value = JSON.parse(JSON.stringify(target.screen));
-  components.value = JSON.parse(JSON.stringify(target.components));
+  screen.value = { ...target.screen };
+  components.value = target.components || [];
   selectedIds.value = [];
 
-  fitToScreen();
-  recordHistory();
+  invalidateAssociatedPointsCache();
+
+  // If in editor mode, fitToScreen and recordHistory; if in preview mode, don't spam history stack with deep clones
+  if (!showPreviewModal.value) {
+    fitToScreen();
+    recordHistory();
+  }
 };
 
 // Helper to enforce strictly unique screen names across the system
@@ -422,13 +427,13 @@ const historyIndex = ref<number>(-1);
 const isPerformingHistory = ref(false);
 
 const recordHistory = () => {
-  if (isPerformingHistory.value) return;
+  if (isPerformingHistory.value || showPreviewModal.value) return;
   syncActiveScreenToProject();
 
   const snapshot: HistorySnapshot = {
-    screen: JSON.parse(JSON.stringify(screen.value)),
-    components: JSON.parse(JSON.stringify(components.value)),
-    datasets: JSON.parse(JSON.stringify(datasets.value)),
+    screen: { ...screen.value },
+    components: components.value.map(c => ({ ...c })),
+    datasets: datasets.value,
     selectedId: selectedIds.value[0] || null
   };
 
@@ -1080,10 +1085,10 @@ const handleDataAssociationSubmit = (payload: {
       ...comp.data.bindings,
       value: pointKey
     };
-    // 关联测点成功后，此时尚未有采集数据，全部默认按照 0 显示
-    comp.data.value = 0;
+    const initialVal = resolveDataPointValue(datasets.value, datasetId, pointKey, 0);
+    comp.data.value = initialVal;
     if (comp.customProps) {
-      comp.customProps.value = 0;
+      comp.customProps.value = initialVal;
     }
   } else if (category === 'yx') {
     const pointKey = `${deviceId}_YX_${pointId}`;
@@ -1100,15 +1105,15 @@ const handleDataAssociationSubmit = (payload: {
       ...comp.data.bindings,
       state: pointKey
     };
-    // 遥信测点默认初始状态为 0 (分闸/试验位)
-    comp.data.state = 0;
-    comp.data.value = 0;
+    const initialVal = resolveDataPointValue(datasets.value, datasetId, pointKey, 0);
+    comp.data.state = initialVal;
+    comp.data.value = initialVal;
     if (comp.customProps) {
-      comp.customProps.state = 0;
-      comp.customProps.value = 0;
+      comp.customProps.state = initialVal;
+      comp.customProps.value = initialVal;
     }
     if (comp.states && comp.states.length > 0) {
-      comp.activeState = '0';
+      comp.activeState = String(initialVal);
     }
   } else if (category === 'dd') {
     const pointKey = `${deviceId}_DD_${pointId}`;
@@ -1126,9 +1131,10 @@ const handleDataAssociationSubmit = (payload: {
       ...comp.data.bindings,
       value: pointKey
     };
-    comp.data.value = 0;
+    const initialVal = resolveDataPointValue(datasets.value, datasetId, pointKey, 0);
+    comp.data.value = initialVal;
     if (comp.customProps) {
-      comp.customProps.value = 0;
+      comp.customProps.value = initialVal;
     }
   } else if (category === 'yk') {
     const ykKey = `${deviceId}_YK_${pointId}`;
@@ -1186,6 +1192,9 @@ const handleDataAssociationSubmit = (payload: {
   }
 
   showDataAssociationModal.value = false;
+  invalidateAssociatedPointsCache();
+  syncDatasetFastIndex(datasets.value);
+  scadaLiveTick.value++;
   recordHistory();
 };
 
@@ -1352,17 +1361,9 @@ onMounted(async () => {
   recordHistory();
   fitToScreen();
 
-  simulationTimer = setInterval(() => {
-    // Only refresh live simulation telemetry when preview mode is active!
-    // This decouples editor performance from telemetry polling loops.
-    if (showPreviewModal.value && isStreaming.value && Array.isArray(datasets.value) && datasets.value.length > 0) {
-      const nextDatasets = datasets.value.map(ds => tickDataset(ds));
-      syncDatasetFastIndex(nextDatasets);
-      requestAnimationFrame(() => {
-        datasets.value = nextDatasets;
-      });
-    }
-  }, 1500);
+  // Only start synthetic simulation timer if explicitly running offline demo mode without SCADA
+  // In industrial SCADA mode, realtime polling is strictly handled by fetchScadaRealtime
+  simulationTimer = null;
 
   window.addEventListener('resize', fitToScreen);
   window.addEventListener('keydown', handleKeyDown);
@@ -1501,7 +1502,7 @@ onBeforeUnmount(() => {
     />
 
     <!-- Main Workspace Studio -->
-    <div class="flex-1 flex overflow-hidden relative">
+    <div v-show="!showPreviewModal" class="flex-1 flex overflow-hidden relative">
       <!-- Left Sidebar Navigation Tabs (Palette vs Layers) -->
       <div class="w-11 shrink-0 bg-[#0c1d37] border-r border-cyan-500/25 flex flex-col items-center py-2.5 gap-2.5 z-30">
         <button

@@ -143,11 +143,10 @@ if [ "$ENABLE_FORCE_SOFT_GPU" = "1" ]; then
     "--disable-gpu-rasterization"
   )
 else
-  echo "[图形渲染] 硬件视频解码加速 + Skia 2D 精准直出 (禁用 FBO 离屏重采样模糊)"
+  echo "[图形渲染] Intel 2代核显 i915 精准直显模式 (低延迟直出)"
   EXTRA_GPU_FLAGS=(
     "--ignore-gpu-blocklist"
-    "--enable-accelerated-video-decode"
-    "--enable-features=VaapiVideoDecoder,PlatformHEVCDecoderSupport"
+    "--disable-gpu-vsync"
     "--use-cmd-decoder=validating"
     "--disable-features=CanvasOopRasterization,UseSkiaRendererByDefaultForOOPR"
     "--disable-gpu-rasterization"
