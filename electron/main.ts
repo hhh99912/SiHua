@@ -55,6 +55,8 @@ app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+app.commandLine.appendSwitch('disable-component-update');
+app.commandLine.appendSwitch('disable-domain-reliability');
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -85,13 +87,20 @@ function createWindow() {
   // Remove default menu for clean SCADA workstation feel
   Menu.setApplicationMenu(null);
 
-  // Ready to show
-  mainWindow.once('ready-to-show', () => {
-    if (mainWindow) {
+  // 极速弹出窗口策略：多重触发 + 超时保底，杜绝离线环境下因系统字体或网络超时导致的白屏等待
+  const showWindowFast = () => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
       mainWindow.show();
       mainWindow.focus();
     }
-  });
+  };
+
+  mainWindow.once('ready-to-show', showWindowFast);
+  mainWindow.webContents.once('dom-ready', showWindowFast);
+  mainWindow.webContents.once('did-finish-load', showWindowFast);
+
+  // 300ms 强制弹出保底（即使处于纯离线工业网段也能瞬间亮起黑底窗口，零等待）
+  setTimeout(showWindowFast, 300);
 
   // 监听窗口恢复与显示事件，瞬间触发渲染重绘，消除后台唤醒时的视觉停顿
   mainWindow.on('restore', () => {
@@ -830,6 +839,43 @@ function setupIpcHandlers() {
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err?.message || '删除数据集失败' };
+    }
+  });
+
+  // ---------------- SCADA Global Config JSON File Storage IPC (data/scada_config.json) ----------------
+  const getScadaConfigFilePath = () => {
+    const dir = getDataDir();
+    return path.join(dir, 'scada_config.json');
+  };
+
+  ipcMain.handle('scada:get-config-file', async () => {
+    try {
+      const p = getScadaConfigFilePath();
+      if (fs.existsSync(p)) {
+        const content = await fs.promises.readFile(p, 'utf-8');
+        return { success: true, data: JSON.parse(content), path: p };
+      }
+      return { success: false, message: 'scada_config.json not found' };
+    } catch (e: any) {
+      return { success: false, error: e?.message };
+    }
+  });
+
+  ipcMain.handle('scada:save-config-file', async (_event, payload: any) => {
+    try {
+      const p = getScadaConfigFilePath();
+      let raw = '';
+      if (typeof payload === 'string') {
+        raw = payload;
+      } else if (payload && payload.data) {
+        raw = typeof payload.data === 'string' ? payload.data : JSON.stringify(payload.data, null, 2);
+      } else {
+        raw = JSON.stringify(payload, null, 2);
+      }
+      await fs.promises.writeFile(p, raw, 'utf-8');
+      return { success: true, path: p };
+    } catch (e: any) {
+      return { success: false, error: e?.message };
     }
   });
 

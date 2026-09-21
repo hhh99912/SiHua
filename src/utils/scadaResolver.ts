@@ -1,4 +1,10 @@
 import { DatasetItem, ScreenComponent, ScadaDeviceItem } from '../types';
+import {
+  scadaFacilities,
+  cachedRealtimeYc,
+  cachedRealtimeYx,
+  getScadaPointLiveValue
+} from './scadaClient';
 
 /**
  * Smart Component & Asset Unique Duplicate Name Generator (智能唯一去重与自动递增命名)
@@ -146,6 +152,44 @@ let lastIndexedTimestamp = 0;
  * Indexes datasets into a flat O(1) point map if dataset reference changed
  */
 export function syncDatasetFastIndex(datasets?: DatasetItem[]) {
+  // 1. Index SCADA facilities standard hierarchy & realtime caches
+  if (scadaFacilities.value && scadaFacilities.value.length > 0) {
+    for (let f = 0; f < scadaFacilities.value.length; f++) {
+      const fac = scadaFacilities.value[f];
+      const facId = fac.fac_id;
+      for (let b = 0; b < (fac.bays || []).length; b++) {
+        const bay = fac.bays[b];
+        const bayId = bay.bay_id;
+        for (let d = 0; d < (bay.devices || []).length; d++) {
+          const dev = bay.devices[d];
+          const devId = dev.dev_id;
+
+          // Index YC points
+          for (let p = 0; p < (dev.yc_list || []).length; p++) {
+            const yc = dev.yc_list[p];
+            const live = cachedRealtimeYc.get(yc.id);
+            const val = live ? live.val : (yc.val ?? 0);
+            globalPointIndex.set(String(yc.id), val);
+            globalPointIndex.set(`YC_${yc.id}`, val);
+            globalPointIndex.set(`${devId}_YC_${yc.id}`, val);
+            globalPointIndex.set(`${facId}_${bayId}_${devId}_YC_${yc.id}`, val);
+          }
+
+          // Index YX points
+          for (let p = 0; p < (dev.yx_list || []).length; p++) {
+            const yx = dev.yx_list[p];
+            const live = cachedRealtimeYx.get(yx.id);
+            const val = live ? live.val : (yx.val ?? 0);
+            globalPointIndex.set(String(yx.id), val);
+            globalPointIndex.set(`YX_${yx.id}`, val);
+            globalPointIndex.set(`${devId}_YX_${yx.id}`, val);
+            globalPointIndex.set(`${facId}_${bayId}_${devId}_YX_${yx.id}`, val);
+          }
+        }
+      }
+    }
+  }
+
   if (!datasets || datasets.length === 0) return;
   // If same array reference and not invalidated, skip indexing
   if (datasets === lastIndexedDatasetsRef && Date.now() - lastIndexedTimestamp < 200) {
@@ -179,6 +223,7 @@ export function syncDatasetFastIndex(datasets?: DatasetItem[]) {
           for (let p = 0; p < dev.telemetries.length; p++) {
             const pt = dev.telemetries[p];
             globalPointIndex.set(`${devId}_YC_${pt.pointId}`, pt.value);
+            globalPointIndex.set(String(pt.pointId), pt.value);
           }
         }
         // TeleSignals
@@ -186,6 +231,7 @@ export function syncDatasetFastIndex(datasets?: DatasetItem[]) {
           for (let p = 0; p < dev.teleSignals.length; p++) {
             const pt = dev.teleSignals[p];
             globalPointIndex.set(`${devId}_YX_${pt.pointId}`, pt.value);
+            globalPointIndex.set(String(pt.pointId), pt.value);
           }
         }
         // Energies
@@ -229,17 +275,26 @@ export function resolveDataPointValue(
     cleanKey = cleanKey.slice(2, -2).trim();
   }
 
+  // 1. Direct SCADA Realtime Live Cache Check (YC & YX IDs e.g. 62000001, 61000001, YC_62000001)
+  const numId = parseInt(cleanKey.replace(/^.*?([0-9]{5,})/i, '$1'), 10);
+  if (!isNaN(numId)) {
+    if (cachedRealtimeYc.has(numId)) {
+      return cachedRealtimeYc.get(numId)!.val;
+    }
+    if (cachedRealtimeYx.has(numId)) {
+      return cachedRealtimeYx.get(numId)!.val;
+    }
+  }
+
   // Fast O(1) hash map lookup
   if (globalPointIndex.has(cleanKey)) {
     return globalPointIndex.get(cleanKey);
   }
 
   // If not yet indexed, update index now
-  if (datasets) {
-    syncDatasetFastIndex(datasets);
-    if (globalPointIndex.has(cleanKey)) {
-      return globalPointIndex.get(cleanKey);
-    }
+  syncDatasetFastIndex(datasets);
+  if (globalPointIndex.has(cleanKey)) {
+    return globalPointIndex.get(cleanKey);
   }
 
   if (!datasets) return fallbackVal;

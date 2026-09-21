@@ -53,6 +53,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     saveOne: (datasetData: any) => ipcRenderer.invoke('data:save-one', safePojo(datasetData)),
     deleteOne: (identifier: string) => ipcRenderer.invoke('data:delete-one', String(identifier))
   },
+  scada: {
+    getConfigFile: () => ipcRenderer.invoke('scada:get-config-file'),
+    saveConfigFile: (payload: any) => ipcRenderer.invoke('scada:save-config-file', safePojo(payload))
+  },
   uds: {
     getDevices: (options?: any) => ipcRenderer.invoke('uds:get-devices', safePojo(options)),
     getRealtimeData: (options?: any) => ipcRenderer.invoke('uds:get-realtime', safePojo(options)),

@@ -37,12 +37,11 @@ import { ScreenConfig, ScreenComponent, DatasetItem, ScreenItem, ScadaDeviceItem
 import { PRESET_SCADA_DEVICES } from '../data/presetDatasets';
 import { currentUser, canEditCanvas } from '../utils/auth';
 import {
-  triggerGetRealtimeDataViaUds,
-  isAlarmStreamRunning,
-  onUdsAlarm,
-  onUdsRealtime,
-  ScadaAlarmEvent
-} from '../utils/udsClient';
+  fetchScadaRealtime,
+  getAssociatedPointIdsFromComponents,
+  getAllPointIdsFromFacilities,
+  scadaFacilities
+} from '../utils/scadaClient';
 import WidgetRenderer from './widgets/WidgetRenderer.vue';
 import HistoryCurveModal from './HistoryCurveModal.vue';
 import RealtimeAlarmModal from './RealtimeAlarmModal.vue';
@@ -93,9 +92,9 @@ const controlDeviceId = ref<string>('DEV-101');
 const showLoginModal = ref(false);
 const loginNotice = ref('');
 
-// Trigger UDS Realtime Refresh state
-const isTriggeringUds = ref(false);
-const udsTriggerStatus = ref<string>('');
+// Trigger SCADA Realtime Refresh state
+const isTriggeringScada = ref(false);
+const scadaTriggerStatus = ref<string>('');
 
 // Context Menu State
 const contextMenu = ref<{
@@ -129,31 +128,48 @@ const hoverTooltip = ref<{
 } | null>(null);
 
 let hoverTimer: any = null;
-let unsubscribeAlarm: (() => void) | null = null;
-let unsubscribeRealtime: (() => void) | null = null;
+let realtimePollingTimer: any = null;
 
 const handleResize = () => {
   windowWidth.value = window.innerWidth;
   windowHeight.value = window.innerHeight;
 };
 
-// Handle UDS Realtime Manual Trigger
-const handleTriggerUdsRealtime = async () => {
-  if (isTriggeringUds.value) return;
-  isTriggeringUds.value = true;
-  udsTriggerStatus.value = '正在拉取 UDS 实时数据...';
+// 1-second interval polling for already associated points in Preview Mode
+const pollAssociatedRealtimeData = async () => {
+  const { yc_ids, yx_ids } = getAssociatedPointIdsFromComponents(props.components, props.screens);
+  if (yc_ids.length === 0 && yx_ids.length === 0) {
+    return;
+  }
   try {
-    const res = await triggerGetRealtimeDataViaUds();
+    await fetchScadaRealtime({ yc_ids, yx_ids });
+  } catch (err) {
+    // Ignore silent polling network errors in background
+  }
+};
+
+// Handle SCADA Realtime Manual Trigger (POST /api/scada/realtime)
+const handleTriggerScadaRealtime = async () => {
+  if (isTriggeringScada.value) return;
+  isTriggeringScada.value = true;
+  scadaTriggerStatus.value = '正在拉取已关联 SCADA 实时数据...';
+  try {
+    const { yc_ids, yx_ids } = getAssociatedPointIdsFromComponents(props.components, props.screens);
+    const targetYc = yc_ids.length > 0 ? yc_ids : getAllPointIdsFromFacilities(scadaFacilities.value).yc_ids;
+    const targetYx = yx_ids.length > 0 ? yx_ids : getAllPointIdsFromFacilities(scadaFacilities.value).yx_ids;
+    const res = await fetchScadaRealtime({ yc_ids: targetYc, yx_ids: targetYx });
     if (res.success) {
-      udsTriggerStatus.value = 'UDS 数据触发刷新成功';
+      scadaTriggerStatus.value = '实时数据刷新成功';
+    } else {
+      scadaTriggerStatus.value = res.error || 'SCADA 刷新失败';
     }
   } catch (err) {
-    udsTriggerStatus.value = 'UDS 触发失败';
+    scadaTriggerStatus.value = 'SCADA 触发失败';
   } finally {
     setTimeout(() => {
-      isTriggeringUds.value = false;
-      udsTriggerStatus.value = '';
-    }, 1200);
+      isTriggeringScada.value = false;
+      scadaTriggerStatus.value = '';
+    }, 1500);
   }
 };
 
@@ -526,10 +542,9 @@ onMounted(() => {
   window.addEventListener('scada:open:control', handleGlobalControl);
   handleResize();
 
-  // 监听 UDS 实时告警推送
-  unsubscribeAlarm = onUdsAlarm((event: ScadaAlarmEvent) => {
-    unacknowledgedAlarmCount.value += 1;
-  });
+  // 1-second interval realtime polling for already associated points
+  pollAssociatedRealtimeData();
+  realtimePollingTimer = setInterval(pollAssociatedRealtimeData, 1000);
 });
 
 onBeforeUnmount(() => {
@@ -539,8 +554,11 @@ onBeforeUnmount(() => {
   window.removeEventListener('datav:jump:screen', handleGlobalJump);
   window.removeEventListener('scada:open:control', handleGlobalControl);
   clearTimeout(hoverTimer);
-  if (unsubscribeAlarm) unsubscribeAlarm();
-  if (unsubscribeRealtime) unsubscribeRealtime();
+
+  if (realtimePollingTimer) {
+    clearInterval(realtimePollingTimer);
+    realtimePollingTimer = null;
+  }
 });
 </script>
 
@@ -857,22 +875,22 @@ onBeforeUnmount(() => {
           </span>
         </button>
 
-        <!-- 4. 触发拉取 UDS 实时数据 (Trigger UDS Realtime Refresh - 纯图标) -->
+        <!-- 4. 触发拉取 SCADA 实时数据 (Trigger SCADA Realtime Refresh - 纯图标) -->
         <button
-          @click="handleTriggerUdsRealtime"
-          :disabled="isTriggeringUds"
+          @click="handleTriggerScadaRealtime"
+          :disabled="isTriggeringScada"
           class="p-2 rounded-lg bg-slate-900 border border-slate-700 hover:border-cyan-500 text-cyan-300 cursor-pointer transition-all flex items-center justify-center relative group"
-          title="触发 UDS 刷新"
+          title="触发 SCADA 实时刷新"
         >
-          <RefreshCw class="w-4 h-4 text-cyan-400" :class="{ 'animate-spin': isTriggeringUds }" />
+          <RefreshCw class="w-4 h-4 text-cyan-400" :class="{ 'animate-spin': isTriggeringScada }" />
           <!-- 中文浮标 Tooltip -->
           <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block px-2 py-1 bg-slate-950/95 border border-cyan-500/50 rounded text-[11px] text-cyan-300 whitespace-nowrap shadow-xl z-50">
-            {{ isTriggeringUds ? 'UDS 数据拉取中...' : '触发拉取 UDS 实时数据' }}
+            {{ isTriggeringScada ? 'SCADA 数据拉取中...' : '触发拉取 SCADA 实时数据' }}
           </span>
         </button>
 
-        <span v-if="udsTriggerStatus" class="text-[11px] text-emerald-400 font-mono animate-fade-in pl-1">
-          {{ udsTriggerStatus }}
+        <span v-if="scadaTriggerStatus" class="text-[11px] text-emerald-400 font-mono animate-fade-in pl-1">
+          {{ scadaTriggerStatus }}
         </span>
       </div>
 

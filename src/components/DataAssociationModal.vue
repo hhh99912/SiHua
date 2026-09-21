@@ -7,22 +7,27 @@ import {
   CheckCircle2,
   Cpu,
   Radio,
-  Sliders,
-  Activity,
   Zap,
   Layers,
   Unlink,
   Check,
-  ShieldCheck,
   Building2,
   ChevronRight,
-  Info
+  Info,
+  Link2
 } from 'lucide-vue-next';
 import {
   DatasetItem,
-  ScadaDeviceItem,
-  ScreenComponent
+  ScreenComponent,
+  ScadaFacilityNode,
+  ScadaBayNode,
+  ScadaDeviceNode,
+  ScadaYcItem,
+  ScadaYxItem
 } from '../types';
+import {
+  scadaFacilities
+} from '../utils/scadaClient';
 
 interface Props {
   visible: boolean;
@@ -50,300 +55,224 @@ const emit = defineEmits<{
   }): void;
 }>();
 
-// 级联临时选择状态 (不点击提交就不会实际生效)
-const selectedStationId = ref<string>('');
-const selectedDeviceId = ref<string>('');
+// Cascading State
+const selectedFacId = ref<number | string>(scadaFacilities.value[0]?.fac_id || 4000003);
+const selectedBayId = ref<number | string>(scadaFacilities.value[0]?.bays?.[0]?.bay_id || 430000001);
+const selectedDevId = ref<number | string>(scadaFacilities.value[0]?.bays?.[0]?.devices?.[0]?.dev_id || 7000001);
 const selectedCategory = ref<'yc' | 'yx' | 'dd' | 'yk' | 'yt'>('yc');
 const selectedPointId = ref<number | string | null>(null);
 const selectedPoint = ref<any>(null);
-const selectedTargetVerificationId = ref<number | string | null>(null);
 const searchQuery = ref<string>('');
 const isUnboundPending = ref<boolean>(false);
 
-// 当前选中的厂站 (Station / Dataset)
-const currentStation = computed<DatasetItem | undefined>(() => {
-  return props.datasets.find(d => d.id === selectedStationId.value) || props.datasets[0];
+// Previous association detail information for display
+const initialAssociatedInfo = ref<{
+  isBound: boolean;
+  facName?: string;
+  bayName?: string;
+  devName?: string;
+  category?: 'yc' | 'yx' | 'dd' | 'yk' | 'yt';
+  pointId?: number | string;
+  pointName?: string;
+} | null>(null);
+
+// Current Facility
+const currentFacility = computed<ScadaFacilityNode | undefined>(() => {
+  return scadaFacilities.value.find(f => f.fac_id === selectedFacId.value) || scadaFacilities.value[0];
 });
 
-// 当前厂站下的受控装置列表 (Devices)
-const currentDevices = computed<ScadaDeviceItem[]>(() => {
-  const ds = currentStation.value;
-  if (!ds) return [];
-  if (Array.isArray(ds.devices) && ds.devices.length > 0) {
-    return ds.devices;
-  }
-  if (ds.data && Array.isArray((ds.data as any).devices)) {
-    return (ds.data as any).devices;
+// Current Bay
+const currentBay = computed<ScadaBayNode | undefined>(() => {
+  const fac = currentFacility.value;
+  if (!fac || !fac.bays?.length) return undefined;
+  return fac.bays.find(b => b.bay_id === selectedBayId.value) || fac.bays[0];
+});
+
+// Current Device
+const currentDevice = computed<ScadaDeviceNode | undefined>(() => {
+  const bay = currentBay.value;
+  if (!bay || !bay.devices?.length) return undefined;
+  return bay.devices.find(d => d.dev_id === selectedDevId.value) || bay.devices[0];
+});
+
+// Category counts for the active device
+const categoryStats = computed(() => {
+  const dev = currentDevice.value;
+  if (!dev) return { yc: 0, yx: 0, dd: 0, yk: 0, yt: 0 };
+  return {
+    yc: dev.yc_list?.length || 0,
+    yx: dev.yx_list?.length || 0,
+    dd: 0,
+    yk: 0,
+    yt: 0
+  };
+});
+
+// Points list for current device and category (Only ID & Name)
+const pointsList = computed(() => {
+  const dev = currentDevice.value;
+  if (!dev) return [];
+  if (selectedCategory.value === 'yc') {
+    return dev.yc_list || [];
+  } else if (selectedCategory.value === 'yx') {
+    return dev.yx_list || [];
   }
   return [];
 });
 
-// 当前选中的受控装置 (Device)
-const currentDevice = computed<ScadaDeviceItem | undefined>(() => {
-  return currentDevices.value.find(d => d.deviceId === selectedDeviceId.value) || currentDevices.value[0];
-});
-
-// 五遥分类定义与测点统计
-const categoryStats = computed(() => {
-  const dev = currentDevice.value;
-  if (!dev) {
-    return { yc: 0, yx: 0, dd: 0, yk: 0, yt: 0 };
-  }
-  return {
-    yc: dev.telemetries?.length || 0,
-    yx: dev.teleSignals?.length || 0,
-    dd: dev.energies?.length || 0,
-    yk: dev.teleControls?.length || 0,
-    yt: dev.teleRegulations?.length || 0
-  };
-});
-
-// 当前装置和分类下的测点点表
-const pointsList = computed(() => {
-  const dev = currentDevice.value;
-  if (!dev) return [];
-  let list: any[] = [];
-  if (selectedCategory.value === 'yc') {
-    list = dev.telemetries || [];
-  } else if (selectedCategory.value === 'yx') {
-    list = dev.teleSignals || [];
-  } else if (selectedCategory.value === 'dd') {
-    list = dev.energies || [];
-  } else if (selectedCategory.value === 'yk') {
-    list = dev.teleControls || [];
-  } else if (selectedCategory.value === 'yt') {
-    list = dev.teleRegulations || [];
-  }
-  return list;
-});
-
-// 搜索过滤后的测点列表
+// Filtered Points (by ID or Name)
 const filteredPoints = computed(() => {
   const list = pointsList.value;
   if (!searchQuery.value.trim()) return list;
   const q = searchQuery.value.toLowerCase().trim();
   return list.filter(item =>
-    String(item.pointId).toLowerCase().includes(q) ||
-    (item.name && item.name.toLowerCase().includes(q)) ||
-    (item.unit && item.unit.toLowerCase().includes(q)) ||
-    (item.description && item.description.toLowerCase().includes(q)) ||
-    (item.statusText && item.statusText.toLowerCase().includes(q))
+    String(item.id).toLowerCase().includes(q) ||
+    (item.name && item.name.toLowerCase().includes(q))
   );
 });
 
-// 针对遥控遥调的校验点列表
-const availableVerificationPoints = computed(() => {
-  const dev = currentDevice.value;
-  if (!dev) return [];
-  if (selectedCategory.value === 'yk') {
-    return dev.teleSignals || [];
-  }
-  if (selectedCategory.value === 'yt') {
-    return dev.telemetries || [];
-  }
-  return [];
-});
-
-// 自动定位级联的选中状态 (若关联点不在数据集中，按未绑定处理)
+// Initialize and restore previous association when modal opens
 const initializeCascadingSelection = () => {
-  searchQuery.value = '';
-  isUnboundPending.value = false;
+  if (!props.component) return;
 
   const comp = props.component;
-  if (!comp || !comp.data) {
-    applyDefaultUnbound();
+  const data = comp.data || {};
+  const mapping = data.mapping || {};
+  const bindings = data.bindings || {};
+
+  const boundKey = bindings.value || bindings.state || mapping.valueKey || mapping.stateKey || '';
+  const m = String(boundKey).match(/(\d{5,})/);
+  const targetPointId = mapping.pointId ? Number(mapping.pointId) : (m ? Number(m[1]) : null);
+  const targetCategory = (mapping.pointCategory === 'teleSignal' || String(boundKey).includes('_YX_')) ? 'yx' : 'yc';
+
+  let foundBoundPoint = false;
+
+  if (targetPointId) {
+    for (const fac of scadaFacilities.value) {
+      for (const bay of fac.bays || []) {
+        for (const dev of bay.devices || []) {
+          // Check YC list
+          const yc = (dev.yc_list || []).find(p => p.id === targetPointId);
+          if (yc) {
+            selectedFacId.value = fac.fac_id;
+            selectedBayId.value = bay.bay_id;
+            selectedDevId.value = dev.dev_id;
+            selectedCategory.value = 'yc';
+            selectedPointId.value = yc.id;
+            selectedPoint.value = {
+              pointId: yc.id,
+              name: yc.name
+            };
+            isUnboundPending.value = false;
+            initialAssociatedInfo.value = {
+              isBound: true,
+              facName: fac.fac_name,
+              bayName: bay.bay_name,
+              devName: dev.dev_name,
+              category: 'yc',
+              pointId: yc.id,
+              pointName: yc.name
+            };
+            foundBoundPoint = true;
+            break;
+          }
+
+          // Check YX list
+          const yx = (dev.yx_list || []).find(p => p.id === targetPointId);
+          if (yx) {
+            selectedFacId.value = fac.fac_id;
+            selectedBayId.value = bay.bay_id;
+            selectedDevId.value = dev.dev_id;
+            selectedCategory.value = 'yx';
+            selectedPointId.value = yx.id;
+            selectedPoint.value = {
+              pointId: yx.id,
+              name: yx.name
+            };
+            isUnboundPending.value = false;
+            initialAssociatedInfo.value = {
+              isBound: true,
+              facName: fac.fac_name,
+              bayName: bay.bay_name,
+              devName: dev.dev_name,
+              category: 'yx',
+              pointId: yx.id,
+              pointName: yx.name
+            };
+            foundBoundPoint = true;
+            break;
+          }
+        }
+        if (foundBoundPoint) break;
+      }
+      if (foundBoundPoint) break;
+    }
+  }
+
+  if (foundBoundPoint) {
+    nextTick(() => {
+      scrollToSelectedRow();
+    });
     return;
   }
 
-  const mapping = comp.data.mapping || {};
-  const action = comp.data.action;
-  const bindings = comp.data.bindings || {};
+  // Not bound previously
+  initialAssociatedInfo.value = {
+    isBound: false
+  };
 
-  let targetStationId = comp.data.datasetId || props.datasets[0]?.id || '';
-  let targetDevId = mapping.deviceId || (action?.type === 'tele-control' || action?.type === 'tele-regulation' ? action?.deviceId : undefined);
-  let rawKey = mapping.valueKey || mapping.stateKey || mapping.statusKey || bindings.value || bindings.state || '';
-
-  if (!targetDevId && rawKey) {
-    const match = String(rawKey).match(/^([A-Za-z0-9_-]+)_(YC|YX|DD|YK|YT)_/i);
-    if (match) targetDevId = match[1];
-  }
-
-  // 识别五遥分类
-  let targetCat: 'yc' | 'yx' | 'dd' | 'yk' | 'yt' = 'yc';
-  if (mapping.pointCategory === 'teleControl' || action?.type === 'tele-control' || mapping.ykPointId || String(rawKey).includes('_YK_')) {
-    targetCat = 'yk';
-  } else if (mapping.pointCategory === 'teleRegulation' || action?.type === 'tele-regulation' || mapping.ytPointId || String(rawKey).includes('_YT_')) {
-    targetCat = 'yt';
-  } else if (mapping.pointCategory === 'teleSignal' || String(rawKey).includes('_YX_') || mapping.stateKey) {
-    targetCat = 'yx';
-  } else if (mapping.pointCategory === 'energy' || String(rawKey).includes('_DD_')) {
-    targetCat = 'dd';
-  } else if (mapping.pointCategory === 'telemetry' || String(rawKey).includes('_YC_') || mapping.valueKey) {
-    targetCat = 'yc';
-  }
-
-  let targetPointId: any = undefined;
-  if (targetCat === 'yk') {
-    targetPointId = mapping.ykPointId || action?.pointId || mapping.pointId;
-  } else if (targetCat === 'yt') {
-    targetPointId = mapping.ytPointId || action?.pointId || mapping.pointId;
-  } else {
-    targetPointId = mapping.pointId;
-  }
-  if (targetPointId === undefined && rawKey) {
-    const m = String(rawKey).match(/_(?:YC|YX|DD|YK|YT)_(\d+)/i);
-    if (m) targetPointId = Number(m[1]);
-  }
-
-  // 校验该测点是否存在于当前数据集
-  let matchedDs = props.datasets.find(d => d.id === targetStationId) || props.datasets[0];
-  let matchedDev: ScadaDeviceItem | undefined = undefined;
-  let matchedPoint: any = undefined;
-
-  if (matchedDs && targetDevId) {
-    const devs = (Array.isArray(matchedDs.devices) ? matchedDs.devices : (matchedDs.data as any)?.devices) || [];
-    matchedDev = devs.find((d: any) => d.deviceId === targetDevId);
-  }
-
-  if (matchedDev && targetPointId !== undefined && targetPointId !== null) {
-    let list: any[] = [];
-    if (targetCat === 'yc') list = matchedDev.telemetries || [];
-    else if (targetCat === 'yx') list = matchedDev.teleSignals || [];
-    else if (targetCat === 'dd') list = matchedDev.energies || [];
-    else if (targetCat === 'yk') list = matchedDev.teleControls || [];
-    else if (targetCat === 'yt') list = matchedDev.teleRegulations || [];
-
-    matchedPoint = list.find((p: any) => String(p.pointId) === String(targetPointId));
-  }
-
-  if (matchedDs && matchedDev && matchedPoint) {
-    // 成功定位到有效测点
-    selectedStationId.value = matchedDs.id;
-    selectedDeviceId.value = matchedDev.deviceId;
-    selectedCategory.value = targetCat;
-    selectedPointId.value = matchedPoint.pointId;
-    selectedPoint.value = matchedPoint;
-    selectedTargetVerificationId.value = action?.targetPointId || mapping.targetYxPointId || mapping.targetYcPointId || null;
-    isUnboundPending.value = false;
-
-    // 自动滚动到对应行
-    nextTick(() => {
-      scrollToSelectedPoint(matchedPoint.pointId);
-    });
-  } else {
-    // 关联点不在数据集中，按未绑定处理并智能定位默认列表
-    applyDefaultUnbound();
-  }
-};
-
-const applyDefaultUnbound = () => {
-  const firstDs = props.datasets[0];
-  selectedStationId.value = firstDs?.id || '';
-  
-  const devs = (firstDs && Array.isArray(firstDs.devices) ? firstDs.devices : (firstDs?.data as any)?.devices) || [];
-  selectedDeviceId.value = devs[0]?.deviceId || '';
-  
-  // 依据组件特征提供友好的默认分类
-  const comp = props.component;
-  if (comp) {
-    const t = comp.type;
-    if (['elec-breaker', 'elec-disconnector', 'elec-grounding', 'elec-handcart', 'ctrl-indicator'].includes(t) || comp.category === 'status') {
-      selectedCategory.value = 'yx';
-    } else if (t === 'ctrl-button') {
-      selectedCategory.value = 'yk';
-    } else {
-      selectedCategory.value = 'yc';
+  const firstFac = scadaFacilities.value[0];
+  if (firstFac) {
+    selectedFacId.value = firstFac.fac_id;
+    if (firstFac.bays?.[0]) {
+      selectedBayId.value = firstFac.bays[0].bay_id;
+      if (firstFac.bays[0].devices?.[0]) {
+        selectedDevId.value = firstFac.bays[0].devices[0].dev_id;
+      }
     }
+  }
+
+  if (['elec-breaker', 'elec-disconnector', 'elec-grounding', 'elec-handcart', 'ctrl-indicator'].includes(comp.type) || comp.category === 'status') {
+    selectedCategory.value = 'yx';
   } else {
     selectedCategory.value = 'yc';
   }
 
   selectedPointId.value = null;
   selectedPoint.value = null;
-  selectedTargetVerificationId.value = null;
   isUnboundPending.value = false;
 };
 
-// 监听弹框显示状态，每次打开时重新初始化并定位
-watch(
-  () => props.visible,
-  (val) => {
-    if (val) {
-      initializeCascadingSelection();
-    }
-  },
-  { immediate: true }
-);
-
-// 选择厂站时，自动保持或重置装置
-const handleSelectStation = (stationId: string) => {
-  selectedStationId.value = stationId;
-  const devs = currentDevices.value;
-  if (!devs.some(d => d.deviceId === selectedDeviceId.value)) {
-    selectedDeviceId.value = devs[0]?.deviceId || '';
-  }
-  // 清除点选或检查是否保留
-  checkPointValidityAfterSwitch();
-};
-
-// 选择装置时
-const handleSelectDevice = (deviceId: string) => {
-  selectedDeviceId.value = deviceId;
-  checkPointValidityAfterSwitch();
-};
-
-// 选择五遥分类时
-const handleSelectCategory = (cat: 'yc' | 'yx' | 'dd' | 'yk' | 'yt') => {
-  selectedCategory.value = cat;
-  searchQuery.value = '';
-  checkPointValidityAfterSwitch();
-};
-
-const checkPointValidityAfterSwitch = () => {
-  if (selectedPointId.value !== null) {
-    const exists = pointsList.value.some(p => String(p.pointId) === String(selectedPointId.value));
-    if (!exists) {
-      selectedPointId.value = null;
-      selectedPoint.value = null;
-    }
+const scrollToSelectedRow = () => {
+  if (!selectedPointId.value) return;
+  const el = document.getElementById(`cascade-point-row-${selectedPointId.value}`);
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 };
 
-// 选择测点
+watch(() => props.visible, (isOpen) => {
+  if (isOpen) {
+    searchQuery.value = '';
+    initializeCascadingSelection();
+  }
+}, { immediate: true });
+
 const handleSelectPointRow = (pt: any) => {
   isUnboundPending.value = false;
-  if (String(selectedPointId.value) === String(pt.pointId)) {
-    // 再次点击已选中的点不做变动，保持高亮
-    return;
-  }
-  selectedPointId.value = pt.pointId;
-  selectedPoint.value = pt;
-
-  // 如果是遥控，自动带入默认校验遥信
-  if (selectedCategory.value === 'yk') {
-    selectedTargetVerificationId.value = pt.targetPointId || currentDevice.value?.teleSignals?.[0]?.pointId || 1;
-  } else if (selectedCategory.value === 'yt') {
-    selectedTargetVerificationId.value = pt.targetYcPointId || currentDevice.value?.telemetries?.[0]?.pointId || 1;
-  }
+  selectedPointId.value = pt.id;
+  selectedPoint.value = {
+    pointId: pt.id,
+    name: pt.name
+  };
 };
 
-// 滚动定位点表行
-const scrollToSelectedPoint = (pointId: number | string) => {
-  const el = document.getElementById(`cascade-point-row-${pointId}`);
-  if (el) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-};
-
-// 点击解绑按钮
 const handleMarkUnbound = () => {
   selectedPointId.value = null;
   selectedPoint.value = null;
-  selectedTargetVerificationId.value = null;
   isUnboundPending.value = true;
 };
 
-// 提交生效
 const handleSubmit = () => {
   if (!props.component) {
     emit('close');
@@ -351,28 +280,21 @@ const handleSubmit = () => {
   }
 
   if (isUnboundPending.value || selectedPointId.value === null || !selectedPoint.value) {
-    // 提交解绑
     emit('submit', {
       componentId: props.component.id,
       unbind: true
     });
   } else {
-    // 提交测点关联生效
     emit('submit', {
       componentId: props.component.id,
       unbind: false,
-      datasetId: currentStation.value?.id || selectedStationId.value,
-      deviceId: currentDevice.value?.deviceId || selectedDeviceId.value,
-      deviceName: currentDevice.value?.deviceName,
+      datasetId: String(selectedFacId.value),
+      deviceId: String(selectedDevId.value),
+      deviceName: currentDevice.value ? `${currentBay.value?.bay_name || ''} - ${currentDevice.value.dev_name}` : '',
       category: selectedCategory.value,
-      point: selectedPoint.value,
-      targetVerificationPointId: selectedTargetVerificationId.value || undefined
+      point: selectedPoint.value
     });
   }
-  emit('close');
-};
-
-const handleCancel = () => {
   emit('close');
 };
 </script>
@@ -380,377 +302,289 @@ const handleCancel = () => {
 <template>
   <div
     v-if="visible"
-    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md select-none font-sans"
-    @click.self="handleCancel"
+    id="data-association-modal"
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 select-none font-sans"
+    @click.self="emit('close')"
   >
     <div
-      class="relative w-full max-w-5xl h-[680px] max-h-[92vh] bg-[#0c1d37] border border-cyan-400/60 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.95),0_0_30px_rgba(0,242,255,0.2)] flex flex-col overflow-hidden text-cyan-100 animate-in fade-in zoom-in-95 duration-150"
+      class="relative w-full max-w-5xl h-[700px] max-h-[94vh] bg-slate-900 border-2 border-cyan-500/60 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-white"
     >
-      <!-- Modal Header -->
-      <div class="px-6 py-4 border-b border-cyan-500/30 bg-[#10274a] flex items-center justify-between shrink-0">
+      <!-- Header -->
+      <div class="px-6 py-4 border-b border-slate-800 bg-slate-950 flex items-center justify-between shrink-0">
         <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl bg-cyan-500/20 border border-cyan-400/60 flex items-center justify-center text-cyan-300 shadow-[0_0_15px_rgba(0,242,255,0.3)]">
-            <Database class="w-5 h-5 stroke-[2]" />
+          <div class="p-2.5 bg-cyan-500/20 border border-cyan-400 rounded-xl text-cyan-300">
+            <Link2 class="w-6 h-6" />
           </div>
           <div>
-            <div class="flex items-center gap-2.5">
-              <h2 class="text-base font-medium text-cyan-100 tracking-wide">SCADA 测点数据级联关联配置</h2>
+            <div class="flex items-center gap-3">
+              <h2 class="text-base font-bold text-white tracking-wide">SCADA 测点数据关联配置</h2>
               <span
                 v-if="component"
-                class="px-2.5 py-0.5 rounded-full text-xs font-mono bg-cyan-950/80 border border-cyan-400/50 text-cyan-300 shadow-xs"
+                class="px-3 py-0.5 rounded-full text-xs font-mono font-bold bg-cyan-500/20 border border-cyan-400 text-cyan-200"
               >
-                目标图元: {{ component.name }}
+                目标图元: {{ component.name }} ({{ component.id }})
               </span>
             </div>
-            <p class="text-xs text-cyan-400/70 font-light mt-0.5">
-              依次级联选择「厂站 ➔ 装置 ➔ 五遥 ➔ 测点」，选完点击提交即刻生效
+            <p class="text-xs text-cyan-200 mt-1 font-medium">
+              层级选择：厂站 (Facility) → 间隔 (Bay) → 装置 (Device) → 遥测(YC) / 遥信(YX) 测点
             </p>
           </div>
         </div>
 
-        <button
-          @click="handleCancel"
-          class="p-1.5 rounded-lg bg-[#183a69] hover:bg-rose-500/30 text-cyan-300 hover:text-rose-200 border border-cyan-500/40 hover:border-rose-400/60 cursor-pointer transition-colors"
-          title="取消并关闭"
-        >
-          <X class="w-4 h-4 stroke-[2]" />
-        </button>
-      </div>
-
-      <!-- Cascading 4-Column Studio Layout -->
-      <div class="flex-1 min-h-0 grid grid-cols-12 divide-x divide-cyan-500/25 bg-[#09152b] overflow-hidden">
-        
-        <!-- Column 1: 厂站 (Station / Dataset) - 3 Cols -->
-        <div class="col-span-3 flex flex-col h-full bg-[#081326]/60 overflow-hidden">
-          <div class="px-3.5 py-2.5 bg-[#0e213f] border-b border-cyan-500/30 flex items-center justify-between shrink-0">
-            <div class="flex items-center gap-1.5 text-xs font-medium text-cyan-200">
-              <span class="w-4 h-4 rounded-full bg-cyan-500/20 text-cyan-400 text-[10px] flex items-center justify-center font-mono font-bold">1</span>
-              <Building2 class="w-3.5 h-3.5 text-cyan-400" />
-              <span>选择厂站 / 数据集</span>
-            </div>
-            <span class="text-[11px] font-mono text-cyan-400/70">{{ datasets.length }} 个厂站</span>
-          </div>
-
-          <div class="flex-1 overflow-y-auto p-2 space-y-1.5 custom-scrollbar">
-            <div
-              v-for="ds in datasets"
-              :key="ds.id"
-              @click="handleSelectStation(ds.id)"
-              class="p-2.5 rounded-xl border text-xs cursor-pointer transition-all flex items-center justify-between group"
-              :class="selectedStationId === ds.id
-                ? 'bg-cyan-950/70 border-cyan-400 text-cyan-100 shadow-[0_0_15px_rgba(0,242,255,0.25)] ring-1 ring-cyan-400'
-                : 'bg-[#0d1f3b]/60 border-cyan-500/25 text-cyan-300/90 hover:border-cyan-400/60 hover:bg-[#12284b]'"
-            >
-              <div class="min-w-0 pr-2">
-                <div class="font-medium truncate flex items-center gap-1.5">
-                  <span class="w-1.5 h-1.5 rounded-full" :class="selectedStationId === ds.id ? 'bg-cyan-400 shadow-[0_0_6px_#00f2ff]' : 'bg-slate-600'"></span>
-                  <span class="truncate">{{ ds.name }}</span>
-                </div>
-                <div class="text-[10px] text-cyan-400/60 font-mono mt-1 flex items-center gap-2">
-                  <span>包含 {{ (Array.isArray(ds.devices) ? ds.devices.length : (ds.data as any)?.devices?.length) || 0 }} 台装置</span>
-                </div>
-              </div>
-              <ChevronRight class="w-4 h-4 text-cyan-400 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" :class="{ 'opacity-100': selectedStationId === ds.id }" />
-            </div>
-          </div>
-        </div>
-
-        <!-- Column 2: 受控装置 (Device) - 3 Cols -->
-        <div class="col-span-3 flex flex-col h-full bg-[#081326]/40 overflow-hidden">
-          <div class="px-3.5 py-2.5 bg-[#0e213f] border-b border-cyan-500/30 flex items-center justify-between shrink-0">
-            <div class="flex items-center gap-1.5 text-xs font-medium text-cyan-200">
-              <span class="w-4 h-4 rounded-full bg-cyan-500/20 text-cyan-400 text-[10px] flex items-center justify-center font-mono font-bold">2</span>
-              <Cpu class="w-3.5 h-3.5 text-cyan-400" />
-              <span>选择受控装置</span>
-            </div>
-            <span class="text-[11px] font-mono text-cyan-400/70">{{ currentDevices.length }} 台</span>
-          </div>
-
-          <div class="flex-1 overflow-y-auto p-2 space-y-1.5 custom-scrollbar">
-            <div
-              v-for="dev in currentDevices"
-              :key="dev.deviceId"
-              @click="handleSelectDevice(dev.deviceId)"
-              class="p-2.5 rounded-xl border text-xs cursor-pointer transition-all flex items-center justify-between group"
-              :class="selectedDeviceId === dev.deviceId
-                ? 'bg-cyan-950/70 border-cyan-400 text-cyan-100 shadow-[0_0_15px_rgba(0,242,255,0.25)] ring-1 ring-cyan-400'
-                : 'bg-[#0d1f3b]/60 border-cyan-500/25 text-cyan-300/90 hover:border-cyan-400/60 hover:bg-[#12284b]'"
-            >
-              <div class="min-w-0 pr-2">
-                <div class="font-medium truncate flex items-center gap-1.5">
-                  <span class="w-1.5 h-1.5 rounded-full" :class="selectedDeviceId === dev.deviceId ? 'bg-cyan-400 shadow-[0_0_6px_#00f2ff]' : 'bg-slate-600'"></span>
-                  <span class="truncate">{{ dev.deviceName }}</span>
-                </div>
-                <div class="text-[10px] text-cyan-400/60 font-mono mt-1 flex items-center gap-2">
-                  <span class="px-1 rounded bg-[#061021] border border-cyan-500/30 text-cyan-300">[{{ dev.deviceId }}]</span>
-                  <span>{{ dev.deviceType || '测控保护' }}</span>
-                </div>
-              </div>
-              <ChevronRight class="w-4 h-4 text-cyan-400 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" :class="{ 'opacity-100': selectedDeviceId === dev.deviceId }" />
-            </div>
-
-            <div v-if="currentDevices.length === 0" class="p-6 text-center text-xs text-cyan-400/60">
-              当前厂站下无装置
-            </div>
-          </div>
-        </div>
-
-        <!-- Column 3: 五遥分类 (Five Remotes Category) - 2 Cols -->
-        <div class="col-span-2 flex flex-col h-full bg-[#081326]/20 overflow-hidden">
-          <div class="px-3 py-2.5 bg-[#0e213f] border-b border-cyan-500/30 flex items-center justify-between shrink-0">
-            <div class="flex items-center gap-1.5 text-xs font-medium text-cyan-200">
-              <span class="w-4 h-4 rounded-full bg-cyan-500/20 text-cyan-400 text-[10px] flex items-center justify-center font-mono font-bold">3</span>
-              <Activity class="w-3.5 h-3.5 text-cyan-400" />
-              <span>五遥分类</span>
-            </div>
-          </div>
-
-          <div class="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
-            <!-- 遥测 YC -->
-            <button
-              type="button"
-              @click="handleSelectCategory('yc')"
-              class="w-full p-2.5 rounded-xl border text-left cursor-pointer transition-all flex flex-col gap-1"
-              :class="selectedCategory === 'yc'
-                ? 'bg-cyan-500 text-slate-950 font-medium border-cyan-400 shadow-[0_0_12px_rgba(0,242,255,0.4)]'
-                : 'bg-[#0d1f3b]/60 border-cyan-500/30 text-cyan-300 hover:border-cyan-400 hover:bg-[#12284b]'"
-            >
-              <div class="flex items-center justify-between w-full">
-                <span class="font-bold text-xs">遥测 YC</span>
-                <span class="text-[10px] font-mono px-1.5 py-0.2 rounded" :class="selectedCategory === 'yc' ? 'bg-slate-950/30 text-slate-950 font-bold' : 'bg-cyan-950 text-cyan-300 border border-cyan-500/40'">
-                  {{ categoryStats.yc }}
-                </span>
-              </div>
-              <span class="text-[10px] opacity-80">模拟量 (电压/电流/功率)</span>
-            </button>
-
-            <!-- 遥信 YX -->
-            <button
-              type="button"
-              @click="handleSelectCategory('yx')"
-              class="w-full p-2.5 rounded-xl border text-left cursor-pointer transition-all flex flex-col gap-1"
-              :class="selectedCategory === 'yx'
-                ? 'bg-emerald-500 text-slate-950 font-medium border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.4)]'
-                : 'bg-[#0d1f3b]/60 border-emerald-500/30 text-emerald-300 hover:border-emerald-400 hover:bg-[#12284b]'"
-            >
-              <div class="flex items-center justify-between w-full">
-                <span class="font-bold text-xs">遥信 YX</span>
-                <span class="text-[10px] font-mono px-1.5 py-0.2 rounded" :class="selectedCategory === 'yx' ? 'bg-slate-950/30 text-slate-950 font-bold' : 'bg-emerald-950 text-emerald-300 border border-emerald-500/40'">
-                  {{ categoryStats.yx }}
-                </span>
-              </div>
-              <span class="text-[10px] opacity-80">状态量 (开关分合/告警)</span>
-            </button>
-
-            <!-- 遥控 YK -->
-            <button
-              type="button"
-              @click="handleSelectCategory('yk')"
-              class="w-full p-2.5 rounded-xl border text-left cursor-pointer transition-all flex flex-col gap-1"
-              :class="selectedCategory === 'yk'
-                ? 'bg-purple-500 text-white font-medium border-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.4)]'
-                : 'bg-[#0d1f3b]/60 border-purple-500/30 text-purple-300 hover:border-purple-400 hover:bg-[#12284b]'"
-            >
-              <div class="flex items-center justify-between w-full">
-                <span class="font-bold text-xs">遥控 YK</span>
-                <span class="text-[10px] font-mono px-1.5 py-0.2 rounded" :class="selectedCategory === 'yk' ? 'bg-purple-950 text-purple-200 font-bold' : 'bg-purple-950 text-purple-300 border border-purple-500/40'">
-                  {{ categoryStats.yk }}
-                </span>
-              </div>
-              <span class="text-[10px] opacity-80">控制输出 (分合闸指令)</span>
-            </button>
-
-            <!-- 遥调 YT -->
-            <button
-              type="button"
-              @click="handleSelectCategory('yt')"
-              class="w-full p-2.5 rounded-xl border text-left cursor-pointer transition-all flex flex-col gap-1"
-              :class="selectedCategory === 'yt'
-                ? 'bg-blue-500 text-white font-medium border-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.4)]'
-                : 'bg-[#0d1f3b]/60 border-blue-500/30 text-blue-300 hover:border-blue-400 hover:bg-[#12284b]'"
-            >
-              <div class="flex items-center justify-between w-full">
-                <span class="font-bold text-xs">遥调 YT</span>
-                <span class="text-[10px] font-mono px-1.5 py-0.2 rounded" :class="selectedCategory === 'yt' ? 'bg-blue-950 text-blue-200 font-bold' : 'bg-blue-950 text-blue-300 border border-blue-500/40'">
-                  {{ categoryStats.yt }}
-                </span>
-              </div>
-              <span class="text-[10px] opacity-80">定值输出 (档位/设定)</span>
-            </button>
-
-            <!-- 电度 DD -->
-            <button
-              type="button"
-              @click="handleSelectCategory('dd')"
-              class="w-full p-2.5 rounded-xl border text-left cursor-pointer transition-all flex flex-col gap-1"
-              :class="selectedCategory === 'dd'
-                ? 'bg-amber-500 text-slate-950 font-medium border-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.4)]'
-                : 'bg-[#0d1f3b]/60 border-amber-500/30 text-amber-300 hover:border-amber-400 hover:bg-[#12284b]'"
-            >
-              <div class="flex items-center justify-between w-full">
-                <span class="font-bold text-xs">电度 DD</span>
-                <span class="text-[10px] font-mono px-1.5 py-0.2 rounded" :class="selectedCategory === 'dd' ? 'bg-slate-950/30 text-slate-950 font-bold' : 'bg-amber-950 text-amber-300 border border-amber-500/40'">
-                  {{ categoryStats.dd }}
-                </span>
-              </div>
-              <span class="text-[10px] opacity-80">电能量 (kWh / 累计量)</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Column 4: 测点点表 (Points Table) - 4 Cols -->
-        <div class="col-span-4 flex flex-col h-full bg-[#081326]/10 overflow-hidden">
-          <div class="px-3.5 py-2.5 bg-[#0e213f] border-b border-cyan-500/30 flex items-center justify-between shrink-0">
-            <div class="flex items-center gap-1.5 text-xs font-medium text-cyan-200">
-              <span class="w-4 h-4 rounded-full bg-cyan-500/20 text-cyan-400 text-[10px] flex items-center justify-center font-mono font-bold">4</span>
-              <Sliders class="w-3.5 h-3.5 text-cyan-400" />
-              <span>选择目标测点 (点击选择)</span>
-            </div>
-            <span class="text-[11px] font-mono text-cyan-400/70">共 {{ filteredPoints.length }} 点</span>
-          </div>
-
-          <!-- Search Input -->
-          <div class="p-2 border-b border-cyan-500/20 bg-[#071120]">
-            <div class="relative">
-              <Search class="w-3.5 h-3.5 text-cyan-400 absolute left-2.5 top-2.5" />
-              <input
-                type="text"
-                v-model="searchQuery"
-                placeholder="按点号、点名或规约标识快速过滤..."
-                class="w-full bg-[#0d1f3b] border border-cyan-500/30 focus:border-cyan-400 rounded-lg pl-8 pr-3 py-1.5 text-xs text-cyan-100 placeholder-cyan-500/50 outline-hidden font-light"
-              />
-            </div>
-          </div>
-
-          <!-- Points Scroll List -->
-          <div class="flex-1 overflow-y-auto p-2 space-y-1.5 custom-scrollbar">
-            <div
-              v-for="pt in filteredPoints"
-              :key="pt.pointId"
-              :id="`cascade-point-row-${pt.pointId}`"
-              @click="handleSelectPointRow(pt)"
-              class="p-2.5 rounded-xl border text-xs cursor-pointer transition-all flex items-center justify-between group font-light"
-              :class="[
-                !isUnboundPending && String(selectedPointId) === String(pt.pointId)
-                  ? 'border-cyan-400 bg-cyan-950/80 shadow-[0_0_15px_rgba(0,242,255,0.3)] ring-1 ring-cyan-400 text-cyan-100'
-                  : 'border-cyan-500/25 bg-[#0d1f3b]/60 text-cyan-300 hover:border-cyan-400/60 hover:bg-[#12284b]'
-              ]"
-            >
-              <div class="min-w-0 pr-2">
-                <div class="flex items-center gap-2">
-                  <span class="font-mono text-cyan-400 text-xs font-medium">#{{ pt.pointId }}</span>
-                  <span class="font-medium text-cyan-100 truncate group-hover:text-cyan-200">{{ pt.name }}</span>
-                </div>
-                <div class="text-[10px] text-cyan-400/60 font-mono mt-1 truncate">
-                  {{ currentDevice?.deviceId }}_{{ selectedCategory.toUpperCase() }}_{{ pt.pointId }}
-                </div>
-              </div>
-
-              <div class="text-right shrink-0 flex items-center gap-2">
-                <!-- Values for YC / DD -->
-                <div v-if="selectedCategory === 'yc' || selectedCategory === 'dd'" class="text-right">
-                  <span class="font-mono text-emerald-400 font-medium text-xs">{{ pt.value }}</span>
-                  <span class="text-[10px] text-cyan-300 ml-1">{{ pt.unit || '' }}</span>
-                </div>
-
-                <!-- Values for YX -->
-                <div v-else-if="selectedCategory === 'yx'" class="text-right">
-                  <span
-                    class="px-1.5 py-0.5 rounded text-[10px] font-mono border"
-                    :class="pt.value === 1 ? 'bg-emerald-950 text-emerald-300 border-emerald-500/40' : 'bg-[#050c1c] text-cyan-400 border-cyan-500/30'"
-                  >
-                    {{ pt.value }} ({{ pt.statusText || (pt.value === 1 ? '合闸' : '分闸') }})
-                  </span>
-                </div>
-
-                <!-- Values for YK / YT -->
-                <div v-else-if="selectedCategory === 'yk' || selectedCategory === 'yt'" class="text-right">
-                  <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-purple-950/80 text-purple-300 border border-purple-500/40">
-                    {{ selectedCategory === 'yk' ? '控制通道' : '调节定值' }}
-                  </span>
-                </div>
-
-                <!-- Selected Tick -->
-                <div
-                  v-if="!isUnboundPending && String(selectedPointId) === String(pt.pointId)"
-                  class="w-5 h-5 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center shrink-0 shadow-[0_0_8px_#00f2ff]"
-                >
-                  <Check class="w-3.5 h-3.5 stroke-[3]" />
-                </div>
-              </div>
-            </div>
-
-            <div v-if="filteredPoints.length === 0" class="p-8 text-center text-xs text-cyan-400/60 font-light">
-              未找到符合条件的测点
-            </div>
-          </div>
-
-          <!-- Closed-Loop Verification for YK / YT -->
-          <div
-            v-if="selectedCategory === 'yk' || selectedCategory === 'yt'"
-            class="p-2.5 border-t border-purple-500/40 bg-purple-950/30 space-y-1.5 shrink-0"
-          >
-            <div class="flex items-center justify-between text-[11px] text-purple-300 font-medium">
-              <span class="flex items-center gap-1">
-                <ShieldCheck class="w-3.5 h-3.5 text-purple-400" />
-                <span>{{ selectedCategory === 'yk' ? '校验遥信 (YX 反馈状态)' : '校验遥测 (YC 实测值)' }}</span>
-              </span>
-            </div>
-            <select
-              v-model="selectedTargetVerificationId"
-              class="w-full bg-[#050c1c] border border-purple-500/40 rounded-lg px-2 py-1 text-purple-200 text-xs font-mono outline-hidden cursor-pointer"
-            >
-              <option v-for="vp in availableVerificationPoints" :key="vp.pointId" :value="vp.pointId">
-                [#{{ vp.pointId }}] {{ vp.name }} (实时: {{ vp.value }} {{ vp.unit || '' }})
-              </option>
-            </select>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Modal Footer Action Bar -->
-      <div class="px-6 py-3.5 border-t border-cyan-500/30 bg-[#10274a] flex items-center justify-between shrink-0">
-        <!-- Left status summary / unbind action -->
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2.5">
           <button
-            type="button"
+            class="px-3.5 py-1.5 rounded-lg text-xs font-bold bg-rose-500/20 border border-rose-500/60 text-rose-200 hover:bg-rose-500/30 transition-colors flex items-center gap-1.5 cursor-pointer"
             @click="handleMarkUnbound"
-            class="px-3 py-1.5 rounded-lg border text-xs font-light cursor-pointer transition-all flex items-center gap-1.5"
-            :class="isUnboundPending
-              ? 'bg-rose-500 text-slate-950 font-medium border-rose-400 shadow-[0_0_10px_rgba(244,63,94,0.3)]'
-              : 'bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 border-rose-500/40'"
           >
-            <Unlink class="w-3.5 h-3.5" />
-            <span>{{ isUnboundPending ? '已标记为解绑 (点击确定生效)' : '解除测点关联 (清空绑定)' }}</span>
+            <Unlink class="w-4 h-4 text-rose-300" />
+            <span>解除测点关联</span>
           </button>
+          <button
+            class="p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+            @click="emit('close')"
+          >
+            <X class="w-5 h-5 text-white" />
+          </button>
+        </div>
+      </div>
 
-          <span v-if="!isUnboundPending && selectedPoint" class="text-xs text-cyan-300/80 font-mono hidden sm:inline-block">
-            待关联: {{ currentStation?.name }} ➔ {{ currentDevice?.deviceName }} ➔ {{ selectedPoint.name }} (#{{ selectedPoint.pointId }})
+      <!-- Previously Associated Info Banner (高亮体现已关联信息) -->
+      <div
+        v-if="initialAssociatedInfo?.isBound"
+        class="px-6 py-2.5 bg-cyan-950 border-b border-cyan-500/40 flex items-center justify-between text-xs text-white shrink-0"
+      >
+        <div class="flex items-center gap-2">
+          <span class="px-2 py-0.5 rounded bg-cyan-500 text-slate-950 font-bold text-[11px]">
+            已关联测点
+          </span>
+          <span class="font-medium text-cyan-100">
+            厂站: <strong class="text-white">{{ initialAssociatedInfo.facName }}</strong>
+            <span class="text-cyan-400 mx-1">→</span>
+            间隔: <strong class="text-white">{{ initialAssociatedInfo.bayName }}</strong>
+            <span class="text-cyan-400 mx-1">→</span>
+            装置: <strong class="text-white">{{ initialAssociatedInfo.devName }}</strong>
+            <span class="text-cyan-400 mx-1">→</span>
+            类型: <strong class="text-amber-300">{{ initialAssociatedInfo.category?.toUpperCase() }}</strong>
+            <span class="text-cyan-400 mx-1">→</span>
+            测点: <strong class="text-amber-300 font-mono">ID {{ initialAssociatedInfo.pointId }}</strong>
+            (<span class="text-white font-semibold">{{ initialAssociatedInfo.pointName }}</span>)
+          </span>
+        </div>
+        <div class="flex items-center gap-1 text-emerald-400 font-bold">
+          <CheckCircle2 class="w-4 h-4 text-emerald-400" />
+          <span>已生效</span>
+        </div>
+      </div>
+
+      <div
+        v-else
+        class="px-6 py-2 bg-slate-950/80 border-b border-slate-800 flex items-center gap-2 text-xs text-slate-200 shrink-0"
+      >
+        <span class="px-2 py-0.5 rounded bg-slate-800 text-cyan-300 font-bold text-[11px]">未关联</span>
+        <span>当前图元尚未关联任何测点，请从下方选择测点并点击「确认关联生效」</span>
+      </div>
+
+      <!-- Main Cascading Columns -->
+      <div class="flex-1 flex overflow-hidden">
+        <!-- 1. 厂站 (Facility) -->
+        <div class="w-56 border-r border-slate-800 bg-slate-950/60 flex flex-col">
+          <div class="p-3 border-b border-slate-800 text-xs font-bold text-cyan-300 flex items-center justify-between bg-slate-950">
+            <div class="flex items-center gap-1.5">
+              <Building2 class="w-4 h-4 text-blue-400" />
+              <span>1. 厂站 (Facility)</span>
+            </div>
+            <span class="px-1.5 py-0.2 bg-blue-900/60 border border-blue-400 text-blue-200 text-[10px] rounded font-mono font-bold">
+              {{ scadaFacilities.length }}
+            </span>
+          </div>
+          <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
+            <div
+              v-for="fac in scadaFacilities"
+              :key="fac.fac_id"
+              class="p-2.5 rounded-xl cursor-pointer border-2 transition-all text-left text-xs"
+              :class="selectedFacId === fac.fac_id ? 'bg-blue-600/30 border-blue-400 text-white font-bold shadow-md' : 'bg-slate-900 border-slate-800 text-slate-100 hover:bg-slate-800 hover:border-slate-700'"
+              @click="selectedFacId = fac.fac_id; if (fac.bays?.[0]) selectedBayId = fac.bays[0].bay_id; if (fac.bays?.[0]?.devices?.[0]) selectedDevId = fac.bays[0].devices[0].dev_id;"
+            >
+              <div class="flex items-center justify-between">
+                <span class="truncate text-white font-bold">{{ fac.fac_name }}</span>
+                <ChevronRight class="w-4 h-4 text-cyan-400" />
+              </div>
+              <div class="text-[11px] text-blue-300 font-mono font-medium mt-1">ID: {{ fac.fac_id }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. 间隔 (Bay) -->
+        <div class="w-60 border-r border-slate-800 bg-slate-950/40 flex flex-col">
+          <div class="p-3 border-b border-slate-800 text-xs font-bold text-cyan-300 flex items-center justify-between bg-slate-950">
+            <div class="flex items-center gap-1.5">
+              <Layers class="w-4 h-4 text-indigo-400" />
+              <span>2. 间隔 (Bay)</span>
+            </div>
+            <span class="px-1.5 py-0.2 bg-indigo-900/60 border border-indigo-400 text-indigo-200 text-[10px] rounded font-mono font-bold">
+              {{ currentFacility?.bays?.length || 0 }}
+            </span>
+          </div>
+          <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
+            <div
+              v-for="bay in (currentFacility?.bays || [])"
+              :key="bay.bay_id"
+              class="p-2.5 rounded-xl cursor-pointer border-2 transition-all text-left text-xs"
+              :class="selectedBayId === bay.bay_id ? 'bg-indigo-600/30 border-indigo-400 text-white font-bold shadow-md' : 'bg-slate-900 border-slate-800 text-slate-100 hover:bg-slate-800 hover:border-slate-700'"
+              @click="selectedBayId = bay.bay_id; if (bay.devices?.[0]) selectedDevId = bay.devices[0].dev_id;"
+            >
+              <div class="flex items-center justify-between">
+                <span class="truncate text-white font-bold">{{ bay.bay_name }}</span>
+                <ChevronRight class="w-4 h-4 text-cyan-400" />
+              </div>
+              <div class="text-[11px] text-indigo-300 font-mono font-medium mt-1">ID: {{ bay.bay_id }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. 装置 (Device) -->
+        <div class="w-60 border-r border-slate-800 bg-slate-950/30 flex flex-col">
+          <div class="p-3 border-b border-slate-800 text-xs font-bold text-cyan-300 flex items-center justify-between bg-slate-950">
+            <div class="flex items-center gap-1.5">
+              <Cpu class="w-4 h-4 text-emerald-400" />
+              <span>3. 装置 (Device)</span>
+            </div>
+            <span class="px-1.5 py-0.2 bg-emerald-900/60 border border-emerald-400 text-emerald-200 text-[10px] rounded font-mono font-bold">
+              {{ currentBay?.devices?.length || 0 }}
+            </span>
+          </div>
+          <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
+            <div
+              v-for="dev in (currentBay?.devices || [])"
+              :key="dev.dev_id"
+              class="p-2.5 rounded-xl cursor-pointer border-2 transition-all text-left text-xs"
+              :class="selectedDevId === dev.dev_id ? 'bg-emerald-600/30 border-emerald-400 text-white font-bold shadow-md' : 'bg-slate-900 border-slate-800 text-slate-100 hover:bg-slate-800 hover:border-slate-700'"
+              @click="selectedDevId = dev.dev_id"
+            >
+              <div class="truncate text-white font-bold">{{ dev.dev_name }}</div>
+              <div class="flex items-center justify-between text-[11px] text-emerald-300 font-mono font-medium mt-1">
+                <span>ID: {{ dev.dev_id }}</span>
+                <span class="px-1.5 py-0.2 bg-emerald-950 border border-emerald-500 text-[10px] rounded">cbty: {{ dev.cbty ?? 0 }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. 测点列表 (Points Table: Only ID & Name, High Contrast) -->
+        <div class="flex-1 flex flex-col bg-slate-900 overflow-hidden">
+          <!-- Category Tabs & Search Bar -->
+          <div class="p-3 border-b border-slate-800 bg-slate-950 flex items-center justify-between gap-3 shrink-0">
+            <div class="flex items-center gap-2">
+              <button
+                class="px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
+                :class="selectedCategory === 'yc' ? 'bg-blue-600 text-white shadow-lg border border-blue-400' : 'bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white border border-slate-700'"
+                @click="selectedCategory = 'yc'"
+              >
+                <Zap class="w-4 h-4 text-amber-300" />
+                <span>遥测 (YC)</span>
+                <span class="px-2 py-0.5 bg-black/40 rounded-full text-[10px] font-mono font-bold">{{ categoryStats.yc }}</span>
+              </button>
+
+              <button
+                class="px-4 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer"
+                :class="selectedCategory === 'yx' ? 'bg-indigo-600 text-white shadow-lg border border-indigo-400' : 'bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white border border-slate-700'"
+                @click="selectedCategory = 'yx'"
+              >
+                <Radio class="w-4 h-4 text-cyan-300" />
+                <span>遥信 (YX)</span>
+                <span class="px-2 py-0.5 bg-black/40 rounded-full text-[10px] font-mono font-bold">{{ categoryStats.yx }}</span>
+              </button>
+            </div>
+
+            <!-- Search -->
+            <div class="relative w-64">
+              <input
+                v-model="searchQuery"
+                type="text"
+                placeholder="搜索测点 ID 或名称..."
+                class="w-full pl-8 pr-3 py-1.5 bg-slate-950 border border-slate-600 rounded-lg text-xs text-white placeholder:text-slate-400 focus:outline-none focus:border-cyan-400 font-medium"
+              />
+              <Search class="w-4 h-4 text-cyan-400 absolute left-2.5 top-2" />
+            </div>
+          </div>
+
+          <!-- Point Table: Strictly ID & Name ONLY (No Realtime, No Units) -->
+          <div class="flex-1 overflow-y-auto p-3">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="border-b-2 border-slate-700 bg-slate-950 text-cyan-300">
+                  <th class="p-3 font-bold w-44">测点 ID</th>
+                  <th class="p-3 font-bold">测点名称</th>
+                  <th class="p-3 font-bold w-28 text-right">选中状态</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800">
+                <tr
+                  v-for="pt in filteredPoints"
+                  :key="pt.id"
+                  :id="`cascade-point-row-${pt.id}`"
+                  class="cursor-pointer transition-colors"
+                  :class="selectedPointId === pt.id ? 'bg-cyan-500/25 border-y-2 border-cyan-400 text-white font-bold' : 'hover:bg-slate-800 text-slate-100'"
+                  @click="handleSelectPointRow(pt)"
+                >
+                  <td class="p-3 font-mono text-sm font-bold" :class="selectedCategory === 'yc' ? 'text-amber-300' : 'text-cyan-300'">
+                    {{ pt.id }}
+                  </td>
+                  <td class="p-3 font-sans text-sm font-semibold text-white">
+                    {{ pt.name }}
+                  </td>
+                  <td class="p-3 text-right">
+                    <div
+                      class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold transition-all"
+                      :class="selectedPointId === pt.id ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 text-slate-400 border border-slate-700'"
+                    >
+                      <Check class="w-3.5 h-3.5 stroke-[3]" />
+                      <span>{{ selectedPointId === pt.id ? '已选中' : '选择' }}</span>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-if="filteredPoints.length === 0">
+                  <td colspan="3" class="p-8 text-center text-slate-300 font-sans text-sm font-medium">
+                    当前装置暂无符合条件的测点
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Bar -->
+      <div class="px-6 py-3.5 border-t border-slate-800 bg-slate-950 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2 text-xs">
+          <span class="text-cyan-300 font-bold">当前选择:</span>
+          <span v-if="isUnboundPending" class="text-rose-400 font-bold font-mono">
+            [已标记解除测点绑定]
+          </span>
+          <span v-else-if="selectedPoint" class="text-cyan-200 font-bold font-mono">
+            [{{ selectedCategory.toUpperCase() }}] {{ currentFacility?.fac_name }} → {{ currentBay?.bay_name }} → {{ currentDevice?.dev_name }} → 点号: <strong class="text-amber-300 font-bold">{{ selectedPoint.pointId }}</strong> ({{ selectedPoint.name }})
+          </span>
+          <span v-else class="text-slate-300 font-medium">
+            未选择任何测点
           </span>
         </div>
 
-        <!-- Right Confirm / Cancel buttons -->
-        <div class="flex items-center gap-2.5">
+        <div class="flex items-center gap-3">
           <button
-            type="button"
-            @click="handleCancel"
-            class="px-4 py-2 rounded-xl bg-[#142c52] hover:bg-[#1a3869] border border-cyan-500/40 text-cyan-300 hover:text-cyan-100 text-xs font-light cursor-pointer transition-colors"
+            class="px-5 py-2 rounded-xl text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors cursor-pointer"
+            @click="emit('close')"
           >
             取消
           </button>
-
           <button
-            type="button"
+            class="px-6 py-2 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-all shadow-lg shadow-cyan-500/30 flex items-center gap-1.5 cursor-pointer"
             @click="handleSubmit"
-            class="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-medium text-xs cursor-pointer shadow-[0_0_20px_rgba(0,242,255,0.4)] transition-all flex items-center gap-1.5 active:scale-95"
           >
-            <CheckCircle2 class="w-4 h-4 stroke-[2.5]" />
-            <span>确认关联并生效</span>
+            <Check class="w-4 h-4 stroke-[3]" />
+            <span>确认关联生效</span>
           </button>
         </div>
       </div>
-
     </div>
   </div>
 </template>

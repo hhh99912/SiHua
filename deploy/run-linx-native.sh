@@ -28,14 +28,18 @@ else
 fi
 
 # 3. 中文输入法 (IME) 智能检测与 DBus 环境变量自动桥接
-# 解决场景：以 root 身份或从终端启动时丢失 DBUS 会话导致输入法候选框弹不出的问题
-if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
+# 解决场景：以 root 身份或从终端启动时丢失/损坏 DBUS 会话导致输入法候选框弹不出或 bus.cc 报错
+export NO_AT_BRIDGE=1
+
+if [ -z "$DBUS_SESSION_BUS_ADDRESS" ] || [[ "$DBUS_SESSION_BUS_ADDRESS" != unix:* && "$DBUS_SESSION_BUS_ADDRESS" != tcp:* ]]; then
   USER_ID=$(id -u)
-  if [ -e "/run/user/${USER_ID}/bus" ]; then
+  if [ -S "/run/user/${USER_ID}/bus" ]; then
     export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${USER_ID}/bus"
-  elif [ -e "/tmp/dbus-*" ]; then
-    FOUND_DBUS=$(ls -t /tmp/dbus-* 2>/dev/null | head -n 1)
-    [ -n "$FOUND_DBUS" ] && export DBUS_SESSION_BUS_ADDRESS="unix:path=${FOUND_DBUS}"
+  elif [ -n "$XDG_RUNTIME_DIR" ] && [ -S "${XDG_RUNTIME_DIR}/bus" ]; then
+    export DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+  else
+    # 清理非法的 DBUS 变量，避免 Chromium 打印 Unknown address type 告警
+    unset DBUS_SESSION_BUS_ADDRESS
   fi
 fi
 

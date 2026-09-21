@@ -21,13 +21,21 @@ import {
   Sparkles,
   Search
 } from 'lucide-vue-next';
-import {
-  ScadaAlarmEvent,
-  startAlarmStreamViaUds,
-  stopAlarmStreamViaUds,
-  isAlarmStreamRunning,
-  onUdsAlarm
-} from '../utils/udsClient';
+export interface ScadaAlarmEvent {
+  id: string;
+  timestamp: number;
+  timeStr: string;
+  deviceId: string;
+  deviceName: string;
+  pointType: 'YC' | 'YX' | 'DD';
+  pointId: number;
+  pointName: string;
+  level: 'critical' | 'major' | 'minor' | 'info';
+  value: any;
+  threshold?: number;
+  message: string;
+  acknowledged: boolean;
+}
 
 interface Props {
   visible: boolean;
@@ -38,7 +46,7 @@ const emit = defineEmits<{
   (e: 'close'): void;
 }>();
 
-const isStreaming = ref(isAlarmStreamRunning());
+const isStreaming = ref(true);
 const alarmList = ref<ScadaAlarmEvent[]>([]);
 const selectedLevel = ref<string>('all');
 const searchQuery = ref<string>('');
@@ -109,16 +117,8 @@ const INITIAL_ALARMS: ScadaAlarmEvent[] = [
 
 alarmList.value = [...INITIAL_ALARMS];
 
-let unsubscribeAlarm: (() => void) | null = null;
-
-const toggleStreaming = async () => {
-  if (isStreaming.value) {
-    await stopAlarmStreamViaUds();
-    isStreaming.value = false;
-  } else {
-    await startAlarmStreamViaUds();
-    isStreaming.value = true;
-  }
+const toggleStreaming = () => {
+  isStreaming.value = !isStreaming.value;
 };
 
 const handleAcknowledge = (alarm: ScadaAlarmEvent) => {
@@ -158,21 +158,60 @@ const criticalCount = computed(() => {
   return alarmList.value.filter(a => a.level === 'critical').length;
 });
 
+let intervalTimer: any = null;
+
 onMounted(() => {
-  isStreaming.value = isAlarmStreamRunning();
-  unsubscribeAlarm = onUdsAlarm((event: ScadaAlarmEvent) => {
-    alarmList.value.unshift(event);
-    if (alarmList.value.length > 500) {
-      alarmList.value.pop();
+  intervalTimer = setInterval(() => {
+    if (!isStreaming.value) return;
+    if (Math.random() < 0.15) {
+      const d = new Date();
+      const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}.${String(d.getMilliseconds()).padStart(3, '0')}`;
+      const mockAlarms: ScadaAlarmEvent[] = [
+        {
+          id: `ALM-${Date.now().toString().slice(-4)}`,
+          timestamp: Date.now(),
+          timeStr,
+          deviceId: '7000001',
+          deviceName: '10kV 1号主变测控',
+          pointType: 'YC',
+          pointId: 10000001,
+          pointName: 'A相电流 Ia',
+          level: 'minor',
+          value: (120 + Math.random() * 20).toFixed(1),
+          threshold: 130.0,
+          message: '【越限监视】10kV 1号主变 A相电流越上限告警',
+          acknowledged: false
+        },
+        {
+          id: `ALM-${Date.now().toString().slice(-4)}`,
+          timestamp: Date.now(),
+          timeStr,
+          deviceId: '7000002',
+          deviceName: '10kV 1号进线柜',
+          pointType: 'YX',
+          pointId: 20000001,
+          pointName: '断路器分合位置',
+          level: 'info',
+          value: 1,
+          message: '【变位记录】10kV 1号进线柜 断路器由分闸变位为合闸',
+          acknowledged: false
+        }
+      ];
+      const picked = mockAlarms[Math.floor(Math.random() * mockAlarms.length)];
+      alarmList.value.unshift(picked);
+      if (alarmList.value.length > 500) {
+        alarmList.value.pop();
+      }
     }
-  });
+  }, 4000);
 });
 
 onBeforeUnmount(() => {
-  if (unsubscribeAlarm) {
-    unsubscribeAlarm();
+  if (intervalTimer) {
+    clearInterval(intervalTimer);
   }
 });
+
 </script>
 
 <template>
@@ -198,27 +237,27 @@ onBeforeUnmount(() => {
                 :class="isStreaming ? 'bg-emerald-950 text-emerald-300 border-emerald-500/40' : 'bg-slate-900 text-slate-400 border-slate-700'"
               >
                 <span class="w-1.5 h-1.5 rounded-full" :class="isStreaming ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'"></span>
-                {{ isStreaming ? 'UDS 持续推流中' : 'UDS 推流已关闭' }}
+                {{ isStreaming ? '实时告警监视中' : '告警监视已暂停' }}
               </span>
               <span v-if="unacknowledgedCount > 0" class="text-[10px] px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-500/40 font-mono font-bold">
                 {{ unacknowledgedCount }} 条未确认
               </span>
             </div>
             <p class="text-[11px] text-slate-400 font-mono mt-0.5">
-              基于 UDS 本地套接字 / 命名管道的毫秒级告警事件流推送机制
+              SCADA 厂站装置测点越限、保护跳闸与变位事件流监视
             </p>
           </div>
         </div>
 
         <div class="flex items-center gap-2.5">
-          <!-- 核心操作：开启 / 关闭 UDS 持续告警推送流 -->
+          <!-- 核心操作：开启 / 关闭 持续告警推送流 -->
           <button
             @click="toggleStreaming"
             class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-bold text-xs cursor-pointer transition-all border"
             :class="isStreaming ? 'bg-rose-950/80 border-rose-500 text-rose-300 hover:bg-rose-900' : 'bg-emerald-600 hover:bg-emerald-500 text-slate-950 shadow-md'"
           >
             <component :is="isStreaming ? Pause : Play" class="w-3.5 h-3.5" />
-            <span>{{ isStreaming ? '关闭 UDS 告警流' : '开启 UDS 持续告警流' }}</span>
+            <span>{{ isStreaming ? '暂停告警监视' : '恢复告警监视' }}</span>
           </button>
 
           <!-- 一键确认告警 -->

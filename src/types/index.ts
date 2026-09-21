@@ -230,8 +230,87 @@ export interface AnimationConfig {
 }
 
 // -------------------------------------------------------------
-// SCADA & Power Dispatching Device-Centric Dataset Data Models
-// (以装置号为初始单位，下挂遥测、遥信、电度、遥控、遥调)
+// New SCADA Standard Hierarchy: Facility (厂站) -> Bay (间隔) -> Device (装置) -> YC (遥测) / YX (遥信)
+// -------------------------------------------------------------
+export interface ScadaYcItem {
+  id: number;
+  name: string;
+  type?: number;
+  val?: number;
+  status?: number;
+  unit?: string;
+  [key: string]: any;
+}
+
+export interface ScadaYxItem {
+  id: number;
+  name: string;
+  type?: number;
+  val?: number;
+  status?: number;
+  q?: number;
+  statusText?: string;
+  [key: string]: any;
+}
+
+export interface ScadaDeviceNode {
+  dev_id: number | string;
+  dev_name: string;
+  cbty?: number;
+  yc_list: ScadaYcItem[];
+  yx_list: ScadaYxItem[];
+  [key: string]: any;
+}
+
+export interface ScadaBayNode {
+  bay_id: number | string;
+  bay_name: string;
+  devices: ScadaDeviceNode[];
+  [key: string]: any;
+}
+
+export interface ScadaFacilityNode {
+  fac_id: number | string;
+  fac_name: string;
+  bays: ScadaBayNode[];
+  [key: string]: any;
+}
+
+export interface ScadaConfigResponse {
+  code: number;
+  msg: string;
+  data: ScadaFacilityNode[];
+}
+
+export interface ScadaRealtimeRequest {
+  yc_ids: number[];
+  yx_ids: number[];
+}
+
+export interface ScadaRealtimeYcItem {
+  id: number;
+  status: number;
+  val: number;
+}
+
+export interface ScadaRealtimeYxItem {
+  id: number;
+  q?: number;
+  status?: number;
+  val: number;
+}
+
+export interface ScadaRealtimeResponse {
+  code: number;
+  msg: string;
+  data: {
+    yc: ScadaRealtimeYcItem[];
+    yx: ScadaRealtimeYxItem[];
+  };
+}
+
+// -------------------------------------------------------------
+// Legacy & Adapter Point Models
 // -------------------------------------------------------------
 
 // 1. 遥测 (YC / Telemetry - Analog): 点号, 系数, 单位, 数值等

@@ -1,0 +1,70 @@
+[
+  {
+    "fac_id": 4000003,
+    "fac_name": "苏州晟高",
+    "bays": [
+      {
+        "bay_id": 430000001,
+        "bay_name": "苏州晟高一体柜",
+        "devices": [
+          {
+            "dev_id": 7000001,
+            "dev_name": "6",
+            "cbty": 0,
+            "yc_list": [
+              { "id": 62000001, "name": "yc01", "type": 0 },
+              { "id": 62000002, "name": "yc02", "type": 0 },
+              { "id": 62000003, "name": "yc03", "type": 0 },
+              { "id": 62000004, "name": "yc04", "type": 0 },
+              { "id": 62000005, "name": "yc05", "type": 0 },
+              { "id": 62000006, "name": "yc06", "type": 0 },
+              { "id": 62000007, "name": "yc07", "type": 0 },
+              { "id": 62000008, "name": "yc08", "type": 0 },
+              { "id": 62000009, "name": "yc09", "type": 0 },
+              { "id": 62000010, "name": "yc10", "type": 0 },
+              { "id": 62000011, "name": "yc11", "type": 0 },
+              { "id": 62000012, "name": "yc12", "type": 0 },
+              { "id": 62000013, "name": "yc13", "type": 0 },
+              { "id": 62000014, "name": "yc14", "type": 0 },
+              { "id": 62000015, "name": "yc15", "type": 0 },
+              { "id": 62000016, "name": "yc16", "type": 0 },
+              { "id": 62000017, "name": "yc17", "type": 0 },
+              { "id": 62000018, "name": "yc19", "type": 0 },
+              { "id": 62000019, "name": "yc20", "type": 0 },
+              { "id": 62000020, "name": "yc21", "type": 0 },
+              { "id": 62000021, "name": "yc22", "type": 0 },
+              { "id": 62000022, "name": "yc23", "type": 0 },
+              { "id": 62000023, "name": "yc24", "type": 0 }
+            ],
+            "yx_list": [
+              { "id": 61000001, "name": "yx01", "type": 0 },
+              { "id": 61000002, "name": "yx02", "type": 0 },
+              { "id": 61000003, "name": "yx03", "type": 0 },
+              { "id": 61000004, "name": "yx04", "type": 0 },
+              { "id": 61000005, "name": "yx05", "type": 0 },
+              { "id": 61000006, "name": "yx06", "type": 0 },
+              { "id": 61000007, "name": "yx07", "type": 0 },
+              { "id": 61000008, "name": "yx08", "type": 0 },
+              { "id": 61000009, "name": "yx09", "type": 0 },
+              { "id": 61000010, "name": "yx10", "type": 0 },
+              { "id": 61000011, "name": "yx11", "type": 0 },
+              { "id": 61000012, "name": "yx12", "type": 0 },
+              { "id": 61000013, "name": "yx13", "type": 0 },
+              { "id": 61000014, "name": "yx14", "type": 0 },
+              { "id": 61000015, "name": "yx15", "type": 0 },
+              { "id": 61000016, "name": "yx16", "type": 0 },
+              { "id": 61000017, "name": "yx17", "type": 0 },
+              { "id": 61000018, "name": "yx18", "type": 0 },
+              { "id": 61000019, "name": "yx19", "type": 0 },
+              { "id": 61000020, "name": "yx20", "type": 0 },
+              { "id": 61000021, "name": "yx21", "type": 0 },
+              { "id": 61000022, "name": "yx22", "type": 0 },
+              { "id": 61000023, "name": "yx23", "type": 0 },
+              { "id": 61000024, "name": "yx24", "type": 0 }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

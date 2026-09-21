@@ -42,6 +42,7 @@ import {
   setIndexScreen
 } from './utils/screenFileService';
 import { fetchAllDatasetsFromDisk } from './utils/datasetFileService';
+import { loadLocalScadaConfigFile } from './utils/scadaClient';
 import { currentUser, canEditCanvas, isLoggedIn, logoutUser } from './utils/auth';
 import { Sparkles, Layers, Box, Zap, HardDrive } from 'lucide-vue-next';
 
@@ -1073,20 +1074,16 @@ const handleDataAssociationSubmit = (payload: {
       pointId,
       pointName,
       valueKey: pointKey,
-      unit: point.unit || comp.data.unit || ''
+      unit: ''
     };
     comp.data.bindings = {
       ...comp.data.bindings,
       value: pointKey
     };
-    if (point.value !== undefined) {
-      comp.data.value = point.value;
-    }
-    if (point.unit) {
-      comp.data.unit = point.unit;
-      if (comp.customProps) {
-        comp.customProps.unit = point.unit;
-      }
+    // 关联测点成功后，此时尚未有采集数据，全部默认按照 0 显示
+    comp.data.value = 0;
+    if (comp.customProps) {
+      comp.customProps.value = 0;
     }
   } else if (category === 'yx') {
     const pointKey = `${deviceId}_YX_${pointId}`;
@@ -1103,12 +1100,15 @@ const handleDataAssociationSubmit = (payload: {
       ...comp.data.bindings,
       state: pointKey
     };
-    if (point.value !== undefined) {
-      comp.data.state = point.value;
-      comp.data.value = point.value;
-      if (comp.states && comp.states.length > 0) {
-        comp.activeState = String(point.value);
-      }
+    // 遥信测点默认初始状态为 0 (分闸/试验位)
+    comp.data.state = 0;
+    comp.data.value = 0;
+    if (comp.customProps) {
+      comp.customProps.state = 0;
+      comp.customProps.value = 0;
+    }
+    if (comp.states && comp.states.length > 0) {
+      comp.activeState = '0';
     }
   } else if (category === 'dd') {
     const pointKey = `${deviceId}_DD_${pointId}`;
@@ -1120,20 +1120,15 @@ const handleDataAssociationSubmit = (payload: {
       pointId,
       pointName,
       valueKey: pointKey,
-      unit: point.unit || comp.data.unit || ''
+      unit: ''
     };
     comp.data.bindings = {
       ...comp.data.bindings,
       value: pointKey
     };
-    if (point.value !== undefined) {
-      comp.data.value = point.value;
-    }
-    if (point.unit) {
-      comp.data.unit = point.unit;
-      if (comp.customProps) {
-        comp.customProps.unit = point.unit;
-      }
+    comp.data.value = 0;
+    if (comp.customProps) {
+      comp.customProps.value = 0;
     }
   } else if (category === 'yk') {
     const ykKey = `${deviceId}_YK_${pointId}`;
@@ -1345,6 +1340,13 @@ onMounted(async () => {
     }
   } catch (err) {
     console.warn('[SCADA] 自动加载 data/ 目录数据集失败:', err);
+  }
+
+  // 4. 启动时加载本地持久化 scada_config.json 测点配置树 (只加载一次)
+  try {
+    await loadLocalScadaConfigFile();
+  } catch (err) {
+    console.warn('[SCADA] 启动加载本地 scada_config.json 失败:', err);
   }
 
   recordHistory();
