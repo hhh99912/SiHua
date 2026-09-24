@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import { ScreenComponent, DatasetItem } from '../../types';
 import { ArrowRight, Power } from 'lucide-vue-next';
+import { isComponentBoundToControlOrRegulation } from '../../utils/scadaClient';
 
 interface Props {
   component: ScreenComponent;
@@ -83,14 +84,7 @@ const triggerAction = () => {
     if (isJumpAction.value && action.value.targetScreenId) {
       emit('jump:screen', action.value.targetScreenId);
       window.dispatchEvent(new CustomEvent('datav:jump:screen', { detail: action.value.targetScreenId }));
-    } else if (action.value.type === 'tele-control') {
-      const devId = action.value.deviceId || props.component.data?.mapping?.deviceId;
-      const ptId = action.value.pointId || props.component.data?.mapping?.pointId;
-      window.dispatchEvent(new CustomEvent('scada:open:control', { detail: { deviceId: devId, pointId: ptId, type: 'control' } }));
-    } else if (action.value.type === 'tele-regulation') {
-      const devId = action.value.deviceId || props.component.data?.mapping?.deviceId;
-      const ptId = action.value.pointId || props.component.data?.mapping?.pointId;
-      window.dispatchEvent(new CustomEvent('scada:open:control', { detail: { deviceId: devId, pointId: ptId, type: 'regulation' } }));
+      return;
     } else if (action.value.type === 'dispatch-command') {
       window.dispatchEvent(new CustomEvent('datav:command', { 
         detail: { 
@@ -98,14 +92,38 @@ const triggerAction = () => {
           command: action.value.commandValue || 'TRIGGER' 
         } 
       }));
+      return;
     }
+  }
+
+  const bound = isComponentBoundToControlOrRegulation(props.component);
+  if (bound.isBound) {
+    const devId = String(bound.device?.dev_id || bound.device?.id || action.value?.deviceId || props.component.data?.mapping?.deviceId || '7000001');
+    const ptId = bound.pointId || action.value?.pointId || null;
+    const targetVId = bound.targetVerificationPointId || action.value?.targetVerificationPointId || null;
+    const type = bound.type || 'yk';
+    window.dispatchEvent(new CustomEvent('scada:open:control', {
+      detail: {
+        deviceId: devId,
+        pointId: ptId,
+        targetVerificationPointId: targetVId,
+        type
+      }
+    }));
   } else {
-    // Default SCADA behavior: open control modal for bound device if configured
-    const deviceId = props.component.data?.mapping?.deviceId;
-    const pointId = props.component.data?.mapping?.pointId;
-    if (deviceId && pointId) {
-      window.dispatchEvent(new CustomEvent('scada:open:control', { detail: { deviceId, pointId, type: 'control' } }));
-    }
+    // Default fallback
+    const deviceId = props.component.data?.mapping?.deviceId || action.value?.deviceId || '7000001';
+    const pointId = props.component.data?.mapping?.pointId || action.value?.pointId || null;
+    const targetVId = props.component.data?.mapping?.targetVerificationPointId || action.value?.targetVerificationPointId || null;
+    const type = props.component.data?.mapping?.pointCategory === 'teleRegulation' || action.value?.type === 'tele-regulation' ? 'yt' : 'yk';
+    window.dispatchEvent(new CustomEvent('scada:open:control', {
+      detail: {
+        deviceId,
+        pointId,
+        targetVerificationPointId: targetVId,
+        type
+      }
+    }));
   }
 };
 

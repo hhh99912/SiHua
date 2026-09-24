@@ -235,9 +235,13 @@ export interface AnimationConfig {
 export interface ScadaYcItem {
   id: number;
   name: string;
+  alias?: string;
   type?: number;
+  type_name?: string;
   val?: number;
+  value?: number;
   status?: number;
+  status_name?: string;
   unit?: string;
   [key: string]: any;
 }
@@ -245,67 +249,145 @@ export interface ScadaYcItem {
 export interface ScadaYxItem {
   id: number;
   name: string;
+  alias?: string;
   type?: number;
+  type_name?: string;
   val?: number;
+  value?: number;
   status?: number;
+  status_name?: string;
   q?: number;
   statusText?: string;
   [key: string]: any;
 }
 
+export interface ScadaYkItem {
+  id: number;
+  name: string;
+  alias?: string;
+  type?: number;
+  type_name?: string;
+  channel?: number;
+  targetVerificationPointId?: number; // 关联返校遥信点
+  options?: Array<{ label: string; value: string | number }>;
+  [key: string]: any;
+}
+
+export interface ScadaYtItem {
+  id: number;
+  name: string;
+  alias?: string;
+  type?: number;
+  type_name?: string;
+  channel?: number;
+  targetVerificationPointId?: number; // 关联返校遥测点
+  min?: number;
+  max?: number;
+  step?: number;
+  unit?: string;
+  [key: string]: any;
+}
+
+export interface ScadaDdItem {
+  id: number;
+  name: string;
+  alias?: string;
+  type?: number;
+  type_name?: string;
+  val?: number;
+  value?: number;
+  status?: number;
+  status_name?: string;
+  unit?: string;
+  [key: string]: any;
+}
+
 export interface ScadaDeviceNode {
+  id?: number | string;
   dev_id: number | string;
+  name?: string;
   dev_name: string;
+  alias?: string;
   cbty?: number;
+  cbty_name?: string;
+  state?: number;
+  status?: number;
   yc_list: ScadaYcItem[];
   yx_list: ScadaYxItem[];
+  yk_list?: ScadaYkItem[];
+  yt_list?: ScadaYtItem[];
+  dd_list?: ScadaDdItem[];
+  yc_points?: ScadaYcItem[];
+  yx_points?: ScadaYxItem[];
+  yk_points?: ScadaYkItem[];
+  yt_points?: ScadaYtItem[];
+  dd_points?: ScadaDdItem[];
   [key: string]: any;
 }
 
 export interface ScadaBayNode {
+  id?: number | string;
   bay_id: number | string;
+  name?: string;
   bay_name: string;
+  alias?: string;
+  type?: number;
   devices: ScadaDeviceNode[];
+  cb_devices?: ScadaDeviceNode[];
   [key: string]: any;
 }
 
 export interface ScadaFacilityNode {
+  id?: number | string;
   fac_id: number | string;
+  name?: string;
   fac_name: string;
+  alias?: string;
   bays: ScadaBayNode[];
   [key: string]: any;
 }
 
 export interface ScadaConfigResponse {
-  code: number;
-  msg: string;
-  data: ScadaFacilityNode[];
+  version?: string;
+  statistics?: Record<string, number>;
+  code?: number;
+  msg?: string;
+  data?: ScadaFacilityNode[];
+  facilities?: ScadaFacilityNode[];
 }
 
 export interface ScadaRealtimeRequest {
-  yc_ids: number[];
-  yx_ids: number[];
+  yc_ids?: number[];
+  yx_ids?: number[];
+  dd_ids?: number[];
 }
 
 export interface ScadaRealtimeYcItem {
   id: number;
-  status: number;
-  val: number;
+  status?: number;
+  val?: number;
 }
 
 export interface ScadaRealtimeYxItem {
   id: number;
   q?: number;
   status?: number;
-  val: number;
+  val?: number;
+}
+
+export interface ScadaRealtimeDdItem {
+  id: number;
+  status?: number;
+  val?: number;
 }
 
 export interface ScadaRealtimeResponse {
   code: number;
   msg: string;
-  data: {
-    yc: ScadaRealtimeYcItem[];
-    yx: ScadaRealtimeYxItem[];
+  data?: {
+    yc?: ScadaRealtimeYcItem[];
+    yx?: ScadaRealtimeYxItem[];
+    dd?: ScadaRealtimeDdItem[];
   };
 }
 
@@ -418,6 +500,17 @@ export interface DataFieldMapping {
   targetYcPointId?: number;
   ykPointId?: number;
   ytPointId?: number;
+  targetVerificationPointId?: number | string; // 关联返校校验测点 ID (遥信 YX 或 遥测 YC)
+  targetVerificationType?: 'yx' | 'yc'; // 返校测点类型
+  targetVerificationName?: string; // 返校测点名称
+  verificationTimeout?: number; // 返校校验超时时间 (秒，默认 10)
+  yk_id?: number | string; // SCADA YK 点号
+  yt_id?: number | string; // SCADA YT 点号
+  yk_action?: 'prev' | 'exec' | 'cancel' | 'direct';
+  yk_state?: string; // 'close' | 'open' | 'tqh' | 'yyh' | 'wyh' | 'hhh' | 'tsh' | 'fg' | 'st'
+  yt_oper?: 'adjust' | 'up' | 'down' | 'stop';
+  yt_val?: number;
+  yt_old_val?: number;
 
   // DataV Structured JSON Dataset Mapping (结构化/复合数据集关联)
   datasetMode?: 'scada-point' | 'json-dataset';
@@ -441,7 +534,12 @@ export interface ComponentAction {
   targetScreenId?: string;
   deviceId?: string;
   pointId?: string | number;
-  controlValue?: number;
+  yk_id?: number | string;
+  yt_id?: number | string;
+  targetVerificationPointId?: number | string;
+  targetVerificationType?: 'yx' | 'yc';
+  verificationTimeout?: number;
+  controlValue?: number | string;
   regulationValue?: number;
   commandValue?: any;
   url?: string;

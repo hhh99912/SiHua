@@ -20,6 +20,7 @@ import {
   getStraightLinePoints, 
   getPolylinePoints 
 } from '../utils/linePathUtils';
+import { isComponentBoundToControlOrRegulation } from '../utils/scadaClient';
 
 interface Props {
   screen: ScreenConfig;
@@ -71,7 +72,7 @@ const emit = defineEmits<{
   (e: 'finish:draw'): void;
   (e: 'undo'): void;
   (e: 'redo'): void;
-  (e: 'open:control-modal', deviceId?: string): void;
+  (e: 'open:control-modal', payload?: any): void;
   (e: 'open:property-inspector'): void;
   (e: 'open:data-association', component?: ScreenComponent): void;
   (e: 'open:batch-association', payload: { components: ScreenComponent[]; category: 'yc' | 'yx' }): void;
@@ -1101,9 +1102,14 @@ const handleCanvasClick = (e: MouseEvent) => {
       placeDrawing.value.currentY = coords.y;
       placeDrawing.value.def = props.activeComponentDef;
     } else {
-      placeDrawing.value.currentX = coords.x;
-      placeDrawing.value.currentY = coords.y;
-      finishPlaceDrawing();
+      const distW = Math.abs(coords.x - placeDrawing.value.startX);
+      const distH = Math.abs(coords.y - placeDrawing.value.startY);
+      // 必须产生有效位移才确定终止点，避免在起点原地误触直接完成
+      if (distW >= 10 || distH >= 10) {
+        placeDrawing.value.currentX = coords.x;
+        placeDrawing.value.currentY = coords.y;
+        finishPlaceDrawing();
+      }
     }
     return;
   }
@@ -2047,14 +2053,6 @@ defineExpose({
       :cursorPos="mousePos"
     />
 
-    <!-- Optional: Floating Polyline Drawing Hint -->
-    <div 
-      v-if="drawTool === 'draw-polyline'" 
-      class="absolute top-4 left-1/2 -translate-x-1/2 z-40 px-3 py-1.5 bg-[#132745]/90 border border-amber-400/70 text-amber-300 rounded-lg text-xs font-mono shadow-xl backdrop-blur-sm pointer-events-none flex items-center gap-2"
-    >
-      <span>⚡ 折线绘制中: 单击添加拐点，双击或回车结束 (ESC取消{{ orthogonalLock ? ', 正交锁定' : '' }})</span>
-    </div>
-
     <!-- Infinite Canvas Viewport Stage -->
     <div 
       ref="infinitePlaneRef"
@@ -2821,7 +2819,24 @@ defineExpose({
           <!-- SCADA YK/YT Execution -->
           <button
             v-if="primarySelectedHasControl"
-            @click="emit('open:control-modal', effectivePrimaryComponent?.data?.mapping?.deviceId); closeContextMenu();"
+            @click="() => {
+              const comp = effectivePrimaryComponent;
+              const bound = isComponentBoundToControlOrRegulation(comp);
+              const data = comp?.data || {};
+              const mapping = data.mapping || {};
+              const action = data.action;
+              const devId = String(bound.device?.dev_id || bound.device?.id || action?.deviceId || mapping.deviceId || '7000001');
+              const ptId = bound.pointId || action?.pointId || action?.yk_id || action?.yt_id || mapping.pointId || mapping.yk_id || mapping.yt_id || null;
+              const targetVId = bound.targetVerificationPointId || action?.targetVerificationPointId || action?.targetPointId || mapping.targetVerificationPointId || mapping.targetYcPointId || null;
+              const type = bound.type || (mapping.pointCategory === 'teleRegulation' || action?.type === 'tele-regulation' ? 'yt' : 'yk');
+              emit('open:control-modal', {
+                deviceId: devId,
+                pointId: ptId,
+                targetVerificationPointId: targetVId,
+                type
+              });
+              closeContextMenu();
+            }"
             class="w-full text-left px-3 py-1.5 bg-[#fbbf24]/15 hover:bg-[#fbbf24]/25 border border-[#fbbf24]/40 rounded-lg text-[#fbbf24] hover:text-[#fde047] cursor-pointer flex items-center justify-between group transition-colors"
           >
             <div class="flex items-center gap-2.5">

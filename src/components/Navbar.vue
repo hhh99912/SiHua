@@ -109,7 +109,6 @@ const emit = defineEmits<{
   (e: 'open:preview'): void;
   (e: 'open:datasets'): void;
   (e: 'open:control'): void;
-  (e: 'open:json'): void;
   (e: 'open:disk-storage'): void;
   (e: 'open:symbols'): void;
   (e: 'open:platform'): void;
@@ -192,19 +191,6 @@ onBeforeUnmount(() => {
 
       <!-- Right: Main Project Features, Auth & Big Screen Preview -->
       <div class="flex items-center gap-1.5">
-        <!-- Real-time Simulation Switch -->
-        <button
-          @click="emit('toggle:streaming')"
-          class="p-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer border"
-          :class="isStreaming 
-            ? 'bg-emerald-950 border-emerald-400 text-emerald-200 shadow-[0_0_10px_rgba(16,185,129,0.4)]' 
-            : 'bg-[#173055] border-cyan-500/60 text-cyan-200 hover:border-cyan-300 hover:text-white'"
-          :title="isStreaming ? '数据流：运行中 (点击暂停)' : '数据流：已暂停 (点击运行)'"
-        >
-          <Pause v-if="isStreaming" class="w-3.5 h-3.5 text-emerald-300" />
-          <Play v-else class="w-3.5 h-3.5 text-cyan-300" />
-        </button>
-
         <!-- Dataset Manager -->
         <button
           @click="emit('open:datasets')"
@@ -212,15 +198,6 @@ onBeforeUnmount(() => {
           title="数据集管理：配置测点、模拟点与装置阵列"
         >
           <Database class="w-3.5 h-3.5 text-cyan-300" />
-        </button>
-
-        <!-- SCADA Tele-Control Center (遥控遥调执行) -->
-        <button
-          @click="emit('open:control')"
-          class="p-1.5 rounded-lg bg-amber-950/60 border border-amber-400 hover:border-amber-300 hover:bg-amber-900 text-amber-200 transition-all cursor-pointer shadow-[0_0_10px_rgba(245,158,11,0.25)]"
-          title="SCADA 遥控分合闸与遥调指令中心 (YK / YT)"
-        >
-          <Radio class="w-3.5 h-3.5 text-amber-300" />
         </button>
 
         <!-- Custom Symbol Library Button -->
@@ -232,15 +209,6 @@ onBeforeUnmount(() => {
           <FolderOpen class="w-3.5 h-3.5 text-cyan-300" />
         </button>
 
-        <!-- JSON Schema Export / Import -->
-        <button
-          @click="emit('open:json')"
-          class="p-1.5 rounded-lg bg-[#173055] border border-cyan-400 hover:border-cyan-300 hover:text-white text-cyan-200 transition-all cursor-pointer shadow-[0_0_6px_rgba(0,242,255,0.2)]"
-          title="工程 JSON 架构导入与导出"
-        >
-          <Code class="w-3.5 h-3.5 text-cyan-300" />
-        </button>
-
         <!-- Disk Storage Files per Screen -->
         <button
           @click="emit('open:disk-storage')"
@@ -248,24 +216,6 @@ onBeforeUnmount(() => {
           title="磁盘大屏存储管理 (每个大屏独立存储为同名 JSON 文件)"
         >
           <HardDrive class="w-3.5 h-3.5 text-cyan-300" />
-        </button>
-
-        <!-- Multi-Platform Desktop & Packaging Hub -->
-        <button
-          @click="emit('open:platform')"
-          class="p-1.5 rounded-lg bg-[#173055] border border-cyan-400 hover:border-cyan-300 hover:text-white text-cyan-200 transition-all cursor-pointer relative shadow-[0_0_6px_rgba(0,242,255,0.2)]"
-          :title="`跨平台桌面端打包分发中心 (当前环境: ${currentPlatform.toUpperCase()})`"
-        >
-          <Laptop class="w-3.5 h-3.5 text-cyan-300" />
-        </button>
-
-        <!-- Clear Canvas -->
-        <button
-          @click="emit('clear:canvas')"
-          class="p-1.5 rounded-lg bg-red-950/40 border border-red-400 hover:border-red-300 hover:bg-red-900/60 text-red-200 hover:text-white transition-colors cursor-pointer shadow-[0_0_6px_rgba(239,68,68,0.2)]"
-          title="清空当前画布中所有元件"
-        >
-          <Trash2 class="w-3.5 h-3.5 text-red-300" />
         </button>
 
         <!-- User Auth Status / Switcher -->

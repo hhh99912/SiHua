@@ -41,12 +41,15 @@ import {
   getAssociatedPointIdsFromComponents,
   getAllPointIdsFromFacilities,
   scadaFacilities,
-  invalidateAssociatedPointsCache
+  invalidateAssociatedPointsCache,
+  isComponentBoundToControlOrRegulation,
+  findScadaPointDef
 } from '../utils/scadaClient';
 import WidgetRenderer from './widgets/WidgetRenderer.vue';
 import HistoryCurveModal from './HistoryCurveModal.vue';
 import RealtimeAlarmModal from './RealtimeAlarmModal.vue';
-import ScadaControlModal from './ScadaControlModal.vue';
+import ScadaTeleControlModal from './ScadaTeleControlModal.vue';
+import ScadaTeleRegulationModal from './ScadaTeleRegulationModal.vue';
 import LoginModal from './LoginModal.vue';
 
 interface Props {
@@ -87,7 +90,9 @@ const historyPointId = ref<number>(1);
 const showAlarmModal = ref(false);
 const unacknowledgedAlarmCount = ref(2);
 
-const showControlModal = ref(false);
+// Split Modals State for YK and YT
+const showTeleControlModal = ref(false);
+const showTeleRegulationModal = ref(false);
 const controlDeviceId = ref<string>('DEV-101');
 
 const showLoginModal = ref(false);
@@ -231,14 +236,39 @@ const handleExitPreview = () => {
 // Component click handler for screen jump & interaction actions
 const handlePreviewCompClick = (comp: ScreenComponent) => {
   const act = comp.data?.action;
-  if (!act || act.type === 'none') return;
-  if ((act.type === 'jump-screen' || act.type === 'switch-screen') && act.targetScreenId) {
+  const mapping = comp.data?.mapping || {};
+  const bound = isComponentBoundToControlOrRegulation(comp);
+
+  if ((act?.type === 'jump-screen' || act?.type === 'switch-screen') && act.targetScreenId) {
     emit('switch:screen', act.targetScreenId);
-  } else if (act.type === 'link' && act.url) {
+    return;
+  } else if (act?.type === 'link' && act.url) {
     window.open(act.url, '_blank');
-  } else if (act.type === 'tele-control' || act.type === 'tele-regulation') {
-    controlDeviceId.value = act.deviceId || 'DEV-101';
-    showControlModal.value = true;
+    return;
+  }
+
+  if (bound.isBound) {
+    controlDeviceId.value = String(bound.device?.dev_id || bound.device?.id || act?.deviceId || mapping.deviceId || '7000001');
+    controlInitialPointId.value = bound.pointId || null;
+    controlInitialTargetVerificationPointId.value = bound.targetVerificationPointId || null;
+    if (bound.type === 'yt') {
+      showTeleRegulationModal.value = true;
+    } else {
+      showTeleControlModal.value = true;
+    }
+    return;
+  }
+
+  if (act?.type === 'tele-control') {
+    controlDeviceId.value = String(act.deviceId || mapping.deviceId || '7000001');
+    controlInitialPointId.value = act.pointId || act.yk_id || mapping.pointId || mapping.yk_id || null;
+    controlInitialTargetVerificationPointId.value = act.targetPointId || act.targetVerificationPointId || mapping.targetVerificationPointId || null;
+    showTeleControlModal.value = true;
+  } else if (act?.type === 'tele-regulation') {
+    controlDeviceId.value = String(act.deviceId || mapping.deviceId || '7000001');
+    controlInitialPointId.value = act.pointId || act.yt_id || mapping.pointId || mapping.yt_id || null;
+    controlInitialTargetVerificationPointId.value = act.targetPointId || act.targetVerificationPointId || mapping.targetVerificationPointId || null;
+    showTeleRegulationModal.value = true;
   }
 };
 
@@ -451,9 +481,26 @@ const closeContextMenu = () => {
 };
 
 // Context Menu Action Dispatchers
+const controlInitialType = ref<'yk' | 'yt'>('yk');
+const controlInitialPointId = ref<number | null>(null);
+const controlInitialTargetVerificationPointId = ref<number | null>(null);
+
+const targetControlInfo = computed(() => {
+  return isComponentBoundToControlOrRegulation(contextMenu.value.targetComponent);
+});
+
 const handleOpenControlFromMenu = () => {
-  controlDeviceId.value = contextMenu.value.targetDeviceId || 'DEV-101';
-  showControlModal.value = true;
+  const bound = isComponentBoundToControlOrRegulation(contextMenu.value.targetComponent);
+  controlInitialType.value = bound.type || 'yk';
+  controlInitialPointId.value = bound.pointId || null;
+  controlInitialTargetVerificationPointId.value = bound.targetVerificationPointId || null;
+  controlDeviceId.value = String(bound.device?.dev_id || bound.device?.id || contextMenu.value.targetDeviceId || '7000001');
+  
+  if (bound.type === 'yt') {
+    showTeleRegulationModal.value = true;
+  } else {
+    showTeleControlModal.value = true;
+  }
   closeContextMenu();
 };
 
@@ -475,7 +522,13 @@ const handleGlobalJump = (e: any) => {
 const handleGlobalControl = (e: any) => {
   if (e.detail) {
     controlDeviceId.value = e.detail.deviceId || 'DEV-101';
-    showControlModal.value = true;
+    controlInitialPointId.value = e.detail.pointId || null;
+    controlInitialTargetVerificationPointId.value = e.detail.targetVerificationPointId || null;
+    if (e.detail.type === 'yt') {
+      showTeleRegulationModal.value = true;
+    } else {
+      showTeleControlModal.value = true;
+    }
   }
 };
 
@@ -682,17 +735,22 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <!-- Section 2: SCADA Operations (Direct YK/YT on clicked target) -->
-      <div class="py-1">
+      <!-- Section 2: SCADA Operations (只给关联了遥控遥调的组件加上右击菜单遥控遥调选择) -->
+      <div v-if="targetControlInfo.isBound" class="py-1">
         <button
           @click="handleOpenControlFromMenu"
           class="w-full px-3 py-1.5 text-left bg-transparent hover:bg-amber-500/20 text-amber-200 hover:text-amber-100 flex items-center justify-between cursor-pointer group transition-colors"
         >
           <span class="flex items-center gap-2">
-            <Zap class="w-4 h-4 text-amber-300 stroke-[1.75]" />
-            <span class="text-amber-100 group-hover:text-white font-normal tracking-wide text-[13px]">SCADA 遥控/遥调置数</span>
+            <Zap v-if="targetControlInfo.type === 'yk'" class="w-4 h-4 text-cyan-300 stroke-[1.75]" />
+            <Sliders v-else class="w-4 h-4 text-amber-300 stroke-[1.75]" />
+            <span class="text-amber-100 group-hover:text-white font-normal tracking-wide text-[13px]">
+              {{ targetControlInfo.type === 'yk' ? 'SCADA 遥控操作 (YK)' : 'SCADA 遥调置数 (YT)' }}
+            </span>
           </span>
-          <span class="text-[11px] text-amber-300/80 font-mono font-normal">YK/YT</span>
+          <span class="text-[11px] text-amber-300/80 font-mono font-normal">
+            {{ targetControlInfo.type === 'yk' ? `[YK_${targetControlInfo.pointId}]` : `[YT_${targetControlInfo.pointId}]` }}
+          </span>
         </button>
       </div>
 
@@ -713,18 +771,6 @@ onBeforeUnmount(() => {
 
       <!-- Section 4: View & Ratio Settings -->
       <div class="py-1">
-        <button
-          @click="emit('toggle:streaming'); closeContextMenu();"
-          class="w-full px-3 py-1.5 text-left bg-transparent hover:bg-emerald-500/20 flex items-center justify-between cursor-pointer transition-colors"
-          :class="isStreaming ? 'text-emerald-300' : 'text-slate-300'"
-        >
-          <span class="flex items-center gap-2 font-normal">
-            <Pause v-if="isStreaming" class="w-3.5 h-3.5 text-emerald-300 stroke-[1.75]" />
-            <Play v-else class="w-3.5 h-3.5 text-slate-400 stroke-[1.75]" />
-            <span :class="isStreaming ? 'text-emerald-200' : 'text-slate-300'" class="font-normal tracking-wide text-[13px]">{{ isStreaming ? '暂停实时数据流' : '恢复实时数据流' }}</span>
-          </span>
-        </button>
-
         <!-- Scale Mode Submenu / Toggle (No heavy boxes) -->
         <div class="px-3 py-1.5 flex items-center justify-between text-[12px] text-slate-200">
           <span class="font-normal text-slate-200">显示比例:</span>
@@ -919,13 +965,24 @@ onBeforeUnmount(() => {
       @close="showAlarmModal = false"
     />
 
-    <!-- SCADA Control Modal -->
-    <ScadaControlModal
-      v-if="showControlModal"
-      :visible="showControlModal"
-      :initial-device-id="controlDeviceId"
-      :datasets="datasets"
-      @close="showControlModal = false"
+    <!-- SCADA YK Control Modal (DO 遥控专职弹窗) -->
+    <ScadaTeleControlModal
+      :visible="showTeleControlModal"
+      :initialDeviceId="controlDeviceId"
+      :initialPointId="controlInitialPointId"
+      :initialTargetVerificationPointId="controlInitialTargetVerificationPointId"
+      @close="showTeleControlModal = false"
+      @success="pollAssociatedRealtimeData"
+    />
+
+    <!-- SCADA YT Regulation Modal (AO 遥调专职弹窗) -->
+    <ScadaTeleRegulationModal
+      :visible="showTeleRegulationModal"
+      :initialDeviceId="controlDeviceId"
+      :initialPointId="controlInitialPointId"
+      :initialTargetVerificationPointId="controlInitialTargetVerificationPointId"
+      @close="showTeleRegulationModal = false"
+      @success="pollAssociatedRealtimeData"
     />
 
     <!-- User Authentication Modal -->

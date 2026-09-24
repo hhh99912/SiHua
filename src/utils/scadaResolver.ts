@@ -3,11 +3,13 @@ import {
   scadaFacilities,
   rawYcValues,
   rawYxValues,
+  rawDdValues,
   rawYcQuality,
   rawYxQuality,
   scadaLiveTick,
   cachedRealtimeYc,
   cachedRealtimeYx,
+  cachedRealtimeDd,
   getScadaPointLiveValue
 } from './scadaClient';
 
@@ -266,7 +268,7 @@ export function syncDatasetFastIndex(datasets?: DatasetItem[]) {
               const numVal = Number(pt.value) || 0;
               globalPointIndex.set(`${devId}_DD_${pt.pointId}`, numVal);
               if (!isNaN(ptId) && ptId > 0) {
-                rawYcValues.set(ptId, numVal);
+                rawDdValues.set(ptId, numVal);
               }
             }
           }
@@ -307,9 +309,12 @@ export function resolveDataPointValue(
       const v = rawYxValues.get(parsed.pointId);
       if (v !== undefined) return v;
     } else if (parsed.category === 'dd') {
-      const v = rawYcValues.get(parsed.pointId);
+      const v = rawDdValues.get(parsed.pointId);
       if (v !== undefined) return v;
     } else {
+      if (rawDdValues.has(parsed.pointId)) {
+        return rawDdValues.get(parsed.pointId);
+      }
       if (rawYcValues.has(parsed.pointId)) {
         return rawYcValues.get(parsed.pointId);
       }

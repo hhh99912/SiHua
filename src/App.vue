@@ -24,10 +24,10 @@ import ScreenManagerBar from './components/ScreenManagerBar.vue';
 import CustomSymbolModal from './components/CustomSymbolModal.vue';
 import SaveSymbolModal from './components/SaveSymbolModal.vue';
 import DatasetManagerModal from './components/DatasetManagerModal.vue';
-import JsonExportImportModal from './components/JsonExportImportModal.vue';
 import PreviewScreen from './components/PreviewScreen.vue';
 import DesktopPlatformModal from './components/DesktopPlatformModal.vue';
-import ScadaControlModal from './components/ScadaControlModal.vue';
+import ScadaTeleControlModal from './components/ScadaTeleControlModal.vue';
+import ScadaTeleRegulationModal from './components/ScadaTeleRegulationModal.vue';
 import ScadaBatchPointModal from './components/ScadaBatchPointModal.vue';
 import DataAssociationModal from './components/DataAssociationModal.vue';
 import BatchDataAssociationModal from './components/BatchDataAssociationModal.vue';
@@ -90,8 +90,10 @@ watch(selectedIds, (newIds) => {
 // Modals
 const showDatasetsModal = ref(false);
 const showControlModal = ref(false);
+const showRegulationModal = ref(false);
 const controlInitialDeviceId = ref<string | undefined>(undefined);
-const showJsonModal = ref(false);
+const controlInitialPointId = ref<number | string | null>(null);
+const controlInitialTargetVerificationPointId = ref<number | string | null>(null);
 const showPreviewModal = ref(true); // Automatically enter SCADA Dashboard on startup
 const showSymbolModal = ref(false);
 const showSaveSymbolModal = ref(false);
@@ -1149,18 +1151,25 @@ const handleDataAssociationSubmit = (payload: {
       pointCategory: 'teleControl',
       pointId,
       ykPointId: pointId,
-      pointName
+      yk_id: pointId,
+      pointName,
+      targetVerificationPointId: payload.targetVerificationPointId,
+      targetVerificationType: 'yx',
+      verificationTimeout: payload.verificationTimeout || 10
     };
     comp.data.action = {
       type: 'tele-control',
       deviceId,
       pointId,
-      command: point.command || 'trip-close',
-      targetPointId: payload.targetVerificationPointId
+      yk_id: pointId,
+      targetPointId: payload.targetVerificationPointId,
+      targetVerificationPointId: payload.targetVerificationPointId,
+      targetVerificationType: 'yx',
+      verificationTimeout: payload.verificationTimeout || 10
     };
     if (payload.targetVerificationPointId) {
       const yxKey = `${deviceId}_YX_${payload.targetVerificationPointId}`;
-      comp.data.mapping.targetYxPointId = payload.targetVerificationPointId;
+      comp.data.mapping.targetYxPointId = Number(payload.targetVerificationPointId);
       comp.data.mapping.stateKey = yxKey;
       comp.data.bindings = {
         ...comp.data.bindings,
@@ -1176,17 +1185,25 @@ const handleDataAssociationSubmit = (payload: {
       pointCategory: 'teleRegulation',
       pointId,
       ytPointId: pointId,
-      pointName
+      yt_id: pointId,
+      pointName,
+      targetVerificationPointId: payload.targetVerificationPointId,
+      targetVerificationType: 'yc',
+      verificationTimeout: payload.verificationTimeout || 10
     };
     comp.data.action = {
       type: 'tele-regulation',
       deviceId,
       pointId,
-      targetPointId: payload.targetVerificationPointId
+      yt_id: pointId,
+      targetPointId: payload.targetVerificationPointId,
+      targetVerificationPointId: payload.targetVerificationPointId,
+      targetVerificationType: 'yc',
+      verificationTimeout: payload.verificationTimeout || 10
     };
     if (payload.targetVerificationPointId) {
       const ycKey = `${deviceId}_YC_${payload.targetVerificationPointId}`;
-      comp.data.mapping.targetYcPointId = payload.targetVerificationPointId;
+      comp.data.mapping.targetYcPointId = Number(payload.targetVerificationPointId);
       comp.data.mapping.valueKey = ycKey;
       comp.data.bindings = {
         ...comp.data.bindings,
@@ -1307,38 +1324,6 @@ const handleSymbolSaved = (sym: CustomSymbolDef) => {
   showDiskNotification(`图元「${sym.name}」已封装成功并保存至电力一次系统物料库`);
 };
 
-// Import Project JSON
-const handleImportProject = (data: any) => {
-  if (Array.isArray(data.screens) && data.screens.length > 0) {
-    screens.value = JSON.parse(JSON.stringify(data.screens));
-    const targetId = data.activeScreenId || data.screens[0].id;
-    activeScreenId.value = targetId;
-    const active = screens.value.find(s => s.id === targetId) || screens.value[0];
-    screen.value = JSON.parse(JSON.stringify(active.screen));
-    components.value = JSON.parse(JSON.stringify(active.components));
-  } else if (data.screen && Array.isArray(data.components)) {
-    screen.value = JSON.parse(JSON.stringify(data.screen));
-    components.value = JSON.parse(JSON.stringify(data.components));
-    screens.value = [
-      {
-        id: data.screen.id || `screen-${Date.now()}`,
-        name: data.screen.name || '导入的 SCADA 工程',
-        screen: JSON.parse(JSON.stringify(data.screen)),
-        components: JSON.parse(JSON.stringify(data.components))
-      }
-    ];
-    activeScreenId.value = screens.value[0].id;
-  }
-
-  if (Array.isArray(data.datasets) && data.datasets.length > 0) {
-    datasets.value = JSON.parse(JSON.stringify(data.datasets));
-  }
-
-  selectedIds.value = [];
-  fitToScreen();
-  recordHistory();
-};
-
 // Selected Components reactive computed
 const selectedComponents = computed(() => {
   return components.value.filter(c => selectedIds.value.includes(c.id));
@@ -1389,7 +1374,31 @@ const handleGlobalScadaControlEvent = (e: any) => {
   // If preview is active, PreviewScreen handles the modal directly in the preview layer
   if (showPreviewModal.value) return;
   controlInitialDeviceId.value = e.detail?.deviceId || undefined;
-  showControlModal.value = true;
+  controlInitialPointId.value = e.detail?.pointId || null;
+  controlInitialTargetVerificationPointId.value = e.detail?.targetVerificationPointId || null;
+  if (e.detail?.type === 'yt' || e.detail?.type === 'regulation') {
+    showRegulationModal.value = true;
+  } else {
+    showControlModal.value = true;
+  }
+};
+
+const handleOpenControlModalFromApp = (payload: any) => {
+  if (typeof payload === 'string') {
+    controlInitialDeviceId.value = payload;
+    controlInitialPointId.value = null;
+    controlInitialTargetVerificationPointId.value = null;
+    showControlModal.value = true;
+  } else if (payload) {
+    controlInitialDeviceId.value = payload.deviceId || undefined;
+    controlInitialPointId.value = payload.pointId || null;
+    controlInitialTargetVerificationPointId.value = payload.targetVerificationPointId || null;
+    if (payload.type === 'yt' || payload.type === 'regulation') {
+      showRegulationModal.value = true;
+    } else {
+      showControlModal.value = true;
+    }
+  }
 };
 
 // Global keyboard shortcut: Ctrl+S / Cmd+S to save active screen only
@@ -1505,30 +1514,22 @@ const handleLoginSuccess = async () => {
   fitToScreen();
 };
 
-// 手动进入大屏预览：重新加载最新保存的磁盘 JSON，避免呈现未保存的画面；手动预览不触发主索引切换逻辑
+// 手动进入大屏预览：自动同步保存当前大屏，并确保内存中配置的测点及图元数据即时呈现在大屏中
 const handleOpenPreview = async () => {
   try {
-    const res = await loadScreensFromDisk();
-    if (res.success && res.screens && res.screens.length > 0) {
-      screens.value = res.screens;
-      diskFileCount.value = res.screens.length;
-      // 保持当前查看的大屏，从磁盘重新载入其已保存数据
-      const reloaded = res.screens.find(s => s.id === activeScreenId.value || s.name.trim() === screen.value.name.trim());
-      if (reloaded) {
-        activeScreenId.value = reloaded.id;
-        screen.value = JSON.parse(JSON.stringify(reloaded.screen));
-        components.value = JSON.parse(JSON.stringify(reloaded.components));
-      } else {
-        const first = res.screens[0];
-        activeScreenId.value = first.id;
-        screen.value = JSON.parse(JSON.stringify(first.screen));
-        components.value = JSON.parse(JSON.stringify(first.components));
-      }
-      selectedIds.value = [];
-      showDiskNotification('已从 graph/ 重新加载已保存数据，确保预览画面最新');
+    // 1. 同步当前大屏到 screens 列表中，防止配置未落盘前被覆盖
+    const curIdx = screens.value.findIndex(s => s.id === activeScreenId.value);
+    if (curIdx >= 0) {
+      screens.value[curIdx] = {
+        ...screens.value[curIdx],
+        screen: JSON.parse(JSON.stringify(screen.value)),
+        components: JSON.parse(JSON.stringify(components.value))
+      };
     }
+    // 2. 自动持久化保存当前大屏至 graph/ 磁盘目录
+    await handleSaveCurrentScreenToDisk();
   } catch (err) {
-    console.warn('[SCADA] 预览前重新载入磁盘 JSON 失败:', err);
+    console.warn('[SCADA] 预览前自动保存失败:', err);
   }
   showPreviewModal.value = true;
   fitToScreen();
@@ -1588,7 +1589,6 @@ onBeforeUnmount(() => {
       @open:preview="handleOpenPreview"
       @open:datasets="showDatasetsModal = true"
       @open:control="showControlModal = true; controlInitialDeviceId = undefined;"
-      @open:json="showJsonModal = true"
       @open:disk-storage="showDiskStorageModal = true"
       @open:symbols="showSymbolModal = true"
       @open:platform="showPlatformModal = true"
@@ -1702,7 +1702,7 @@ onBeforeUnmount(() => {
           @open:property-inspector="showPropertyInspector = true"
           @open:data-association="handleOpenDataAssociation"
           @open:batch-association="handleOpenBatchAssociation"
-          @open:control-modal="(devId) => { controlInitialDeviceId = devId; showControlModal = true; }"
+          @open:control-modal="handleOpenControlModalFromApp"
           @commit:history="recordHistory"
         />
 
@@ -1777,15 +1777,22 @@ onBeforeUnmount(() => {
       @submit="handleBatchAssociationSubmit"
     />
 
-    <!-- 1.5. SCADA Tele-Control Center Modal (主界面遥控分合闸与遥调指令执行) -->
-    <ScadaControlModal
+    <!-- 1.5. SCADA Tele-Control Center Modal (主界面遥控分合闸) -->
+    <ScadaTeleControlModal
       :visible="showControlModal"
-      :datasets="datasets"
       :initialDeviceId="controlInitialDeviceId"
+      :initialPointId="controlInitialPointId"
+      :initialTargetVerificationPointId="controlInitialTargetVerificationPointId"
       @close="showControlModal = false"
-      @execute:control="handleExecuteControl"
-      @execute:regulation="handleExecuteRegulation"
-      @update:datasets="datasets = $event; recordHistory();"
+    />
+
+    <!-- 1.6. SCADA Tele-Regulation Modal (主界面遥调定值设置) -->
+    <ScadaTeleRegulationModal
+      :visible="showRegulationModal"
+      :initialDeviceId="controlInitialDeviceId"
+      :initialPointId="controlInitialPointId"
+      :initialTargetVerificationPointId="controlInitialTargetVerificationPointId"
+      @close="showRegulationModal = false"
     />
 
     <!-- 1.8. SCADA Batch Point Generation & Binding Modal -->
@@ -1796,18 +1803,6 @@ onBeforeUnmount(() => {
       @close="showBatchPointModal = false"
       @batch:generate="handleBatchGenerateComps"
       @batch:bind="handleBatchBindPoints"
-    />
-
-    <!-- 2. JSON Schema Export & Import Modal -->
-    <JsonExportImportModal
-      :visible="showJsonModal"
-      :screen="screen"
-      :components="components"
-      :datasets="datasets"
-      :screens="screens"
-      :activeScreenId="activeScreenId"
-      @close="showJsonModal = false"
-      @import:project="handleImportProject"
     />
 
     <!-- 3. Reusable Custom Symbol Library & Studio Modal -->

@@ -1,534 +1,655 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import { 
   X, Zap, Radio, Sliders, ShieldCheck, CheckCircle2, 
-  AlertTriangle, Send, Activity, Lock, RefreshCw, Cpu
+  AlertTriangle, Send, Activity, Lock, RefreshCw, Cpu,
+  Clock, Check, AlertCircle, XCircle, ArrowRight
 } from 'lucide-vue-next';
-import { ScadaDeviceItem, DeviceTeleControlPoint, DeviceTeleRegulationPoint, DatasetItem } from '../types';
+import { 
+  ScadaFacilityNode,
+  ScadaBayNode,
+  ScadaDeviceNode,
+  ScadaYkItem,
+  ScadaYtItem,
+  ScadaYxItem,
+  ScadaYcItem
+} from '../types';
+import { 
+  scadaFacilities, 
+  rawYxValues, 
+  rawYcValues,
+  executeClosedLoopControl,
+  sendScadaYk,
+  sendScadaYt,
+  YK_STATE_OPTIONS,
+  YT_OPER_OPTIONS,
+  findScadaPointDef
+} from '../utils/scadaClient';
 
 interface Props {
   visible: boolean;
-  device?: ScadaDeviceItem | null;
-  initialDeviceId?: string | null;
+  initialType?: 'yk' | 'yt' | 'control' | 'regulation';
   initialPointId?: number | string | null;
-  initialType?: 'control' | 'regulation' | 'view';
-  datasets: DatasetItem[];
+  initialTargetVerificationPointId?: number | string | null;
+  initialDeviceId?: number | string | null;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   visible: false,
-  device: null,
-  initialDeviceId: null,
+  initialType: 'yk',
   initialPointId: null,
-  initialType: 'control'
+  initialTargetVerificationPointId: null,
+  initialDeviceId: null
 });
 
 const emit = defineEmits<{
   (e: 'close'): void;
-  (e: 'execute:control', deviceId: string, pointId: number | string, targetValue: number): void;
-  (e: 'execute:regulation', deviceId: string, pointId: number | string, targetValue: number): void;
+  (e: 'success', info: any): void;
 }>();
 
-// Extract all available devices from all datasets
-const allDevices = computed<ScadaDeviceItem[]>(() => {
-  const list: ScadaDeviceItem[] = [];
-  props.datasets.forEach(ds => {
-    if (Array.isArray(ds.devices)) {
-      ds.devices.forEach(d => {
-        if (!list.some(existing => existing.deviceId === d.deviceId)) {
-          list.push(d);
-        }
-      });
-    }
-  });
-  return list;
-});
+// Active Mode: 'yk' (遥控) | 'yt' (遥调)
+const activeTab = ref<'yk' | 'yt'>('yk');
 
-const selectedDeviceId = ref<string>('');
-const currentDevice = computed<ScadaDeviceItem | undefined>(() => {
-  if (props.device) return props.device;
-  return allDevices.value.find(d => d.deviceId === selectedDeviceId.value) || allDevices.value[0];
-});
+// Selected Hierarchy
+const selectedFacId = ref<number | string>(scadaFacilities.value[0]?.fac_id || 4000003);
+const selectedBayId = ref<number | string>(scadaFacilities.value[0]?.bays?.[0]?.bay_id || 430000001);
+const selectedDevId = ref<number | string>(scadaFacilities.value[0]?.bays?.[0]?.devices?.[0]?.dev_id || 7000001);
 
-const activeType = ref<'control' | 'regulation' | 'view'>('control');
-const selectedPointId = ref<number | string | null>(null);
-const targetControlValue = ref<number>(0);
-const targetRegulationValue = ref<number>(0);
+// Selected Points
+const selectedPointId = ref<number | null>(null);
+const selectedVerificationPointId = ref<number | null>(null);
+
+// Control Parameters
+const selectedYkState = ref<string>('close');
+const selectedYtOper = ref<string>('adjust');
+const targetYtVal = ref<number>(20.0);
+const oldYtVal = ref<number>(9.0);
+const controlMode = ref<'prev-exec' | 'direct'>('prev-exec'); // 标准预置-执行 vs 直接执行
+const timeoutSeconds = ref<number>(10); // 超时时间 (秒)
 const operatorName = ref<string>('值班调度员 (SCADA_OP_01)');
-const isVerified = ref<boolean>(true); // SCADA 双人监护预演校核
-const executionSuccessMsg = ref<string | null>(null);
-const executingState = ref<'idle' | 'transmitting' | 'verifying' | 'success'>('idle');
 
+// Execution & Verification State
+const executionState = ref<'idle' | 'executing' | 'success' | 'failed' | 'timeout'>('idle');
+const progressMessage = ref<string>('');
+const remainingSeconds = ref<number>(10);
+const elapsedMs = ref<number>(0);
+const resultMessage = ref<string>('');
+const liveReturnVal = ref<any>(null);
+
+// Facilities lookup
+const currentFacility = computed<ScadaFacilityNode | undefined>(() => {
+  return scadaFacilities.value.find(f => f.fac_id === selectedFacId.value || f.id === selectedFacId.value) || scadaFacilities.value[0];
+});
+
+const currentBay = computed<ScadaBayNode | undefined>(() => {
+  const fac = currentFacility.value;
+  if (!fac || !fac.bays?.length) return undefined;
+  return fac.bays.find(b => b.bay_id === selectedBayId.value || b.id === selectedBayId.value) || fac.bays[0];
+});
+
+const currentDevice = computed<ScadaDeviceNode | undefined>(() => {
+  const bay = currentBay.value;
+  if (!bay) return undefined;
+  const devs = bay.devices || bay.cb_devices || [];
+  return devs.find(d => d.dev_id === selectedDevId.value || d.id === selectedDevId.value) || devs[0];
+});
+
+// All Available YK & YT points in current device
+const availableYkPoints = computed<ScadaYkItem[]>(() => {
+  const dev = currentDevice.value;
+  return dev?.yk_list || dev?.yk_points || [];
+});
+
+const availableYtPoints = computed<ScadaYtItem[]>(() => {
+  const dev = currentDevice.value;
+  return dev?.yt_list || dev?.yt_points || [];
+});
+
+// All Available YX & YC verification candidate points in current device
+const availableYxPoints = computed<ScadaYxItem[]>(() => {
+  const dev = currentDevice.value;
+  return dev?.yx_list || dev?.yx_points || [];
+});
+
+const availableYcPoints = computed<ScadaYcItem[]>(() => {
+  const dev = currentDevice.value;
+  return dev?.yc_list || dev?.yc_points || [];
+});
+
+// Active YK or YT point object
+const activePoint = computed<any>(() => {
+  if (activeTab.value === 'yk') {
+    return availableYkPoints.value.find(k => k.id === selectedPointId.value) || availableYkPoints.value[0];
+  } else {
+    return availableYtPoints.value.find(t => t.id === selectedPointId.value) || availableYtPoints.value[0];
+  }
+});
+
+// Active Verification Point object
+const activeVerificationPoint = computed<any>(() => {
+  if (!selectedVerificationPointId.value) return null;
+  if (activeTab.value === 'yk') {
+    return availableYxPoints.value.find(x => x.id === selectedVerificationPointId.value);
+  } else {
+    return availableYcPoints.value.find(c => c.id === selectedVerificationPointId.value);
+  }
+});
+
+// Current Live values for display
+const currentLiveYxVal = computed(() => {
+  if (selectedVerificationPointId.value && activeTab.value === 'yk') {
+    return rawYxValues.get(selectedVerificationPointId.value) ?? 0;
+  }
+  return 0;
+});
+
+const currentLiveYcVal = computed(() => {
+  if (selectedVerificationPointId.value && activeTab.value === 'yt') {
+    return rawYcValues.get(selectedVerificationPointId.value) ?? 0;
+  }
+  return 0;
+});
+
+// Reset / Initialize on open
 watch(
-  () => [props.visible, props.initialDeviceId, props.device],
-  () => {
-    if (props.visible) {
-      if (props.device) {
-        selectedDeviceId.value = props.device.deviceId;
-      } else if (props.initialDeviceId) {
-        selectedDeviceId.value = props.initialDeviceId;
-      } else if (allDevices.value.length > 0 && !selectedDeviceId.value) {
-        selectedDeviceId.value = allDevices.value[0].deviceId;
+  () => props.visible,
+  (val) => {
+    if (val) {
+      executionState.value = 'idle';
+      progressMessage.value = '';
+      resultMessage.value = '';
+      elapsedMs.value = 0;
+
+      if (props.initialType === 'yt' || props.initialType === 'regulation') {
+        activeTab.value = 'yt';
+      } else {
+        activeTab.value = 'yk';
       }
 
-      activeType.value = props.initialType || 'control';
-      const dev = currentDevice.value;
-      if (dev) {
-        if (activeType.value === 'control') {
-          const pt = props.initialPointId 
-            ? dev.teleControls.find(c => String(c.pointId) === String(props.initialPointId))
-            : dev.teleControls[0];
-          selectedPointId.value = pt ? pt.pointId : null;
-          targetControlValue.value = pt?.options[0]?.value ?? 0;
-        } else if (activeType.value === 'regulation') {
-          const pt = props.initialPointId
-            ? dev.teleRegulations.find(r => String(r.pointId) === String(props.initialPointId))
-            : dev.teleRegulations[0];
-          selectedPointId.value = pt ? pt.pointId : null;
-          targetRegulationValue.value = pt?.value ?? 0;
+      // Restore device & point
+      if (props.initialPointId) {
+        const pDef = findScadaPointDef(props.initialPointId);
+        if (pDef.facility) selectedFacId.value = pDef.facility.fac_id || pDef.facility.id || selectedFacId.value;
+        if (pDef.bay) selectedBayId.value = pDef.bay.bay_id || pDef.bay.id || selectedBayId.value;
+        if (pDef.device) selectedDevId.value = pDef.device.dev_id || pDef.device.id || selectedDevId.value;
+        selectedPointId.value = Number(props.initialPointId);
+      } else {
+        const firstYk = availableYkPoints.value[0];
+        const firstYt = availableYtPoints.value[0];
+        selectedPointId.value = activeTab.value === 'yk' ? (firstYk?.id || 54000003) : (firstYt?.id || 54000004);
+      }
+
+      if (props.initialTargetVerificationPointId) {
+        selectedVerificationPointId.value = Number(props.initialTargetVerificationPointId);
+      } else {
+        // Auto default to associated verification point
+        if (activeTab.value === 'yk') {
+          selectedVerificationPointId.value = activePoint.value?.targetVerificationPointId || availableYxPoints.value[0]?.id || null;
+        } else {
+          selectedVerificationPointId.value = activePoint.value?.targetVerificationPointId || availableYcPoints.value[0]?.id || null;
+          oldYtVal.value = currentLiveYcVal.value;
         }
       }
-      executionSuccessMsg.value = null;
-      executingState.value = 'idle';
     }
   },
   { immediate: true }
 );
 
+// Switch Point handler
 watch(
-  () => selectedDeviceId.value,
+  () => [selectedDevId.value, activeTab.value],
   () => {
-    const dev = currentDevice.value;
-    if (dev) {
-      if (activeType.value === 'control') {
-        const pt = dev.teleControls[0];
-        selectedPointId.value = pt ? pt.pointId : null;
-        targetControlValue.value = pt?.options[0]?.value ?? 0;
-      } else if (activeType.value === 'regulation') {
-        const pt = dev.teleRegulations[0];
-        selectedPointId.value = pt ? pt.pointId : null;
-        targetRegulationValue.value = pt?.value ?? 0;
-      }
+    if (activeTab.value === 'yk') {
+      const pt = availableYkPoints.value[0];
+      selectedPointId.value = pt?.id || null;
+      selectedVerificationPointId.value = pt?.targetVerificationPointId || availableYxPoints.value[0]?.id || null;
+    } else {
+      const pt = availableYtPoints.value[0];
+      selectedPointId.value = pt?.id || null;
+      selectedVerificationPointId.value = pt?.targetVerificationPointId || availableYcPoints.value[0]?.id || null;
+      oldYtVal.value = currentLiveYcVal.value;
     }
   }
 );
 
-const currentControlPoint = computed<DeviceTeleControlPoint | undefined>(() => {
-  const dev = currentDevice.value;
-  if (!dev || !dev.teleControls) return undefined;
-  return dev.teleControls.find(c => String(c.pointId) === String(selectedPointId.value)) || dev.teleControls[0];
-});
+// Execute Control with Verification
+let cancelFlag = false;
 
-const currentRegulationPoint = computed<DeviceTeleRegulationPoint | undefined>(() => {
-  const dev = currentDevice.value;
-  if (!dev || !dev.teleRegulations) return undefined;
-  return dev.teleRegulations.find(r => String(r.pointId) === String(selectedPointId.value)) || dev.teleRegulations[0];
-});
-
-// Linked Tele-Signal (关联遥信状态)
-const linkedTeleSignal = computed(() => {
-  const dev = currentDevice.value;
-  if (!dev || !currentControlPoint.value) return undefined;
-  if (currentControlPoint.value.targetPointId !== undefined) {
-    return dev.teleSignals.find(s => String(s.pointId) === String(currentControlPoint.value?.targetPointId));
-  }
-  return undefined;
-});
-
-const handleConfirmControl = () => {
-  const dev = currentDevice.value;
-  if (!dev || !currentControlPoint.value) return;
-
-  executingState.value = 'transmitting';
+const handleExecuteControl = async () => {
+  if (!selectedPointId.value) return;
   
-  setTimeout(() => {
-    executingState.value = 'verifying';
-    emit('execute:control', dev.deviceId, currentControlPoint.value!.pointId, targetControlValue.value);
+  cancelFlag = false;
+  executionState.value = 'executing';
+  progressMessage.value = '正在校验权限与下发控制预演...';
+  remainingSeconds.value = timeoutSeconds.value;
+  resultMessage.value = '';
 
-    const optLabel = currentControlPoint.value!.options.find(o => o.value === targetControlValue.value)?.label || `状态 (${targetControlValue.value})`;
-    
-    setTimeout(() => {
-      executingState.value = 'success';
-      executionSuccessMsg.value = `✓ 遥控指令校验通过并执行成功！已向 [${dev.deviceId}] 下发: ${optLabel}，对应遥信状态已联动刷新`;
-      
-      setTimeout(() => {
-        executionSuccessMsg.value = null;
-        executingState.value = 'idle';
-        emit('close');
-      }, 1500);
-    }, 400);
-  }, 400);
+  const res = await executeClosedLoopControl({
+    type: activeTab.value,
+    pointId: selectedPointId.value,
+    action: controlMode.value,
+    ykState: selectedYkState.value,
+    ytOper: selectedYtOper.value,
+    ytVal: targetYtVal.value,
+    ytOldVal: oldYtVal.value,
+    targetVerificationPointId: selectedVerificationPointId.value || undefined,
+    targetVerificationType: activeTab.value === 'yk' ? 'yx' : 'yc',
+    verificationTimeoutMs: timeoutSeconds.value * 1000,
+    onProgress: (info) => {
+      progressMessage.value = info.step;
+      remainingSeconds.value = info.remainingSeconds;
+      elapsedMs.value = info.elapsedMs;
+      liveReturnVal.value = info.currentVal;
+    }
+  });
+
+  if (res.success && res.verified) {
+    executionState.value = 'success';
+    resultMessage.value = res.message;
+    emit('success', {
+      type: activeTab.value,
+      pointId: selectedPointId.value,
+      verificationPointId: selectedVerificationPointId.value,
+      finalValue: res.finalValue,
+      elapsedMs: res.elapsedMs
+    });
+  } else if (res.timeout) {
+    executionState.value = 'timeout';
+    resultMessage.value = res.message;
+  } else {
+    executionState.value = 'failed';
+    resultMessage.value = res.message;
+  }
 };
 
-const handleConfirmRegulation = () => {
-  const dev = currentDevice.value;
-  if (!dev || !currentRegulationPoint.value) return;
-
-  executingState.value = 'transmitting';
-
-  setTimeout(() => {
-    executingState.value = 'verifying';
-    emit('execute:regulation', dev.deviceId, currentRegulationPoint.value!.pointId, Number(targetRegulationValue.value));
-
-    setTimeout(() => {
-      executingState.value = 'success';
-      executionSuccessMsg.value = `✓ 遥调定值下发成功！[${dev.deviceId}] ${currentRegulationPoint.value!.name} 已整定为: ${targetRegulationValue.value} ${currentRegulationPoint.value!.unit}`;
-      
-      setTimeout(() => {
-        executionSuccessMsg.value = null;
-        executingState.value = 'idle';
-        emit('close');
-      }, 1500);
-    }, 400);
-  }, 400);
+// Send Cancel Command
+const handleCancelCommand = async () => {
+  cancelFlag = true;
+  executionState.value = 'idle';
+  progressMessage.value = '';
+  
+  if (selectedPointId.value) {
+    if (activeTab.value === 'yk') {
+      await sendScadaYk({ yk_id: selectedPointId.value, action: 'cancel', state: selectedYkState.value });
+    } else {
+      await sendScadaYt({ yt_id: selectedPointId.value, action: 'cancel', oper: selectedYtOper.value, val: targetYtVal.value });
+    }
+  }
 };
 </script>
 
 <template>
   <div
-    v-if="visible && currentDevice"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4 animate-in fade-in duration-200"
+    v-if="visible"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200"
     @click.self="emit('close')"
   >
-    <div class="bg-[#050a16] border border-cyan-500/50 rounded-2xl w-full max-w-xl overflow-hidden shadow-[0_0_50px_rgba(0,242,255,0.2)] flex flex-col font-sans">
-      <!-- Modal Header -->
-      <div class="px-6 py-4 bg-[#081122] border-b border-cyan-500/30 flex items-center justify-between">
+    <div
+      class="bg-[#0b1329] border border-cyan-500/60 rounded-2xl w-full max-w-3xl shadow-[0_0_50px_rgba(6,182,212,0.25)] flex flex-col overflow-hidden text-slate-100"
+      @click.stop
+    >
+      <!-- Header -->
+      <div class="px-6 py-4 bg-gradient-to-r from-slate-900 via-[#0d1c3a] to-slate-900 border-b border-cyan-500/40 flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl bg-cyan-950 border border-cyan-500/50 flex items-center justify-center text-cyan-400">
-            <Zap class="w-5 h-5" />
+          <div class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-400 flex items-center justify-center shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+            <Zap v-if="activeTab === 'yk'" class="w-5 h-5 text-cyan-400 animate-pulse" />
+            <Sliders v-else class="w-5 h-5 text-amber-400 animate-pulse" />
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <span class="text-xs px-2 py-0.5 rounded bg-cyan-900/60 text-cyan-300 border border-cyan-500/40 font-mono font-bold">
-                {{ currentDevice.deviceId }}
-              </span>
-              <h3 class="text-base font-bold text-slate-100">
-                电力 SCADA 远方调度操作台
+              <h3 class="text-lg font-bold text-white tracking-wide">
+                {{ activeTab === 'yk' ? 'SCADA 遥控操作 (YK) 与返校闭环校验' : 'SCADA 遥调操作 (YT) 与定值反馈校核' }}
               </h3>
+              <span class="px-2 py-0.5 rounded text-[11px] font-mono font-bold uppercase bg-cyan-950/80 text-cyan-300 border border-cyan-500/50">
+                {{ activeTab === 'yk' ? 'Tele-Control' : 'Tele-Regulation' }}
+              </span>
             </div>
             <p class="text-xs text-slate-400 mt-0.5">
-              目标装置: {{ currentDevice.deviceName }} ({{ currentDevice.deviceType || '测控保护装置' }})
+              严格遵照 SCADA 双人监护预演标准流程：预置下发 (prev) -> 执行下发 (exec) -> 限时返校校验闭环变位
             </p>
           </div>
         </div>
 
         <button
           @click="emit('close')"
-          class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+          class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
         >
           <X class="w-5 h-5" />
         </button>
       </div>
 
-      <!-- Device Switcher (when multiple devices exist) -->
-      <div v-if="allDevices.length > 1" class="px-6 py-2.5 bg-[#060e1d] border-b border-slate-800 flex items-center justify-between text-xs">
-        <span class="text-slate-400 flex items-center gap-1.5 font-medium">
-          <Cpu class="w-3.5 h-3.5 text-cyan-400" />
-          <span>切换目标调度装置:</span>
-        </span>
-        <select
-          v-model="selectedDeviceId"
-          class="bg-[#09152b] border border-cyan-500/40 rounded-lg px-2.5 py-1 text-xs text-cyan-200 font-bold outline-hidden cursor-pointer"
-        >
-          <option v-for="d in allDevices" :key="d.deviceId" :value="d.deviceId">
-            [{{ d.deviceId }}] {{ d.deviceName }}
-          </option>
-        </select>
-      </div>
-
-      <!-- Type Switcher Tabs -->
-      <div class="flex border-b border-slate-800 bg-[#060b18] px-6 pt-2">
-        <button
-          @click="activeType = 'control'"
-          class="px-4 py-2.5 text-xs font-bold border-b-2 cursor-pointer transition-all flex items-center gap-2"
-          :class="activeType === 'control' 
-            ? 'border-amber-400 text-amber-300 bg-amber-950/20' 
-            : 'border-transparent text-slate-400 hover:text-slate-200'"
-        >
-          <Radio class="w-4 h-4" />
-          <span>⚡ 遥控指令下发 (YK)</span>
-          <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 font-mono">{{ currentDevice.teleControls?.length || 0 }}</span>
-        </button>
-
-        <button
-          @click="activeType = 'regulation'"
-          class="px-4 py-2.5 text-xs font-bold border-b-2 cursor-pointer transition-all flex items-center gap-2"
-          :class="activeType === 'regulation' 
-            ? 'border-cyan-400 text-cyan-300 bg-cyan-950/20' 
-            : 'border-transparent text-slate-400 hover:text-slate-200'"
-        >
-          <Sliders class="w-4 h-4" />
-          <span>🎛️ 参数定值遥调 (YT)</span>
-          <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 font-mono">{{ currentDevice.teleRegulations?.length || 0 }}</span>
-        </button>
-
-        <button
-          @click="activeType = 'view'"
-          class="px-4 py-2.5 text-xs font-bold border-b-2 cursor-pointer transition-all flex items-center gap-2"
-          :class="activeType === 'view' 
-            ? 'border-emerald-400 text-emerald-300 bg-emerald-950/20' 
-            : 'border-transparent text-slate-400 hover:text-slate-200'"
-        >
-          <Activity class="w-4 h-4" />
-          <span>📊 装置四遥点表总览</span>
-        </button>
-      </div>
-
-      <!-- Execution State Indicator Banner -->
-      <div v-if="executingState === 'transmitting'" class="mx-6 mt-4 p-3 rounded-xl bg-cyan-950/80 border border-cyan-400 text-cyan-300 text-xs font-bold flex items-center gap-2 animate-pulse">
-        <RefreshCw class="w-4 h-4 text-cyan-400 animate-spin shrink-0" />
-        <span>正在通过 SCADA 专网向装置 [{{ currentDevice.deviceId }}] 下发指令报文...</span>
-      </div>
-
-      <div v-else-if="executingState === 'verifying'" class="mx-6 mt-4 p-3 rounded-xl bg-amber-950/80 border border-amber-400 text-amber-300 text-xs font-bold flex items-center gap-2 animate-pulse">
-        <ShieldCheck class="w-4 h-4 text-amber-400 shrink-0" />
-        <span>正在比对遥信回路返校遥信状态，执行一致性闭锁校验...</span>
-      </div>
-
-      <!-- Success Notification Toast inside Modal -->
-      <div v-else-if="executionSuccessMsg" class="mx-6 mt-4 p-3 rounded-xl bg-emerald-950/80 border border-emerald-400 text-emerald-300 text-xs font-bold flex items-center gap-2">
-        <CheckCircle2 class="w-4 h-4 text-emerald-400 shrink-0" />
-        <span>{{ executionSuccessMsg }}</span>
-      </div>
-
-      <!-- Modal Body -->
-      <div class="p-6 space-y-5 overflow-y-auto max-h-[65vh] custom-scrollbar text-xs">
-        <!-- 1. TELE-CONTROL (遥控) -->
-        <template v-if="activeType === 'control'">
-          <div v-if="!currentDevice.teleControls || currentDevice.teleControls.length === 0" class="text-center py-8 text-slate-400">
-            该装置暂未配置遥控控制点。
+      <!-- Main Body -->
+      <div class="p-6 space-y-5 overflow-y-auto max-h-[75vh]">
+        <!-- 1. Mode Tab Selector -->
+        <div class="flex items-center justify-between bg-slate-950/80 p-1.5 rounded-xl border border-slate-800">
+          <div class="flex items-center gap-2">
+            <button
+              @click="activeTab = 'yk'"
+              class="px-5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
+              :class="activeTab === 'yk' ? 'bg-cyan-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.5)]' : 'text-slate-400 hover:text-white hover:bg-slate-900'"
+            >
+              <Zap class="w-4 h-4" />
+              <span>遥控操作 (YK)</span>
+            </button>
+            <button
+              @click="activeTab = 'yt'"
+              class="px-5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
+              :class="activeTab === 'yt' ? 'bg-amber-500 text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'text-slate-400 hover:text-white hover:bg-slate-900'"
+            >
+              <Sliders class="w-4 h-4" />
+              <span>遥调操作 (YT)</span>
+            </button>
           </div>
-          <div v-else class="space-y-4">
-            <!-- Select Control Point -->
+
+          <div class="flex items-center gap-2 text-xs text-slate-400 pr-2 font-mono">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            <span>接口协议: HTTP / JSON</span>
+          </div>
+        </div>
+
+        <!-- 2. Device & Point Cascader Selection -->
+        <div class="grid grid-cols-3 gap-3 bg-[#0d1a33]/80 p-3.5 rounded-xl border border-slate-800 text-xs">
+          <div>
+            <label class="block text-slate-400 mb-1 font-medium">所属厂站 (Facility):</label>
+            <select
+              v-model="selectedFacId"
+              class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono focus:border-cyan-400 focus:outline-none"
+            >
+              <option v-for="f in scadaFacilities" :key="f.fac_id || f.id" :value="f.fac_id || f.id">
+                [{{ f.fac_id || f.id }}] {{ f.fac_name || f.name }}
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-slate-400 mb-1 font-medium">所属间隔 (Bay):</label>
+            <select
+              v-model="selectedBayId"
+              class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono focus:border-cyan-400 focus:outline-none"
+            >
+              <option v-for="b in currentFacility?.bays || []" :key="b.bay_id || b.id" :value="b.bay_id || b.id">
+                [{{ b.bay_id || b.id }}] {{ b.bay_name || b.name }}
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-slate-400 mb-1 font-medium">一次设备/装置 (Device):</label>
+            <select
+              v-model="selectedDevId"
+              class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white font-mono focus:border-cyan-400 focus:outline-none"
+            >
+              <option v-for="d in currentBay?.devices || currentBay?.cb_devices || []" :key="d.dev_id || d.id" :value="d.dev_id || d.id">
+                [{{ d.dev_id || d.id }}] {{ d.dev_name || d.name }} ({{ d.cbty_name || '开关' }})
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 3. Target Control Point & Return Verification Point (两点联动配置) -->
+        <div class="grid grid-cols-2 gap-4">
+          <!-- Left: Control Point Selection -->
+          <div class="bg-[#0d1a33]/90 p-4 rounded-xl border border-cyan-500/40 space-y-3">
+            <div class="flex items-center justify-between border-b border-cyan-500/30 pb-2">
+              <div class="flex items-center gap-2 font-bold text-sm text-cyan-300">
+                <Zap v-if="activeTab === 'yk'" class="w-4 h-4 text-cyan-400" />
+                <Sliders v-else class="w-4 h-4 text-amber-400" />
+                <span>1. 选择控制点 ({{ activeTab === 'yk' ? 'YK 遥控点' : 'YT 遥调点' }})</span>
+              </div>
+              <span class="text-[10px] font-mono text-slate-400">下发控制源</span>
+            </div>
+
             <div>
-              <label class="font-bold text-slate-300 block mb-1.5">选择要操作的遥控点 (Tele-Control Point)</label>
+              <label class="block text-xs text-slate-300 mb-1">控制点号与名称:</label>
               <select
-                :value="currentControlPoint?.pointId"
-                @change="selectedPointId = ($event.target as HTMLSelectElement).value"
-                class="w-full bg-[#081226] border border-cyan-500/40 rounded-xl px-3 py-2 text-cyan-200 font-bold outline-hidden cursor-pointer"
+                v-model="selectedPointId"
+                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-cyan-200 focus:border-cyan-400 focus:outline-none"
               >
-                <option v-for="c in currentDevice.teleControls" :key="c.pointId" :value="c.pointId">
-                  #{{ c.pointId }} {{ c.name }}
-                </option>
+                <template v-if="activeTab === 'yk'">
+                  <option v-for="pt in availableYkPoints" :key="pt.id" :value="pt.id">
+                    [YK_{{ pt.id }}] {{ pt.name }} ({{ pt.alias || pt.type_name }})
+                  </option>
+                </template>
+                <template v-else>
+                  <option v-for="pt in availableYtPoints" :key="pt.id" :value="pt.id">
+                    [YT_{{ pt.id }}] {{ pt.name }} ({{ pt.alias || pt.type_name }})
+                  </option>
+                </template>
               </select>
             </div>
 
-            <!-- Current Linked Tele-Signal Status -->
-            <div class="p-3 rounded-xl bg-[#09142b] border border-slate-800 flex items-center justify-between">
-              <div>
-                <span class="text-slate-400 text-[11px] block">当前关联遥信回路状态 (YX):</span>
-                <span class="text-slate-200 font-bold text-xs mt-0.5 block">
-                  {{ linkedTeleSignal ? `[#${linkedTeleSignal.pointId}] ${linkedTeleSignal.name}` : '未指定关联遥信' }}
-                </span>
-              </div>
-              <div>
-                <span 
-                  v-if="linkedTeleSignal"
-                  class="px-2.5 py-1 rounded-lg text-xs font-bold font-mono border inline-block"
-                  :class="linkedTeleSignal.value === 1 ? 'bg-emerald-950 text-emerald-300 border-emerald-500/50' : (linkedTeleSignal.value === 2 ? 'bg-amber-950 text-amber-300 border-amber-500/50' : 'bg-slate-900 text-slate-300 border-slate-700')"
-                >
-                  当前状态: {{ linkedTeleSignal.statusText || linkedTeleSignal.value }}
-                </span>
-              </div>
-            </div>
-
-            <!-- Target Command Options -->
-            <div class="space-y-2">
-              <label class="font-bold text-amber-300 block">选择下发控制指令目标值:</label>
-              <div class="grid grid-cols-2 gap-2.5">
+            <!-- YK Target State Selection -->
+            <div v-if="activeTab === 'yk'" class="space-y-2">
+              <label class="block text-xs text-slate-300">目标遥控指令 (State):</label>
+              <div class="grid grid-cols-3 gap-2">
                 <button
-                  v-for="opt in currentControlPoint?.options || []"
+                  v-for="opt in YK_STATE_OPTIONS"
                   :key="opt.value"
-                  @click="targetControlValue = opt.value"
-                  class="py-3 px-4 rounded-xl border text-xs font-mono font-bold cursor-pointer transition-all flex items-center justify-between"
-                  :class="targetControlValue === opt.value
-                    ? (opt.value === 1 ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow-md scale-[1.01]' : (opt.value === 2 ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md scale-[1.01]' : 'bg-rose-500 text-white border-rose-400 shadow-md scale-[1.01]'))
-                    : 'bg-[#081226] text-slate-300 border-slate-700 hover:border-cyan-400'"
+                  @click="selectedYkState = opt.value"
+                  class="px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all text-center cursor-pointer"
+                  :class="selectedYkState === opt.value
+                    ? (opt.targetState === 1 ? 'bg-rose-600 border-rose-400 text-white shadow-[0_0_10px_rgba(225,29,72,0.4)]' : 'bg-emerald-600 border-emerald-400 text-white shadow-[0_0_10px_rgba(16,185,129,0.4)]')
+                    : 'bg-slate-900/90 border-slate-700 text-slate-300 hover:border-slate-500'"
                 >
-                  <span>{{ opt.label }}</span>
-                  <span class="text-[11px] opacity-80">枚举值: {{ opt.value }}</span>
+                  {{ opt.label }}
                 </button>
               </div>
             </div>
 
-            <!-- SCADA Two-Step Verification Check -->
-            <div class="p-3 rounded-xl bg-amber-950/20 border border-amber-500/40 space-y-2">
-              <div class="flex items-center gap-2 text-amber-300 font-bold text-xs">
-                <ShieldCheck class="w-4 h-4 text-amber-400" />
-                <span>SCADA 防误闭锁与监护核对机制</span>
+            <!-- YT Target Oper & Value -->
+            <div v-else class="space-y-3">
+              <div>
+                <label class="block text-xs text-slate-300 mb-1">遥调操作类型 (Oper):</label>
+                <div class="grid grid-cols-4 gap-1.5">
+                  <button
+                    v-for="opt in YT_OPER_OPTIONS"
+                    :key="opt.value"
+                    @click="selectedYtOper = opt.value"
+                    class="px-2 py-1.5 rounded-lg text-xs font-semibold border transition-all text-center cursor-pointer"
+                    :class="selectedYtOper === opt.value ? 'bg-amber-500 border-amber-300 text-slate-950 font-bold' : 'bg-slate-900 border-slate-700 text-slate-300'"
+                  >
+                    {{ opt.label }}
+                  </button>
+                </div>
               </div>
-              <p class="text-[11px] text-slate-300 leading-relaxed">
-                按照电力系统调度规程，本次遥控下发已通过闭锁逻辑校验（无接地刀闸闭锁、无检修互锁挂牌）。指令触发后将虚拟驱动远方遥信状态变位并核验动作一致性。
-              </p>
+
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">目标设定值 (val):</label>
+                  <input
+                    v-model.number="targetYtVal"
+                    type="number"
+                    step="0.1"
+                    class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-amber-300 font-mono focus:border-amber-400 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">当前参考值 (old_val):</label>
+                  <input
+                    v-model.number="oldYtVal"
+                    type="number"
+                    step="0.1"
+                    class="w-full bg-slate-900/60 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-400 font-mono focus:outline-none"
+                  />
+                </div>
+              </div>
             </div>
           </div>
-        </template>
 
-        <!-- 2. TELE-REGULATION (遥调) -->
-        <template v-else-if="activeType === 'regulation'">
-          <div v-if="!currentDevice.teleRegulations || currentDevice.teleRegulations.length === 0" class="text-center py-8 text-slate-400">
-            该装置暂未配置遥调定值点。
-          </div>
-          <div v-else class="space-y-4">
-            <!-- Select Regulation Point -->
+          <!-- Right: Return Verification Point (返校校验点) Selection -->
+          <div class="bg-[#0d1a33]/90 p-4 rounded-xl border border-purple-500/40 space-y-3">
+            <div class="flex items-center justify-between border-b border-purple-500/30 pb-2">
+              <div class="flex items-center gap-2 font-bold text-sm text-purple-300">
+                <ShieldCheck class="w-4 h-4 text-purple-400" />
+                <span>2. 选择返回校验点 (闭环返校)</span>
+              </div>
+              <span class="text-[10px] font-mono text-purple-300 font-bold">校验反馈源</span>
+            </div>
+
             <div>
-              <label class="font-bold text-slate-300 block mb-1.5">选择要整定的遥调项目 (Tele-Regulation)</label>
+              <label class="block text-xs text-slate-300 mb-1">
+                {{ activeTab === 'yk' ? '关联返校遥信点 (YX):' : '关联返校遥测点 (YC):' }}
+              </label>
               <select
-                :value="currentRegulationPoint?.pointId"
-                @change="selectedPointId = ($event.target as HTMLSelectElement).value; targetRegulationValue = currentRegulationPoint?.value ?? 0;"
-                class="w-full bg-[#081226] border border-cyan-500/40 rounded-xl px-3 py-2 text-cyan-200 font-bold outline-hidden cursor-pointer"
+                v-model="selectedVerificationPointId"
+                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-purple-200 focus:border-purple-400 focus:outline-none"
               >
-                <option v-for="r in currentDevice.teleRegulations" :key="r.pointId" :value="r.pointId">
-                  #{{ r.pointId }} {{ r.name }} (当前: {{ r.value }} {{ r.unit }})
-                </option>
+                <option :value="null">-- 不进行返校校验 (单向开环指令) --</option>
+                <template v-if="activeTab === 'yk'">
+                  <option v-for="yx in availableYxPoints" :key="yx.id" :value="yx.id">
+                    [YX_{{ yx.id }}] {{ yx.name }} ({{ yx.alias || yx.type_name }}) - 当前: {{ yx.val === 1 ? '合闸(1)' : '分闸(0)' }}
+                  </option>
+                </template>
+                <template v-else>
+                  <option v-for="yc in availableYcPoints" :key="yc.id" :value="yc.id">
+                    [YC_{{ yc.id }}] {{ yc.name }} ({{ yc.alias || yc.type_name }}) - 当前: {{ yc.val }} {{ yc.unit }}
+                  </option>
+                </template>
               </select>
             </div>
 
-            <!-- Current vs Target Value Input -->
-            <div v-if="currentRegulationPoint" class="p-4 rounded-xl bg-[#081226] border border-cyan-500/40 space-y-3">
+            <!-- Live Status of Verification Point -->
+            <div class="bg-slate-950/80 p-3 rounded-lg border border-purple-900/60 text-xs space-y-1.5">
               <div class="flex items-center justify-between">
-                <div>
-                  <span class="text-slate-400 text-[11px]">当前装置定值:</span>
-                  <span class="text-cyan-300 font-mono font-bold text-sm block">
-                    {{ currentRegulationPoint.value }} {{ currentRegulationPoint.unit }}
-                  </span>
-                </div>
-                <div class="text-right">
-                  <span class="text-slate-400 text-[11px]">可调节范围:</span>
-                  <span class="text-slate-200 font-mono font-bold text-xs block">
-                    {{ currentRegulationPoint.min }} ~ {{ currentRegulationPoint.max }} {{ currentRegulationPoint.unit }}
-                  </span>
-                </div>
+                <span class="text-slate-400">返校测点当前采样值:</span>
+                <span v-if="activeTab === 'yk'" class="font-mono font-bold" :class="currentLiveYxVal === 1 ? 'text-rose-400' : 'text-emerald-400'">
+                  {{ currentLiveYxVal === 1 ? '合闸状态 (1)' : '分闸状态 (0)' }}
+                </span>
+                <span v-else class="font-mono font-bold text-amber-300">
+                  {{ currentLiveYcVal }}
+                </span>
               </div>
 
-              <!-- Slider & Numeric Input -->
-              <div class="space-y-2 pt-2 border-t border-slate-800">
-                <div class="flex items-center justify-between">
-                  <label class="text-xs font-bold text-slate-200">目标整定数值:</label>
-                  <div class="flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      :min="currentRegulationPoint.min"
-                      :max="currentRegulationPoint.max"
-                      :step="currentRegulationPoint.step || 1"
-                      v-model.number="targetRegulationValue"
-                      class="w-24 bg-[#050a16] border border-cyan-400 rounded-lg px-2 py-1 text-cyan-300 font-bold text-sm font-mono text-center outline-hidden"
-                    />
-                    <span class="text-cyan-400 font-mono font-bold">{{ currentRegulationPoint.unit }}</span>
-                  </div>
-                </div>
+              <div class="flex items-center justify-between">
+                <span class="text-slate-400">期望变位结果:</span>
+                <span v-if="activeTab === 'yk'" class="font-mono font-bold text-cyan-300">
+                  {{ ['close', 'tqh', 'yyh', 'wyh', 'hhh', 'tsh'].includes(selectedYkState) ? '变位 -> 合闸 (1)' : '变位 -> 分闸 (0)' }}
+                </span>
+                <span v-else class="font-mono font-bold text-cyan-300">
+                  达到目标值 -> {{ targetYtVal }}
+                </span>
+              </div>
 
-                <input
-                  type="range"
-                  :min="currentRegulationPoint.min"
-                  :max="currentRegulationPoint.max"
-                  :step="currentRegulationPoint.step || 1"
-                  v-model.number="targetRegulationValue"
-                  class="w-full accent-cyan-400 cursor-pointer"
-                />
-              </div>
-            </div>
-          </div>
-        </template>
-
-        <!-- 3. VIEW 4-TELE POINTS (四遥点表一览) -->
-        <template v-else>
-          <div class="space-y-3">
-            <!-- YC List -->
-            <div>
-              <div class="font-bold text-cyan-300 mb-1.5 flex items-center gap-1.5">
-                <span>📟 遥测清单 (YC)</span>
-                <span class="text-slate-400 font-normal">({{ currentDevice.telemetries?.length || 0 }} 项)</span>
-              </div>
-              <div class="grid grid-cols-2 gap-1.5">
-                <div
-                  v-for="yc in currentDevice.telemetries"
-                  :key="yc.pointId"
-                  class="p-2 rounded-lg bg-[#081226] border border-slate-800 flex items-center justify-between"
-                >
-                  <span class="text-slate-300 truncate text-[11px]">#{{ yc.pointId }} {{ yc.name }}</span>
-                  <span class="font-mono font-bold text-emerald-400">{{ yc.value }} {{ yc.unit }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- YX List -->
-            <div class="pt-2 border-t border-slate-800">
-              <div class="font-bold text-amber-300 mb-1.5 flex items-center gap-1.5">
-                <span>🚦 遥信状态 (YX)</span>
-                <span class="text-slate-400 font-normal">({{ currentDevice.teleSignals?.length || 0 }} 项)</span>
-              </div>
-              <div class="grid grid-cols-2 gap-1.5">
-                <div
-                  v-for="yx in currentDevice.teleSignals"
-                  :key="yx.pointId"
-                  class="p-2 rounded-lg bg-[#081226] border border-slate-800 flex items-center justify-between"
-                >
-                  <span class="text-slate-300 truncate text-[11px]">#{{ yx.pointId }} {{ yx.name }}</span>
-                  <span
-                    class="px-1.5 py-0.2 rounded text-[10px] font-bold font-mono"
-                    :class="yx.value === 1 ? 'bg-emerald-950 text-emerald-300' : (yx.value === 2 ? 'bg-amber-950 text-amber-300' : 'bg-slate-800 text-slate-300')"
-                  >
-                    {{ yx.value }} ({{ yx.statusText || yx.value }})
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <!-- DD List -->
-            <div v-if="currentDevice.energies && currentDevice.energies.length > 0" class="pt-2 border-t border-slate-800">
-              <div class="font-bold text-purple-300 mb-1.5 flex items-center gap-1.5">
-                <span>⚡ 电度计量 (DD)</span>
-                <span class="text-slate-400 font-normal">({{ currentDevice.energies?.length || 0 }} 项)</span>
-              </div>
-              <div class="grid grid-cols-2 gap-1.5">
-                <div
-                  v-for="dd in currentDevice.energies"
-                  :key="dd.pointId"
-                  class="p-2 rounded-lg bg-[#081226] border border-slate-800 flex items-center justify-between"
-                >
-                  <span class="text-slate-300 truncate text-[11px]">#{{ dd.pointId }} {{ dd.name }}</span>
-                  <span class="font-mono font-bold text-purple-400">{{ dd.value }} {{ dd.unit }}</span>
+              <div class="flex items-center justify-between pt-1 border-t border-slate-900 text-[11px]">
+                <span class="text-slate-500">校验超时时限:</span>
+                <div class="flex items-center gap-1 font-mono">
+                  <input
+                    v-model.number="timeoutSeconds"
+                    type="number"
+                    min="3"
+                    max="60"
+                    class="w-12 bg-slate-900 border border-slate-700 rounded px-1 text-center text-purple-300"
+                  />
+                  <span class="text-slate-400">秒</span>
                 </div>
               </div>
             </div>
           </div>
-        </template>
+        </div>
+
+        <!-- 4. Execution Workflow Monitor Panel (执行与倒计时返校监控进度条) -->
+        <div v-if="executionState !== 'idle'" class="bg-[#070e1e] p-4 rounded-xl border border-cyan-500/50 space-y-3 animate-in fade-in zoom-in-95 duration-150">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 font-bold text-sm">
+              <RefreshCw v-if="executionState === 'executing'" class="w-4 h-4 text-cyan-400 animate-spin" />
+              <CheckCircle2 v-else-if="executionState === 'success'" class="w-4 h-4 text-emerald-400" />
+              <XCircle v-else class="w-4 h-4 text-rose-400" />
+              <span :class="{
+                'text-cyan-300': executionState === 'executing',
+                'text-emerald-400 font-bold': executionState === 'success',
+                'text-rose-400 font-bold': executionState === 'failed' || executionState === 'timeout'
+              }">
+                {{ executionState === 'executing' ? '控制指令已下发，正在进行限时返校闭环校验...' : (executionState === 'success' ? '控制执行成功！返校校验变位正常' : '控制超时或校验失败！') }}
+              </span>
+            </div>
+
+            <div class="flex items-center gap-3 font-mono text-xs">
+              <span v-if="executionState === 'executing'" class="text-amber-300 animate-pulse font-bold">
+                校验倒计时: {{ remainingSeconds }}s
+              </span>
+              <span class="text-slate-400">
+                耗时: {{ (elapsedMs / 1000).toFixed(1) }}s
+              </span>
+            </div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="w-full h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+            <div
+              class="h-full transition-all duration-300 rounded-full"
+              :class="{
+                'bg-gradient-to-r from-cyan-500 to-blue-500': executionState === 'executing',
+                'bg-emerald-500': executionState === 'success',
+                'bg-rose-500': executionState === 'failed' || executionState === 'timeout'
+              }"
+              :style="{ width: executionState === 'executing' ? `${Math.max(5, (1 - remainingSeconds / timeoutSeconds) * 100)}%` : '100%' }"
+            ></div>
+          </div>
+
+          <!-- Status Log Message -->
+          <div class="text-xs font-mono px-3 py-2 rounded-lg bg-slate-950 border border-slate-800" :class="{
+            'text-cyan-200': executionState === 'executing',
+            'text-emerald-300 border-emerald-500/50 bg-emerald-950/40': executionState === 'success',
+            'text-rose-300 border-rose-500/50 bg-rose-950/40': executionState === 'failed' || executionState === 'timeout'
+          }">
+            {{ resultMessage || progressMessage }}
+          </div>
+        </div>
+
+        <!-- 5. Dual-Operator Safety Confirmation Bar -->
+        <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2 text-slate-300">
+            <ShieldCheck class="w-4 h-4 text-emerald-400" />
+            <span>执行模式:</span>
+            <label class="flex items-center gap-1 cursor-pointer">
+              <input type="radio" value="prev-exec" v-model="controlMode" :disabled="executionState === 'executing'" />
+              <span>标准两步预置执行 (prev->exec)</span>
+            </label>
+            <label class="flex items-center gap-1 cursor-pointer ml-2">
+              <input type="radio" value="direct" v-model="controlMode" :disabled="executionState === 'executing'" />
+              <span>直接执行 (direct)</span>
+            </label>
+          </div>
+
+          <div class="text-slate-400 font-mono">
+            操作员: <span class="text-white">{{ operatorName }}</span>
+          </div>
+        </div>
       </div>
 
-      <!-- Modal Footer Action Buttons -->
-      <div class="px-6 py-4 bg-[#081122] border-t border-cyan-500/30 flex items-center justify-between">
-        <div class="flex items-center gap-2 text-slate-400 text-xs font-mono">
-          <Lock class="w-3.5 h-3.5 text-cyan-400" />
-          <span>调度员: {{ operatorName }}</span>
+      <!-- Footer Buttons -->
+      <div class="px-6 py-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
+        <div class="text-xs text-slate-500">
+          POST /api/scada/control/{{ activeTab === 'yk' ? 'yk' : 'yt' }}
         </div>
 
         <div class="flex items-center gap-3">
           <button
+            v-if="executionState === 'executing'"
+            @click="handleCancelCommand"
+            class="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-[0_0_15px_rgba(225,29,72,0.3)]"
+          >
+            <X class="w-4 h-4" />
+            <span>取消指令 (Cancel)</span>
+          </button>
+
+          <button
             @click="emit('close')"
-            class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs cursor-pointer transition-colors"
+            class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
           >
-            取消关闭
+            关闭
           </button>
 
           <button
-            v-if="activeType === 'control' && currentControlPoint"
-            @click="handleConfirmControl"
-            :disabled="executingState !== 'idle'"
-            class="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-bold text-xs cursor-pointer transition-all flex items-center gap-1.5 shadow-lg shadow-amber-500/20 disabled:opacity-50"
+            v-if="executionState !== 'executing'"
+            @click="handleExecuteControl"
+            class="px-6 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-lg"
+            :class="activeTab === 'yk'
+              ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-[0_0_20px_rgba(6,182,212,0.4)]'
+              : 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-[0_0_20px_rgba(245,158,11,0.4)]'"
           >
-            <Send class="w-3.5 h-3.5" />
-            <span>{{ executingState === 'idle' ? '执行遥控下发' : '正在下发...' }}</span>
-          </button>
-
-          <button
-            v-else-if="activeType === 'regulation' && currentRegulationPoint"
-            @click="handleConfirmRegulation"
-            :disabled="executingState !== 'idle'"
-            class="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-cyan-400 hover:from-cyan-400 hover:to-cyan-300 text-slate-950 font-bold text-xs cursor-pointer transition-all flex items-center gap-1.5 shadow-lg shadow-cyan-500/20 disabled:opacity-50"
-          >
-            <Send class="w-3.5 h-3.5" />
-            <span>{{ executingState === 'idle' ? '执行遥调定值下发' : '正在下发...' }}</span>
+            <Send class="w-4 h-4" />
+            <span>下发并启动返校校验</span>
           </button>
         </div>
       </div>

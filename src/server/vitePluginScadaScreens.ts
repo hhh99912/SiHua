@@ -26,6 +26,12 @@ import {
   deleteDatasetFromDisk,
   ensureDataDirectory
 } from './scadaDataStorage';
+import {
+  handleGetScadaConfig,
+  handleGetScadaRealtime,
+  handlePostScadaYk,
+  handlePostScadaYt
+} from './scadaMockBackend';
 
 /**
  * 辅助函数：从 http.IncomingMessage 解析 JSON 请求体
@@ -85,13 +91,14 @@ function registerEndpoints(middlewares: any) {
   middlewares.use(async (req: any, res: any, next: any) => {
     const url = req.url || '';
 
-    // 拦截 /api/screens、/api/templates (/api/models)、/api/cells 与 /api/data (/api/datasets) 前缀的请求
+    // 拦截 /api/screens、/api/templates (/api/models)、/api/cells、/api/data 与 /api/scada 前缀的请求
     const isScreensApi = url.startsWith('/api/screens');
     const isTemplatesApi = url.startsWith('/api/templates') || url.startsWith('/api/models');
     const isCellsApi = url.startsWith('/api/cells');
     const isDataApi = url.startsWith('/api/data') || url.startsWith('/api/datasets');
+    const isScadaApi = url.startsWith('/api/scada');
 
-    if (!isScreensApi && !isTemplatesApi && !isCellsApi && !isDataApi) {
+    if (!isScreensApi && !isTemplatesApi && !isCellsApi && !isDataApi && !isScadaApi) {
       return next();
     }
 
@@ -99,6 +106,39 @@ function registerEndpoints(middlewares: any) {
       const parsedUrl = new URL(url, 'http://localhost');
       const pathname = parsedUrl.pathname;
       const method = (req.method || 'GET').toUpperCase();
+
+      // ==================== SCADA 开放标准接口 (/api/scada/*) ====================
+      if (isScadaApi) {
+        // 1. GET /api/scada/config - 全站层级模型与全量配置
+        if (method === 'GET' && pathname === '/api/scada/config') {
+          const pretty = parsedUrl.searchParams.get('pretty') === '1';
+          const result = handleGetScadaConfig(pretty);
+          return sendJson(res, 200, result);
+        }
+
+        // 2. POST /api/scada/realtime - 批量查询实时数据 (YC / YX / DD)
+        if (method === 'POST' && pathname === '/api/scada/realtime') {
+          const body = await parseJsonBody(req);
+          const result = handleGetScadaRealtime(body);
+          return sendJson(res, 200, result);
+        }
+
+        // 3. POST /api/scada/control/yk - 遥控操作 (YK)
+        if (method === 'POST' && pathname === '/api/scada/control/yk') {
+          const body = await parseJsonBody(req);
+          const result = handlePostScadaYk(body);
+          return sendJson(res, result.code || 200, result);
+        }
+
+        // 4. POST /api/scada/control/yt - 遥调操作 (YT)
+        if (method === 'POST' && pathname === '/api/scada/control/yt') {
+          const body = await parseJsonBody(req);
+          const result = handlePostScadaYt(body);
+          return sendJson(res, result.code || 200, result);
+        }
+
+        return sendJson(res, 404, { code: 404, msg: `未找到 SCADA 接口: ${method} ${pathname}` });
+      }
 
       // ==================== 数据集与点表 API 路由 (存储在 data/ 目录) ====================
       if (isDataApi) {
