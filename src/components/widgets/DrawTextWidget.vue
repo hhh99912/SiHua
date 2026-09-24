@@ -19,10 +19,10 @@ const textContent = computed(() => {
 const textStyle = computed(() => {
   const { style } = props.component;
   const color = style?.textColor || style?.stroke || '#00f2ff';
-  const fontSize = typeof style?.fontSize === 'number' ? `${style.fontSize}px` : (style?.fontSize || '14px');
+  const fontSize = typeof style?.fontSize === 'number' ? `${style.fontSize}px` : (style?.fontSize || '18px');
   const fontWeight = style?.fontWeight || 'bold';
   const textAlign = style?.textAlign || 'center';
-  const fontFamily = style?.fontFamily || `'JetBrains Mono', Consolas, monospace, sans-serif`;
+  const fontFamily = style?.fontFamily || `'Noto Sans SC', 'Noto Sans CJK SC', 'Source Han Sans SC', 'WenQuanYi Micro Hei', 'Microsoft YaHei', 'PingFang SC', 'SimHei', 'JetBrains Mono', system-ui, sans-serif`;
   const letterSpacing = style?.letterSpacing ? `${style.letterSpacing}px` : '0.5px';
   const bg = style?.fill && style.fill !== 'transparent' ? style.fill : 'transparent';
 

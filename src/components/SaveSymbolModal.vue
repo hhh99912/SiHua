@@ -26,7 +26,7 @@ const selectedExistingSymbolId = ref<string>('');
 
 // New Symbol Form
 const symbolName = ref('新自定义组装图元');
-const symbolCategory = ref<'electrical' | 'industrial' | 'basic' | 'custom'>('electrical');
+const symbolCategory = ref<'electrical'>('electrical');
 const symbolDescription = ref('由主界面多选图元组合封装而成的多态 SCADA 图元');
 const tagsInput = ref('电力, 开关柜, 自定义图元');
 const stateId = ref('1');
@@ -219,32 +219,19 @@ const handleSave = () => {
         <div class="flex-1 space-y-3.5">
           <!-- New Symbol Fields -->
           <template v-if="mode === 'new'">
-            <div>
-              <label class="block text-[11px] font-mono text-slate-400 mb-1">图元名称 *</label>
-              <input
-                v-model="symbolName"
-                type="text"
-                class="w-full bg-slate-900 border border-cyan-500/30 rounded-lg px-3 py-1.5 text-xs text-slate-100 font-mono focus:border-cyan-400 focus:outline-hidden"
-                placeholder="例如: 10kV 进线断路器柜组合"
-              />
-            </div>
-
             <div class="grid grid-cols-2 gap-3">
               <div>
-                <label class="block text-[11px] font-mono text-slate-400 mb-1">图元分类</label>
-                <select
-                  v-model="symbolCategory"
-                  class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 font-mono focus:border-cyan-400 focus:outline-hidden cursor-pointer"
-                >
-                  <option value="electrical">⚡ 电力系统图元</option>
-                  <option value="industrial">🏭 工业SCADA流体</option>
-                  <option value="basic">📐 基础几何与控制</option>
-                  <option value="custom">📦 自定义组合</option>
-                </select>
+                <label class="block text-[11px] font-mono text-slate-400 mb-1">图元名称 *</label>
+                <input
+                  v-model="symbolName"
+                  type="text"
+                  class="w-full bg-slate-900 border border-cyan-500/30 rounded-lg px-3 py-1.5 text-xs text-slate-100 font-mono focus:border-cyan-400 focus:outline-hidden"
+                  placeholder="例如: 10kV 进线断路器柜组合"
+                />
               </div>
 
               <div>
-                <label class="block text-[11px] font-mono text-slate-400 mb-1">标签</label>
+                <label class="block text-[11px] font-mono text-slate-400 mb-1">标签 (自动归入电力一次系统)</label>
                 <input
                   v-model="tagsInput"
                   type="text"

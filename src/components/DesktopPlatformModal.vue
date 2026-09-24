@@ -39,7 +39,7 @@ export LC_ALL="zh_CN.UTF-8"
 export LC_CTYPE="zh_CN.UTF-8"
 [ -z "$DBUS_SESSION_BUS_ADDRESS" ] && [ -e "/run/user/$(id -u)/bus" ] && export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
 export XMODIFIERS="@im=fcitx"
-export GTK_IM_MODULE="fcitx"
+export GTK_IM_MODULE="\${GTK_IM_MODULE:-xim}"
 export QT_IM_MODULE="fcitx"
 export GDK_SCALE=1
 export GDK_DPI_SCALE=1

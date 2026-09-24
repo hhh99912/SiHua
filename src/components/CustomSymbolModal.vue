@@ -763,8 +763,8 @@ const handleSaveSymbol = (andPlaceToCanvas = false) => {
   const symDef: CustomSymbolDef = {
     id: editingSymbolId.value || `custom-sym-${Date.now()}`,
     name: trimmedName,
-    category: editorSymbolCategory.value,
-    iconName: editorSymbolCategory.value === 'electrical' ? 'Zap' : (editorSymbolCategory.value === 'industrial' ? 'Cpu' : 'Box'),
+    category: 'electrical',
+    iconName: 'Zap',
     description: editorSymbolDesc.value.trim() || '工坊自定义封装多态图元',
     tags: tagsArr.length > 0 ? tagsArr : ['自定义图元'],
     defaultWidth: maxW,
@@ -908,7 +908,10 @@ const handleCanvasMouseDown = (e: MouseEvent) => {
       polylineDrawing.value.currentX = coords.x;
       polylineDrawing.value.currentY = coords.y;
     } else {
-      polylineDrawing.value.points.push({ x: coords.x, y: coords.y });
+      const lastPt = polylineDrawing.value.points[polylineDrawing.value.points.length - 1];
+      if (!lastPt || Math.hypot(coords.x - lastPt.x, coords.y - lastPt.y) >= 4) {
+        polylineDrawing.value.points.push({ x: coords.x, y: coords.y });
+      }
     }
     return;
   }
@@ -1178,7 +1181,20 @@ const handleCanvasMouseUp = () => {
 // Finish Polyline Drawing (Consistent with CanvasEditor.vue)
 const finishPolylineDrawing = () => {
   if (!polylineDrawing.value.active) return;
-  const pts = polylineDrawing.value.points;
+  // 严格清洗顶点：过滤掉因双击连续触发 click 而产生的重复尾部顶点及所有相邻重合节点 (<= 4px)
+  const rawPts = polylineDrawing.value.points;
+  const pts: Array<{ x: number; y: number }> = [];
+  for (const p of rawPts) {
+    if (pts.length === 0) {
+      pts.push(p);
+    } else {
+      const prev = pts[pts.length - 1];
+      if (Math.hypot(p.x - prev.x, p.y - prev.y) >= 4) {
+        pts.push(p);
+      }
+    }
+  }
+
   if (pts.length < 2) {
     polylineDrawing.value.active = false;
     polylineDrawing.value.points = [];
@@ -1607,10 +1623,12 @@ const handleKeyUp = (e: KeyboardEvent) => {
 
 // Keyboard handler: micro-adjustments & full shortcut suite
 const handleKeyDown = (e: KeyboardEvent) => {
+  if (e.isComposing || e.keyCode === 229) return;
+  if ((e.code === 'Space' || e.key === ' ' || e.keyCode === 32) && (e.ctrlKey || e.metaKey || e.altKey)) return;
   if (currentMode.value !== 'editor') return;
 
   const target = e.target as HTMLElement;
-  if (target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) {
+  if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) {
     return;
   }
 
@@ -2203,16 +2221,11 @@ const handleFileChange = async (e: Event) => {
                 v-model="editorSymbolName"
                 type="text"
                 placeholder="图元名称"
-                class="bg-slate-950 border border-slate-700 focus:border-cyan-400 rounded px-2.5 py-1 text-xs text-cyan-300 font-bold w-48 font-mono focus:outline-hidden"
+                class="bg-slate-950 border border-slate-700 focus:border-cyan-400 rounded px-2.5 py-1 text-xs text-cyan-300 font-bold w-56 font-mono focus:outline-hidden"
               />
-              <select
-                v-model="editorSymbolCategory"
-                class="bg-slate-950 border border-slate-700 text-slate-300 rounded px-2 py-1 text-xs font-mono focus:outline-hidden"
-              >
-                <option value="electrical">电力一次设备</option>
-                <option value="industrial">工业SCADA</option>
-                <option value="custom">自定义资产</option>
-              </select>
+              <span class="text-[11px] text-cyan-400/80 bg-cyan-950/40 border border-cyan-800/60 px-2 py-0.5 rounded font-mono">
+                ⚡ 电力一次系统
+              </span>
             </div>
           </div>
 

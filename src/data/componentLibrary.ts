@@ -521,8 +521,8 @@ export const COMPONENT_DEFINITIONS: ComponentDefinition[] = [
     defaultHeight: 40,
     defaultStyle: {
       text: '10kV 配电室 #1 主变',
-      fontSize: 16,
-      fontWeight: '400',
+      fontSize: 18,
+      fontWeight: '700',
       fontFamily: "'Noto Sans SC', system-ui, sans-serif",
       textAlign: 'center',
       verticalAlign: 'center',

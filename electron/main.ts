@@ -4,7 +4,7 @@ import fs from 'fs';
 import net from 'net';
 
 // ==============================================================================
-// 凝思安全操作系统 (Linx OS 4.9.x) / Intel 2代核显 (i915) / 96DPI VGA 屏幕高清抗模糊专用配置
+// 凝思安全操作系统 (Linx OS 4.9.x) / Intel 2代核显 (i915) / 96DPI VGA 屏幕高清抗模糊与输入法专用配置
 // ==============================================================================
 if (process.platform === 'linux') {
   // 1. 基础安全沙箱与共享内存稳定性
@@ -23,19 +23,34 @@ if (process.platform === 'linux') {
   app.commandLine.appendSwitch('enable-font-antialiasing');
   app.commandLine.appendSwitch('enable-lcd-text'); // 开启 LCD RGB 次像素文字微调，消除灰度抗锯齿导致的字体发虚发灰
   
-  // 关键：Linux 96 DPI 屏幕下，medium/full hinting 将汉字横平竖直笔画对齐到物理屏幕整数像素，彻底消除模糊
-  const hintingMode = process.env.SCADA_FONT_HINTING || (process.argv.includes('--hinting-full') ? 'full' : 'medium');
+  // 关键：Linux 96 DPI 屏幕下，full hinting 将汉字横平竖直笔画对齐到物理屏幕整数像素，彻底消除未放大时的发虚
+  const hintingMode = process.env.SCADA_FONT_HINTING || 'full';
   app.commandLine.appendSwitch('font-render-hinting', hintingMode);
 
   // 4. 显卡与图形光栅化调优 (适配 Intel 2代核显 i915 / Mesa Linux 4.9)
+  // 核心：针对 Intel 2代 Sandy Bridge (8086:0102) i915 显卡，禁用 GPU 字体光栅化，强制由 CPU FreeType 进行全微调渲染，
+  // 彻底根除 GPU 双线性纹理过滤导致的未放大字体边缘发虚/毛刺问题！
   app.commandLine.appendSwitch('ignore-gpu-blocklist');
   app.commandLine.appendSwitch('disable-gpu-vsync'); // 避免 VGA 60Hz 垂直同步锁频等待导致的掉帧与刷新卡顿
+  app.commandLine.appendSwitch('disable-gpu-rasterization'); // 禁用 GPU 文字光栅化，使小字号汉字呈现点对点晶体般清晰
   app.commandLine.appendSwitch('enable-zero-copy');
   app.commandLine.appendSwitch('enable-features', 'OverlayScrollbar');
-  app.commandLine.appendSwitch('disable-features', 'CanvasOopRasterization,UseSkiaRendererByDefaultForOOPR');
 
   // 5. 校验解码器与命令流平滑
   app.commandLine.appendSwitch('use-cmd-decoder', 'validating');
+
+  // 6. Linux 凝思安全系统 (X11/Xorg) / Fcitx / IBus 中文输入法唤醒支持 (Ctrl+Space / 候选框)
+  // 注意：严禁添加 enable-input-method 或 enable-wayland-ime（此参数为 ChromeOS/Wayland 专用，在 X11 下会阻断 Fcitx 拦截）
+  if (!process.env.XMODIFIERS) process.env.XMODIFIERS = '@im=fcitx';
+  if (!process.env.GTK_IM_MODULE) {
+    const hasGtk3Fcitx = fs.existsSync('/usr/lib/x86_64-linux-gnu/gtk-3.0/3.0.0/immodules/im-fcitx.so') ||
+                         fs.existsSync('/usr/lib/gtk-3.0/3.0.0/immodules/im-fcitx.so') ||
+                         fs.existsSync('/usr/lib64/gtk-3.0/3.0.0/immodules/im-fcitx.so');
+    process.env.GTK_IM_MODULE = hasGtk3Fcitx ? 'fcitx' : 'xim';
+  }
+  if (!process.env.QT_IM_MODULE) process.env.QT_IM_MODULE = 'fcitx';
+
+  app.commandLine.appendSwitch('gtk-version', '3');
 
   // 如果用户手动传入 --disable-gpu 或 --software-render，彻底启用 CPU 纯软渲染
   if (
@@ -54,7 +69,7 @@ if (process.platform === 'linux') {
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
-app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+app.commandLine.appendSwitch('disable-features', 'CanvasOopRasterization,UseSkiaRendererByDefaultForOOPR,CalculateNativeWinOcclusion');
 app.commandLine.appendSwitch('disable-component-update');
 app.commandLine.appendSwitch('disable-domain-reliability');
 
@@ -80,7 +95,8 @@ function createWindow() {
       sandbox: false,
       webSecurity: false,
       nativeWindowOpen: true, // 消除 Electron 15 废弃警告
-      backgroundThrottling: false // 关键：彻底禁用后台休眠与定时器节流，保持 60FPS 活跃状态，最小化还原无卡死
+      backgroundThrottling: false, // 关键：彻底禁用后台休眠与定时器节流，保持 60FPS 活跃状态，最小化还原无卡死
+      spellcheck: false // 禁用拼写检查，避免占用输入法通道和产生红波浪线
     }
   });
 

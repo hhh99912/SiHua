@@ -42,11 +42,12 @@ else
       `# --- 1. 声卡硬件映射（告警音） ---` \
       --device /dev/snd \
       --group-add audio \
-      `# --- 2. Fcitx 中文输入法通信通道 ---` \
+      `# --- 2. Fcitx 中文输入法通信通道 (支持 XIM 与 D-Bus 贯通) ---` \
       -e XMODIFIERS="@im=fcitx" \
-      -e GTK_IM_MODULE="fcitx" \
+      -e GTK_IM_MODULE="${GTK_IM_MODULE:-xim}" \
       -e QT_IM_MODULE="fcitx" \
       -v /tmp:/tmp \
+      -v /run/user:/run/user \
       `# --- 3. Mesa 多核软渲染与高清抗模糊核心环境变量 ---` \
       -e LIBGL_ALWAYS_SOFTWARE=1 \
       -e GALLIUM_DRIVER=llvmpipe \
@@ -54,8 +55,8 @@ else
       -e GDK_SCALE=${GDK_SCALE:-1} \
       -e GDK_DPI_SCALE=${GDK_DPI_SCALE:-1} \
       -e SCADA_SCALE_FACTOR=${SCADA_SCALE_FACTOR:-1} \
-      -e SCADA_FONT_HINTING=${SCADA_FONT_HINTING:-medium} \
-      -e FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=1 type1:no-stem-darkening=1 autofitter:warping=1" \
+      -e SCADA_FONT_HINTING=${SCADA_FONT_HINTING:-full} \
+      -e FREETYPE_PROPERTIES="truetype:interpreter-version=35 cff:no-stem-darkening=1 type1:no-stem-darkening=1 autofitter:warping=1" \
       --privileged \
       ${IMAGE_NAME} >/dev/null 2>&1
 fi

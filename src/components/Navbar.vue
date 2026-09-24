@@ -276,7 +276,7 @@ onBeforeUnmount(() => {
         >
           <ShieldCheck v-if="currentUser.role === 'system_admin'" class="w-3.5 h-3.5 text-cyan-300" />
           <UserCheck v-else class="w-3.5 h-3.5 text-emerald-300" />
-          <span class="max-w-[70px] truncate text-[11px] font-light">{{ currentUser.name }}</span>
+          <span class="max-w-[80px] truncate text-xs font-semibold text-[#00f2ff]">{{ currentUser.name }}</span>
         </button>
 
         <!-- Save Current Screen to Disk (仅保存当前这一个大屏) -->
@@ -633,7 +633,7 @@ onBeforeUnmount(() => {
           >
             <ZoomOut class="w-3.5 h-3.5 stroke-[2]" />
           </button>
-          <span class="text-[11px] font-mono font-light text-cyan-200 bg-[#204576] border border-cyan-400/80 rounded px-1.5 py-0.5 w-12 text-center">
+          <span class="text-xs font-mono font-bold text-[#00f2ff] bg-[#204576] border border-cyan-400 rounded px-1.5 py-0.5 w-14 text-center">
             {{ Math.round(zoom * 100) }}%
           </span>
           <button

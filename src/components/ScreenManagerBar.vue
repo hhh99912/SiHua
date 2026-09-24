@@ -492,12 +492,12 @@ const handleConfirmSaveTemplate = async () => {
     </div>
 
     <!-- Right: Screen Resolution Info & Model Directory indicator -->
-    <div class="text-[11px] text-cyan-300/90 flex items-center gap-3 shrink-0 font-light">
-      <span class="text-cyan-400/80 flex items-center gap-1">
-        <Folder class="w-3 h-3 text-cyan-400" />
-        模板库: <strong class="text-cyan-200 font-normal">model/ ({{ availableModels.length }}个)</strong>
+    <div class="text-xs text-[#00f2ff] flex items-center gap-3 shrink-0 font-medium">
+      <span class="text-cyan-200 flex items-center gap-1">
+        <Folder class="w-3.5 h-3.5 text-[#00f2ff]" />
+        模板库: <strong class="text-[#00f2ff] font-bold">model/ ({{ availableModels.length }}个)</strong>
       </span>
-      <span>当前画面尺寸: <strong class="text-cyan-100 font-normal">{{ currentScreen?.screen.width || 1980 }}×{{ currentScreen?.screen.height || 1100 }}</strong></span>
+      <span class="text-cyan-200">当前画面尺寸: <strong class="text-[#00f2ff] font-bold">{{ currentScreen?.screen.width || 1980 }}×{{ currentScreen?.screen.height || 1100 }}</strong></span>
     </div>
 
     <!-- ==================== 1. 新建大屏弹窗 (以下拉菜单形式选择模板，亦可无模板加极简方框) ==================== -->

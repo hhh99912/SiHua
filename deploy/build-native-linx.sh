@@ -120,32 +120,49 @@ elif [ -n "$XMODIFIERS" ]; then
   fi
 fi
 
-# 若未能检测到任何运行中的输入法，默认采用凝思/国产系统普及率最高的 fcitx
-if [ -z "$DETECTED_IME" ]; then
-  DETECTED_IME="fcitx"
-fi
+# 优先继承桌面环境当前已生效的输入法环境变量，避免强制覆盖导致与当前 X11 会话脱节
+ORIG_GTK_IM="$GTK_IM_MODULE"
+ORIG_XMOD="$XMODIFIERS"
 
-if [ "$DETECTED_IME" = "fcitx" ]; then
+if [ -n "$ORIG_XMOD" ]; then
+  export XMODIFIERS="$ORIG_XMOD"
+elif [ "$DETECTED_IME" = "fcitx" ]; then
   export XMODIFIERS="@im=fcitx"
-  export GTK_IM_MODULE="fcitx"
-  export QT_IM_MODULE="fcitx"
-  export CLUTTER_IM_MODULE="fcitx"
-  export SDL_IM_MODULE="fcitx"
-  echo "[输入法] 已激活 Fcitx / 搜狗拼音输入法适配 (GTK3 / X11 协议已就绪)"
 elif [ "$DETECTED_IME" = "ibus" ]; then
   export XMODIFIERS="@im=ibus"
-  export GTK_IM_MODULE="ibus"
-  export QT_IM_MODULE="ibus"
-  export CLUTTER_IM_MODULE="ibus"
-  export SDL_IM_MODULE="ibus"
-  export IBUS_ENABLE_SYNC_MODE=1
-  echo "[输入法] 已激活 IBus 智能输入法适配 (GTK3 / X11 协议已就绪)"
 else
-  export XMODIFIERS="@im=${DETECTED_IME}"
-  export GTK_IM_MODULE="${DETECTED_IME}"
-  export QT_IM_MODULE="${DETECTED_IME}"
-  echo "[输入法] 启用系统输入法: ${DETECTED_IME}"
+  export XMODIFIERS="@im=fcitx"
 fi
+
+# 检查是否存在 GTK3 的 fcitx 模块；若无 GTK3 模块，强制回退至 X11 标准 XIM 协议 (解决 Ctrl+空格 无法唤醒的问题)
+HAS_GTK3_FCITX=0
+if [ -f "/usr/lib/x86_64-linux-gnu/gtk-3.0/3.0.0/immodules/im-fcitx.so" ] || \
+   [ -f "/usr/lib/gtk-3.0/3.0.0/immodules/im-fcitx.so" ] || \
+   [ -f "/usr/lib64/gtk-3.0/3.0.0/immodules/im-fcitx.so" ]; then
+  HAS_GTK3_FCITX=1
+fi
+
+if [ -n "$SCADA_IM_MODULE" ]; then
+  export GTK_IM_MODULE="$SCADA_IM_MODULE"
+elif [ "$DETECTED_IME" = "fcitx" ]; then
+  if [ "$HAS_GTK3_FCITX" = "1" ] && [ "$ORIG_GTK_IM" = "fcitx" ]; then
+    export GTK_IM_MODULE="fcitx"
+  else
+    # 凝思默认桌面往往仅有 GTK2 模块，使用 xim 可直接穿透 X11 唤起 Fcitx 候选框 (Ctrl+空格)
+    export GTK_IM_MODULE="xim"
+  fi
+elif [ -n "$ORIG_GTK_IM" ]; then
+  export GTK_IM_MODULE="$ORIG_GTK_IM"
+elif [ "$DETECTED_IME" = "ibus" ]; then
+  export GTK_IM_MODULE="ibus"
+else
+  export GTK_IM_MODULE="xim"
+fi
+
+export QT_IM_MODULE="${QT_IM_MODULE:-fcitx}"
+export CLUTTER_IM_MODULE="${CLUTTER_IM_MODULE:-xim}"
+export SDL_IM_MODULE="${SDL_IM_MODULE:-fcitx}"
+echo "[输入法] 已激活 ${DETECTED_IME} (GTK_IM_MODULE=${GTK_IM_MODULE}, XMODIFIERS=${XMODIFIERS})"
 
 # 3. 凝思 1080p 96DPI 屏幕与 Intel 2代核显 (i915) 高清抗模糊配置
 export GDK_SCALE=1

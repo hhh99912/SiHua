@@ -1506,9 +1506,30 @@ const batchUniformColor = computed(() => {
 
 const batchUniformFontSize = computed(() => {
   if (props.selectedComponents.length === 0) return '';
-  const firstFS = props.selectedComponents[0].style?.fontSize || 14;
-  return props.selectedComponents.every(c => (c.style?.fontSize || 14) === firstFS) ? firstFS : '';
+  const firstFS = props.selectedComponents[0].style?.fontSize ?? props.selectedComponents[0].customProps?.fontSize ?? '';
+  if (firstFS === '') return '';
+  return props.selectedComponents.every(c => (c.style?.fontSize ?? c.customProps?.fontSize ?? '') === firstFS) ? firstFS : '';
 });
+
+const batchUniformDecimals = computed(() => {
+  if (props.selectedComponents.length === 0) return '';
+  const firstDec = props.selectedComponents[0].style?.decimals ?? props.selectedComponents[0].customProps?.decimals ?? 2;
+  return props.selectedComponents.every(c => (c.style?.decimals ?? c.customProps?.decimals ?? 2) === firstDec) ? firstDec : '';
+});
+
+const handleBatchFontSizeChange = (val: string | number) => {
+  const num = Number(val);
+  if (isNaN(num) || num <= 0) return;
+  const clamped = Math.max(8, Math.min(200, Math.round(num)));
+  handleBatchUpdateStyle({ fontSize: clamped }, { fontSize: clamped });
+};
+
+const handleBatchDecimalsChange = (val: string | number) => {
+  const num = Number(val);
+  if (isNaN(num) || num < 0) return;
+  const clamped = Math.max(0, Math.min(6, Math.round(num)));
+  handleBatchUpdateStyle({ decimals: clamped }, { decimals: clamped });
+};
 
 // Batch Actions
 const handleBatchSetWidth = (w: number) => {
@@ -1630,12 +1651,12 @@ const toggleBatchVisibility = () => {
 </script>
 
 <template>
-  <aside class="w-80 h-full bg-[#10213b] border-l border-cyan-500/40 flex flex-col select-none z-30 shadow-xl overflow-hidden font-mono">
+  <aside class="w-80 h-full bg-[#0c1424] border-l border-slate-800 flex flex-col select-none z-30 shadow-xl overflow-hidden font-mono">
     <!-- Header -->
-    <div class="p-3 border-b border-cyan-500/30 bg-[#142c4e]">
+    <div class="p-3 border-b border-slate-800 bg-[#101c33]">
       <div class="flex items-center justify-between">
-        <div class="flex items-center gap-1.5 font-mono font-normal text-xs text-cyan-200">
-          <SlidersHorizontal class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
+        <div class="flex items-center gap-1.5 font-mono font-normal text-xs text-slate-200">
+          <SlidersHorizontal class="w-3.5 h-3.5 text-cyan-400 stroke-[2]" />
           <span v-if="selectedComponents.length > 1">多选元件配置 ({{ selectedComponents.length }})</span>
           <span v-else-if="component">组件属性配置</span>
           <span v-else>属性配置面板</span>
@@ -2120,28 +2141,86 @@ const toggleBatchVisibility = () => {
             </div>
           </div>
 
-          <!-- Batch Text Styling -->
-          <div class="space-y-2 pt-1 border-t border-cyan-500/20">
-            <label class="text-[11px] text-cyan-200 font-normal block">批量文字属性 (Text & Font)</label>
+          <!-- Batch Text & Telemetry Styling (批量文字与遥测数值属性) -->
+          <div class="space-y-2.5 pt-1 border-t border-cyan-500/20">
+            <div class="flex items-center justify-between">
+              <label class="text-[11px] text-cyan-200 font-normal block">批量文字与遥测数值属性</label>
+              <span class="text-[10px] text-cyan-400/80 font-mono font-light">已选 {{ selectedComponents.length }} 个</span>
+            </div>
             
             <div class="grid grid-cols-2 gap-2">
+              <!-- 1. 字号 (Font Size) - 输入填充 -->
               <div>
-                <label class="text-[10px] text-cyan-300/80 block mb-1">字号 (Font Size)</label>
-                <select
-                  :value="batchUniformFontSize || 14"
-                  @change="handleBatchUpdateStyle({ fontSize: Number(($event.target as HTMLSelectElement).value) })"
-                  class="w-full bg-[#09152b] border border-cyan-500/40 focus:border-cyan-300 rounded-lg px-2 py-1 text-cyan-200 text-xs outline-hidden cursor-pointer"
-                >
-                  <option :value="10">10px 极小</option>
-                  <option :value="12">12px 标注</option>
-                  <option :value="14">14px 标准</option>
-                  <option :value="16">16px 标题</option>
-                  <option :value="18">18px 放大</option>
-                  <option :value="24">24px 数显</option>
-                  <option :value="32">32px 特大</option>
-                </select>
+                <label class="text-[10px] text-cyan-300/80 flex items-center justify-between mb-1">
+                  <span>字号 (Font Size)</span>
+                  <span class="text-[10px] text-cyan-400 font-mono">{{ batchUniformFontSize !== '' ? `${batchUniformFontSize}px` : '多字号' }}</span>
+                </label>
+                <div class="relative flex items-center">
+                  <input
+                    type="number"
+                    min="8"
+                    max="200"
+                    step="1"
+                    :value="batchUniformFontSize"
+                    :placeholder="batchUniformFontSize !== '' ? String(batchUniformFontSize) : '输入统一字号'"
+                    @change="handleBatchFontSizeChange(($event.target as HTMLInputElement).value)"
+                    @keyup.enter="handleBatchFontSizeChange(($event.target as HTMLInputElement).value)"
+                    class="w-full bg-[#09152b] border border-cyan-500/40 focus:border-cyan-300 rounded-lg pl-2.5 pr-7 py-1 text-cyan-200 text-xs font-mono outline-hidden"
+                  />
+                  <span class="absolute right-2 text-[10px] text-cyan-400/70 font-mono pointer-events-none">px</span>
+                </div>
+                <!-- 常用字号快捷微选 -->
+                <div class="flex items-center gap-1 mt-1">
+                  <button
+                    v-for="fs in [12, 14, 16, 20, 24, 32]"
+                    :key="fs"
+                    @click="handleBatchFontSizeChange(fs)"
+                    class="flex-1 py-0.5 rounded text-[9px] font-mono border text-center transition-colors cursor-pointer"
+                    :class="batchUniformFontSize === fs ? 'bg-cyan-500 text-slate-950 font-bold border-cyan-400' : 'bg-[#09152b] text-cyan-300/80 border-cyan-500/30 hover:border-cyan-300 hover:text-white'"
+                  >
+                    {{ fs }}
+                  </button>
+                </div>
               </div>
 
+              <!-- 2. 小数位数 (截断不进位) - 输入填充 + 快捷位 -->
+              <div>
+                <label class="text-[10px] text-cyan-300/80 flex items-center justify-between mb-1">
+                  <span>小数位数 (截断)</span>
+                  <span class="text-[10px] text-cyan-400 font-mono">{{ batchUniformDecimals !== '' ? `${batchUniformDecimals} 位` : '多位数' }}</span>
+                </label>
+                <div class="relative flex items-center">
+                  <input
+                    type="number"
+                    min="0"
+                    max="6"
+                    step="1"
+                    :value="batchUniformDecimals"
+                    :placeholder="batchUniformDecimals !== '' ? String(batchUniformDecimals) : '输入小数位(0-6)'"
+                    @change="handleBatchDecimalsChange(($event.target as HTMLInputElement).value)"
+                    @keyup.enter="handleBatchDecimalsChange(($event.target as HTMLInputElement).value)"
+                    class="w-full bg-[#09152b] border border-cyan-500/40 focus:border-cyan-300 rounded-lg pl-2.5 pr-7 py-1 text-cyan-200 text-xs font-mono outline-hidden"
+                  />
+                  <span class="absolute right-2 text-[10px] text-cyan-400/70 font-mono pointer-events-none">位</span>
+                </div>
+                <!-- 常用截断位数快捷微选 -->
+                <div class="flex items-center gap-1 mt-1">
+                  <button
+                    v-for="dec in [0, 1, 2, 3, 4]"
+                    :key="dec"
+                    @click="handleBatchDecimalsChange(dec)"
+                    class="flex-1 py-0.5 rounded text-[9px] font-mono border text-center transition-colors cursor-pointer"
+                    :class="batchUniformDecimals === dec ? 'bg-cyan-500 text-slate-950 font-bold border-cyan-400' : 'bg-[#09152b] text-cyan-300/80 border-cyan-500/30 hover:border-cyan-300 hover:text-white'"
+                    :title="dec === 0 ? '0位 纯整数直接截断 (如 0.98 -> 0)' : `直接截断保留 ${dec} 位小数`"
+                  >
+                    {{ dec }}位
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 字重与文字颜色 -->
+            <div class="grid grid-cols-2 gap-2 pt-0.5">
               <div>
                 <label class="text-[10px] text-cyan-300/80 block mb-1">字重 (Weight)</label>
                 <div class="grid grid-cols-2 gap-1">
@@ -2159,24 +2238,25 @@ const toggleBatchVisibility = () => {
                   </button>
                 </div>
               </div>
-            </div>
 
-            <!-- Text Color -->
-            <div class="flex items-center gap-2 pt-1">
-              <span class="text-[10px] text-cyan-300/80 whitespace-nowrap">文字颜色:</span>
-              <input
-                type="color"
-                :value="batchUniformColor && batchUniformColor.startsWith('#') ? batchUniformColor : '#ffffff'"
-                @input="handleBatchUpdateStyle({ textColor: ($event.target as HTMLInputElement).value, color: ($event.target as HTMLInputElement).value })"
-                class="w-6 h-6 rounded border border-cyan-500/40 bg-transparent cursor-pointer"
-              />
-              <input
-                type="text"
-                :value="batchUniformColor"
-                :placeholder="batchUniformColor || '保持各自文字色'"
-                @change="handleBatchUpdateStyle({ textColor: ($event.target as HTMLInputElement).value, color: ($event.target as HTMLInputElement).value })"
-                class="flex-1 bg-[#09152b] border border-cyan-500/40 focus:border-cyan-300 rounded-lg px-2 py-1 text-cyan-200 text-xs outline-hidden"
-              />
+              <div>
+                <label class="text-[10px] text-cyan-300/80 block mb-1">文字颜色</label>
+                <div class="flex items-center gap-1.5">
+                  <input
+                    type="color"
+                    :value="batchUniformColor && batchUniformColor.startsWith('#') ? batchUniformColor : '#ffffff'"
+                    @input="handleBatchUpdateStyle({ textColor: ($event.target as HTMLInputElement).value, color: ($event.target as HTMLInputElement).value })"
+                    class="w-7 h-7 rounded border border-cyan-500/40 bg-transparent cursor-pointer shrink-0"
+                  />
+                  <input
+                    type="text"
+                    :value="batchUniformColor"
+                    :placeholder="batchUniformColor || '保持各自文字色'"
+                    @change="handleBatchUpdateStyle({ textColor: ($event.target as HTMLInputElement).value, color: ($event.target as HTMLInputElement).value })"
+                    class="flex-1 min-w-0 bg-[#09152b] border border-cyan-500/40 focus:border-cyan-300 rounded-lg px-2 py-1 text-cyan-200 text-xs outline-hidden font-mono"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 

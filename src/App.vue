@@ -30,6 +30,7 @@ import DesktopPlatformModal from './components/DesktopPlatformModal.vue';
 import ScadaControlModal from './components/ScadaControlModal.vue';
 import ScadaBatchPointModal from './components/ScadaBatchPointModal.vue';
 import DataAssociationModal from './components/DataAssociationModal.vue';
+import BatchDataAssociationModal from './components/BatchDataAssociationModal.vue';
 import LoginModal from './components/LoginModal.vue';
 import ScadaPvLogin from './components/ScadaPvLogin.vue';
 import DiskStorageModal from './components/DiskStorageModal.vue';
@@ -98,6 +99,9 @@ const showPlatformModal = ref(false);
 const showBatchPointModal = ref(false);
 const showDataAssociationModal = ref(false);
 const associationTargetComponent = ref<ScreenComponent | null>(null);
+const showBatchAssociationModal = ref(false);
+const batchAssociationComponents = ref<ScreenComponent[]>([]);
+const batchAssociationCategory = ref<'yc' | 'yx'>('yc');
 const showLoginModal = ref(false);
 const showDiskStorageModal = ref(false);
 const loginNotice = ref('');
@@ -1198,11 +1202,109 @@ const handleDataAssociationSubmit = (payload: {
   recordHistory();
 };
 
+// Open Batch Data Association Modal (右键菜单批量关联遥测/遥信)
+const handleOpenBatchAssociation = (payload: { components: ScreenComponent[]; category: 'yc' | 'yx' }) => {
+  batchAssociationComponents.value = payload.components;
+  batchAssociationCategory.value = payload.category;
+  showBatchAssociationModal.value = true;
+};
+
+// Batch Data Association Submit
+const handleBatchAssociationSubmit = (mappings: Array<{
+  componentId: string;
+  point: { pointId: number; name: string };
+  deviceId: string;
+  deviceName: string;
+  datasetId: string;
+  category: 'yc' | 'yx';
+}>) => {
+  if (!mappings || mappings.length === 0) {
+    showBatchAssociationModal.value = false;
+    return;
+  }
+
+  mappings.forEach(m => {
+    const comp = components.value.find(c => c.id === m.componentId);
+    if (!comp) return;
+
+    if (!comp.data) comp.data = { mapping: {} };
+    if (!comp.data.mapping) comp.data.mapping = {};
+    if (!comp.data.bindings) comp.data.bindings = {};
+
+    const datasetId = m.datasetId || 'ds-substation-scada';
+    const deviceId = m.deviceId || '';
+    const pointId = m.point.pointId;
+    const pointName = m.point.name || '';
+    const category = m.category;
+
+    comp.data.datasetId = datasetId;
+
+    if (category === 'yc') {
+      const pointKey = `${deviceId}_YC_${pointId}`;
+      comp.data.mapping = {
+        ...comp.data.mapping,
+        deviceId,
+        deviceName: m.deviceName,
+        pointCategory: 'telemetry',
+        pointId,
+        pointName,
+        valueKey: pointKey,
+        unit: ''
+      };
+      comp.data.bindings = {
+        ...comp.data.bindings,
+        value: pointKey
+      };
+      const initialVal = resolveDataPointValue(datasets.value, datasetId, pointKey, 0);
+      comp.data.value = initialVal;
+      if (comp.customProps) {
+        comp.customProps.value = initialVal;
+      }
+    } else if (category === 'yx') {
+      const pointKey = `${deviceId}_YX_${pointId}`;
+      comp.data.mapping = {
+        ...comp.data.mapping,
+        deviceId,
+        deviceName: m.deviceName,
+        pointCategory: 'teleSignal',
+        pointId,
+        pointName,
+        stateKey: pointKey
+      };
+      comp.data.bindings = {
+        ...comp.data.bindings,
+        state: pointKey
+      };
+      const initialVal = resolveDataPointValue(datasets.value, datasetId, pointKey, 0);
+      comp.data.state = initialVal;
+      comp.data.value = initialVal;
+      if (comp.customProps) {
+        comp.customProps.state = initialVal;
+        comp.customProps.value = initialVal;
+      }
+      if (comp.states && comp.states.length > 0) {
+        comp.activeState = String(initialVal);
+      }
+    }
+  });
+
+  showBatchAssociationModal.value = false;
+  invalidateAssociatedPointsCache();
+  syncDatasetFastIndex(datasets.value);
+  scadaLiveTick.value++;
+  recordHistory();
+  showDiskNotification(`已成功批量关联 ${mappings.length} 个 ${batchAssociationCategory.value === 'yc' ? '遥测' : '遥信'} 测点`);
+};
+
 // Save as Custom Symbol Flow
 const handleOpenSaveSymbolModal = (comps: ScreenComponent[]) => {
   if (comps.length === 0) return;
   componentsToSave.value = comps;
   showSaveSymbolModal.value = true;
+};
+
+const handleSymbolSaved = (sym: CustomSymbolDef) => {
+  showDiskNotification(`图元「${sym.name}」已封装成功并保存至电力一次系统物料库`);
 };
 
 // Import Project JSON
@@ -1292,7 +1394,10 @@ const handleGlobalScadaControlEvent = (e: any) => {
 
 // Global keyboard shortcut: Ctrl+S / Cmd+S to save active screen only
 const handleKeyDown = (e: KeyboardEvent) => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+  if (e.isComposing || e.keyCode === 229) return;
+  if ((e.code === 'Space' || e.key === ' ' || e.keyCode === 32) && (e.ctrlKey || e.metaKey || e.altKey)) return;
+
+  if ((e.ctrlKey || e.metaKey) && e.key?.toLowerCase() === 's') {
     e.preventDefault();
     handleSaveCurrentScreenToDisk();
   }
@@ -1596,6 +1701,7 @@ onBeforeUnmount(() => {
           @finish:draw="drawTool = 'select'; activePlacementDef = null; activeShapeType = '';"
           @open:property-inspector="showPropertyInspector = true"
           @open:data-association="handleOpenDataAssociation"
+          @open:batch-association="handleOpenBatchAssociation"
           @open:control-modal="(devId) => { controlInitialDeviceId = devId; showControlModal = true; }"
           @commit:history="recordHistory"
         />
@@ -1661,6 +1767,16 @@ onBeforeUnmount(() => {
       @submit="handleDataAssociationSubmit"
     />
 
+    <!-- 1.4.1 SCADA Batch Point Association Modal (右键菜单多选遥测/遥信批量关联) -->
+    <BatchDataAssociationModal
+      :visible="showBatchAssociationModal"
+      :components="batchAssociationComponents"
+      :category="batchAssociationCategory"
+      :datasets="datasets"
+      @close="showBatchAssociationModal = false; batchAssociationComponents = [];"
+      @submit="handleBatchAssociationSubmit"
+    />
+
     <!-- 1.5. SCADA Tele-Control Center Modal (主界面遥控分合闸与遥调指令执行) -->
     <ScadaControlModal
       :visible="showControlModal"
@@ -1707,7 +1823,7 @@ onBeforeUnmount(() => {
       :visible="showSaveSymbolModal"
       :selectedComponents="componentsToSave"
       @close="showSaveSymbolModal = false"
-      @saved="handleAddCustomSymbolToCanvas"
+      @saved="handleSymbolSaved"
     />
 
     <!-- 5. Fullscreen Big Screen Presentation Preview -->

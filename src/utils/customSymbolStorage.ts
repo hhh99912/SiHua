@@ -73,6 +73,8 @@ export function normalizeSymbolZeroMargin(symbol: CustomSymbolDef): CustomSymbol
   cloned.defaultWidth = symbolWidth;
   cloned.defaultHeight = symbolHeight;
   cloned.type = 'composite-symbol';
+  cloned.category = 'electrical';
+  cloned.iconName = 'Zap';
 
   return cloned;
 }

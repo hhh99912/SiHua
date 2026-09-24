@@ -47,13 +47,12 @@ const textFontSize = computed(() => {
 
 const textFontWeight = computed(() => {
   const w = style.value.fontWeight;
-  if (!w || w === 'normal') return '400';
-  if (w === 'bold') return '700';
+  if (!w || w === 'normal' || w === 'bold' || w === '700') return '700';
   return String(w);
 });
 
 const textFontFamily = computed(() => {
-  return style.value.fontFamily || "'Noto Sans SC', system-ui, -apple-system, sans-serif";
+  return style.value.fontFamily || "'Noto Sans SC', 'Noto Sans CJK SC', 'Source Han Sans SC', 'WenQuanYi Micro Hei', 'Microsoft YaHei', 'PingFang SC', 'SimHei', system-ui, -apple-system, sans-serif";
 });
 
 const textAlign = computed(() => {
