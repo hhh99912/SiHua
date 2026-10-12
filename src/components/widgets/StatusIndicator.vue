@@ -6,16 +6,19 @@ import { resolveTeleSignalState, resolveComponentDynamicData, parseStrictNumber 
 interface Props {
   component: ScreenComponent;
   datasets?: DatasetItem[];
+  previewMode?: boolean;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  previewMode: false
+});
 
 const style = computed(() => props.component.style || {});
 const customProps = computed(() => props.component.customProps || {});
 const mapping = computed(() => props.component.data?.mapping || {});
 
 // Dynamic resolved data via unified resolver
-const dynamicData = computed(() => resolveComponentDynamicData(props.component, props.datasets));
+const dynamicData = computed(() => resolveComponentDynamicData(props.component, props.datasets, props.previewMode));
 
 // Resolve strictly 0 (Green) vs 1 (Red) state
 const indicatorState = computed(() => {
@@ -44,7 +47,7 @@ const indicatorState = computed(() => {
 
   // 2. If SCADA live telemetry point is bound and not static override
   if (props.component.data?.useStatic !== true && sKey && (dyn.state === undefined && dyn.value === undefined)) {
-    const resolved = resolveTeleSignalState(props.datasets, props.component.data?.datasetId, sKey, rawState, props.component);
+    const resolved = resolveTeleSignalState(props.datasets, props.component.data?.datasetId, sKey, rawState, props.component, props.previewMode);
     effectiveState = resolved.numericValue;
   } else {
     // 3. Static or direct JSON injection parsing with strict numeric safety

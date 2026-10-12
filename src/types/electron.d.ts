@@ -50,6 +50,10 @@ export interface ElectronAPI {
     saveOne: (cellData: any) => Promise<{ success: boolean; filename?: string; cell?: any; error?: string }>;
     deleteOne: (name: string) => Promise<{ success: boolean; filename?: string; error?: string }>;
   };
+  power?: {
+    getStayAwake: () => Promise<{ success: boolean; stayAwake: boolean; blockerId: number | null; platform: string; isLinxLinux: boolean }>;
+    setStayAwake: (enabled: boolean) => Promise<{ success: boolean; stayAwake: boolean }>;
+  };
 }
 
 declare global {

@@ -23,7 +23,9 @@ const updateTime = () => {
 
 onMounted(() => {
   updateTime();
-  timerId = setInterval(updateTime, 1000);
+  if (props.previewMode) {
+    timerId = setInterval(updateTime, 1000);
+  }
 });
 
 onBeforeUnmount(() => {

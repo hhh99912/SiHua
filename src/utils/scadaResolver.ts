@@ -10,7 +10,8 @@ import {
   cachedRealtimeYc,
   cachedRealtimeYx,
   cachedRealtimeDd,
-  getScadaPointLiveValue
+  getScadaPointLiveValue,
+  getPointReactiveRef
 } from './scadaClient';
 
 export { scadaLiveTick };
@@ -510,9 +511,18 @@ export function resolveDynamicObjectValues(
  */
 export function getComponentLiveValue(
   component: ScreenComponent,
-  datasets?: DatasetItem[]
+  datasets?: DatasetItem[],
+  subscribeLive = false
 ): any {
-  const _tick = scadaLiveTick.value;
+  if (subscribeLive) {
+    const rawPid = component?.data?.mapping?.pointId ?? component?.data?.bindings?.value ?? component?.data?.mapping?.valueKey ?? component?.data?.bindings?.state ?? component?.data?.mapping?.stateKey;
+    const numPid = Number(rawPid);
+    if (!isNaN(numPid) && numPid > 0) {
+      const _ = getPointReactiveRef(numPid).value;
+    } else {
+      const _ = scadaLiveTick.value;
+    }
+  }
   if (!component) return { value: 0, state: 0, unit: '', label: '', quality: 0 };
 
   const dataConfig = component.data;
@@ -589,9 +599,18 @@ export const resolveComponentDynamicData = getComponentLiveValue;
 export function getComponentLiveNumericValue(
   component: ScreenComponent,
   datasets?: DatasetItem[],
-  fallback = 0
+  fallback = 0,
+  subscribeLive = false
 ): number {
-  const _tick = scadaLiveTick.value;
+  if (subscribeLive) {
+    const rawPid = component?.data?.mapping?.pointId ?? component?.data?.bindings?.value ?? component?.data?.mapping?.valueKey;
+    const numPid = Number(rawPid);
+    if (!isNaN(numPid) && numPid > 0) {
+      const _ = getPointReactiveRef(numPid).value;
+    } else {
+      const _ = scadaLiveTick.value;
+    }
+  }
   if (!component) return fallback;
 
   // 1. If static override mode is explicitly set
@@ -669,7 +688,8 @@ export function resolveTeleSignalState(
   datasetId: string | undefined,
   stateKey: string | undefined,
   defaultVal: number | string = 0,
-  component?: ScreenComponent
+  component?: ScreenComponent,
+  subscribeLive = false
 ): {
   numericValue: number;
   statusText: string;
@@ -680,7 +700,15 @@ export function resolveTeleSignalState(
   isWorking: boolean;
   color: string;
 } {
-  const _tick = scadaLiveTick.value;
+  if (subscribeLive) {
+    const rawPid = component?.data?.mapping?.pointId ?? stateKey ?? component?.data?.bindings?.state ?? component?.data?.mapping?.stateKey;
+    const numPid = Number(rawPid);
+    if (!isNaN(numPid) && numPid > 0) {
+      const _ = getPointReactiveRef(numPid).value;
+    } else {
+      const _ = scadaLiveTick.value;
+    }
+  }
   let num: number | undefined = undefined;
 
   const effStateKey = stateKey ||

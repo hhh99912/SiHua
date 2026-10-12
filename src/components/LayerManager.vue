@@ -82,9 +82,10 @@ const saveRename = (comp: ScreenComponent) => {
     });
   }
   editingId.value = null;
+  editingName.value = '';
 };
 
-const toggleVisibility = (comp: ScreenComponent, e: Event) => {
+const toggleVisibility = (comp: ScreenComponent, e: MouseEvent) => {
   e.stopPropagation();
   emit('update:component', {
     ...comp,
@@ -92,7 +93,7 @@ const toggleVisibility = (comp: ScreenComponent, e: Event) => {
   });
 };
 
-const toggleLock = (comp: ScreenComponent, e: Event) => {
+const toggleLock = (comp: ScreenComponent, e: MouseEvent) => {
   e.stopPropagation();
   emit('update:component', {
     ...comp,
@@ -102,63 +103,73 @@ const toggleLock = (comp: ScreenComponent, e: Event) => {
 </script>
 
 <template>
-  <aside class="w-64 shrink-0 h-full bg-[#10213b] border-r border-cyan-400/50 flex flex-col select-none z-30 shadow-xl overflow-hidden font-sans">
-    <!-- Header -->
-    <div class="px-2.5 py-2 border-b border-cyan-500/30 bg-[#142c4e] flex items-center justify-between">
-      <div class="flex items-center gap-1.5 font-mono font-medium text-xs text-cyan-200">
-        <Layers class="w-3.5 h-3.5 text-cyan-300" />
-        <span class="font-normal tracking-wide">图层与组件管理</span>
+  <aside class="w-80 shrink-0 h-full bg-white border-r border-slate-200 flex flex-col select-none z-30 shadow-xs overflow-hidden font-sans text-slate-800 tracking-wide">
+    <!-- Header: Title & Total Count -->
+    <div class="px-3.5 py-2.5 border-b border-slate-200 bg-white flex items-center justify-between shrink-0">
+      <div class="flex items-center gap-2.5">
+        <div class="w-7 h-7 rounded bg-sky-50 text-sky-600 border border-sky-200 flex items-center justify-center font-bold text-xs shadow-2xs">
+          <Layers class="w-4 h-4" />
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-slate-900 tracking-wide leading-none">
+            图层管理
+          </h3>
+          <span class="text-[10px] text-slate-400 font-mono leading-none tracking-normal">
+            Layer Hierarchy
+          </span>
+        </div>
       </div>
-      <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#183761] border border-cyan-500/40 text-cyan-300 font-light">
-        {{ components.length }} 个元件
+
+      <span class="text-[12px] font-mono font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2.5 py-0.5 rounded">
+        共 {{ components?.length || 0 }} 个元件
       </span>
     </div>
 
-    <!-- Layer List -->
-    <div class="flex-1 overflow-y-auto p-1.5 space-y-1 custom-scrollbar">
+    <!-- Components List in Reverse Z-Index Order -->
+    <div class="flex-1 overflow-y-auto p-2 space-y-1.5 bg-slate-50/50">
       <div
         v-if="reversedComponents.length === 0"
-        class="text-center py-10 text-xs font-mono text-cyan-300 font-light"
+        class="text-center py-12 text-sm text-slate-400 font-medium"
       >
         暂无图层元件
       </div>
 
       <div
-        v-for="{ comp, originalIdx } in reversedComponents"
+        v-for="{ comp } in reversedComponents"
         :key="comp.id"
         @click="handleItemClick($event, comp.id)"
-        class="group flex items-center justify-between px-2 py-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer border"
+        class="group flex items-center justify-between px-2.5 py-2 rounded-lg text-[13px] transition-colors cursor-pointer border shadow-2xs"
         :class="activeSelectedIds.includes(comp.id) 
-          ? 'bg-cyan-600/30 border-cyan-300 text-cyan-100 shadow-[0_0_10px_rgba(0,242,255,0.25)]' 
-          : 'bg-[#142c4e] border-cyan-500/30 text-cyan-200 hover:bg-[#183761] hover:text-white hover:border-cyan-400'"
+          ? 'bg-sky-50 border-sky-300 text-sky-950 font-bold ring-1 ring-sky-200' 
+          : 'bg-white border-slate-200 text-slate-800 hover:bg-slate-50 hover:border-slate-300'"
       >
         <!-- Left: Visibility, Lock & Name -->
-        <div class="flex items-center gap-1.5 min-w-0 flex-1">
+        <div class="flex items-center gap-2 min-w-0 flex-1">
           <!-- Visibility Toggle -->
           <button
             @click="toggleVisibility(comp, $event)"
-            class="p-0.5 rounded hover:bg-cyan-900/60 text-cyan-300 hover:text-white transition-colors"
+            class="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer shrink-0"
             :title="comp.visible === false ? '显示图层' : '隐藏图层'"
           >
-            <EyeOff v-if="comp.visible === false" class="w-3.5 h-3.5 text-cyan-500/40" />
-            <Eye v-else class="w-3.5 h-3.5 text-cyan-300 stroke-[2]" />
+            <EyeOff v-if="comp.visible === false" class="w-4 h-4 text-slate-300" />
+            <Eye v-else class="w-4 h-4 text-slate-600 stroke-[2]" />
           </button>
 
           <!-- Lock Toggle -->
           <button
             @click="toggleLock(comp, $event)"
-            class="p-0.5 rounded hover:bg-cyan-900/60 text-cyan-300 hover:text-amber-300 transition-colors"
+            class="p-1 rounded hover:bg-slate-100 text-slate-500 hover:text-amber-600 transition-colors cursor-pointer shrink-0"
             :title="comp.locked ? '解锁图层' : '锁定图层'"
           >
-            <Lock v-if="comp.locked" class="w-3.5 h-3.5 text-amber-300 stroke-[2]" />
-            <Unlock v-else class="w-3.5 h-3.5 text-cyan-300 group-hover:text-cyan-100 stroke-[2]" />
+            <Lock v-if="comp.locked" class="w-4 h-4 text-amber-600 stroke-[2]" />
+            <Unlock v-else class="w-4 h-4 text-slate-400 group-hover:text-slate-600 stroke-[2]" />
           </button>
 
           <!-- Editable Name / Static Name -->
-          <div class="flex-1 min-w-0 flex items-center gap-1">
+          <div class="flex-1 min-w-0 flex items-center gap-1.5">
             <span 
               v-if="activeSelectedIds.includes(comp.id) && activeSelectedIds.length > 1" 
-              class="px-1 py-0.2 bg-cyan-400 text-slate-950 rounded-[2px] font-normal text-[9px] leading-tight shrink-0"
+              class="px-1.5 py-0.2 bg-sky-600 text-white rounded text-[10px] font-bold font-mono leading-tight shrink-0"
             >
               #{{ activeSelectedIds.indexOf(comp.id) + 1 }}
             </span>
@@ -168,15 +179,14 @@ const toggleLock = (comp: ScreenComponent, e: Event) => {
               @blur="saveRename(comp)"
               @keydown.enter="saveRename(comp)"
               @click.stop
-              ref="nameInputRef"
-              class="w-full bg-[#10213b] border border-cyan-300 rounded px-1 py-0.5 text-xs text-cyan-100 outline-hidden font-light"
+              class="w-full bg-white border border-sky-400 rounded px-1.5 py-0.5 text-[13px] text-slate-900 outline-hidden font-bold"
               autoFocus
             />
             <span 
               v-else
               @dblclick.stop="startRename(comp)"
-              class="truncate text-xs font-light text-cyan-100 group-hover:text-cyan-200 tracking-wide"
-              :class="{ 'line-through opacity-40': comp.visible === false }"
+              class="truncate text-[13px] text-slate-800 font-medium tracking-wide"
+              :class="{ 'line-through text-slate-400': comp.visible === false }"
             >
               {{ comp.name }}
             </span>
@@ -184,59 +194,59 @@ const toggleLock = (comp: ScreenComponent, e: Event) => {
         </div>
 
         <!-- Right: Action Buttons -->
-        <div class="flex items-center gap-0.5 opacity-70 group-hover:opacity-100 transition-opacity">
+        <div class="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity shrink-0">
           <!-- Bring to Front -->
           <button
             @click.stop="emit('bring:front', comp.id)"
-            class="p-1 rounded hover:bg-cyan-900/60 text-cyan-300 hover:text-white"
+            class="p-1 rounded hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
             title="置于顶层"
           >
-            <ArrowUpToLine class="w-3 h-3 stroke-[2]" />
+            <ArrowUpToLine class="w-3.5 h-3.5 stroke-[2]" />
           </button>
 
           <!-- Move Up (Z-index +1) -->
           <button
             @click.stop="emit('move:up', comp.id)"
-            class="p-1 rounded hover:bg-cyan-900/60 text-cyan-300 hover:text-white"
+            class="p-1 rounded hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
             title="上移一层"
           >
-            <ChevronUp class="w-3 h-3 stroke-[2]" />
+            <ChevronUp class="w-3.5 h-3.5 stroke-[2]" />
           </button>
 
           <!-- Move Down (Z-index -1) -->
           <button
             @click.stop="emit('move:down', comp.id)"
-            class="p-1 rounded hover:bg-cyan-900/60 text-cyan-300 hover:text-white"
+            class="p-1 rounded hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
             title="下移一层"
           >
-            <ChevronDown class="w-3 h-3 stroke-[2]" />
+            <ChevronDown class="w-3.5 h-3.5 stroke-[2]" />
           </button>
 
           <!-- Send to Back -->
           <button
             @click.stop="emit('send:back', comp.id)"
-            class="p-1 rounded hover:bg-cyan-900/60 text-cyan-300 hover:text-white"
+            class="p-1 rounded hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
             title="置于底层"
           >
-            <ArrowDownToLine class="w-3 h-3 stroke-[2]" />
+            <ArrowDownToLine class="w-3.5 h-3.5 stroke-[2]" />
           </button>
 
           <!-- Duplicate -->
           <button
             @click.stop="emit('duplicate', comp)"
-            class="p-1 rounded hover:bg-cyan-900/60 text-cyan-300 hover:text-white"
+            class="p-1 rounded hover:bg-slate-100 text-slate-600 hover:text-slate-900 cursor-pointer"
             title="复制"
           >
-            <Copy class="w-3 h-3 stroke-[2]" />
+            <Copy class="w-3.5 h-3.5 stroke-[2]" />
           </button>
 
           <!-- Delete -->
           <button
             @click.stop="emit('delete', comp.id)"
-            class="p-1 rounded hover:bg-red-950 text-cyan-300 hover:text-rose-300"
+            class="p-1 rounded hover:bg-rose-50 text-slate-600 hover:text-rose-600 cursor-pointer"
             title="删除"
           >
-            <Trash2 class="w-3 h-3 stroke-[2]" />
+            <Trash2 class="w-3.5 h-3.5 stroke-[2]" />
           </button>
         </div>
       </div>

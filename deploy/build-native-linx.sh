@@ -120,56 +120,40 @@ elif [ -n "$XMODIFIERS" ]; then
   fi
 fi
 
-# 优先继承桌面环境当前已生效的输入法环境变量，避免强制覆盖导致与当前 X11 会话脱节
-ORIG_GTK_IM="$GTK_IM_MODULE"
-ORIG_XMOD="$XMODIFIERS"
-
-if [ -n "$ORIG_XMOD" ]; then
-  export XMODIFIERS="$ORIG_XMOD"
-elif [ "$DETECTED_IME" = "fcitx" ]; then
-  export XMODIFIERS="@im=fcitx"
-elif [ "$DETECTED_IME" = "ibus" ]; then
-  export XMODIFIERS="@im=ibus"
-else
-  export XMODIFIERS="@im=fcitx"
-fi
-
-# 检查是否存在 GTK3 的 fcitx 模块；若无 GTK3 模块，强制回退至 X11 标准 XIM 协议 (解决 Ctrl+空格 无法唤醒的问题)
-HAS_GTK3_FCITX=0
-if [ -f "/usr/lib/x86_64-linux-gnu/gtk-3.0/3.0.0/immodules/im-fcitx.so" ] || \
-   [ -f "/usr/lib/gtk-3.0/3.0.0/immodules/im-fcitx.so" ] || \
-   [ -f "/usr/lib64/gtk-3.0/3.0.0/immodules/im-fcitx.so" ]; then
-  HAS_GTK3_FCITX=1
-fi
-
+# 优先采用原生 fcitx 协议（通过 DBus 传递按键与候选框，保证 Ctrl+空格 瞬时生效）
 if [ -n "$SCADA_IM_MODULE" ]; then
   export GTK_IM_MODULE="$SCADA_IM_MODULE"
-elif [ "$DETECTED_IME" = "fcitx" ]; then
-  if [ "$HAS_GTK3_FCITX" = "1" ] && [ "$ORIG_GTK_IM" = "fcitx" ]; then
-    export GTK_IM_MODULE="fcitx"
-  else
-    # 凝思默认桌面往往仅有 GTK2 模块，使用 xim 可直接穿透 X11 唤起 Fcitx 候选框 (Ctrl+空格)
-    export GTK_IM_MODULE="xim"
-  fi
-elif [ -n "$ORIG_GTK_IM" ]; then
-  export GTK_IM_MODULE="$ORIG_GTK_IM"
 elif [ "$DETECTED_IME" = "ibus" ]; then
   export GTK_IM_MODULE="ibus"
+  export XMODIFIERS="@im=ibus"
+  export QT_IM_MODULE="ibus"
 else
-  export GTK_IM_MODULE="xim"
+  export GTK_IM_MODULE="fcitx"
+  export XMODIFIERS="@im=fcitx"
+  export QT_IM_MODULE="fcitx"
+  export CLUTTER_IM_MODULE="fcitx"
+  export SDL_IM_MODULE="fcitx"
 fi
 
-export QT_IM_MODULE="${QT_IM_MODULE:-fcitx}"
-export CLUTTER_IM_MODULE="${CLUTTER_IM_MODULE:-xim}"
-export SDL_IM_MODULE="${SDL_IM_MODULE:-fcitx}"
-echo "[输入法] 已激活 ${DETECTED_IME} (GTK_IM_MODULE=${GTK_IM_MODULE}, XMODIFIERS=${XMODIFIERS})"
+if [ "$DETECTED_IME" = "fcitx" ]; then
+  if ! pgrep -x fcitx >/dev/null 2>&1 && ! pgrep -x fcitx5 >/dev/null 2>&1; then
+    if command -v fcitx >/dev/null 2>&1; then
+      fcitx -d >/dev/null 2>&1 || true
+      sleep 0.2
+    fi
+  fi
+fi
 
-# 3. 凝思 1080p 96DPI 屏幕与 Intel 2代核显 (i915) 高清抗模糊配置
+echo "[输入法] 已激活 ${DETECTED_IME} (GTK_IM_MODULE=${GTK_IM_MODULE}, XMODIFIERS=${XMODIFIERS}, Ctrl+空格 激活)"
+
+# 3. 凝思 1080p 96DPI 屏幕与 Intel 2代核显 (i915) 高清抗模糊与声卡直通配置
 export GDK_SCALE=1
 export GDK_DPI_SCALE=1
 export SCADA_SCALE_FACTOR=1
-export SCADA_FONT_HINTING=medium
-export FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=1 type1:no-stem-darkening=1 autofitter:warping=1"
+export SCADA_FONT_HINTING=full
+export FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=0 type1:no-stem-darkening=0 autofitter:warping=1"
+export PULSE_LATENCY_MSEC=60
+export ALSA_CARD="${ALSA_CARD:-0}"
 
 # 4. 自动识别定位可执行主程序 (如 datav-scada-studio)
 APP_EXEC=$(find "$SCRIPT_DIR" -maxdepth 1 -type f -executable ! -name '*.so*' ! -name '*.sh' ! -name '*.bin' ! -name '*.pak' ! -name 'chrome*' | head -n 1)
@@ -196,7 +180,6 @@ for arg in "$@"; do
   elif [ "$arg" = "--disable-gpu" ] || [ "$arg" = "--soft-render" ] || [ "$arg" = "--cpu-render" ]; then
     ENABLE_FORCE_SOFT_GPU=1
   elif [[ "$arg" == --ime=* ]]; then
-    # 忽略 --ime 参数，已在上方处理
     continue
   else
     FILTERED_ARGS+=("$arg")
@@ -208,22 +191,29 @@ if [ "$ENABLE_DEBUG" = "1" ]; then
   echo "[调试模式] 已通过 SCADA_DEBUG=1 激活调试与开发者工具 (F12)"
 fi
 
-# 6. 图形与光栅化渲染控制
+# 6. 针对硬件的全部优化 (Intel 2代核显 i915 / Mesa CPU 多核软渲染)
+CPU_CORES=$(nproc 2>/dev/null || echo 4)
 EXTRA_GPU_FLAGS=()
 if [ "$ENABLE_FORCE_SOFT_GPU" = "1" ]; then
-  echo "[图形渲染] 纯 CPU Skia 软件光栅化模式 (彻底消除老旧显卡硬件滤波模糊)"
+  echo "[图形渲染] Mesa 多核 CPU 软渲染模式 (线程数: $CPU_CORES)"
+  export LIBGL_ALWAYS_SOFTWARE=1
+  export GALLIUM_DRIVER=llvmpipe
+  export LP_NUM_THREADS=$CPU_CORES
   EXTRA_GPU_FLAGS=(
     "--disable-gpu"
     "--disable-gpu-compositing"
     "--disable-gpu-rasterization"
   )
 else
-  echo "[图形渲染] 硬件加速 + Skia 2D 精准直出 (禁用 FBO 双线性模糊过滤)"
+  echo "[图形渲染] Intel 2代核显 i915 精准直出模式 (CPU FreeType 字体全微调)"
   EXTRA_GPU_FLAGS=(
+    "--ignore-gpu-blocklist"
+    "--disable-gpu-vsync"
     "--use-cmd-decoder=validating"
-    "--disable-features=CanvasOopRasterization,UseSkiaRendererByDefaultForOOPR"
+    "--disable-features=CanvasOopRasterization,UseSkiaRendererByDefaultForOOPR,SkiaGraphite,CalculateNativeWinOcclusion,Translate,AutofillServerCommunication"
     "--disable-gpu-rasterization"
-    "--enable-zero-copy"
+    "--disable-zero-copy"
+    "--disable-gpu-watchdog"
   )
 fi
 
@@ -232,6 +222,8 @@ exec "$APP_EXEC" \
   --no-sandbox \
   --disable-dev-shm-usage \
   --disable-gpu-sandbox \
+  --disable-gpu-process-crash-limit \
+  --disable-gpu-watchdog \
   --disable-renderer-backgrounding \
   --disable-background-timer-throttling \
   --disable-backgrounding-occluded-windows \
@@ -239,8 +231,17 @@ exec "$APP_EXEC" \
   --high-dpi-support=1 \
   --enable-lcd-text \
   --enable-font-antialiasing \
-  --font-render-hinting=medium \
+  --font-render-hinting=full \
   --force-color-profile=srgb \
+  --gtk-version=3 \
+  --disable-breakpad \
+  --disable-component-update \
+  --disable-sync \
+  --disable-domain-reliability \
+  --disable-background-networking \
+  --disable-speech-api \
+  --disable-print-preview \
+  --no-pings \
   "${EXTRA_GPU_FLAGS[@]}" \
   "${FILTERED_ARGS[@]}"
 EOF

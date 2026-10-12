@@ -159,12 +159,12 @@ onBeforeUnmount(() => {
     <!-- Top Industrial Navigation Header -->
     <header class="relative z-10 w-full px-4 sm:px-8 py-3 border-b border-slate-800 bg-[#070f1e]/80 backdrop-blur-md shrink-0 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="w-8 h-8 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center text-cyan-400 shadow-sm">
-          <Zap class="w-4 h-4 text-cyan-400" />
+        <div class="w-8 h-8 rounded-lg bg-[#d81e06] flex items-center justify-center text-white font-black text-sm shadow-sm">
+          K
         </div>
         <div class="flex items-center gap-2">
           <h1 class="text-sm sm:text-base font-bold text-slate-100 tracking-wider">
-            GE-SCADA 工业监控平台
+            KND科能达 工业监控平台
           </h1>
           <span class="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 text-[10px] font-mono">
             v2.5.0
@@ -280,7 +280,7 @@ onBeforeUnmount(() => {
     <footer class="relative z-10 w-full px-4 sm:px-8 py-2.5 border-t border-slate-800 bg-[#070f1e]/80 backdrop-blur-md shrink-0 flex items-center justify-between text-xs text-slate-400 font-mono">
       <div class="flex items-center gap-2 text-slate-300 font-medium">
         <Server class="w-4 h-4 text-cyan-400" />
-        <span>GE-SCADA 工业监控平台</span>
+        <span>KND科能达 工业监控平台</span>
       </div>
       <div class="text-[11px] text-slate-400 flex items-center gap-2">
         <span class="w-2 h-2 rounded-full bg-emerald-500" />

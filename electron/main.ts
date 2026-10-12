@@ -1,7 +1,49 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, Menu, powerSaveBlocker } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import net from 'net';
+import { exec } from 'child_process';
+
+// ==============================================================================
+// 工业 SCADA 永远常亮保护系统 (防止凝思 Linux / X11 DPMS 熄屏、屏幕保护与系统休眠)
+// ==============================================================================
+let powerBlockerId: number | null = null;
+
+const enableIndustrialStayAwake = () => {
+  try {
+    if (powerBlockerId === null || !powerSaveBlocker.isStarted(powerBlockerId)) {
+      powerBlockerId = powerSaveBlocker.start('prevent-display-sleep');
+      console.log(`[SCADA Power] 工业常亮模式已开启, powerSaveBlocker ID: ${powerBlockerId}`);
+    }
+  } catch (err: any) {
+    console.warn('[SCADA Power] 开启 powerSaveBlocker 失败:', err?.message);
+  }
+
+  // 凝思安全操作系统 (Linx OS 4.9.x / Linux X11) 核心修复：
+  // 即使凝思系统设置了永不休眠，X11 底层的 DPMS 节能协议与 xscreensaver 定时器仍会在长时间无物理键鼠输入时强制熄屏黑屏！
+  // 通过主动执行 xset 彻底关闭 DPMS 与屏保超时，确保永远常亮！
+  if (process.platform === 'linux') {
+    try {
+      exec('xset s off -dpms; xset s 0 0; xset dpms 0 0 0; xset s reset', (error) => {
+        if (error) {
+          console.warn('[SCADA Power] xset 命令执行提示 (非关键):', error.message);
+        } else {
+          console.log('[SCADA Power] 凝思 X11 DPMS 硬件节能与屏幕保护已彻底关闭，锁定屏幕永远常亮');
+        }
+      });
+    } catch {}
+  }
+};
+
+// Linux 凝思环境下每 45 秒发送一次心跳重置 X11 屏保计时器，形成双保险
+if (process.platform === 'linux' && typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    try {
+      exec('xset s reset', () => {});
+    } catch {}
+  }, 45000);
+}
+
 
 // ==============================================================================
 // 凝思安全操作系统 (Linx OS 4.9.x) / Intel 2代核显 (i915) / 96DPI VGA 屏幕高清抗模糊与输入法专用配置
@@ -12,6 +54,7 @@ if (process.platform === 'linux') {
   app.commandLine.appendSwitch('disable-gpu-sandbox');
   app.commandLine.appendSwitch('disable-dev-shm-usage'); // 解决共享内存不足导致的渲染器崩溃
   app.commandLine.appendSwitch('disable-gpu-process-crash-limit');
+  app.commandLine.appendSwitch('disable-gpu-watchdog'); // 彻底禁用 GPU 看门狗，防止图形渲染超时引发崩溃连锁反应导致 Linux 4.9 内核震荡重启
 
   // 2. 核心抗模糊：锁定 1:1 像素比，彻底防止 VGA 480x270mm EDID 导致 Chromium 自动计算 1.05x/1.1x 模糊缩放
   const customScale = process.env.SCADA_SCALE_FACTOR || '1';
@@ -27,13 +70,14 @@ if (process.platform === 'linux') {
   const hintingMode = process.env.SCADA_FONT_HINTING || 'full';
   app.commandLine.appendSwitch('font-render-hinting', hintingMode);
 
-  // 4. 显卡与图形光栅化调优 (适配 Intel 2代核显 i915 / Mesa Linux 4.9)
-  // 核心：针对 Intel 2代 Sandy Bridge (8086:0102) i915 显卡，禁用 GPU 字体光栅化，强制由 CPU FreeType 进行全微调渲染，
-  // 彻底根除 GPU 双线性纹理过滤导致的未放大字体边缘发虚/毛刺问题！
+  // 4. 显卡与图形光栅化调优 (严格适配 Intel 2代核显 i915 / Linux 4.9 内核稳定防护)
+  // 核心：彻底禁用 GPU 字体光栅化由 CPU FreeType 精准全微调渲染；禁用不稳定 zero-copy 防范 i915 DRM ring 挂死导致系统重启！
   app.commandLine.appendSwitch('ignore-gpu-blocklist');
   app.commandLine.appendSwitch('disable-gpu-vsync'); // 避免 VGA 60Hz 垂直同步锁频等待导致的掉帧与刷新卡顿
   app.commandLine.appendSwitch('disable-gpu-rasterization'); // 禁用 GPU 文字光栅化，使小字号汉字呈现点对点晶体般清晰
-  app.commandLine.appendSwitch('enable-zero-copy');
+  app.commandLine.appendSwitch('disable-zero-copy'); // 关键：凝思 4.9 内核对 Sandy Bridge 2代核显的零拷贝 GEM 映射极易触发 GPU hang 重启，禁用保平安
+  app.commandLine.appendSwitch('disable-accelerated-video-decode');
+  app.commandLine.appendSwitch('disable-accelerated-video-encode');
   app.commandLine.appendSwitch('enable-features', 'OverlayScrollbar');
 
   // 5. 校验解码器与命令流平滑
@@ -69,9 +113,30 @@ if (process.platform === 'linux') {
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
-app.commandLine.appendSwitch('disable-features', 'CanvasOopRasterization,UseSkiaRendererByDefaultForOOPR,CalculateNativeWinOcclusion');
+app.commandLine.appendSwitch('disable-features', 'CanvasOopRasterization,UseSkiaRendererByDefaultForOOPR,CalculateNativeWinOcclusion,Translate,AutofillServerCommunication');
 app.commandLine.appendSwitch('disable-component-update');
 app.commandLine.appendSwitch('disable-domain-reliability');
+app.commandLine.appendSwitch('disable-background-networking');
+app.commandLine.appendSwitch('disable-breakpad');
+app.commandLine.appendSwitch('disable-sync');
+app.commandLine.appendSwitch('disable-speech-api');
+app.commandLine.appendSwitch('disable-print-preview');
+app.commandLine.appendSwitch('disable-client-side-phishing-detection');
+app.commandLine.appendSwitch('no-pings');
+
+// V8 与 Chromium 极速减重与内存优化：去除 optimize-for-size 避免密集点位解析时反复触发 JIT 降级抽搐
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=512 --max-semi-space-size=64 --expose-gc');
+app.commandLine.appendSwitch('disk-cache-size', '33554432'); // 适当保留 32MB 磁盘缓存加速冷启动
+app.commandLine.appendSwitch('media-cache-size', '8388608');
+
+// 定期在空闲时段触发 V8 垃圾回收以释放无用内存
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    if (typeof global !== 'undefined' && (global as any).gc) {
+      try { (global as any).gc(); } catch {}
+    }
+  }, 45000);
+}
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -83,27 +148,28 @@ function createWindow() {
     height: 1080,
     minWidth: 1200,
     minHeight: 760,
-    backgroundColor: '#040810',
-    title: 'SCADA 工业组态大屏工作台',
-    frame: true, // Native window frame for cross-platform compatibility
+    backgroundColor: '#080f1e', // 与工业 SCADA 背景色完全一致，彻底杜绝白屏闪烁
+    title: 'KND科能达 SCADA 工业组态大屏工作台',
+    frame: true,
     autoHideMenuBar: true,
-    show: false, // Show once ready to avoid white flash
+    show: false, // 严格保持隐藏，直到首屏真实渲染完毕才显示，彻底杜绝冷启动白屏
+    paintWhenInitiallyHidden: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
       webSecurity: false,
-      nativeWindowOpen: true, // 消除 Electron 15 废弃警告
-      backgroundThrottling: false, // 关键：彻底禁用后台休眠与定时器节流，保持 60FPS 活跃状态，最小化还原无卡死
-      spellcheck: false // 禁用拼写检查，避免占用输入法通道和产生红波浪线
+      nativeWindowOpen: true,
+      backgroundThrottling: false,
+      spellcheck: false
     }
   });
 
   // Remove default menu for clean SCADA workstation feel
   Menu.setApplicationMenu(null);
 
-  // 极速弹出窗口策略：多重触发 + 超时保底，杜绝离线环境下因系统字体或网络超时导致的白屏等待
+  // 消除冷启动白屏核心：等待前端 Vue 完成挂载首帧（通过 app:renderer-ready 握手），再呼出窗口
   const showWindowFast = () => {
     if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
       mainWindow.show();
@@ -111,12 +177,16 @@ function createWindow() {
     }
   };
 
-  mainWindow.once('ready-to-show', showWindowFast);
-  mainWindow.webContents.once('dom-ready', showWindowFast);
-  mainWindow.webContents.once('did-finish-load', showWindowFast);
+  // 1. 优先等待前端 Vue 首帧挂载完成握手（彻底告别 did-finish-load 阶段过早弹出 X11 白色空窗的问题）
+  ipcMain.once('app:renderer-ready', showWindowFast);
 
-  // 300ms 强制弹出保底（即使处于纯离线工业网段也能瞬间亮起黑底窗口，零等待）
-  setTimeout(showWindowFast, 300);
+  // 2. Chromium 内部 ready-to-show：配合 250ms 短暂缓冲，确保首帧像素提交到 X11
+  mainWindow.once('ready-to-show', () => {
+    setTimeout(showWindowFast, 250);
+  });
+
+  // 3. 保底超时：冷启动极端低速磁盘 I/O 异常时保底 4500ms
+  setTimeout(showWindowFast, 4500);
 
   // 监听窗口恢复与显示事件，瞬间触发渲染重绘，消除后台唤醒时的视觉停顿
   mainWindow.on('restore', () => {
@@ -1040,6 +1110,34 @@ function setupIpcHandlers() {
     }
     return { success: true };
   });
+
+  // ---------------- 工业常亮防熄屏电源管理 IPC ----------------
+  ipcMain.handle('power:get-stay-awake', () => {
+    return {
+      success: true,
+      stayAwake: powerBlockerId !== null && powerSaveBlocker.isStarted(powerBlockerId),
+      blockerId: powerBlockerId,
+      platform: process.platform,
+      isLinxLinux: process.platform === 'linux'
+    };
+  });
+
+  ipcMain.handle('power:set-stay-awake', (_event, enabled: boolean) => {
+    if (enabled) {
+      enableIndustrialStayAwake();
+    } else {
+      if (powerBlockerId !== null && powerSaveBlocker.isStarted(powerBlockerId)) {
+        try {
+          powerSaveBlocker.stop(powerBlockerId);
+        } catch {}
+        powerBlockerId = null;
+      }
+    }
+    return {
+      success: true,
+      stayAwake: powerBlockerId !== null && powerSaveBlocker.isStarted(powerBlockerId)
+    };
+  });
 }
 
 // App lifecycle with Single Instance Lock for Windows & Linux
@@ -1056,6 +1154,7 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
+    enableIndustrialStayAwake();
     setupIpcHandlers();
     createWindow();
 

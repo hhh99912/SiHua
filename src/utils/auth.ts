@@ -67,7 +67,7 @@ const getInitialUser = (): UserProfile => {
 };
 
 export const currentUser = ref<UserProfile>(getInitialUser());
-export const isLoggedIn = ref<boolean>(false);
+export const isLoggedIn = ref<boolean>(true);
 
 export const loginUser = (username: string, password: string): { success: boolean; message: string; user?: UserProfile } => {
   const match = PRESET_USERS.find(u => u.username.toLowerCase() === username.trim().toLowerCase());

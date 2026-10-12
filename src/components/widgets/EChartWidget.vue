@@ -463,6 +463,7 @@ const renderChart = () => {
 };
 
 let resizeObserver: ResizeObserver | null = null;
+let resizeRafId: number | null = null;
 
 onMounted(() => {
   isDisposed = false;
@@ -470,9 +471,14 @@ onMounted(() => {
 
   if (chartRef.value) {
     resizeObserver = new ResizeObserver(() => {
-      if (!isDisposed && chartInstance) {
-        chartInstance.resize();
-      }
+      if (resizeRafId) cancelAnimationFrame(resizeRafId);
+      resizeRafId = requestAnimationFrame(() => {
+        if (!isDisposed && chartInstance) {
+          try {
+            chartInstance.resize();
+          } catch {}
+        }
+      });
     });
     resizeObserver.observe(chartRef.value);
   }
@@ -488,7 +494,12 @@ watch(
 
 onBeforeUnmount(() => {
   isDisposed = true;
+  if (resizeRafId) {
+    cancelAnimationFrame(resizeRafId);
+    resizeRafId = null;
+  }
   resizeObserver?.disconnect();
+  resizeObserver = null;
   if (chartInstance) {
     try {
       chartInstance.dispose();

@@ -1,6 +1,4 @@
 import { isElectron } from './platform';
-import { PV_HIGH_VOLTAGE_TEMPLATE } from '../data/pvHighVoltageTemplate';
-import { PRESET_TEMPLATES } from '../data/templates';
 
 export interface DiskModelItem {
   id: string;
@@ -16,50 +14,7 @@ export interface DiskModelItem {
   datasets?: any[];
 }
 
-const LOCAL_STORAGE_MODELS_CACHE = 'ge_scada_models_cache_v1';
-
-/**
- * 本地缓存兜底
- */
-function getLocalFallbackModels(): DiskModelItem[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_MODELS_CACHE);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch {}
-
-  // 兜底内置预设
-  return [
-    {
-      id: 'tpl-pv-high-voltage',
-      name: '35kV高压光伏一次系统接线图',
-      description: PV_HIGH_VOLTAGE_TEMPLATE.description || '国标35kV/110kV光伏升压站一次接线图，100%采用基础几何与标准电气图元原子组装',
-      category: '新能源电力',
-      tags: ['35kV', '110kV', '光伏升压站', '一次系统图', '纯图元组装'],
-      version: '2.0.0',
-      updatedAt: new Date().toISOString(),
-      filename: '35kV高压光伏一次系统接线图.json',
-      screen: PV_HIGH_VOLTAGE_TEMPLATE.schema.screen,
-      components: PV_HIGH_VOLTAGE_TEMPLATE.schema.components || []
-    },
-    ...PRESET_TEMPLATES.filter(t => t.id !== 'tpl-pv-high-voltage').map(t => ({
-      id: t.id,
-      name: t.name,
-      description: t.description,
-      category: t.category,
-      tags: t.tags,
-      version: '2.0.0',
-      updatedAt: new Date().toISOString(),
-      filename: `${t.name}.json`,
-      screen: t.schema.screen,
-      components: t.schema.components || []
-    }))
-  ];
-}
+const LOCAL_STORAGE_MODELS_CACHE = 'ge_scada_models_cache_v2';
 
 function saveToLocalCache(models: DiskModelItem[]) {
   try {
@@ -67,8 +22,22 @@ function saveToLocalCache(models: DiskModelItem[]) {
   } catch {}
 }
 
+function getLocalCacheModels(): DiskModelItem[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_MODELS_CACHE);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return [];
+}
+
 /**
  * 项目启动或需要时：检索并加载 model/ 目录下的所有模板 JSON 文件
+ * 严格依据 model/ 目录磁盘文件，空目录时返回空列表
  */
 export async function loadTemplatesFromDisk(): Promise<{
   success: boolean;
@@ -81,10 +50,11 @@ export async function loadTemplatesFromDisk(): Promise<{
 }> {
   // 1. Electron 桌面环境
   if (isElectron()) {
-    if ((window as any).electronAPI?.models?.loadAll) {
+    const electronModels = (typeof window !== 'undefined' && ((window as any).electronAPI?.models || (window as any).electron?.models));
+    if (electronModels?.loadAll) {
       try {
-        const res = await (window as any).electronAPI.models.loadAll();
-        if (res && res.success && Array.isArray(res.models) && res.models.length > 0) {
+        const res = await electronModels.loadAll();
+        if (res && res.success && Array.isArray(res.models)) {
           saveToLocalCache(res.models);
           return {
             success: true,
@@ -96,7 +66,7 @@ export async function loadTemplatesFromDisk(): Promise<{
           };
         }
       } catch (err) {
-        console.warn('[ModelFileService] Electron 读取 model 目录异常，尝试请求服务/缓存:', err);
+        console.warn('[ModelFileService] Electron 读取 model 目录异常:', err);
       }
     }
   }
@@ -110,7 +80,7 @@ export async function loadTemplatesFromDisk(): Promise<{
 
     if (response.ok) {
       const data = await response.json();
-      if (data && data.success && Array.isArray(data.models) && data.models.length > 0) {
+      if (data && data.success && Array.isArray(data.models)) {
         saveToLocalCache(data.models);
         return {
           success: true,
@@ -123,17 +93,17 @@ export async function loadTemplatesFromDisk(): Promise<{
       }
     }
   } catch (err) {
-    console.warn('[ModelFileService] 请求 /api/templates 失败，回退本地预设缓存:', err);
+    console.warn('[ModelFileService] 请求 /api/templates 失败:', err);
   }
 
-  // 3. 兜底回退
-  const fallback = getLocalFallbackModels();
+  // 3. 兜底本地缓存或空列表（完全依据实际 model 存储，无虚构模板）
+  const cached = getLocalCacheModels();
   return {
     success: true,
-    models: fallback,
+    models: cached,
     storageDir: 'model',
-    count: fallback.length,
-    files: fallback.map(m => `${m.name}.json`),
+    count: cached.length,
+    files: cached.map(m => m.filename || `${m.name}.json`),
     source: 'local_fallback'
   };
 }
@@ -195,7 +165,7 @@ export async function saveTemplateToDisk(templateData: {
   } catch (err: any) {
     console.warn('[ModelFileService] 请求 /api/templates/save 失败:', err);
     // 离线更新本地缓存
-    const list = getLocalFallbackModels().filter(m => m.name !== trimmedName);
+    const list = getLocalCacheModels().filter(m => m.name !== trimmedName);
     const newModel: DiskModelItem = {
       id: `model-${Date.now()}`,
       name: trimmedName,

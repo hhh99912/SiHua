@@ -6,9 +6,12 @@ import { resolveTeleSignalState } from '../../utils/scadaResolver';
 interface Props {
   component: ScreenComponent;
   datasets?: DatasetItem[];
+  previewMode?: boolean;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  previewMode: false
+});
 
 const breakerState = computed(() => {
   const { data, style, customProps } = props.component;
@@ -24,7 +27,7 @@ const breakerState = computed(() => {
     defaultVal = customProps.state;
   }
 
-  const resolved = resolveTeleSignalState(props.datasets, data?.datasetId, sKey, defaultVal, props.component);
+  const resolved = resolveTeleSignalState(props.datasets, data?.datasetId, sKey, defaultVal, props.component, props.previewMode);
 
   const isClosed = resolved.isClosed || resolved.numericValue === 1;
   const status = resolved.isFault ? 'fault' : (isClosed ? 'closed' : 'open');

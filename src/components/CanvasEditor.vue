@@ -218,6 +218,8 @@ const marqueeBox = ref<{ startX: number; startY: number; x: number; y: number; w
   height: 0
 });
 
+let cachedMarqueeAABBs: Array<{ id: string; minX: number; maxX: number; minY: number; maxY: number }> = [];
+
 // Dragging & Resizing & Rotating state
 const isDragging = ref(false);
 const hasMovedDrag = ref(false);
@@ -652,7 +654,7 @@ const processMouseMove = (e: MouseEvent) => {
     return;
   }
 
-  // 4. Marquee Selection Drag (拉框多选：完全包围整个组件才判定为选中)
+  // 4. Marquee Selection Drag (拉框多选：完全包围整个组件才判定为选中，预缓存AABB与去重触发)
   if (isSelectingMarquee.value) {
     const minX = Math.min(marqueeBox.value.startX, coords.rawX);
     const minY = Math.min(marqueeBox.value.startY, coords.rawY);
@@ -674,18 +676,24 @@ const processMouseMove = (e: MouseEvent) => {
       const boxRight = minX + w;
       const boxBottom = minY + h;
 
-      const selected = props.components.filter(c => {
-        if (c.visible === false) return false;
-        const aabb = getComponentAABB(c);
-        // 严格全包围判定：只有当拉框区域完全容纳该图元的全部包围盒边界时才判定为选中，触碰不算选中
-        return (
-          aabb.minX >= boxLeft &&
-          aabb.maxX <= boxRight &&
-          aabb.minY >= boxTop &&
-          aabb.maxY <= boxBottom
-        );
-      });
-      emit('select', selected.map(c => c.id));
+      const newSelectedIds: string[] = [];
+      for (let i = 0; i < cachedMarqueeAABBs.length; i++) {
+        const item = cachedMarqueeAABBs[i];
+        if (
+          item.minX >= boxLeft &&
+          item.maxX <= boxRight &&
+          item.minY >= boxTop &&
+          item.maxY <= boxBottom
+        ) {
+          newSelectedIds.push(item.id);
+        }
+      }
+
+      // Check if selected IDs changed before emitting to prevent massive reactive re-rendering
+      const prevIds = props.selectedIds;
+      if (prevIds.length !== newSelectedIds.length || !newSelectedIds.every((id, idx) => id === prevIds[idx])) {
+        emit('select', newSelectedIds);
+      }
     }
     return;
   }
@@ -1305,6 +1313,9 @@ const handleCanvasMouseDown = (e: MouseEvent) => {
     const coords = getCanvasCoords(e.clientX, e.clientY, true);
     isSelectingMarquee.value = true;
     hasMovedMarquee.value = false;
+    cachedMarqueeAABBs = props.components
+      .filter(c => c.visible !== false)
+      .map(c => ({ id: c.id, ...getComponentAABB(c) }));
     marqueeBox.value = {
       startX: coords.rawX,
       startY: coords.rawY,

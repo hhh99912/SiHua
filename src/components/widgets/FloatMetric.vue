@@ -6,9 +6,12 @@ import { getComponentLiveNumericValue, formatTruncatedNumber } from '../../utils
 interface Props {
   component: ScreenComponent;
   datasets?: DatasetItem[];
+  previewMode?: boolean;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  previewMode: false
+});
 
 // 1. Static/Style properties (computed only when component style or customProps changes)
 const staticStyle = computed(() => {
@@ -64,7 +67,7 @@ const staticStyle = computed(() => {
 
 // 2. High-speed direct numeric formatting (Instant O(1) hash lookup, Direct Truncation without rounding)
 const formattedValue = computed(() => {
-  const num = getComponentLiveNumericValue(props.component, props.datasets, 0.0);
+  const num = getComponentLiveNumericValue(props.component, props.datasets, 0.0, props.previewMode);
   return formatTruncatedNumber(num, staticStyle.value.decimals, staticStyle.value.trimZeros);
 });
 </script>

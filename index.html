@@ -7,9 +7,42 @@
     <meta name="description" content="GE-SCADA 工业监控系统与组态工程平台，支持实时监控、遥控置数、历史曲线与工程管理。" />
     <meta property="og:title" content="GE-SCADA" />
     <meta property="og:description" content="GE-SCADA 工业监控系统与组态工程平台，支持实时监控、遥控置数、历史曲线与工程管理。" />
+    <script>
+      window.addEventListener('error', function (e) {
+        if (
+          e &&
+          e.message &&
+          (e.message.indexOf('ResizeObserver loop completed with undelivered notifications') !== -1 ||
+           e.message.indexOf('ResizeObserver loop limit exceeded') !== -1)
+        ) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+        }
+      });
+    </script>
   </head>
-  <body class="bg-[#0b172a] text-slate-200 select-none overflow-hidden m-0 p-0">
-    <div id="app"></div>
+  <body class="bg-[#080f1e] text-slate-200 select-none overflow-hidden m-0 p-0" style="background-color: #080f1e;">
+    <div id="app">
+      <!-- 极速冷启动黑屏/白屏消除护盾：在 Vue 脚本解析完成前提供即时工业级深底加载动画 -->
+      <div id="scada-boot-splash" style="position:fixed;inset:0;background-color:#080f1e;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',sans-serif;color:#ffffff;z-index:999999;user-select:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;">
+          <div style="width:36px;height:36px;border-radius:8px;background-color:#d81e06;color:#ffffff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:20px;box-shadow:0 4px 12px rgba(216,30,6,0.4);">K</div>
+          <span style="font-size:22px;font-weight:900;letter-spacing:1px;color:#d81e06;">KND科能达</span>
+          <span style="font-size:18px;font-weight:bold;color:#cbd5e1;letter-spacing:0.5px;">SCADA 工业组态工作台</span>
+        </div>
+        <div style="width:260px;height:4px;background-color:#1e293b;border-radius:2px;overflow:hidden;position:relative;">
+          <div style="position:absolute;top:0;left:0;bottom:0;width:40%;background-color:#0284c7;border-radius:2px;animation:scadaBootLoader 1.4s infinite ease-in-out;"></div>
+        </div>
+        <div style="margin-top:14px;font-size:12px;color:#64748b;font-family:monospace;letter-spacing:0.5px;">系统正在初始化图元引擎与 400+ 测点缓存...</div>
+        <style>
+          @keyframes scadaBootLoader {
+            0% { left: -40%; width: 40%; }
+            50% { left: 40%; width: 50%; }
+            100% { left: 100%; width: 30%; }
+          }
+        </style>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

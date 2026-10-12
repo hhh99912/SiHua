@@ -13,7 +13,7 @@ const safePojo = (obj: any) => {
 };
 
 // Expose safe, strongly typed Electron APIs to Vue renderer
-contextBridge.exposeInMainWorld('electronAPI', {
+const apiBridge = {
   isElectron: true,
   getSystemInfo: () => ipcRenderer.invoke('app:get-system-info'),
   saveFile: (payload: { data: string; defaultName?: string; filters?: any[] }) => 
@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   close: () => ipcRenderer.invoke('window:close'),
   toggleFullscreen: () => ipcRenderer.invoke('window:toggle-fullscreen'),
   openExternal: (url: string) => ipcRenderer.invoke('app:open-external', url),
+  notifyAppReady: () => ipcRenderer.send('app:renderer-ready'),
   screens: {
     loadAll: () => ipcRenderer.invoke('screens:load-all'),
     saveAll: (screens: any) => ipcRenderer.invoke('screens:save-all', safePojo(screens)),
@@ -77,5 +78,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.removeListener('uds:realtime-push', handler);
       };
     }
+  },
+  power: {
+    getStayAwake: () => ipcRenderer.invoke('power:get-stay-awake'),
+    setStayAwake: (enabled: boolean) => ipcRenderer.invoke('power:set-stay-awake', Boolean(enabled))
   }
-});
+};
+
+contextBridge.exposeInMainWorld('electronAPI', apiBridge);
+contextBridge.exposeInMainWorld('electron', apiBridge);
+

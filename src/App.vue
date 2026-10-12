@@ -24,16 +24,19 @@ import ScreenManagerBar from './components/ScreenManagerBar.vue';
 import CustomSymbolModal from './components/CustomSymbolModal.vue';
 import SaveSymbolModal from './components/SaveSymbolModal.vue';
 import DatasetManagerModal from './components/DatasetManagerModal.vue';
-import PreviewScreen from './components/PreviewScreen.vue';
-import DesktopPlatformModal from './components/DesktopPlatformModal.vue';
+import DataAssociationModal from './components/DataAssociationModal.vue';
+import BatchDataAssociationModal from './components/BatchDataAssociationModal.vue';
 import ScadaTeleControlModal from './components/ScadaTeleControlModal.vue';
 import ScadaTeleRegulationModal from './components/ScadaTeleRegulationModal.vue';
 import ScadaBatchPointModal from './components/ScadaBatchPointModal.vue';
-import DataAssociationModal from './components/DataAssociationModal.vue';
-import BatchDataAssociationModal from './components/BatchDataAssociationModal.vue';
+import DesktopPlatformModal from './components/DesktopPlatformModal.vue';
+import PreviewScreen from './components/PreviewScreen.vue';
+import RealtimeAlarmModal from './components/RealtimeAlarmModal.vue';
+import MdiWindow from './components/MdiWindow.vue';
+import PrsBottomBar, { BottomWindowItem } from './components/PrsBottomBar.vue';
 import LoginModal from './components/LoginModal.vue';
-import ScadaPvLogin from './components/ScadaPvLogin.vue';
 import DiskStorageModal from './components/DiskStorageModal.vue';
+import { windowClose } from './utils/platform';
 import { 
   loadScreensFromDisk, 
   saveScreenToDisk, 
@@ -45,7 +48,20 @@ import {
 import { fetchAllDatasetsFromDisk } from './utils/datasetFileService';
 import { loadLocalScadaConfigFile, invalidateAssociatedPointsCache } from './utils/scadaClient';
 import { currentUser, canEditCanvas, isLoggedIn, logoutUser } from './utils/auth';
-import { Sparkles, Layers, Box, Zap, HardDrive } from 'lucide-vue-next';
+import { 
+  Sparkles, 
+  Layers, 
+  Box, 
+  Zap, 
+  HardDrive,
+  PenTool,
+  TrendingUp,
+  Bell,
+  Network,
+  Lightbulb,
+  Sliders,
+  Tv
+} from 'lucide-vue-next';
 
 // 1. Initial State: Load Multi-Screen Electrical Project
 const screens = ref<ScreenItem[]>(JSON.parse(JSON.stringify(PRESET_MULTI_SCREENS)));
@@ -94,7 +110,254 @@ const showRegulationModal = ref(false);
 const controlInitialDeviceId = ref<string | undefined>(undefined);
 const controlInitialPointId = ref<number | string | null>(null);
 const controlInitialTargetVerificationPointId = ref<number | string | null>(null);
-const showPreviewModal = ref(true); // Automatically enter SCADA Dashboard on startup
+const showPreviewModal = ref(false); // Controlled via monitor-screen MdiWindow
+
+// ---------------- GE-SCADA 多组态 MDI 独立窗口系统状态 ----------------
+export interface MdiWindowItem {
+  id: string;
+  title: string;
+  subtitle?: string;
+  icon: any;
+  isOpen: boolean;
+  isMinimized: boolean;
+  isMaximized: boolean;
+  zIndex: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  minWidth?: number;
+  minHeight?: number;
+  headerTheme?: 'white' | 'dark';
+}
+
+const highestZIndex = ref(30);
+const activeWindowId = ref<string>('monitor-screen');
+
+const mdiWindows = ref<MdiWindowItem[]>([
+  {
+    id: 'graphic-editor',
+    title: '图形编辑',
+    subtitle: '',
+    icon: PenTool,
+    isOpen: true,
+    isMinimized: false,
+    isMaximized: true,
+    zIndex: 10,
+    x: 0,
+    y: 0,
+    width: 1200,
+    height: 780,
+    headerTheme: 'white'
+  },
+  {
+    id: 'monitor-screen',
+    title: '实时监控',
+    subtitle: '',
+    icon: Zap,
+    isOpen: true,
+    isMinimized: false,
+    isMaximized: true,
+    zIndex: 30,
+    x: 0,
+    y: 0,
+    width: 1200,
+    height: 780,
+    headerTheme: 'white'
+  },
+  {
+    id: 'alarm-window',
+    title: '全站告警',
+    subtitle: '',
+    icon: Bell,
+    isOpen: false,
+    isMinimized: false,
+    isMaximized: false,
+    zIndex: 35,
+    x: 80,
+    y: 40,
+    width: 1100,
+    height: 640,
+    headerTheme: 'white'
+  }
+]);
+
+const getWindow = (id: string): MdiWindowItem => {
+  return mdiWindows.value.find(w => w.id === id) || mdiWindows.value[0];
+};
+
+const openWindow = (id: string) => {
+  const win = mdiWindows.value.find(w => w.id === id);
+  if (win) {
+    win.isOpen = true;
+    win.isMinimized = false;
+    focusWindow(id);
+  }
+};
+
+const closeWindow = (id: string) => {
+  const win = mdiWindows.value.find(w => w.id === id);
+  if (win) {
+    win.isOpen = false;
+  }
+};
+
+const minimizeWindow = (id: string) => {
+  const win = mdiWindows.value.find(w => w.id === id);
+  if (win) {
+    win.isMinimized = true;
+  }
+};
+
+const maximizeWindow = (id: string) => {
+  const win = mdiWindows.value.find(w => w.id === id);
+  if (win) {
+    win.isMaximized = true;
+    focusWindow(id);
+  }
+};
+
+const restoreWindow = (id: string) => {
+  const win = mdiWindows.value.find(w => w.id === id);
+  if (win) {
+    win.isMaximized = false;
+    focusWindow(id);
+  }
+};
+
+const toggleWindow = (id: string) => {
+  const win = mdiWindows.value.find(w => w.id === id);
+  if (!win) return;
+  if (!win.isOpen) {
+    win.isOpen = true;
+    win.isMinimized = false;
+    focusWindow(id);
+  } else if (win.isMinimized) {
+    win.isMinimized = false;
+    focusWindow(id);
+  } else if (activeWindowId.value === id) {
+    win.isMinimized = true;
+  } else {
+    focusWindow(id);
+  }
+};
+
+const focusWindow = (id: string) => {
+  activeWindowId.value = id;
+  const win = mdiWindows.value.find(w => w.id === id);
+  if (win) {
+    highestZIndex.value += 1;
+    win.zIndex = highestZIndex.value;
+  }
+};
+
+const updateWindowCoord = (id: string, prop: 'x' | 'y' | 'width' | 'height', val: number) => {
+  const win = mdiWindows.value.find(w => w.id === id);
+  if (win) {
+    win[prop] = val;
+  }
+};
+
+const updateWindowProp = (id: string, prop: 'isMaximized' | 'isMinimized', val: boolean) => {
+  const win = mdiWindows.value.find(w => w.id === id);
+  if (win) {
+    win[prop] = val;
+    if (prop === 'isMaximized' && val) {
+      focusWindow(id);
+    }
+  }
+};
+
+const tileWindows = () => {
+  const openWins = mdiWindows.value.filter(w => w.isOpen && !w.isMinimized);
+  if (openWins.length === 0) return;
+  const availW = window.innerWidth;
+  const availH = window.innerHeight - 40;
+
+  if (openWins.length === 1) {
+    openWins[0].isMaximized = true;
+    focusWindow(openWins[0].id);
+    return;
+  }
+
+  openWins.forEach(w => { w.isMaximized = false; });
+
+  if (openWins.length === 2) {
+    openWins[0].x = 0;
+    openWins[0].y = 0;
+    openWins[0].width = Math.floor(availW / 2);
+    openWins[0].height = availH;
+
+    openWins[1].x = Math.floor(availW / 2);
+    openWins[1].y = 0;
+    openWins[1].width = Math.ceil(availW / 2);
+    openWins[1].height = availH;
+  } else if (openWins.length <= 4) {
+    const halfW = Math.floor(availW / 2);
+    const halfH = Math.floor(availH / 2);
+    openWins.forEach((w, idx) => {
+      const col = idx % 2;
+      const row = Math.floor(idx / 2);
+      w.x = col * halfW;
+      w.y = row * halfH;
+      w.width = halfW;
+      w.height = halfH;
+    });
+  } else {
+    const cols = 3;
+    const colW = Math.floor(availW / cols);
+    const rows = Math.ceil(openWins.length / cols);
+    const rowH = Math.floor(availH / rows);
+    openWins.forEach((w, idx) => {
+      const col = idx % cols;
+      const row = Math.floor(idx / cols);
+      w.x = col * colW;
+      w.y = row * rowH;
+      w.width = colW;
+      w.height = rowH;
+    });
+  }
+};
+
+const cascadeWindows = () => {
+  const openWins = mdiWindows.value.filter(w => w.isOpen && !w.isMinimized);
+  openWins.forEach(w => { w.isMaximized = false; });
+  const baseW = Math.min(1080, Math.floor(window.innerWidth * 0.78));
+  const baseH = Math.min(680, Math.floor((window.innerHeight - 40) * 0.78));
+  openWins.forEach((w, idx) => {
+    w.x = Math.min(window.innerWidth - baseW, 30 + idx * 35);
+    w.y = Math.min(window.innerHeight - 40 - baseH, 20 + idx * 30);
+    w.width = baseW;
+    w.height = baseH;
+    highestZIndex.value += 1;
+    w.zIndex = highestZIndex.value;
+  });
+};
+
+const minimizeAll = () => {
+  mdiWindows.value.forEach(w => {
+    if (w.isOpen) w.isMinimized = true;
+  });
+};
+
+const restoreAll = () => {
+  mdiWindows.value.forEach(w => {
+    if (w.isOpen) w.isMinimized = false;
+  });
+};
+
+const bottomBarWindows = computed<BottomWindowItem[]>(() => {
+  return mdiWindows.value.map(w => ({
+    id: w.id,
+    title: w.title.split(' ')[0],
+    icon: w.icon,
+    isOpen: w.isOpen,
+    isMinimized: w.isMinimized,
+    isMaximized: w.isMaximized,
+    isActive: activeWindowId.value === w.id,
+    badge: w.id === 'alarm-window' ? 12 : undefined
+  }));
+});
 const showSymbolModal = ref(false);
 const showSaveSymbolModal = ref(false);
 const showPlatformModal = ref(false);
@@ -448,7 +711,7 @@ const recordHistory = () => {
   }
 
   historyStack.value.push(snapshot);
-  if (historyStack.value.length > 50) {
+  if (historyStack.value.length > 25) {
     historyStack.value.shift();
   }
   historyIndex.value = historyStack.value.length - 1;
@@ -1371,8 +1634,6 @@ const handleGlobalJumpEvent = (e: any) => {
 };
 
 const handleGlobalScadaControlEvent = (e: any) => {
-  // If preview is active, PreviewScreen handles the modal directly in the preview layer
-  if (showPreviewModal.value) return;
   controlInitialDeviceId.value = e.detail?.deviceId || undefined;
   controlInitialPointId.value = e.detail?.pointId || null;
   controlInitialTargetVerificationPointId.value = e.detail?.targetVerificationPointId || null;
@@ -1510,7 +1771,7 @@ const handleLoginSuccess = async () => {
   } catch (err) {
     console.warn('[SCADA] 登录获取主索引大屏配置失败:', err);
   }
-  showPreviewModal.value = true; // Enter Big Screen Dashboard directly on successful login
+  openWindow('graphic-editor');
   fitToScreen();
 };
 
@@ -1531,13 +1792,20 @@ const handleOpenPreview = async () => {
   } catch (err) {
     console.warn('[SCADA] 预览前自动保存失败:', err);
   }
-  showPreviewModal.value = true;
+  openWindow('monitor-screen');
   fitToScreen();
 };
 
 const handleLogout = () => {
   logoutUser();
-  showPreviewModal.value = false;
+};
+
+const handleExitApp = async () => {
+  try {
+    await windowClose();
+  } catch (err) {
+    console.warn('[SCADA] 退出程序调用失败:', err);
+  }
 };
 
 onBeforeUnmount(() => {
@@ -1557,283 +1825,432 @@ onBeforeUnmount(() => {
     @login:success="handleLoginSuccess"
   />
 
-  <!-- 2. SCADA Master Studio Workspace (After login) -->
-  <div v-else class="h-screen w-screen flex flex-col bg-[#0b172a] text-slate-200 overflow-hidden font-sans select-none">
-    <!-- Top Navigation & Global Controls -->
-    <Navbar
-      :screen="screen"
-      :zoom="zoom"
-      :isStreaming="isStreaming"
-      :canUndo="canUndo"
-      :canRedo="canRedo"
-      :drawTool="drawTool"
-      :activeShapeType="activeShapeType"
-      :selectedIds="selectedIds"
-      :selectedComponents="selectedComponents"
-      :showGrid="showGrid"
-      :gridSize="gridSize"
-      :snapToGrid="snapToGrid"
-      :orthogonalLock="orthogonalLock"
-      :showRuler="showRuler"
-      @update:screen="screen = $event; recordHistory();"
-      @update:zoom="zoom = $event"
-      @update:drawTool="drawTool = $event"
-      @select:shape="handleSelectBasicShape"
-      @update:showGrid="showGrid = $event"
-      @update:gridSize="gridSize = $event"
-      @update:snapToGrid="snapToGrid = $event"
-      @update:orthogonalLock="orthogonalLock = $event"
-      @update:showRuler="showRuler = $event"
-      @toggle:streaming="isStreaming = !isStreaming"
-      @save:screen="handleSaveCurrentScreenToDisk"
-      @open:preview="handleOpenPreview"
-      @open:datasets="showDatasetsModal = true"
-      @open:control="showControlModal = true; controlInitialDeviceId = undefined;"
-      @open:disk-storage="showDiskStorageModal = true"
-      @open:symbols="showSymbolModal = true"
-      @open:platform="showPlatformModal = true"
-      @open:login="showLoginModal = true"
-      @load:template="handleSwitchScreen"
-      @clear:canvas="handleClearCanvas"
-      @fit:screen="fitToScreen"
-      @undo="handleUndo"
-      @redo="handleRedo"
-      @align="handleAlignComponent"
-      @group="handleGroup"
-      @ungroup="handleUngroup"
-      @save:symbol="() => handleOpenSaveSymbolModal(selectedComponents)"
-      @center:all="fitToScreen"
-      @snap:all="handleSnapAllToGrid"
-    />
+  <!-- 2. SCADA Master Studio Workspace (After login) - GE-SCADA 多组态 MDI 独立窗口系统 (护眼偏暖白底色) -->
+  <div v-else class="h-screen w-screen fixed inset-0 overflow-hidden bg-[#e5e7eb] text-slate-900 font-sans select-none">
+    <!-- Desktop Area (from top to calc(100vh - 40px)) 护眼柔和暖白底色，杜绝刺眼纯白与冷黑大背景 -->
+    <div class="fixed top-0 left-0 right-0 bottom-10 overflow-hidden bg-[#edf0f5]">
+      <!-- ======================================================== -->
+      <!-- A. 组态窗口 1: 图形编辑界面 (Graphic Editor)             -->
+      <!-- ======================================================== -->
+      <MdiWindow
+        :id="'graphic-editor'"
+        :title="'图形编辑界面 (SCADA Studio)'"
+        :subtitle="currentScreenItem.name"
+        :icon="PenTool"
+        :isOpen="getWindow('graphic-editor').isOpen"
+        :isMinimized="getWindow('graphic-editor').isMinimized"
+        :isMaximized="getWindow('graphic-editor').isMaximized"
+        :zIndex="getWindow('graphic-editor').zIndex"
+        :x="getWindow('graphic-editor').x"
+        :y="getWindow('graphic-editor').y"
+        :width="getWindow('graphic-editor').width"
+        :height="getWindow('graphic-editor').height"
+        :headerTheme="'white'"
+        :hideHeaderWhenMaximized="true"
+        @focus="focusWindow('graphic-editor')"
+        @close="closeWindow('graphic-editor')"
+        @minimize="minimizeWindow('graphic-editor')"
+        @maximize="maximizeWindow('graphic-editor')"
+        @restore="restoreWindow('graphic-editor')"
+        @update:x="val => updateWindowCoord('graphic-editor', 'x', val)"
+        @update:y="val => updateWindowCoord('graphic-editor', 'y', val)"
+        @update:width="val => updateWindowCoord('graphic-editor', 'width', val)"
+        @update:height="val => updateWindowCoord('graphic-editor', 'height', val)"
+        @update:isMaximized="val => updateWindowProp('graphic-editor', 'isMaximized', val)"
+        @update:isMinimized="val => updateWindowProp('graphic-editor', 'isMinimized', val)"
+      >
+        <div class="w-full h-full flex flex-col bg-slate-100 text-slate-800 overflow-hidden font-sans select-none">
+          <!-- Top Navbar (KND科能达 白色主题菜单与工具栏，最大化时自动平衡 Electron 顶栏) -->
+          <Navbar
+            :screen="screen"
+            :zoom="zoom"
+            :isStreaming="isStreaming"
+            :canUndo="canUndo"
+            :canRedo="canRedo"
+            :drawTool="drawTool"
+            :activeShapeType="activeShapeType"
+            :selectedIds="selectedIds"
+            :selectedComponents="selectedComponents"
+            :showGrid="showGrid"
+            :gridSize="gridSize"
+            :snapToGrid="snapToGrid"
+            :orthogonalLock="orthogonalLock"
+            :showRuler="showRuler"
+            :isMaximized="getWindow('graphic-editor').isMaximized"
+            @minimize:window="minimizeWindow('graphic-editor')"
+            @restore:window="restoreWindow('graphic-editor')"
+            @maximize:window="maximizeWindow('graphic-editor')"
+            @close:window="closeWindow('graphic-editor')"
+            @update:screen="screen = $event; recordHistory();"
+            @update:zoom="zoom = $event"
+            @update:drawTool="drawTool = $event"
+            @select:shape="handleSelectBasicShape"
+            @update:showGrid="showGrid = $event"
+            @update:gridSize="gridSize = $event"
+            @update:snapToGrid="snapToGrid = $event"
+            @update:orthogonalLock="orthogonalLock = $event"
+            @update:showRuler="showRuler = $event"
+            @toggle:streaming="isStreaming = !isStreaming"
+            @save:screen="handleSaveCurrentScreenToDisk"
+            @open:preview="handleOpenPreview"
+            @open:datasets="showDatasetsModal = true"
+            @open:control="showControlModal = true; controlInitialDeviceId = undefined;"
+            @open:disk-storage="showDiskStorageModal = true"
+            @open:symbols="showSymbolModal = true"
+            @open:platform="showPlatformModal = true"
+            @open:login="showLoginModal = true"
+            @open:window="openWindow"
+            @exit:app="handleExitApp"
+            @tile:windows="tileWindows"
+            @cascade:windows="cascadeWindows"
+            @load:template="handleSwitchScreen"
+            @clear:canvas="handleClearCanvas"
+            @fit:screen="fitToScreen"
+            @undo="handleUndo"
+            @redo="handleRedo"
+            @align="handleAlignComponent"
+            @group="handleGroup"
+            @ungroup="handleUngroup"
+            @save:symbol="() => handleOpenSaveSymbolModal(selectedComponents)"
+            @center:all="fitToScreen"
+            @snap:all="handleSnapAllToGrid"
+          />
 
-    <!-- Main Workspace Studio -->
-    <div v-show="!showPreviewModal" class="flex-1 flex overflow-hidden relative">
-      <!-- Left Sidebar Navigation Tabs (Palette vs Layers) -->
-      <div class="w-11 shrink-0 bg-[#0c1d37] border-r border-cyan-500/25 flex flex-col items-center py-2.5 gap-2.5 z-30">
-        <button
-          @click="leftSidebarTab = 'palette'"
-          class="w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer"
-          :class="leftSidebarTab === 'palette' 
-            ? 'bg-cyan-500/25 text-cyan-200 border border-cyan-400 shadow-[0_0_10px_rgba(0,242,255,0.35)]' 
-            : 'text-cyan-300 hover:text-white hover:bg-cyan-950/60'"
-          title="组件物料库 (含电力一次图元)"
-        >
-          <Box class="w-4 h-4 stroke-[2]" />
-        </button>
+          <!-- Main Workspace Studio (Sidebar + Canvas + ScreenManagerBar) -->
+          <div class="flex-1 flex overflow-hidden relative">
+            <!-- Left Sidebar Navigation Tabs -->
+            <div class="w-11 shrink-0 bg-slate-100 border-r border-slate-200 flex flex-col items-center py-2.5 gap-2.5 z-30">
+              <button
+                @click="leftSidebarTab = 'palette'"
+                class="w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer"
+                :class="leftSidebarTab === 'palette' 
+                  ? 'bg-white text-sky-700 border border-slate-300 shadow-xs font-bold' 
+                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/60'"
+                title="图元浏览器 (树状层级列表)"
+              >
+                <Box class="w-4 h-4 stroke-[2]" />
+              </button>
+              <button
+                @click="leftSidebarTab = 'layers'"
+                class="w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer relative"
+                :class="leftSidebarTab === 'layers' 
+                  ? 'bg-white text-sky-700 border border-slate-300 shadow-xs font-bold' 
+                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/60'"
+                title="图层层级列表"
+              >
+                <Layers class="w-4 h-4 stroke-[2]" />
+                <span 
+                  v-if="components.length > 0" 
+                  class="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-sky-600 text-white text-[8px] font-mono font-bold flex items-center justify-center"
+                >
+                  {{ components.length }}
+                </span>
+              </button>
+            </div>
 
-        <button
-          @click="leftSidebarTab = 'layers'"
-          class="w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer relative"
-          :class="leftSidebarTab === 'layers' 
-            ? 'bg-cyan-500/25 text-cyan-200 border border-cyan-400 shadow-[0_0_10px_rgba(0,242,255,0.35)]' 
-            : 'text-cyan-300 hover:text-white hover:bg-cyan-950/60'"
-          title="图层层级列表"
-        >
-          <Layers class="w-4 h-4 stroke-[2]" />
-          <span 
-            v-if="components.length > 0" 
-            class="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-cyan-400 text-slate-950 text-[8px] font-mono font-bold flex items-center justify-center"
-          >
-            {{ components.length }}
-          </span>
-        </button>
-      </div>
+            <!-- Left Tab Pane -->
+            <ComponentPalette
+              v-if="leftSidebarTab === 'palette'"
+              @add:component="handleAddComponentFromPalette"
+              @open:symbol-modal="showSymbolModal = true"
+            />
+            <LayerManager
+              v-else
+              :components="components"
+              :selectedIds="selectedIds"
+              @select="selectedIds = $event"
+              @update:component="c => handleUpdateComponent(c, true)"
+              @duplicate="handleDuplicate"
+              @delete="handleDelete"
+              @bring:front="handleBringToFront"
+              @send:back="handleSendToBack"
+              @move:up="handleMoveUp"
+              @move:down="handleMoveDown"
+            />
 
-      <!-- Left Tab Pane Content -->
-      <ComponentPalette
-        v-if="leftSidebarTab === 'palette'"
-        @add:component="handleAddComponentFromPalette"
-        @open:symbol-modal="showSymbolModal = true"
-      />
-      <LayerManager
-        v-else
-        :components="components"
-        :selectedIds="selectedIds"
-        @select="selectedIds = $event"
-        @update:component="c => handleUpdateComponent(c, true)"
-        @duplicate="handleDuplicate"
-        @delete="handleDelete"
-        @bring:front="handleBringToFront"
-        @send:back="handleSendToBack"
-        @move:up="handleMoveUp"
-        @move:down="handleMoveDown"
-      />
+            <!-- Center Workspace Canvas + Bottom ScreenManagerBar -->
+            <div class="flex-1 min-w-0 flex flex-col overflow-hidden relative bg-black">
+              <CanvasEditor
+                ref="canvasEditorRef"
+                :screen="screen"
+                :components="components"
+                :selectedIds="selectedIds"
+                :zoom="zoom"
+                :datasets="datasets"
+                :drawTool="drawTool"
+                :activeComponentDef="activePlacementDef"
+                :canPaste="clipboard.length > 0"
+                :showGrid="showGrid"
+                :gridSize="gridSize"
+                :snapToGrid="snapToGrid"
+                :orthogonalLock="orthogonalLock"
+                :showRuler="showRuler"
+                @update:zoom="zoom = $event"
+                @update:screen="screen = $event; recordHistory();"
+                @update:drawTool="drawTool = $event"
+                @select="selectedIds = $event"
+                @update:component="c => handleUpdateComponent(c, false)"
+                @update:components="cs => handleUpdateComponents(cs, false)"
+                @add:component:at="handleAddComponentAt"
+                @copy="handleCopy"
+                @cut="handleCut"
+                @paste="handlePaste"
+                @duplicate="handleDuplicate"
+                @delete="handleDelete"
+                @bring:front="handleBringToFront"
+                @send:back="handleSendToBack"
+                @move:up="handleMoveUp"
+                @move:down="handleMoveDown"
+                @align="handleAlignComponent"
+                @group="handleGroup"
+                @ungroup="handleUngroup"
+                @save:symbol="handleOpenSaveSymbolModal"
+                @undo="handleUndo"
+                @redo="handleRedo"
+                @finish:draw="drawTool = 'select'; activePlacementDef = null; activeShapeType = '';"
+                @open:property-inspector="showPropertyInspector = true"
+                @open:data-association="handleOpenDataAssociation"
+                @open:batch-association="handleOpenBatchAssociation"
+                @open:control-modal="handleOpenControlModalFromApp"
+                @commit:history="recordHistory"
+              />
 
-      <!-- Center Workspace (Canvas + Bottom Screen Manager Bar) -->
-      <div class="flex-1 min-w-0 flex flex-col overflow-hidden relative bg-black">
-        <CanvasEditor
-          ref="canvasEditorRef"
+              <ScreenManagerBar
+                :screens="screens"
+                :activeScreenId="activeScreenId"
+                :storageDir="storageDirectory"
+                :diskFileCount="diskFileCount"
+                :isSavingDisk="isSavingDisk"
+                :indexScreenId="indexScreenId"
+                :indexScreenName="indexScreenName"
+                @switch:screen="handleSwitchScreen"
+                @add:screen="handleAddScreen"
+                @duplicate:screen="handleDuplicateScreen"
+                @rename:screen="handleRenameScreen"
+                @delete:screen="handleDeleteScreen"
+                @open:disk-storage="showDiskStorageModal = true"
+                @save:current-disk="handleSaveCurrentScreenToDisk"
+                @set:index-screen="handleSetIndexScreen"
+              />
+            </div>
+
+            <!-- Right PropertyInspector -->
+            <PropertyInspector
+              v-if="showPropertyInspector && selectedIds.length > 0"
+              :component="selectedComponent"
+              :selectedComponents="selectedComponents"
+              :screen="screen"
+              :datasets="datasets"
+              :screens="screens"
+              @close="showPropertyInspector = false"
+              @update:component="c => handleUpdateComponent(c, true)"
+              @update:components="cs => handleUpdateComponents(cs, true)"
+              @update:datasets="datasets = $event"
+              @update:screen="screen = $event; recordHistory();"
+              @align:component="handleAlignComponent"
+              @group="handleGroup"
+              @ungroup="handleUngroup"
+              @save:symbol="handleOpenSaveSymbolModal"
+              @delete="handleDeleteBatch"
+              @open:batch:points="showBatchPointModal = true"
+              @open:data-association="handleOpenDataAssociation"
+              @open:control="(devId) => { controlInitialDeviceId = devId; showControlModal = true; }"
+            />
+          </div>
+        </div>
+      </MdiWindow>
+
+      <!-- ======================================================== -->
+      <!-- B. 组态窗口 2: 实时监控主接线 (SCADA Monitoring)         -->
+      <!-- ======================================================== -->
+      <MdiWindow
+        :id="'monitor-screen'"
+        :title="'实时监控'"
+        :subtitle="''"
+        :icon="Zap"
+        :isOpen="getWindow('monitor-screen').isOpen"
+        :isMinimized="getWindow('monitor-screen').isMinimized"
+        :isMaximized="getWindow('monitor-screen').isMaximized"
+        :zIndex="getWindow('monitor-screen').zIndex"
+        :x="getWindow('monitor-screen').x"
+        :y="getWindow('monitor-screen').y"
+        :width="getWindow('monitor-screen').width"
+        :height="getWindow('monitor-screen').height"
+        :headerTheme="'white'"
+        @focus="focusWindow('monitor-screen')"
+        @close="closeWindow('monitor-screen')"
+        @minimize="minimizeWindow('monitor-screen')"
+        @maximize="maximizeWindow('monitor-screen')"
+        @restore="restoreWindow('monitor-screen')"
+        @update:x="val => updateWindowCoord('monitor-screen', 'x', val)"
+        @update:y="val => updateWindowCoord('monitor-screen', 'y', val)"
+        @update:width="val => updateWindowCoord('monitor-screen', 'width', val)"
+        @update:height="val => updateWindowCoord('monitor-screen', 'height', val)"
+        @update:isMaximized="val => updateWindowProp('monitor-screen', 'isMaximized', val)"
+        @update:isMinimized="val => updateWindowProp('monitor-screen', 'isMinimized', val)"
+      >
+        <PreviewScreen
           :screen="screen"
           :components="components"
-          :selectedIds="selectedIds"
-          :zoom="zoom"
           :datasets="datasets"
-          :drawTool="drawTool"
-          :activeComponentDef="activePlacementDef"
-          :canPaste="clipboard.length > 0"
-          :showGrid="showGrid"
-          :gridSize="gridSize"
-          :snapToGrid="snapToGrid"
-          :orthogonalLock="orthogonalLock"
-          :showRuler="showRuler"
-          @update:zoom="zoom = $event"
-          @update:screen="screen = $event; recordHistory();"
-          @update:drawTool="drawTool = $event"
-          @select="selectedIds = $event"
-          @update:component="c => handleUpdateComponent(c, false)"
-          @update:components="cs => handleUpdateComponents(cs, false)"
-          @add:component:at="handleAddComponentAt"
-          @copy="handleCopy"
-          @cut="handleCut"
-          @paste="handlePaste"
-          @duplicate="handleDuplicate"
-          @delete="handleDelete"
-          @bring:front="handleBringToFront"
-          @send:back="handleSendToBack"
-          @move:up="handleMoveUp"
-          @move:down="handleMoveDown"
-          @align="handleAlignComponent"
-          @group="handleGroup"
-          @ungroup="handleUngroup"
-          @save:symbol="handleOpenSaveSymbolModal"
-          @undo="handleUndo"
-          @redo="handleRedo"
-          @finish:draw="drawTool = 'select'; activePlacementDef = null; activeShapeType = '';"
-          @open:property-inspector="showPropertyInspector = true"
-          @open:data-association="handleOpenDataAssociation"
-          @open:batch-association="handleOpenBatchAssociation"
-          @open:control-modal="handleOpenControlModalFromApp"
-          @commit:history="recordHistory"
-        />
-
-        <!-- Bottom Multi-Screen Page Manager Bar -->
-        <ScreenManagerBar
+          :isStreaming="isStreaming"
           :screens="screens"
           :activeScreenId="activeScreenId"
-          :storageDir="storageDirectory"
-          :diskFileCount="diskFileCount"
-          :isSavingDisk="isSavingDisk"
-          :indexScreenId="indexScreenId"
-          :indexScreenName="indexScreenName"
+          :isEmbedded="true"
+          @close="closeWindow('monitor-screen')"
+          @toggle:streaming="isStreaming = !isStreaming"
           @switch:screen="handleSwitchScreen"
-          @add:screen="handleAddScreen"
-          @duplicate:screen="handleDuplicateScreen"
-          @rename:screen="handleRenameScreen"
-          @delete:screen="handleDeleteScreen"
-          @open:disk-storage="showDiskStorageModal = true"
-          @save:current-disk="handleSaveCurrentScreenToDisk"
-          @set:index-screen="handleSetIndexScreen"
+          @logout="handleLogout"
+          @open:alarm="openWindow('alarm-window')"
         />
-      </div>
+      </MdiWindow>
 
-      <!-- Right Property & Data Inspector Panel (Opened via Right-Click Context Menu "查看/编辑属性面板") -->
-      <PropertyInspector
-        v-if="showPropertyInspector && selectedIds.length > 0"
-        :component="selectedComponent"
-        :selectedComponents="selectedComponents"
-        :screen="screen"
-        :datasets="datasets"
-        :screens="screens"
-        @close="showPropertyInspector = false"
-        @update:component="c => handleUpdateComponent(c, true)"
-        @update:components="cs => handleUpdateComponents(cs, true)"
-        @update:datasets="datasets = $event"
-        @update:screen="screen = $event; recordHistory();"
-        @align:component="handleAlignComponent"
-        @group="handleGroup"
-        @ungroup="handleUngroup"
-        @save:symbol="handleOpenSaveSymbolModal"
-        @delete="handleDeleteBatch"
-        @open:batch:points="showBatchPointModal = true"
-        @open:data-association="handleOpenDataAssociation"
-        @open:control="(devId) => { controlInitialDeviceId = devId; showControlModal = true; }"
-      />
+      <!-- ======================================================== -->
+      <!-- C. 独立告警窗口: 全站告警 (可任意拖动/独立打开关闭/白色主题) -->
+      <!-- ======================================================== -->
+      <MdiWindow
+        :id="'alarm-window'"
+        :title="'全站告警'"
+        :subtitle="''"
+        :icon="Bell"
+        :isOpen="getWindow('alarm-window').isOpen"
+        :isMinimized="getWindow('alarm-window').isMinimized"
+        :isMaximized="getWindow('alarm-window').isMaximized"
+        :zIndex="getWindow('alarm-window').zIndex"
+        :x="getWindow('alarm-window').x"
+        :y="getWindow('alarm-window').y"
+        :width="getWindow('alarm-window').width"
+        :height="getWindow('alarm-window').height"
+        :headerTheme="'white'"
+        @focus="focusWindow('alarm-window')"
+        @close="closeWindow('alarm-window')"
+        @minimize="minimizeWindow('alarm-window')"
+        @maximize="maximizeWindow('alarm-window')"
+        @restore="restoreWindow('alarm-window')"
+        @update:x="val => updateWindowCoord('alarm-window', 'x', val)"
+        @update:y="val => updateWindowCoord('alarm-window', 'y', val)"
+        @update:width="val => updateWindowCoord('alarm-window', 'width', val)"
+        @update:height="val => updateWindowCoord('alarm-window', 'height', val)"
+        @update:isMaximized="val => updateWindowProp('alarm-window', 'isMaximized', val)"
+        @update:isMinimized="val => updateWindowProp('alarm-window', 'isMinimized', val)"
+      >
+        <RealtimeAlarmModal
+          :visible="true"
+          :isEmbedded="true"
+          @close="closeWindow('alarm-window')"
+        />
+      </MdiWindow>
     </div>
 
-    <!-- 1. Datasets Management Modal -->
+    <!-- ======================================================== -->
+    <!-- 3. GE-SCADA 底部常驻功能栏 (定死在底部不会消失，纯白主题)  -->
+    <!-- ======================================================== -->
+    <PrsBottomBar
+      :windows="bottomBarWindows"
+      :activeWindowId="activeWindowId"
+      :unconfirmedAlarmCount="12"
+      :safetyDays="1428"
+      @open:window="openWindow"
+      @toggle:window="toggleWindow"
+      @close:window="closeWindow"
+      @tile:windows="tileWindows"
+      @cascade:windows="cascadeWindows"
+      @minimize:all="minimizeAll"
+      @restore:all="restoreAll"
+      @toggle:sound="() => {}"
+      @logout="handleLogout"
+      @switch:user="showLoginModal = true"
+      @open:login="showLoginModal = true"
+      @exit:app="handleExitApp"
+    />
+
+    <!-- ======================================================== -->
+    <!-- 4. 全局弹窗模态框群 (数据集 / 图元工坊 / 测点关联 / 遥控遥调等) -->
+    <!-- ======================================================== -->
+    <!-- 4.1 数据集与测点配置中心 -->
     <DatasetManagerModal
       :visible="showDatasetsModal"
       :datasets="datasets"
       @close="showDatasetsModal = false"
-      @update:datasets="datasets = $event; recordHistory();"
+      @update:datasets="datasets = $event"
     />
 
-    <!-- 1.4. SCADA Component Point Association Cascading Modal (右键大弹框级联选择：厂站/装置/五遥/测点) -->
-    <DataAssociationModal
-      :visible="showDataAssociationModal"
-      :component="associationTargetComponent"
-      :datasets="datasets"
-      @close="showDataAssociationModal = false; associationTargetComponent = null;"
-      @submit="handleDataAssociationSubmit"
-    />
-
-    <!-- 1.4.1 SCADA Batch Point Association Modal (右键菜单多选遥测/遥信批量关联) -->
-    <BatchDataAssociationModal
-      :visible="showBatchAssociationModal"
-      :components="batchAssociationComponents"
-      :category="batchAssociationCategory"
-      :datasets="datasets"
-      @close="showBatchAssociationModal = false; batchAssociationComponents = [];"
-      @submit="handleBatchAssociationSubmit"
-    />
-
-    <!-- 1.5. SCADA Tele-Control Center Modal (主界面遥控分合闸) -->
-    <ScadaTeleControlModal
-      :visible="showControlModal"
-      :initialDeviceId="controlInitialDeviceId"
-      :initialPointId="controlInitialPointId"
-      :initialTargetVerificationPointId="controlInitialTargetVerificationPointId"
-      @close="showControlModal = false"
-    />
-
-    <!-- 1.6. SCADA Tele-Regulation Modal (主界面遥调定值设置) -->
-    <ScadaTeleRegulationModal
-      :visible="showRegulationModal"
-      :initialDeviceId="controlInitialDeviceId"
-      :initialPointId="controlInitialPointId"
-      :initialTargetVerificationPointId="controlInitialTargetVerificationPointId"
-      @close="showRegulationModal = false"
-    />
-
-    <!-- 1.8. SCADA Batch Point Generation & Binding Modal -->
-    <ScadaBatchPointModal
-      :visible="showBatchPointModal"
-      :datasets="datasets"
-      :selectedComponents="selectedComponents"
-      @close="showBatchPointModal = false"
-      @batch:generate="handleBatchGenerateComps"
-      @batch:bind="handleBatchBindPoints"
-    />
-
-    <!-- 3. Reusable Custom Symbol Library & Studio Modal -->
+    <!-- 4.2 自定义多态图元工坊 (资产库与编辑器) -->
     <CustomSymbolModal
       :visible="showSymbolModal"
-      :selectedComponent="selectedComponent"
       @close="showSymbolModal = false"
       @use:symbol="handleAddCustomSymbolToCanvas"
+      @update:symbols="() => {}"
     />
 
-    <!-- 4. Save Selection as Multi-State Custom Symbol Modal -->
+    <!-- 4.3 封装为自定义图元弹窗 -->
     <SaveSymbolModal
+      v-if="showSaveSymbolModal"
       :visible="showSaveSymbolModal"
       :selectedComponents="componentsToSave"
       @close="showSaveSymbolModal = false"
       @saved="handleSymbolSaved"
     />
 
-    <!-- 5. Fullscreen Big Screen Presentation Preview -->
-    <PreviewScreen
-      v-if="showPreviewModal"
-      :screen="screen"
-      :components="components"
+    <!-- 4.4 单图元测点数据关联配置 -->
+    <DataAssociationModal
+      v-if="showDataAssociationModal"
+      :visible="showDataAssociationModal"
+      :component="associationTargetComponent"
+      @close="showDataAssociationModal = false"
+      @submit="handleDataAssociationSubmit"
+    />
+
+    <!-- 4.5 批量图元测点关联配置 -->
+    <BatchDataAssociationModal
+      v-if="showBatchAssociationModal"
+      :visible="showBatchAssociationModal"
+      :components="batchAssociationComponents"
+      :category="batchAssociationCategory"
       :datasets="datasets"
-      :isStreaming="isStreaming"
-      :screens="screens"
-      :activeScreenId="activeScreenId"
-      @close="showPreviewModal = false; nextTick(() => fitToScreen());"
-      @toggle:streaming="isStreaming = !isStreaming"
-      @switch:screen="handleSwitchScreen"
-      @logout="handleLogout"
+      @close="showBatchAssociationModal = false"
+      @submit="handleBatchAssociationSubmit"
+    />
+
+    <!-- 4.6 工业遥控闭环操作弹窗 (YK) -->
+    <ScadaTeleControlModal
+      v-if="showControlModal"
+      :visible="showControlModal"
+      :initialDeviceId="controlInitialDeviceId"
+      :initialPointId="controlInitialPointId"
+      :initialTargetVerificationPointId="controlInitialTargetVerificationPointId"
+      @close="showControlModal = false"
+      @success="() => { showControlModal = false; scadaLiveTick++; }"
+    />
+
+    <!-- 4.7 工业遥调闭环操作弹窗 (YT) -->
+    <ScadaTeleRegulationModal
+      v-if="showRegulationModal"
+      :visible="showRegulationModal"
+      :initialDeviceId="controlInitialDeviceId"
+      :initialPointId="controlInitialPointId"
+      :initialTargetVerificationPointId="controlInitialTargetVerificationPointId"
+      @close="showRegulationModal = false"
+      @success="() => { showRegulationModal = false; scadaLiveTick++; }"
+    />
+
+    <!-- 4.8 批量测点总览管理与自动生成看板 -->
+    <ScadaBatchPointModal
+      v-if="showBatchPointModal"
+      :visible="showBatchPointModal"
+      :datasets="datasets"
+      :selectedComponents="selectedComponents"
+      @close="showBatchPointModal = false"
+      @update:datasets="datasets = $event"
+      @open:control="(devId, ptId, type) => {
+        controlInitialDeviceId = devId;
+        controlInitialPointId = ptId;
+        if (type === 'regulation') {
+          showRegulationModal = true;
+        } else {
+          showControlModal = true;
+        }
+      }"
     />
 
     <!-- 6. Multi-Platform Compatibility & Packaging Studio Modal -->

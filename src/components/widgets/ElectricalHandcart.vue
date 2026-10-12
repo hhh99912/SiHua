@@ -6,16 +6,19 @@ import { resolveTeleSignalState } from '../../utils/scadaResolver';
 interface Props {
   component: ScreenComponent;
   datasets?: DatasetItem[];
+  previewMode?: boolean;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  previewMode: false
+});
 
 const handcartState = computed(() => {
   const { data, style, customProps } = props.component;
   const sKey = data?.mapping?.stateKey || data?.mapping?.statusKey || data?.mapping?.valueKey;
   const defaultVal = customProps?.position !== undefined ? customProps.position : 1;
 
-  const resolved = resolveTeleSignalState(props.datasets, data?.datasetId, sKey, defaultVal);
+  const resolved = resolveTeleSignalState(props.datasets, data?.datasetId, sKey, defaultVal, props.component, props.previewMode);
 
   const isWorking = resolved.isWorking || resolved.numericValue === 1 || resolved.numericValue === 4;
   const isTest = resolved.isTest || resolved.numericValue === 0 || resolved.numericValue === 3;

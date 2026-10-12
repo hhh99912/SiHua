@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { ScreenComponent, DatasetItem } from '../../types';
-import { resolveDataPointValue } from '../../utils/scadaResolver';
+import { resolveDataPointValue, scadaLiveTick } from '../../utils/scadaResolver';
 import WidgetRenderer from './WidgetRenderer.vue';
 
 interface Props {
@@ -19,6 +19,9 @@ const emit = defineEmits<{
 }>();
 
 const children = computed<ScreenComponent[]>(() => {
+  if (props.previewMode) {
+    const _tick = scadaLiveTick.value;
+  }
   const { states, activeState, data, customProps } = props.component;
   
   if (states && states.length > 0) {
@@ -102,6 +105,22 @@ const baseBounds = computed(() => {
 
 const scaleX = computed(() => props.component.width / (baseBounds.value.width || 1));
 const scaleY = computed(() => props.component.height / (baseBounds.value.height || 1));
+
+// Memoize child objects with forwarded dataset/telemetry configuration to avoid inline object allocation churn
+const resolvedChildren = computed(() => {
+  const compData = props.component.data;
+  return children.value.map(child => {
+    const hasChildData = child.data?.datasetId;
+    const effectiveData = hasChildData ? child.data : (compData?.datasetId ? compData : child.data);
+    return {
+      child,
+      renderComp: {
+        ...child,
+        data: effectiveData
+      }
+    };
+  });
+});
 </script>
 
 <template>
@@ -115,24 +134,20 @@ const scaleY = computed(() => props.component.height / (baseBounds.value.height 
       }"
     >
       <div
-        v-for="child in children"
-        :key="child.id"
+        v-for="item in resolvedChildren"
+        :key="item.child.id"
         class="absolute"
         :style="{
-          left: `${child.x * scaleX}px`,
-          top: `${child.y * scaleY}px`,
-          width: `${child.width * scaleX}px`,
-          height: `${child.height * scaleY}px`,
-          transform: child.rotation ? `rotate(${child.rotation}deg)` : 'none',
-          zIndex: child.zIndex || 1
+          left: `${item.child.x * scaleX}px`,
+          top: `${item.child.y * scaleY}px`,
+          width: `${item.child.width * scaleX}px`,
+          height: `${item.child.height * scaleY}px`,
+          transform: item.child.rotation ? `rotate(${item.child.rotation}deg)` : 'none',
+          zIndex: item.child.zIndex || 1
         }"
       >
         <WidgetRenderer
-          :component="{
-            ...child,
-            // Forward dataset or telemetry override if configured
-            data: child.data?.datasetId ? child.data : (component.data?.datasetId ? component.data : child.data)
-          }"
+          :component="item.renderComp"
           :datasets="datasets"
           :preview-mode="previewMode"
           @jump:screen="emit('jump:screen', $event)"

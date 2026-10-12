@@ -155,7 +155,30 @@ watch(
       activeSlotIndex.value = null;
       selectedPoints.value = [];
 
-      // Attempt to prepopulate existing bindings if already mapped
+      // Fast O(1) point map indexing across all facilities
+      const pointMap = new Map<number, SelectedPointItem>();
+      for (const fac of scadaFacilities.value) {
+        for (const bay of fac.bays || []) {
+          for (const dev of bay.devices || []) {
+            const list = props.category === 'yc' ? dev.yc_list : dev.yx_list;
+            for (const pt of list || []) {
+              pointMap.set(pt.id, {
+                pointId: pt.id,
+                name: pt.name,
+                facId: fac.fac_id,
+                facName: fac.fac_name,
+                bayId: bay.bay_id,
+                bayName: bay.bay_name,
+                devId: dev.dev_id,
+                devName: dev.dev_name,
+                category: props.category
+              });
+            }
+          }
+        }
+      }
+
+      // Instant O(1) prefill
       const prefilled: SelectedPointItem[] = [];
       for (const comp of sortedComponents.value) {
         const mapping = comp.data?.mapping;
@@ -164,33 +187,8 @@ watch(
         const m = String(boundKey).match(/(\d{5,})/);
         const targetPtId = mapping?.pointId ? Number(mapping.pointId) : (m ? Number(m[1]) : null);
 
-        if (targetPtId) {
-          let found = false;
-          for (const fac of scadaFacilities.value) {
-            for (const bay of fac.bays || []) {
-              for (const dev of bay.devices || []) {
-                const list = props.category === 'yc' ? dev.yc_list : dev.yx_list;
-                const pt = (list || []).find(p => p.id === targetPtId);
-                if (pt) {
-                  prefilled.push({
-                    pointId: pt.id,
-                    name: pt.name,
-                    facId: fac.fac_id,
-                    facName: fac.fac_name,
-                    bayId: bay.bay_id,
-                    bayName: bay.bay_name,
-                    devId: dev.dev_id,
-                    devName: dev.dev_name,
-                    category: props.category
-                  });
-                  found = true;
-                  break;
-                }
-              }
-              if (found) break;
-            }
-            if (found) break;
-          }
+        if (targetPtId && pointMap.has(targetPtId)) {
+          prefilled.push(pointMap.get(targetPtId)!);
         }
       }
 
@@ -348,7 +346,7 @@ const handleSubmit = (mode: SortMode) => {
     @click.self="emit('close')"
   >
     <div
-      class="relative w-full max-w-7xl h-[88vh] max-h-[880px] bg-[#0e172a] border-2 border-sky-400 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-white"
+      class="relative w-full max-w-[1580px] w-[96vw] h-[90vh] max-h-[920px] bg-[#0e172a] border-2 border-sky-400 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-white"
       style="contain: paint layout;"
     >
       <!-- Header: 简洁统一大方，无冗余多色标签与说明 -->
@@ -385,11 +383,11 @@ const handleSubmit = (mode: SortMode) => {
       <!-- Main Cascading & Mapping Layout -->
       <div class="flex-1 flex overflow-hidden bg-[#0a1120]">
         <!-- 1. 厂站 (Facility) -->
-        <div class="w-48 border-r-2 border-slate-800 bg-[#0c1427] flex flex-col shrink-0">
+        <div class="w-44 border-r-2 border-slate-800 bg-[#0c1427] flex flex-col shrink-0">
           <div class="p-3 border-b-2 border-slate-800 text-sm font-bold text-sky-300 flex items-center justify-between bg-[#080d1a]">
             <div class="flex items-center gap-1.5">
               <Building2 class="w-4 h-4 text-sky-400" />
-              <span>1. 厂站选择</span>
+              <span>1. 厂站</span>
             </div>
             <span class="px-2 py-0.5 bg-slate-800 border border-slate-700 text-slate-100 text-xs rounded font-mono font-bold">
               {{ scadaFacilities.length }}
@@ -413,11 +411,11 @@ const handleSubmit = (mode: SortMode) => {
         </div>
 
         <!-- 2. 间隔 (Bay) -->
-        <div class="w-52 border-r-2 border-slate-800 bg-[#0c1427] flex flex-col shrink-0">
+        <div class="w-48 border-r-2 border-slate-800 bg-[#0c1427] flex flex-col shrink-0">
           <div class="p-3 border-b-2 border-slate-800 text-sm font-bold text-slate-200 flex items-center justify-between bg-[#080d1a]">
             <div class="flex items-center gap-1.5">
               <Layers class="w-4 h-4 text-sky-400" />
-              <span>2. 间隔选择</span>
+              <span>2. 间隔</span>
             </div>
             <span class="px-2 py-0.5 bg-slate-800 border border-slate-700 text-slate-100 text-xs rounded font-mono font-bold">
               {{ currentFacility?.bays?.length || 0 }}
@@ -441,11 +439,11 @@ const handleSubmit = (mode: SortMode) => {
         </div>
 
         <!-- 3. 装置 (Device) -->
-        <div class="w-56 border-r-2 border-slate-800 bg-[#0c1427] flex flex-col shrink-0">
+        <div class="w-52 border-r-2 border-slate-800 bg-[#0c1427] flex flex-col shrink-0">
           <div class="p-3 border-b-2 border-slate-800 text-sm font-bold text-slate-200 flex items-center justify-between bg-[#080d1a]">
             <div class="flex items-center gap-1.5">
               <Cpu class="w-4 h-4 text-sky-400" />
-              <span>3. 装置选择</span>
+              <span>3. 装置</span>
             </div>
             <span class="px-2 py-0.5 bg-slate-800 border border-slate-700 text-slate-100 text-xs rounded font-mono font-bold">
               {{ currentBay?.devices?.length || 0 }}
@@ -468,7 +466,7 @@ const handleSubmit = (mode: SortMode) => {
           </div>
         </div>
 
-        <!-- 4. 测点选择池 (Point Pool) -->
+        <!-- 4. 测点选择池 (Point Pool - 加宽并优化布局，突出序号与名称，不被ID挤占) -->
         <div class="flex-1 flex flex-col bg-[#0f172a] overflow-hidden border-r-2 border-slate-800 min-w-0">
           <!-- Search Bar -->
           <div class="p-3 border-b-2 border-slate-800 bg-[#080d1a] flex items-center justify-between gap-3 shrink-0">
@@ -483,11 +481,11 @@ const handleSubmit = (mode: SortMode) => {
               </span>
             </div>
 
-            <div class="relative w-64">
+            <div class="relative w-72">
               <input
                 v-model="searchQuery"
                 type="text"
-                placeholder="搜索测点 ID 或名称..."
+                placeholder="搜索测点名称..."
                 class="w-full pl-8 pr-3 py-1.5 bg-[#111c34] border border-slate-600 rounded-lg text-xs text-white placeholder:text-slate-400 focus:outline-none focus:border-sky-400 font-medium"
               />
               <Search class="w-3.5 h-3.5 text-sky-400 absolute left-2.5 top-2.5" />
@@ -502,20 +500,20 @@ const handleSubmit = (mode: SortMode) => {
             <table class="w-full text-left text-sm border-collapse" style="table-layout: fixed;">
               <thead>
                 <tr class="border-b-2 border-slate-700 bg-[#080d1a] text-sky-300 font-bold sticky top-0 z-10">
-                  <th class="p-3 w-32">测点 ID</th>
+                  <th class="p-3 w-16 text-center">序号</th>
                   <th class="p-3">测点名称</th>
-                  <th class="p-3 w-36 text-right">操作</th>
+                  <th class="p-3 w-40 text-right">操作</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-800">
                 <tr
-                  v-for="pt in filteredPoints"
+                  v-for="(pt, idx) in filteredPoints"
                   :key="pt.id"
                   class="cursor-pointer transition-colors hover:bg-slate-800 text-slate-100 group"
                   @click="handleAddPoint(pt)"
                 >
-                  <td class="p-3 font-mono text-sm font-bold text-sky-300 truncate">
-                    {{ pt.id }}
+                  <td class="p-3 text-center font-mono text-xs font-bold text-sky-300">
+                    #{{ idx + 1 }}
                   </td>
                   <td class="p-3 font-sans text-sm font-bold text-white truncate" :title="pt.name">
                     {{ pt.name }}
@@ -551,8 +549,8 @@ const handleSubmit = (mode: SortMode) => {
           </div>
         </div>
 
-        <!-- 5. 顺序一一对应映射列表 (Ordered Mapping Queue) -->
-        <div class="w-96 bg-[#080d1a] flex flex-col shrink-0 overflow-hidden border-l-2 border-slate-800">
+        <!-- 5. 顺序一一对应映射列表 (Ordered Mapping Queue - 加宽至 420px，清晰呈现图元与测点) -->
+        <div class="w-[420px] bg-[#080d1a] flex flex-col shrink-0 overflow-hidden border-l-2 border-slate-800">
           <div class="p-3 border-b-2 border-slate-800 bg-[#080d1a] flex items-center justify-between shrink-0 gap-2">
             <div class="flex items-center gap-2 shrink-0">
               <ArrowUpDown v-if="currentSortMode === 'y'" class="w-4 h-4 text-sky-400" />

@@ -56,6 +56,7 @@ const isLineType = computed(() => isLineComponent(compType.value));
       v-if="compType === 'metric-float'"
       :component="component"
       :datasets="datasets"
+      :preview-mode="previewMode"
     />
 
     <!-- 2. Composite & Grouped SCADA Custom Symbol -->
@@ -83,6 +84,7 @@ const isLineType = computed(() => isLineComponent(compType.value));
       v-else-if="compType === 'draw-line' || compType === 'draw-arrow' || compType === 'straight-line'"
       :component="component"
       :datasets="datasets"
+      :preview-mode="previewMode"
     />
 
     <!-- 5. Polyline / Orthogonal Bus Routing -->
@@ -90,6 +92,7 @@ const isLineType = computed(() => isLineComponent(compType.value));
       v-else-if="compType === 'draw-polyline' || compType === 'polyline'"
       :component="component"
       :datasets="datasets"
+      :preview-mode="previewMode"
     />
 
     <!-- 6. Status Indicator / Signal LED Light (0: 停止/分闸, 1: 运行/合闸, 2: 故障/告警) -->
@@ -97,6 +100,7 @@ const isLineType = computed(() => isLineComponent(compType.value));
       v-else-if="compType === 'ctrl-indicator' || (compCategory === 'status' && compType !== 'ind-matrix')"
       :component="component"
       :datasets="datasets"
+      :preview-mode="previewMode"
     />
 
     <!-- 7. Digital Counter / Tabular Readout -->
@@ -104,6 +108,7 @@ const isLineType = computed(() => isLineComponent(compType.value));
       v-else-if="compType === 'ind-counter' || compType === 'metric-counter' || compType === 'metric-digital'"
       :component="component"
       :datasets="datasets"
+      :preview-mode="previewMode"
     />
 
     <!-- 8. ECharts Visualizations -->
@@ -111,6 +116,7 @@ const isLineType = computed(() => isLineComponent(compType.value));
       v-else-if="compCategory === 'charts' || compType.startsWith('chart-')"
       :component="component"
       :datasets="datasets"
+      :preview-mode="previewMode"
     />
 
     <!-- 9. Electrical Power Primary System Symbols -->
@@ -119,31 +125,37 @@ const isLineType = computed(() => isLineComponent(compType.value));
         v-if="compType === 'elec-breaker'"
         :component="component"
         :datasets="datasets"
+        :preview-mode="previewMode"
       />
       <ElectricalHandcart
         v-else-if="compType === 'elec-handcart'"
         :component="component"
         :datasets="datasets"
+        :preview-mode="previewMode"
       />
       <ElectricalDisconnector
         v-else-if="compType === 'elec-disconnector' || compType === 'elec-grounding'"
         :component="component"
         :datasets="datasets"
+        :preview-mode="previewMode"
       />
       <ElectricalTransformer
         v-else-if="compType === 'elec-transformer'"
         :component="component"
         :datasets="datasets"
+        :preview-mode="previewMode"
       />
       <ElectricalSensor
         v-else-if="compType === 'elec-ct' || compType === 'elec-pt' || compType === 'elec-arrester'"
         :component="component"
         :datasets="datasets"
+        :preview-mode="previewMode"
       />
       <ElectricalBusbar
         v-else-if="compType === 'elec-busbar'"
         :component="component"
         :datasets="datasets"
+        :preview-mode="previewMode"
       />
     </div>
 
@@ -159,6 +171,7 @@ const isLineType = computed(() => isLineComponent(compType.value));
         v-else
         :component="component"
         :datasets="datasets"
+        :preview-mode="previewMode"
       />
     </div>
 
@@ -168,21 +181,25 @@ const isLineType = computed(() => isLineComponent(compType.value));
         v-if="compType === 'ind-tank'"
         :component="component"
         :datasets="datasets"
+        :preview-mode="previewMode"
       />
       <PipeFlow 
         v-else-if="compType === 'ind-pipe' || compType === 'draw-pipe'"
         :component="component"
         :datasets="datasets"
+        :preview-mode="previewMode"
       />
       <StatusMatrix 
         v-else-if="compType === 'ind-matrix'"
         :component="component"
         :datasets="datasets"
+        :preview-mode="previewMode"
       />
       <DigitalCounter 
         v-else
         :component="component"
         :datasets="datasets"
+        :preview-mode="previewMode"
       />
     </div>
 
@@ -192,11 +209,13 @@ const isLineType = computed(() => isLineComponent(compType.value));
         v-if="compType === 'custom-svg'"
         :component="component"
         :datasets="datasets"
+        :preview-mode="previewMode"
       />
       <CustomHtmlWidget 
         v-else-if="compType === 'custom-html'"
         :component="component"
         :datasets="datasets"
+        :preview-mode="previewMode"
       />
       <div 
         v-else
@@ -217,12 +236,14 @@ const isLineType = computed(() => isLineComponent(compType.value));
     <CyberBorder 
       v-else-if="compCategory === 'decoration' || compType.startsWith('deco-')"
       :component="component"
+      :preview-mode="previewMode"
     />
 
     <!-- 15. Comprehensive Vector Drawing (All conventional basic primitives) -->
     <CustomLeaferCanvas 
       v-else
       :component="component"
+      :preview-mode="previewMode"
     />
   </div>
 </template>
