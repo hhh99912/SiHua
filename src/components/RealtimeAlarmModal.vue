@@ -16,7 +16,8 @@ import {
   ChevronDown,
   Check,
   Square,
-  CheckSquare
+  CheckSquare,
+  Bell
 } from 'lucide-vue-next';
 
 export interface AlarmItem {
@@ -278,306 +279,336 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="w-full h-full bg-white text-slate-800 flex flex-col font-sans select-none overflow-hidden text-xs">
-    <!-- ===================================================================== -->
-    <!-- 1. 顶部操作工具栏 (仿真实 SCADA: 选项, 确认全部, 清除全部, 暂停, 保存, 打印...) -->
-    <!-- ===================================================================== -->
-    <div class="h-9 bg-slate-50 border-b border-slate-300 px-2 flex items-center justify-between shrink-0 select-none">
-      <!-- 左侧：功能操作按钮群 -->
-      <div class="flex items-center gap-1">
-        <!-- 选项菜单按钮 -->
-        <button
-          class="px-2 py-1 rounded hover:bg-slate-200 border border-transparent hover:border-slate-300 text-slate-700 font-bold transition-colors cursor-pointer flex items-center gap-1"
-          title="系统选项"
-        >
-          <span>选项</span>
-          <ChevronDown class="w-3 h-3 text-slate-500" />
-        </button>
-
-        <div class="h-4 w-[1px] bg-slate-300 mx-0.5" />
-
-        <!-- 确认全部 -->
-        <button
-          @click="handleAcknowledgeAll"
-          class="px-2 py-1 rounded bg-white hover:bg-emerald-50 border border-slate-300 hover:border-emerald-400 text-slate-700 hover:text-emerald-700 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-          title="确认所有未确认告警"
-        >
-          <CheckCheck class="w-3.5 h-3.5 text-emerald-600" />
-          <span>确认全部</span>
-        </button>
-
-        <!-- 清除全部 -->
-        <button
-          @click="handleClearAll"
-          class="px-2 py-1 rounded bg-white hover:bg-rose-50 border border-slate-300 hover:border-rose-400 text-slate-700 hover:text-rose-700 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-          title="清除所有已确认事件"
-        >
-          <Trash2 class="w-3.5 h-3.5 text-rose-500" />
-          <span>清除全部</span>
-        </button>
-
-        <!-- 暂停 / 继续 -->
-        <button
-          @click="togglePause"
-          class="px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-          :title="isPaused ? '恢复告警滚动刷新' : '暂停当前画面滚动'"
-        >
-          <component :is="isPaused ? Play : Pause" class="w-3.5 h-3.5 text-amber-600" />
-          <span>{{ isPaused ? '继续' : '暂停' }}</span>
-        </button>
-
-        <!-- 保存 -->
-        <button
-          @click="handleSave"
-          class="px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-          title="导出/保存当前告警清单为 CSV"
-        >
-          <Save class="w-3.5 h-3.5 text-sky-600" />
-          <span>保存</span>
-        </button>
-
-        <!-- 打印 -->
-        <button
-          @click="handlePrint"
-          class="px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-          title="打印当前列表"
-        >
-          <Printer class="w-3.5 h-3.5 text-slate-600" />
-          <span>打印</span>
-        </button>
-
-        <!-- 历史查询 -->
-        <button
-          @click="showHistoryModal = !showHistoryModal"
-          class="px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-          :class="{ 'bg-sky-50 border-sky-400 text-sky-800 font-bold': showHistoryModal }"
-          title="按条件过滤或历史检索"
-        >
-          <Search class="w-3.5 h-3.5 text-indigo-600" />
-          <span>历史查询</span>
-        </button>
-
-        <!-- 设置 -->
-        <button
-          @click="showSettingsModal = !showSettingsModal"
-          class="px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-          title="告警窗显示与声音设置"
-        >
-          <Settings class="w-3.5 h-3.5 text-slate-600" />
-          <span>设置</span>
-        </button>
-
-        <!-- 隐藏 -->
+  <div 
+    v-if="visible"
+    :class="[
+      isEmbedded 
+        ? 'w-full h-full bg-white text-slate-800 flex flex-col font-sans select-none overflow-hidden text-sm'
+        : 'fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex flex-col select-none p-1 md:p-2'
+    ]"
+  >
+    <div 
+      class="w-full h-full bg-white text-slate-800 flex flex-col font-sans select-none overflow-hidden text-sm"
+      :class="{ 'rounded-lg shadow-2xl border border-slate-300': !isEmbedded }"
+    >
+      <!-- 非嵌入模式下的全屏顶部标题栏 (含关闭按钮) -->
+      <div 
+        v-if="!isEmbedded"
+        class="h-11 bg-slate-100 border-b border-slate-300 px-4 flex items-center justify-between shrink-0 select-none"
+      >
+        <div class="flex items-center gap-2.5 font-bold text-slate-800 text-base">
+          <Bell class="w-5 h-5 text-rose-500" />
+          <span>全站告警中心 (实时 SOE / COS 事件与越限记录)</span>
+        </div>
         <button
           @click="emit('close')"
-          class="px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-          title="隐藏当前告警窗"
+          class="p-1.5 rounded hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+          title="关闭告警窗"
         >
-          <EyeOff class="w-3.5 h-3.5 text-slate-500" />
-          <span>隐藏</span>
-        </button>
-
-        <!-- 屏蔽配置 -->
-        <button
-          class="px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-          title="配置设备告警屏蔽规则"
-        >
-          <ShieldAlert class="w-3.5 h-3.5 text-amber-500" />
-          <span>屏蔽配置</span>
+          <X class="w-5 h-5" />
         </button>
       </div>
 
-      <!-- 右侧：统计摘要 >>>时序信息--未确认数目:4,总数目:4<<< (完全仿照照片) -->
-      <div class="flex items-center text-xs font-mono font-bold text-sky-800 tracking-tight shrink-0 bg-sky-50/80 px-2 py-0.5 rounded border border-sky-200">
-        &gt;&gt;&gt;{{ activeTab }}--未确认数目:{{ unackCount }},总数目:{{ totalCount }}&lt;&lt;&lt;
-      </div>
-    </div>
-
-    <!-- 历史检索展开小栏 (如果开启) -->
-    <div
-      v-if="showHistoryModal"
-      class="bg-slate-100 border-b border-slate-300 px-3 py-1.5 flex items-center justify-between gap-2 shrink-0 animate-in slide-in-from-top-1"
-    >
-      <div class="flex items-center gap-2 flex-1">
-        <span class="font-bold text-slate-700 text-xs">过滤检索:</span>
-        <input
-          v-model="historySearchText"
-          type="text"
-          placeholder="输入厂站、间隔、设备或告警内容进行关键词过滤..."
-          class="flex-1 max-w-md bg-white border border-slate-300 rounded px-2 py-0.5 text-xs text-slate-800 focus:outline-none focus:border-sky-500"
-        />
-        <button
-          v-if="historySearchText"
-          @click="historySearchText = ''"
-          class="px-2 py-0.5 rounded bg-slate-200 hover:bg-slate-300 text-slate-600 text-xs cursor-pointer"
-        >
-          清空
-        </button>
-      </div>
-      <button
-        @click="showHistoryModal = false"
-        class="text-slate-400 hover:text-slate-700 p-0.5 rounded"
-      >
-        <X class="w-3.5 h-3.5" />
-      </button>
-    </div>
-
-    <!-- ===================================================================== -->
-    <!-- 2. 中间主数据表格 (状态, 厂站, 间隔, 装置, 类型, 动作时间, 信息)         -->
-    <!-- ===================================================================== -->
-    <div class="flex-1 overflow-auto bg-white border-b border-slate-300 relative">
-      <table class="w-full border-collapse text-left font-sans text-xs">
-        <!-- 表头 (仿照片灰色质感表头) -->
-        <thead class="sticky top-0 bg-slate-100 border-b border-slate-300 shadow-2xs z-10 text-slate-700 font-bold select-none">
-          <tr>
-            <!-- 状态 -->
-            <th class="py-1.5 px-2 w-20 border-r border-slate-300 text-center">
-              <div class="flex items-center justify-center gap-1 cursor-pointer" @click="toggleSelectAll">
-                <component :is="isAllSelected ? CheckSquare : Square" class="w-3.5 h-3.5 text-slate-500" />
-                <span>状态</span>
-              </div>
-            </th>
-
-            <!-- 厂站 -->
-            <th class="py-1.5 px-2.5 w-36 border-r border-slate-300">
-              厂站
-            </th>
-
-            <!-- 间隔 -->
-            <th class="py-1.5 px-2.5 w-32 border-r border-slate-300">
-              间隔
-            </th>
-
-            <!-- 装置 -->
-            <th class="py-1.5 px-2.5 w-28 border-r border-slate-300">
-              装置
-            </th>
-
-            <!-- 类型 -->
-            <th class="py-1.5 px-2.5 w-20 border-r border-slate-300 text-center">
-              类型
-            </th>
-
-            <!-- 动作时间 -->
-            <th class="py-1.5 px-2.5 w-48 border-r border-slate-300 font-mono">
-              动作时间
-            </th>
-
-            <!-- 信息 -->
-            <th class="py-1.5 px-3">
-              信息
-            </th>
-          </tr>
-        </thead>
-
-        <!-- 表体数据行 -->
-        <tbody class="divide-y divide-slate-100">
-          <tr
-            v-for="item in filteredAlarms"
-            :key="item.id"
-            @click="toggleSelectRow(item.id)"
-            @dblclick="acknowledgeItem(item)"
-            class="transition-colors cursor-pointer select-none"
-            :class="[
-              selectedAlarmIds.has(item.id) 
-                ? 'bg-sky-100 text-sky-950 font-medium' 
-                : !item.acknowledged 
-                  ? 'bg-white hover:bg-rose-50/50' 
-                  : 'bg-white hover:bg-slate-50 text-slate-600'
-            ]"
+      <!-- ===================================================================== -->
+      <!-- 1. 顶部操作工具栏 (放大尺寸与图标，仿真实 SCADA: 选项, 确认全部, 清除全部, 暂停, 保存, 打印...) -->
+      <!-- ===================================================================== -->
+      <div class="h-11 bg-slate-50 border-b border-slate-300 px-3 flex items-center justify-between shrink-0 select-none">
+        <!-- 左侧：功能操作按钮群 (字体与图标全面放大) -->
+        <div class="flex items-center gap-1.5 overflow-x-auto">
+          <!-- 选项菜单按钮 -->
+          <button
+            class="px-2.5 py-1.5 rounded hover:bg-slate-200 border border-transparent hover:border-slate-300 text-slate-700 text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+            title="系统选项"
           >
-            <!-- 状态 (未确认/已确认) -->
-            <td class="py-1 px-2 border-r border-slate-200 text-center whitespace-nowrap">
-              <div class="flex items-center justify-center gap-1.5">
-                <input
-                  type="checkbox"
-                  :checked="selectedAlarmIds.has(item.id)"
-                  @click.stop="toggleSelectRow(item.id)"
-                  class="rounded border-slate-300 text-sky-600 focus:ring-0 cursor-pointer"
-                />
-                <span
-                  class="font-bold text-[11px]"
-                  :class="!item.acknowledged ? 'text-rose-600 font-black' : 'text-slate-500'"
-                >
-                  {{ item.acknowledged ? '已确认' : '未确认' }}
-                </span>
-              </div>
-            </td>
+            <span>选项</span>
+            <ChevronDown class="w-4 h-4 text-slate-500" />
+          </button>
 
-            <!-- 厂站 -->
-            <td class="py-1 px-2.5 border-r border-slate-200 whitespace-nowrap font-medium">
-              {{ item.station }}
-            </td>
+          <div class="h-5 w-[1px] bg-slate-300 mx-1" />
 
-            <!-- 间隔 -->
-            <td class="py-1 px-2.5 border-r border-slate-200 whitespace-nowrap font-mono font-medium text-slate-800">
-              {{ item.bay }}
-            </td>
+          <!-- 确认全部 -->
+          <button
+            @click="handleAcknowledgeAll"
+            class="px-3 py-1.5 rounded bg-white hover:bg-emerald-50 border border-slate-300 hover:border-emerald-400 text-slate-700 hover:text-emerald-700 text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            title="确认所有未确认告警"
+          >
+            <CheckCheck class="w-4.5 h-4.5 text-emerald-600 stroke-[2.2]" />
+            <span>确认全部</span>
+          </button>
 
-            <!-- 装置 -->
-            <td class="py-1 px-2.5 border-r border-slate-200 whitespace-nowrap text-slate-700">
-              {{ item.device }}
-            </td>
+          <!-- 清除全部 -->
+          <button
+            @click="handleClearAll"
+            class="px-3 py-1.5 rounded bg-white hover:bg-rose-50 border border-slate-300 hover:border-rose-400 text-slate-700 hover:text-rose-700 text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            title="清除所有已确认事件"
+          >
+            <Trash2 class="w-4.5 h-4.5 text-rose-500 stroke-[2.2]" />
+            <span>清除全部</span>
+          </button>
 
-            <!-- 类型 -->
-            <td class="py-1 px-2.5 border-r border-slate-200 text-center whitespace-nowrap font-mono text-[11px]">
-              <span
-                class="px-1.5 py-0.2 rounded"
-                :class="[
-                  item.type === '事故' ? 'bg-rose-100 text-rose-700 font-bold' :
-                  item.type === '越限告警' ? 'bg-amber-100 text-amber-700 font-bold' :
-                  item.type === '系统' ? 'bg-slate-100 text-slate-700' :
-                  'bg-sky-50 text-sky-700'
-                ]"
-              >
-                {{ item.type }}
-              </span>
-            </td>
+          <!-- 暂停 / 继续 -->
+          <button
+            @click="togglePause"
+            class="px-3 py-1.5 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            :title="isPaused ? '恢复告警滚动刷新' : '暂停当前画面滚动'"
+          >
+            <component :is="isPaused ? Play : Pause" class="w-4.5 h-4.5 text-amber-600 stroke-[2.2]" />
+            <span>{{ isPaused ? '继续' : '暂停' }}</span>
+          </button>
 
-            <!-- 动作时间 -->
-            <td class="py-1 px-2.5 border-r border-slate-200 whitespace-nowrap font-mono text-slate-700 text-[11px]">
-              {{ item.time }}
-            </td>
+          <!-- 保存 -->
+          <button
+            @click="handleSave"
+            class="px-3 py-1.5 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            title="导出/保存当前告警清单为 CSV"
+          >
+            <Save class="w-4.5 h-4.5 text-sky-600 stroke-[2.2]" />
+            <span>保存</span>
+          </button>
 
-            <!-- 信息 -->
-            <td
-              class="py-1 px-3 truncate"
-              :class="!item.acknowledged ? 'text-slate-900 font-semibold' : 'text-slate-600'"
-              :title="item.message"
-            >
-              {{ item.message }}
-            </td>
-          </tr>
+          <!-- 打印 -->
+          <button
+            @click="handlePrint"
+            class="px-3 py-1.5 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            title="打印当前列表"
+          >
+            <Printer class="w-4.5 h-4.5 text-slate-600 stroke-[2.2]" />
+            <span>打印</span>
+          </button>
 
-          <!-- 空数据状态 -->
-          <tr v-if="filteredAlarms.length === 0">
-            <td colspan="7" class="py-12 text-center text-slate-400 font-mono">
-              无符合条件的实时告警记录
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+          <!-- 历史查询 -->
+          <button
+            @click="showHistoryModal = !showHistoryModal"
+            class="px-3 py-1.5 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            :class="{ 'bg-sky-50 border-sky-400 text-sky-800 font-bold': showHistoryModal }"
+            title="按条件过滤或历史检索"
+          >
+            <Search class="w-4.5 h-4.5 text-indigo-600 stroke-[2.2]" />
+            <span>历史查询</span>
+          </button>
 
-    <!-- ===================================================================== -->
-    <!-- 3. 底部分类标签过滤栏 (完全仿照照片底部的 16 个 SCADA 专业分类按钮)    -->
-    <!-- ===================================================================== -->
-    <div class="h-8 bg-slate-100 border-t border-slate-300 px-1 flex items-center overflow-x-auto scrollbar-none shrink-0 text-xs font-sans select-none divide-x divide-slate-200">
-      <button
-        v-for="tab in categoryTabs"
-        :key="tab"
-        @click="activeTab = tab"
-        class="h-full px-2.5 shrink-0 flex items-center gap-1 transition-colors cursor-pointer text-xs font-medium"
-        :class="activeTab === tab
-          ? 'bg-white text-sky-800 font-bold border-b-2 border-sky-600 shadow-2xs'
-          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'"
+          <!-- 设置 -->
+          <button
+            @click="showSettingsModal = !showSettingsModal"
+            class="px-3 py-1.5 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            title="告警窗显示与声音设置"
+          >
+            <Settings class="w-4.5 h-4.5 text-slate-600 stroke-[2.2]" />
+            <span>设置</span>
+          </button>
+
+          <!-- 隐藏 -->
+          <button
+            @click="emit('close')"
+            class="px-3 py-1.5 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            title="隐藏当前告警窗"
+          >
+            <EyeOff class="w-4.5 h-4.5 text-slate-500 stroke-[2.2]" />
+            <span>隐藏</span>
+          </button>
+
+          <!-- 屏蔽配置 -->
+          <button
+            class="px-3 py-1.5 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            title="配置设备告警屏蔽规则"
+          >
+            <ShieldAlert class="w-4.5 h-4.5 text-amber-500 stroke-[2.2]" />
+            <span>屏蔽配置</span>
+          </button>
+        </div>
+
+        <!-- 右侧：统计摘要 >>>时序信息--未确认数目:4,总数目:4<<< (字体加大加粗) -->
+        <div class="flex items-center text-sm font-mono font-bold text-sky-900 tracking-tight shrink-0 bg-sky-50 px-3 py-1 rounded border border-sky-300 shadow-2xs ml-2">
+          &gt;&gt;&gt;{{ activeTab }}--未确认:{{ unackCount }} / 总数:{{ totalCount }}&lt;&lt;&lt;
+        </div>
+      </div>
+
+      <!-- 历史检索展开小栏 (如果开启) -->
+      <div
+        v-if="showHistoryModal"
+        class="bg-slate-100 border-b border-slate-300 px-4 py-2 flex items-center justify-between gap-3 shrink-0 animate-in slide-in-from-top-1 text-sm"
       >
-        <span
-          class="w-1.5 h-1.5 rounded-full"
-          :class="activeTab === tab ? 'bg-sky-600' : 'bg-slate-400'"
-        />
-        <span>{{ tab }}</span>
-      </button>
+        <div class="flex items-center gap-3 flex-1">
+          <span class="font-bold text-slate-700 text-sm">过滤检索:</span>
+          <input
+            v-model="historySearchText"
+            type="text"
+            placeholder="输入厂站、间隔、设备或告警内容进行关键词过滤..."
+            class="flex-1 max-w-lg bg-white border border-slate-300 rounded px-3 py-1 text-sm text-slate-800 focus:outline-none focus:border-sky-500"
+          />
+          <button
+            v-if="historySearchText"
+            @click="historySearchText = ''"
+            class="px-3 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-medium cursor-pointer"
+          >
+            清空
+          </button>
+        </div>
+        <button
+          @click="showHistoryModal = false"
+          class="text-slate-400 hover:text-slate-700 p-1 rounded"
+        >
+          <X class="w-4 h-4" />
+        </button>
+      </div>
+
+      <!-- ===================================================================== -->
+      <!-- 2. 中间主数据表格 (状态, 厂站, 间隔, 装置, 类型, 动作时间, 信息) - 字体与单元格全面放大 -->
+      <!-- ===================================================================== -->
+      <div class="flex-1 overflow-auto bg-white border-b border-slate-300 relative">
+        <table class="w-full border-collapse text-left font-sans text-sm">
+          <!-- 表头 (仿照片灰色质感表头，字号与行距加大) -->
+          <thead class="sticky top-0 bg-slate-100 border-b border-slate-300 shadow-2xs z-10 text-slate-800 font-bold select-none text-sm">
+            <tr>
+              <!-- 状态 -->
+              <th class="py-2.5 px-3 w-28 border-r border-slate-300 text-center">
+                <div class="flex items-center justify-center gap-1.5 cursor-pointer" @click="toggleSelectAll">
+                  <component :is="isAllSelected ? CheckSquare : Square" class="w-4.5 h-4.5 text-slate-600" />
+                  <span class="text-sm font-bold">状态</span>
+                </div>
+              </th>
+
+              <!-- 厂站 -->
+              <th class="py-2.5 px-3 w-44 border-r border-slate-300 text-sm font-bold">
+                厂站
+              </th>
+
+              <!-- 间隔 -->
+              <th class="py-2.5 px-3 w-36 border-r border-slate-300 text-sm font-bold">
+                间隔
+              </th>
+
+              <!-- 装置 -->
+              <th class="py-2.5 px-3 w-36 border-r border-slate-300 text-sm font-bold">
+                装置
+              </th>
+
+              <!-- 类型 -->
+              <th class="py-2.5 px-3 w-24 border-r border-slate-300 text-center text-sm font-bold">
+                类型
+              </th>
+
+              <!-- 动作时间 -->
+              <th class="py-2.5 px-3 w-56 border-r border-slate-300 font-mono text-sm font-bold">
+                动作时间
+              </th>
+
+              <!-- 信息 -->
+              <th class="py-2.5 px-4 text-sm font-bold">
+                信息内容
+              </th>
+            </tr>
+          </thead>
+
+          <!-- 表体数据行 (行高与文字放大，保证工业大屏清晰辨认) -->
+          <tbody class="divide-y divide-slate-100">
+            <tr
+              v-for="item in filteredAlarms"
+              :key="item.id"
+              @click="toggleSelectRow(item.id)"
+              @dblclick="acknowledgeItem(item)"
+              class="transition-colors cursor-pointer select-none text-sm"
+              :class="[
+                selectedAlarmIds.has(item.id) 
+                  ? 'bg-sky-100/90 text-sky-950 font-medium' 
+                  : !item.acknowledged 
+                    ? 'bg-white hover:bg-rose-50/60' 
+                    : 'bg-white hover:bg-slate-50 text-slate-600'
+              ]"
+            >
+              <!-- 状态 (未确认/已确认) -->
+              <td class="py-2.5 px-3 border-r border-slate-200 text-center whitespace-nowrap">
+                <div class="flex items-center justify-center gap-2">
+                  <input
+                    type="checkbox"
+                    :checked="selectedAlarmIds.has(item.id)"
+                    @click.stop="toggleSelectRow(item.id)"
+                    class="w-4 h-4 rounded border-slate-300 text-sky-600 focus:ring-0 cursor-pointer"
+                  />
+                  <span
+                    class="font-bold text-xs px-2 py-0.5 rounded"
+                    :class="!item.acknowledged ? 'bg-rose-100 text-rose-700 font-black' : 'bg-slate-100 text-slate-500'"
+                  >
+                    {{ item.acknowledged ? '已确认' : '未确认' }}
+                  </span>
+                </div>
+              </td>
+
+              <!-- 厂站 -->
+              <td class="py-2.5 px-3 border-r border-slate-200 whitespace-nowrap font-medium text-sm">
+                {{ item.station }}
+              </td>
+
+              <!-- 间隔 -->
+              <td class="py-2.5 px-3 border-r border-slate-200 whitespace-nowrap font-mono font-medium text-slate-800 text-sm">
+                {{ item.bay }}
+              </td>
+
+              <!-- 装置 -->
+              <td class="py-2.5 px-3 border-r border-slate-200 whitespace-nowrap text-slate-700 text-sm">
+                {{ item.device }}
+              </td>
+
+              <!-- 类型 -->
+              <td class="py-2.5 px-3 border-r border-slate-200 text-center whitespace-nowrap font-mono text-xs">
+                <span
+                  class="px-2 py-0.5 rounded font-bold"
+                  :class="[
+                    item.type === '事故' ? 'bg-rose-100 text-rose-700 font-bold' :
+                    item.type === '越限告警' ? 'bg-amber-100 text-amber-700 font-bold' :
+                    item.type === '系统' ? 'bg-slate-100 text-slate-700' :
+                    'bg-sky-50 text-sky-700'
+                  ]"
+                >
+                  {{ item.type }}
+                </span>
+              </td>
+
+              <!-- 动作时间 -->
+              <td class="py-2.5 px-3 border-r border-slate-200 whitespace-nowrap font-mono text-slate-700 text-xs">
+                {{ item.time }}
+              </td>
+
+              <!-- 信息 -->
+              <td
+                class="py-2.5 px-4 truncate text-sm"
+                :class="!item.acknowledged ? 'text-slate-900 font-semibold' : 'text-slate-600'"
+                :title="item.message"
+              >
+                {{ item.message }}
+              </td>
+            </tr>
+
+            <!-- 空数据状态 -->
+            <tr v-if="filteredAlarms.length === 0">
+              <td colspan="7" class="py-16 text-center text-slate-400 font-mono text-sm">
+                无符合条件的实时告警记录
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ===================================================================== -->
+      <!-- 3. 底部分类标签过滤栏 (高度增加到 h-10，标签与圆点清晰放大)             -->
+      <!-- ===================================================================== -->
+      <div class="h-10 bg-slate-100 border-t border-slate-300 px-2 flex items-center overflow-x-auto scrollbar-none shrink-0 text-sm font-sans select-none divide-x divide-slate-200">
+        <button
+          v-for="tab in categoryTabs"
+          :key="tab"
+          @click="activeTab = tab"
+          class="h-full px-3.5 shrink-0 flex items-center gap-1.5 transition-colors cursor-pointer text-sm font-medium"
+          :class="activeTab === tab
+            ? 'bg-white text-sky-800 font-bold border-b-2 border-sky-600 shadow-2xs'
+            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'"
+        >
+          <span
+            class="w-2 h-2 rounded-full"
+            :class="activeTab === tab ? 'bg-sky-600' : 'bg-slate-400'"
+          />
+          <span>{{ tab }}</span>
+        </button>
+      </div>
     </div>
   </div>
 </template>

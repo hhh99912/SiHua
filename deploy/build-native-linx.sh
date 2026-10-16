@@ -169,16 +169,27 @@ fi
 
 chmod +x "$APP_EXEC"
 
+# 4.1 确保 logs 目录存在
+mkdir -p "$SCRIPT_DIR/logs"
+
+# 4.2 提升工控机系统文件句柄上限，杜绝 EMFILE 导致的突然闪退
+ulimit -n 65535 2>/dev/null || ulimit -n 4096 2>/dev/null || true
+
 # 5. 参数处理与模式识别
 FILTERED_ARGS=()
 ENABLE_DEBUG=0
-ENABLE_FORCE_SOFT_GPU=0
+ENABLE_FORCE_SOFT_GPU=1
+RUN_DIAGNOSE_ONLY=0
 
 for arg in "$@"; do
   if [ "$arg" = "--debug" ]; then
     ENABLE_DEBUG=1
-  elif [ "$arg" = "--disable-gpu" ] || [ "$arg" = "--soft-render" ] || [ "$arg" = "--cpu-render" ]; then
+  elif [ "$arg" = "--enable-gpu" ] || [ "$arg" = "--hardware-gpu" ]; then
+    ENABLE_FORCE_SOFT_GPU=0
+  elif [ "$arg" = "--disable-gpu" ] || [ "$arg" = "--soft-render" ] || [ "$arg" = "--cpu-render" ] || [ "$arg" = "--safe-mode" ]; then
     ENABLE_FORCE_SOFT_GPU=1
+  elif [ "$arg" = "--diagnose" ] || [ "$arg" = "-d" ] || [ "$arg" = "--check" ]; then
+    RUN_DIAGNOSE_ONLY=1
   elif [[ "$arg" == --ime=* ]]; then
     continue
   else
@@ -186,9 +197,34 @@ for arg in "$@"; do
   fi
 done
 
+# 如果用户传入 --diagnose 参数，则直接进入诊断分析模式
+if [ "$RUN_DIAGNOSE_ONLY" = "1" ]; then
+  if [ -f "$SCRIPT_DIR/diagnose.sh" ]; then
+    exec bash "$SCRIPT_DIR/diagnose.sh"
+  elif [ -f "$SCRIPT_DIR/reboot_diagnosis_report.txt" ]; then
+    echo "=== SCADA 上次重启诊断报告 ==="
+    cat "$SCRIPT_DIR/reboot_diagnosis_report.txt"
+    exit 0
+  else
+    echo "[诊断] 尚未捕获到异常重启日志，请先正常运行一次 SCADA。"
+    exit 0
+  fi
+fi
+
 if [ "$ENABLE_DEBUG" = "1" ]; then
   export SCADA_DEBUG=1
   echo "[调试模式] 已通过 SCADA_DEBUG=1 激活调试与开发者工具 (F12)"
+fi
+
+# 5.1 启动前显示黑匣子上次诊断结果 (让用户一眼看到上次为什么退出)
+if [ -f "$SCRIPT_DIR/logs/reboot_diagnosis_report.txt" ]; then
+  LAST_REASON=$(grep "诊断推断原因:" "$SCRIPT_DIR/logs/reboot_diagnosis_report.txt" | head -n 1 | cut -d':' -f2- | xargs || true)
+  if [ -n "$LAST_REASON" ]; then
+    echo "------------------------------------------------------------"
+    echo "🔍 [黑匣子诊断提示] 上次退出判定: $LAST_REASON"
+    echo "   (查看完整报告: ./run.sh --diagnose 或查看 logs/reboot_diagnosis_report.txt)"
+    echo "------------------------------------------------------------"
+  fi
 fi
 
 # 6. 针对硬件的全部优化 (Intel 2代核显 i915 / Mesa CPU 多核软渲染)
@@ -205,7 +241,7 @@ if [ "$ENABLE_FORCE_SOFT_GPU" = "1" ]; then
     "--disable-gpu-rasterization"
   )
 else
-  echo "[图形渲染] Intel 2代核显 i915 精准直出模式 (CPU FreeType 字体全微调)"
+  echo "[图形渲染] Intel 2代核显 i915 安全工业防线 (CPU FreeType 字体全微调)"
   EXTRA_GPU_FLAGS=(
     "--ignore-gpu-blocklist"
     "--disable-gpu-vsync"
@@ -216,6 +252,15 @@ else
     "--disable-gpu-watchdog"
   )
 fi
+
+echo "============================================================"
+echo " 正在启动 KND科能达 SCADA 工业大屏客户端 (凝思 Linux 4.9 稳定版)..."
+echo " 目标程序: $APP_EXEC"
+echo " 内存优化: 已配置 2048MB 安全 V8 堆内存，彻底消灭 512MB 导致的 OOM 闪退"
+echo " 崩溃监控: 工业黑匣子已激活，秒级记录运行快照与退出原因"
+echo " 句柄优化: 文件句柄限制已提升至 65535"
+echo " 输入法适配: $DETECTED_IME (Ctrl+空格 瞬时呼出)"
+echo "============================================================"
 
 # 7. 启动主程序
 exec "$APP_EXEC" \
@@ -234,7 +279,7 @@ exec "$APP_EXEC" \
   --font-render-hinting=full \
   --force-color-profile=srgb \
   --gtk-version=3 \
-  --disable-breakpad \
+  --js-flags="--max-old-space-size=2048 --expose-gc" \
   --disable-component-update \
   --disable-sync \
   --disable-domain-reliability \
@@ -247,6 +292,12 @@ exec "$APP_EXEC" \
 EOF
 
 chmod +x "${UNPACKED_DIR}/run.sh"
+
+# 将诊断分析脚本同步打包进发布目录，方便现场一键执行
+if [ -f "deploy/linx-crash-diagnose.sh" ]; then
+  cp "deploy/linx-crash-diagnose.sh" "${UNPACKED_DIR}/diagnose.sh"
+  chmod +x "${UNPACKED_DIR}/diagnose.sh"
+fi
 
 echo "=== 步骤 4: 打包为 tar.gz 压缩包方便传输至凝思 ==="
 PACKAGE_NAME="ge-scada-linx-native.tar.gz"

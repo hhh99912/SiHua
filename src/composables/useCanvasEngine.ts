@@ -69,34 +69,41 @@ export function useCanvasEngine(options: CanvasEngineOptions = {}) {
     };
   };
 
-  // Orthogonal lock calculation (0°, 90°, 45°)
+  // Orthogonal lock calculation (严格 0° 水平 或 90° 垂直正交锁定，杜绝走线歪斜与伪平行)
   const calculateOrthogonalPoint = (
     startX: number,
     startY: number,
     currentX: number,
-    currentY: number
+    currentY: number,
+    allowDiagonal: boolean = false
   ): CanvasPoint => {
     const dx = currentX - startX;
     const dy = currentY - startY;
     const absDx = Math.abs(dx);
     const absDy = Math.abs(dy);
 
-    // Horizontal lock
-    if (absDx >= 2.2 * absDy) {
-      return { x: currentX, y: startY };
+    if (absDx < 2 && absDy < 2) {
+      return { x: startX, y: startY };
     }
-    // Vertical lock
-    if (absDy >= 2.2 * absDx) {
+
+    // 若允许 45° 对角线且角度在 45° 附近（35°~55°）
+    if (allowDiagonal && absDx > 0.7 * absDy && absDy > 0.7 * absDx) {
+      const gs = (snapToGrid.value && gridSize.value > 0) ? gridSize.value : 1;
+      const dist = Math.round(Math.max(absDx, absDy) / gs) * gs;
+      const signX = dx >= 0 ? 1 : -1;
+      const signY = dy >= 0 ? 1 : -1;
+      return {
+        x: startX + dist * signX,
+        y: startY + dist * signY
+      };
+    }
+
+    // 工业 SCADA 标准正交模式：纯 0° 水平 或 90° 垂直，画出来的折线和母线 100% 绝对水平/垂直平行
+    if (absDx >= absDy) {
+      return { x: currentX, y: startY };
+    } else {
       return { x: startX, y: currentY };
     }
-    // 45 degree diagonal lock
-    const dist = Math.round((absDx + absDy) / 2);
-    const signX = dx >= 0 ? 1 : -1;
-    const signY = dy >= 0 ? 1 : -1;
-    return {
-      x: startX + dist * signX,
-      y: startY + dist * signY
-    };
   };
 
   // Mouse Wheel Zoom centered on cursor

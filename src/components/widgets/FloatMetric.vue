@@ -70,41 +70,58 @@ const formattedValue = computed(() => {
   const num = getComponentLiveNumericValue(props.component, props.datasets, 0.0, props.previewMode);
   return formatTruncatedNumber(num, staticStyle.value.decimals, staticStyle.value.trimZeros);
 });
+
+// 3. Telemetry Font Size (统一直接使用 style.fontSize，支持抓手拉伸实时更新与属性面板批量修改)
+const dynamicFontSize = computed(() => {
+  const fs = props.component.style?.fontSize;
+  if (typeof fs === 'number' && fs > 0) {
+    return `${fs}px`;
+  }
+  const compH = props.component.height || 26;
+  return `${Math.max(10, Math.floor(compH * 0.82))}px`;
+});
 </script>
 
 <template>
   <div 
-    class="w-full h-full flex items-center p-0 m-0 select-none overflow-hidden leading-none relative box-border transform-gpu"
+    class="w-full h-full flex items-center p-0 m-0 select-none overflow-hidden leading-none relative box-border"
     :class="{
-      'justify-start text-left': staticStyle.textAlign === 'left',
-      'justify-center text-center': staticStyle.textAlign === 'center',
-      'justify-end text-right': staticStyle.textAlign === 'right'
-    }"
-    :style="{ 
-      backgroundColor: staticStyle.bgColor,
-      borderStyle: staticStyle.hasBorder ? 'solid' : 'none',
-      borderColor: staticStyle.borderColor,
-      borderWidth: `${staticStyle.borderWidth}px`,
-      borderRadius: '0px',
-      boxSizing: 'border-box',
-      contain: 'strict'
+      'justify-start': staticStyle.textAlign === 'left',
+      'justify-center': staticStyle.textAlign === 'center',
+      'justify-end': staticStyle.textAlign === 'right'
     }"
   >
-    <!-- 极简等宽数码 (Pure Monospace Tabular Digital - Zero Margin, Constant Font Size, Zero CPU Ripple) -->
-    <span
-      class="font-mono font-bold leading-none tracking-tight p-0 m-0 block whitespace-nowrap overflow-hidden select-none w-full"
-      :style="{
-        color: staticStyle.textColor,
-        fontSize: staticStyle.fontSize,
-        fontWeight: staticStyle.fontWeight,
-        textAlign: staticStyle.textAlign as any,
-        fontFamily: `'Chakra Petch', 'JetBrains Mono', Consolas, monospace`,
-        fontVariantNumeric: 'tabular-nums',
-        lineHeight: 1
+    <!-- 紧贴数字或细微边距的数码边框包装盒 (边框紧贴数字，无模糊) -->
+    <div
+      class="inline-flex items-center justify-center select-none overflow-hidden"
+      :class="[
+        staticStyle.hasBorder ? 'px-1 py-[1.5px] rounded-[2px]' : 'px-0 py-0'
+      ]"
+      :style="{ 
+        backgroundColor: staticStyle.bgColor,
+        borderStyle: staticStyle.hasBorder ? 'solid' : 'none',
+        borderColor: staticStyle.borderColor,
+        borderWidth: `${staticStyle.borderWidth}px`,
+        boxSizing: 'border-box',
+        maxWidth: '100%',
+        maxHeight: '100%'
       }"
     >
-      {{ formattedValue }}
-    </span>
+      <span
+        class="font-mono font-bold leading-none tracking-tight p-0 m-0 block whitespace-nowrap overflow-hidden select-none"
+        :style="{
+          color: staticStyle.textColor,
+          fontSize: dynamicFontSize,
+          fontWeight: staticStyle.fontWeight,
+          textAlign: staticStyle.textAlign as any,
+          fontFamily: `'Chakra Petch', 'JetBrains Mono', Consolas, monospace`,
+          fontVariantNumeric: 'tabular-nums',
+          lineHeight: 1
+        }"
+      >
+        {{ formattedValue }}
+      </span>
+    </div>
   </div>
 </template>
 

@@ -82,6 +82,11 @@ const apiBridge = {
   power: {
     getStayAwake: () => ipcRenderer.invoke('power:get-stay-awake'),
     setStayAwake: (enabled: boolean) => ipcRenderer.invoke('power:set-stay-awake', Boolean(enabled))
+  },
+  diagnostics: {
+    getStatus: () => ipcRenderer.invoke('diagnostics:get-status'),
+    openLogsDir: () => ipcRenderer.invoke('diagnostics:open-logs-dir'),
+    readReport: () => ipcRenderer.invoke('diagnostics:read-report')
   }
 };
 

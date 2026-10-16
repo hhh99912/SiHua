@@ -81,32 +81,45 @@ export function normalizeSymbolZeroMargin(symbol: CustomSymbolDef): CustomSymbol
 
 // 内存中缓存的图元列表
 let inMemorySymbols: CustomSymbolDef[] | null = null;
-let isDiskFetching = false;
+let diskFetchPromise: Promise<CustomSymbolDef[]> | null = null;
 
 /**
  * 启动时自动从 cell/ 目录检索所有图元 JSON，并与本地状态同步
  * 若 cell 目录为空，则自定义图元库严格显示为空
  */
 export async function refreshCustomSymbolsFromDisk(): Promise<CustomSymbolDef[]> {
-  if (isDiskFetching) {
-    return inMemorySymbols ?? getCustomSymbols();
+  if (diskFetchPromise) {
+    return diskFetchPromise;
   }
-  isDiskFetching = true;
-  try {
-    const diskCells = await fetchAllCellsFromDisk();
-    const normalized = Array.isArray(diskCells) ? diskCells.map(normalizeSymbolZeroMargin) : [];
-    inMemorySymbols = normalized;
-    saveLocalCache(normalized);
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('scada:custom-symbols-updated', { detail: normalized }));
+  diskFetchPromise = (async () => {
+    try {
+      const diskCells = await fetchAllCellsFromDisk();
+      const normalized = Array.isArray(diskCells) ? diskCells.map(normalizeSymbolZeroMargin) : [];
+      inMemorySymbols = normalized;
+      saveLocalCache(normalized);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('scada:custom-symbols-updated', { detail: normalized }));
+      }
+      return normalized;
+    } catch (err) {
+      console.warn('[CellStorage] 从磁盘检索图元失败:', err);
+      return inMemorySymbols ?? [];
+    } finally {
+      diskFetchPromise = null;
     }
-    return normalized;
-  } catch (err) {
-    console.warn('[CellStorage] 从磁盘检索图元失败:', err);
-  } finally {
-    isDiskFetching = false;
+  })();
+  return diskFetchPromise;
+}
+
+/**
+ * 异步确保获取图元列表（若本地缓存为空则等待磁盘拉取完成）
+ */
+export async function getCustomSymbolsAsync(): Promise<CustomSymbolDef[]> {
+  const current = getCustomSymbols();
+  if (current.length > 0) {
+    return current;
   }
-  return inMemorySymbols ?? getCustomSymbols();
+  return await refreshCustomSymbolsFromDisk();
 }
 
 /**
@@ -126,7 +139,7 @@ function saveLocalCache(symbols: CustomSymbolDef[]) {
  * 获取图元列表（严格由 cell 磁盘文件与同步状态驱动，若为空则返回空数组）
  */
 export function getCustomSymbols(): CustomSymbolDef[] {
-  if (inMemorySymbols !== null) {
+  if (inMemorySymbols !== null && inMemorySymbols.length > 0) {
     return inMemorySymbols;
   }
 
@@ -135,7 +148,7 @@ export function getCustomSymbols(): CustomSymbolDef[] {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw !== null) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           inMemorySymbols = parsed.map(normalizeSymbolZeroMargin);
           // 异步触发一次磁盘刷新
           refreshCustomSymbolsFromDisk().catch(() => {});
@@ -147,11 +160,9 @@ export function getCustomSymbols(): CustomSymbolDef[] {
     console.error('Failed to load custom symbols from localStorage:', e);
   }
 
-  // 严格纯磁盘化：无任何硬编码预设图元强制回退，若 cell/ 目录为空则显示为空
-  inMemorySymbols = [];
-  // 异步从服务端 cell/ 目录检索
+  // 若内存与缓存中均无数据，异步触发从服务端 cell/ 目录检索
   refreshCustomSymbolsFromDisk().catch(() => {});
-  return [];
+  return inMemorySymbols ?? [];
 }
 
 /**

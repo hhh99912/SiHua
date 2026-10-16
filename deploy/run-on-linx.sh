@@ -26,7 +26,8 @@ else
     echo "创建并运行全新大屏容器..."
     docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
     
-    CPU_CORES=$(nproc 2>/dev/null || echo 4)
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    mkdir -p "$SCRIPT_DIR/logs"
 
     docker run -d \
       --name $CONTAINER_NAME \
@@ -48,6 +49,7 @@ else
       -e QT_IM_MODULE="fcitx" \
       -v /tmp:/tmp \
       -v /run/user:/run/user \
+      -v "$SCRIPT_DIR/logs:/app/logs" \
       `# --- 3. Mesa 多核软渲染与高清抗模糊核心环境变量 ---` \
       -e LIBGL_ALWAYS_SOFTWARE=1 \
       -e GALLIUM_DRIVER=llvmpipe \

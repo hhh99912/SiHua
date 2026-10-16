@@ -16,9 +16,33 @@ const style = computed(() => props.component.style || {});
 const stroke = computed(() => style.value.stroke || '#00f2ff');
 const strokeWidth = computed(() => style.value.strokeWidth !== undefined ? style.value.strokeWidth : 2);
 const fill = computed(() => style.value.fill || '#00f2ff');
-const fillOpacity = computed(() => style.value.fillOpacity !== undefined ? style.value.fillOpacity : 0.2);
+const fillOpacity = computed(() => {
+  if (style.value.fillOpacity !== undefined) return Math.max(0, Math.min(1, Number(style.value.fillOpacity)));
+  if (style.value.bgOpacity !== undefined) return Math.max(0, Math.min(1, Number(style.value.bgOpacity)));
+  return 1;
+});
 const opacity = computed(() => style.value.opacity !== undefined ? style.value.opacity : 1);
 const borderRadius = computed(() => style.value.borderRadius ?? 6);
+
+// Accurate background color with custom fillOpacity (0 to 1.0)
+const effectiveBgColor = computed(() => {
+  const f = fill.value;
+  if (!f || f === 'transparent' || f === 'none') return 'transparent';
+  const op = fillOpacity.value;
+  if (op <= 0) return 'transparent';
+  if (op >= 1) return f;
+  if (f.startsWith('#')) {
+    let hex = f.slice(1);
+    if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    if (hex.length === 6) {
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${op.toFixed(2)})`;
+    }
+  }
+  return f;
+});
 
 // Dash array mapping
 const strokeDasharray = computed(() => {
@@ -33,21 +57,27 @@ const isTextType = computed(() => type.value === 'draw-text' || type.value === '
 
 const displayText = computed(() => {
   if (style.value.text !== undefined && style.value.text !== '') return String(style.value.text);
+  if (props.component.customProps?.text !== undefined && props.component.customProps.text !== '') return String(props.component.customProps.text);
   if (props.component.customProps?.title) return String(props.component.customProps.title);
   return props.component.name || '文本标签';
 });
 
 const textColor = computed(() => {
-  return style.value.textColor || '#00f2ff';
+  return style.value.textColor || style.value.color || style.value.stroke || '#00f2ff';
 });
 
 const textFontSize = computed(() => {
-  return Number(style.value.fontSize) || Math.max(12, Math.round(height.value * 0.55));
+  if (style.value.fontSize !== undefined && Number(style.value.fontSize) > 0) {
+    return Number(style.value.fontSize);
+  }
+  return 14;
 });
 
 const textFontWeight = computed(() => {
   const w = style.value.fontWeight;
-  if (!w || w === 'normal' || w === 'bold' || w === '700') return '700';
+  if (!w) return 'normal';
+  if (w === 'bold' || w === '700' || w === 700) return '700';
+  if (w === 'normal' || w === '400' || w === 400) return 'normal';
   return String(w);
 });
 
@@ -252,8 +282,7 @@ const cylPaths = computed(() => {
       v-if="type === 'draw-rect' && !style.gradient"
       class="w-full h-full box-border"
       :style="{
-        backgroundColor: fill && fill !== 'transparent' ? fill : 'transparent',
-        opacity: fill && fill !== 'transparent' ? fillOpacity : 1,
+        backgroundColor: effectiveBgColor,
         borderStyle: strokeWidth > 0 && stroke && stroke !== 'transparent' ? (style.lineStyle || 'solid') : 'none',
         borderColor: stroke || 'transparent',
         borderWidth: `${strokeWidth}px`,
@@ -267,8 +296,7 @@ const cylPaths = computed(() => {
       v-else-if="type === 'draw-rounded-rect' && !style.gradient"
       class="w-full h-full box-border"
       :style="{
-        backgroundColor: fill && fill !== 'transparent' ? fill : 'transparent',
-        opacity: fill && fill !== 'transparent' ? fillOpacity : 1,
+        backgroundColor: effectiveBgColor,
         borderStyle: strokeWidth > 0 && stroke && stroke !== 'transparent' ? (style.lineStyle || 'solid') : 'none',
         borderColor: stroke || 'transparent',
         borderWidth: `${strokeWidth}px`,

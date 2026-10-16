@@ -1,8 +1,10 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, Menu, powerSaveBlocker } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import net from 'net';
 import { exec } from 'child_process';
+import { crashMonitor } from './crash-monitor';
 
 // ==============================================================================
 // 工业 SCADA 永远常亮保护系统 (防止凝思 Linux / X11 DPMS 熄屏、屏幕保护与系统休眠)
@@ -35,13 +37,20 @@ const enableIndustrialStayAwake = () => {
   }
 };
 
-// Linux 凝思环境下每 45 秒发送一次心跳重置 X11 屏保计时器，形成双保险
+// Linux 凝思环境下每 60 秒发送一次心跳重置 X11 屏保计时器 (安全单例执行，绝不堆积子进程)
+let isXsetResetRunning = false;
 if (process.platform === 'linux' && typeof setInterval !== 'undefined') {
   setInterval(() => {
+    if (isXsetResetRunning) return;
+    isXsetResetRunning = true;
     try {
-      exec('xset s reset', () => {});
-    } catch {}
-  }, 45000);
+      exec('xset s reset', () => {
+        isXsetResetRunning = false;
+      });
+    } catch {
+      isXsetResetRunning = false;
+    }
+  }, 60000);
 }
 
 
@@ -71,20 +80,35 @@ if (process.platform === 'linux') {
   app.commandLine.appendSwitch('font-render-hinting', hintingMode);
 
   // 4. 显卡与图形光栅化调优 (严格适配 Intel 2代核显 i915 / Linux 4.9 内核稳定防护)
-  // 核心：彻底禁用 GPU 字体光栅化由 CPU FreeType 精准全微调渲染；禁用不稳定 zero-copy 防范 i915 DRM ring 挂死导致系统重启！
-  app.commandLine.appendSwitch('ignore-gpu-blocklist');
-  app.commandLine.appendSwitch('disable-gpu-vsync'); // 避免 VGA 60Hz 垂直同步锁频等待导致的掉帧与刷新卡顿
-  app.commandLine.appendSwitch('disable-gpu-rasterization'); // 禁用 GPU 文字光栅化，使小字号汉字呈现点对点晶体般清晰
-  app.commandLine.appendSwitch('disable-zero-copy'); // 关键：凝思 4.9 内核对 Sandy Bridge 2代核显的零拷贝 GEM 映射极易触发 GPU hang 重启，禁用保平安
-  app.commandLine.appendSwitch('disable-accelerated-video-decode');
-  app.commandLine.appendSwitch('disable-accelerated-video-encode');
+  // Linux 凝思工控机环境下默认彻底禁用 GPU 硬件加速 (纯 CPU 软渲染)，彻底消除 i915 DRM Ring 挂死与内核 Panic
+  // 除非用户显式传入 --enable-gpu 或 --hardware-gpu
+  const isEnableGpuRequested = process.argv.includes('--enable-gpu') || process.argv.includes('--hardware-gpu');
+  const isDisableGpuRequested = !isEnableGpuRequested || 
+    process.argv.includes('--disable-gpu') || 
+    process.argv.includes('--software-render') || 
+    process.argv.includes('--cpu-render') || 
+    process.argv.includes('--soft-render') || 
+    process.env.SCADA_DISABLE_GPU === '1';
+
+  if (isDisableGpuRequested) {
+    app.disableHardwareAcceleration();
+    app.commandLine.appendSwitch('disable-gpu');
+    app.commandLine.appendSwitch('disable-gpu-compositing');
+    app.commandLine.appendSwitch('disable-gpu-rasterization');
+  } else {
+    // 未禁用 GPU 时的安全防线：严禁 zero-copy 防范 i915 DRM ring 挂死导致系统重启
+    app.commandLine.appendSwitch('ignore-gpu-blocklist');
+    app.commandLine.appendSwitch('disable-gpu-vsync');
+    app.commandLine.appendSwitch('disable-gpu-rasterization');
+    app.commandLine.appendSwitch('disable-zero-copy');
+    app.commandLine.appendSwitch('disable-accelerated-video-decode');
+    app.commandLine.appendSwitch('disable-accelerated-video-encode');
+    app.commandLine.appendSwitch('use-cmd-decoder', 'validating');
+  }
+
   app.commandLine.appendSwitch('enable-features', 'OverlayScrollbar');
 
-  // 5. 校验解码器与命令流平滑
-  app.commandLine.appendSwitch('use-cmd-decoder', 'validating');
-
-  // 6. Linux 凝思安全系统 (X11/Xorg) / Fcitx / IBus 中文输入法唤醒支持 (Ctrl+Space / 候选框)
-  // 注意：严禁添加 enable-input-method 或 enable-wayland-ime（此参数为 ChromeOS/Wayland 专用，在 X11 下会阻断 Fcitx 拦截）
+  // 5. Linux 凝思安全系统 (X11/Xorg) / Fcitx / IBus 中文输入法唤醒支持 (Ctrl+Space / 候选框)
   if (!process.env.XMODIFIERS) process.env.XMODIFIERS = '@im=fcitx';
   if (!process.env.GTK_IM_MODULE) {
     const hasGtk3Fcitx = fs.existsSync('/usr/lib/x86_64-linux-gnu/gtk-3.0/3.0.0/immodules/im-fcitx.so') ||
@@ -95,18 +119,6 @@ if (process.platform === 'linux') {
   if (!process.env.QT_IM_MODULE) process.env.QT_IM_MODULE = 'fcitx';
 
   app.commandLine.appendSwitch('gtk-version', '3');
-
-  // 如果用户手动传入 --disable-gpu 或 --software-render，彻底启用 CPU 纯软渲染
-  if (
-    process.argv.includes('--disable-gpu') || 
-    process.argv.includes('--software-render') || 
-    process.env.SCADA_DISABLE_GPU === '1'
-  ) {
-    app.disableHardwareAcceleration();
-    app.commandLine.appendSwitch('disable-gpu');
-    app.commandLine.appendSwitch('disable-gpu-compositing');
-    app.commandLine.appendSwitch('disable-gpu-rasterization');
-  }
 }
 
 // 全平台防后台挂起/休眠节流优化：彻底解决窗口最小化或后台运行时被 Chromium 挂起、重新放大时界面假死卡顿的问题
@@ -117,16 +129,19 @@ app.commandLine.appendSwitch('disable-features', 'CanvasOopRasterization,UseSkia
 app.commandLine.appendSwitch('disable-component-update');
 app.commandLine.appendSwitch('disable-domain-reliability');
 app.commandLine.appendSwitch('disable-background-networking');
-app.commandLine.appendSwitch('disable-breakpad');
+// 保留 Breakpad 崩溃转储能力，杜绝闪退后无迹可寻
 app.commandLine.appendSwitch('disable-sync');
 app.commandLine.appendSwitch('disable-speech-api');
 app.commandLine.appendSwitch('disable-print-preview');
 app.commandLine.appendSwitch('disable-client-side-phishing-detection');
 app.commandLine.appendSwitch('no-pings');
 
-// V8 与 Chromium 极速减重与内存优化：去除 optimize-for-size 避免密集点位解析时反复触发 JIT 降级抽搐
-app.commandLine.appendSwitch('js-flags', '--max-old-space-size=512 --max-semi-space-size=64 --expose-gc');
-app.commandLine.appendSwitch('disk-cache-size', '33554432'); // 适当保留 32MB 磁盘缓存加速冷启动
+// V8 与 Chromium 内存配置：彻底消除人工 512MB 封顶！
+// 智能根据系统内存动态分配：至少 1536MB，最大 2048MB（4GB+机器取 2048MB）
+const totalHostMemMb = Math.floor(os.totalmem() / 1024 / 1024);
+const v8MaxOldSpaceMb = Math.min(2048, Math.max(1536, Math.floor(totalHostMemMb * 0.5)));
+app.commandLine.appendSwitch('js-flags', `--max-old-space-size=${v8MaxOldSpaceMb} --expose-gc`);
+app.commandLine.appendSwitch('disk-cache-size', '33554432');
 app.commandLine.appendSwitch('media-cache-size', '8388608');
 
 // 定期在空闲时段触发 V8 垃圾回收以释放无用内存
@@ -165,6 +180,9 @@ function createWindow() {
       spellcheck: false
     }
   });
+
+  // 绑定黑匣子窗口崩溃与卡顿监控
+  crashMonitor.attachWindow(mainWindow);
 
   // Remove default menu for clean SCADA workstation feel
   Menu.setApplicationMenu(null);
@@ -1138,6 +1156,37 @@ function setupIpcHandlers() {
       stayAwake: powerBlockerId !== null && powerSaveBlocker.isStarted(powerBlockerId)
     };
   });
+
+  // ---------------- 工业黑匣子与重启崩溃诊断 IPC ----------------
+  ipcMain.handle('diagnostics:get-status', () => {
+    return {
+      success: true,
+      data: crashMonitor.getDiagnosticData()
+    };
+  });
+
+  ipcMain.handle('diagnostics:open-logs-dir', async () => {
+    const dir = crashMonitor.getLogsDirectoryPath();
+    try {
+      await shell.openPath(dir);
+      return { success: true, dir };
+    } catch (e: any) {
+      return { success: false, error: e?.message };
+    }
+  });
+
+  ipcMain.handle('diagnostics:read-report', async () => {
+    try {
+      const p = path.join(crashMonitor.getLogsDirectoryPath(), 'reboot_diagnosis_report.txt');
+      if (fs.existsSync(p)) {
+        const content = await fs.promises.readFile(p, 'utf-8');
+        return { success: true, content };
+      }
+      return { success: false, message: '诊断报告尚未生成' };
+    } catch (e: any) {
+      return { success: false, error: e?.message };
+    }
+  });
 }
 
 // App lifecycle with Single Instance Lock for Windows & Linux
@@ -1154,6 +1203,7 @@ if (!gotTheLock) {
   });
 
   app.whenReady().then(() => {
+    crashMonitor.init(() => mainWindow);
     enableIndustrialStayAwake();
     setupIpcHandlers();
     createWindow();
@@ -1163,9 +1213,14 @@ if (!gotTheLock) {
     });
   });
 
+  app.on('before-quit', () => {
+    crashMonitor.markCleanExit();
+  });
+
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
       app.quit();
     }
   });
 }
+

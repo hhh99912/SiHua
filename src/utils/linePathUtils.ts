@@ -36,11 +36,6 @@ export function isHollowComponent(comp: ScreenComponent): boolean {
   if (isCyberBorderComponent(comp.type, comp.category)) {
     return true;
   }
-  if (comp.type === 'draw-rect' || comp.type === 'draw-rounded-rect') {
-    const fill = comp.style?.fill;
-    const fillOpacity = comp.style?.fillOpacity;
-    return (!fill || fill === 'transparent') || fillOpacity === 0;
-  }
   return false;
 }
 
@@ -53,10 +48,16 @@ export function getPolylinePoints(comp: ScreenComponent): Point2D[] {
     const hasRatios = customPts[0].xRatio !== undefined && customPts[0].yRatio !== undefined;
     
     if (hasRatios) {
-      return customPts.map((p: any) => ({
-        x: p.xRatio * w,
-        y: p.yRatio * h
-      }));
+      return customPts.map((p: any) => {
+        // 若图元未发生非等比形变，优先保留精确的局部整数字段，避免浮点数漂移产生假性微歪
+        if (p.x !== undefined && p.y !== undefined && Math.abs(p.xRatio * w - p.x) < 0.2 && Math.abs(p.yRatio * h - p.y) < 0.2) {
+          return { x: p.x, y: p.y };
+        }
+        return {
+          x: Math.round(p.xRatio * w * 100) / 100,
+          y: Math.round(p.yRatio * h * 100) / 100
+        };
+      });
     } else {
       const minX = Math.min(...customPts.map((p: any) => p.x ?? 0));
       const maxX = Math.max(...customPts.map((p: any) => p.x ?? 0));

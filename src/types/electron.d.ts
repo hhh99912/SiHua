@@ -54,6 +54,11 @@ export interface ElectronAPI {
     getStayAwake: () => Promise<{ success: boolean; stayAwake: boolean; blockerId: number | null; platform: string; isLinxLinux: boolean }>;
     setStayAwake: (enabled: boolean) => Promise<{ success: boolean; stayAwake: boolean }>;
   };
+  diagnostics?: {
+    getStatus: () => Promise<{ success: boolean; data: any }>;
+    openLogsDir: () => Promise<{ success: boolean; dir?: string; error?: string }>;
+    readReport: () => Promise<{ success: boolean; content?: string; message?: string; error?: string }>;
+  };
 }
 
 declare global {

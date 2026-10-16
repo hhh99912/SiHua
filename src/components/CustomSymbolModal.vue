@@ -71,6 +71,10 @@ const activeStateId = ref<string>('0');
 
 // Canvas transform & settings
 const canvasZoom = ref(1.0);
+const invCanvasZoom = computed(() => {
+  const z = Number(canvasZoom.value) || 1;
+  return z > 0 ? 1 / z : 1;
+});
 const canvasPan = ref({ x: 120, y: 80 });
 const isPanning = ref(false);
 const panStart = ref({ x: 0, y: 0 });
@@ -947,6 +951,7 @@ const handleCanvasMouseDown = (e: MouseEvent) => {
 
 // Start Resizing Component via Handle
 const handleStartResizeComp = (comp: ScreenComponent, handle: string, e: MouseEvent) => {
+  if (e.button !== 0) return;
   e.stopPropagation();
   e.preventDefault();
   selectedCompIds.value = [comp.id];
@@ -965,6 +970,7 @@ const handleStartResizeComp = (comp: ScreenComponent, handle: string, e: MouseEv
 
 // Start Rotating Component via Top Handle
 const handleStartRotateComp = (comp: ScreenComponent, e: MouseEvent) => {
+  if (e.button !== 0) return;
   e.stopPropagation();
   e.preventDefault();
   selectedCompIds.value = [comp.id];
@@ -1145,6 +1151,9 @@ const handleCanvasMouseMove = (e: MouseEvent) => {
   }
 
   if (isDraggingComps.value) {
+    const rawDist = Math.hypot(e.clientX - dragStartMouse.value.x, e.clientY - dragStartMouse.value.y);
+    if (rawDist < 3) return;
+
     const dx = (e.clientX - dragStartMouse.value.x) / canvasZoom.value;
     const dy = (e.clientY - dragStartMouse.value.y) / canvasZoom.value;
     const gs = editorGridSize.value || 20;
@@ -1321,6 +1330,7 @@ const handleCanvasDblClick = () => {
 
 // Component Click / Drag Start
 const handleCompMouseDown = (comp: ScreenComponent, e: MouseEvent) => {
+  if (e.button !== 0) return;
   e.stopPropagation();
   if (activeTool.value !== 'select') return;
   if (isResizingComp.value || isRotatingComp.value) return;
@@ -2723,56 +2733,65 @@ const handleFileChange = async (e: Event) => {
                     title="拖拽移动图元"
                   />
 
-                  <!-- 8 Interactive Resize Handles -->
+                  <!-- 8 Interactive Resize Handles (恒定屏幕大小，放大不膨胀遮挡) -->
                   <div
                     @mousedown.stop="handleStartResizeComp(comp, 'nw', $event)"
                     class="pointer-events-auto absolute -top-1.5 -left-1.5 w-3 h-3 bg-cyan-400 border border-slate-950 cursor-nwse-resize rounded-[2px] z-30 shadow hover:scale-125 transition-transform"
+                    :style="{ transform: `scale(${invCanvasZoom})`, transformOrigin: 'center center' }"
                     title="拉伸 (左上角)"
                   />
                   <div
                     v-if="comp.height >= 20"
                     @mousedown.stop="handleStartResizeComp(comp, 'n', $event)"
                     class="pointer-events-auto absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-cyan-400 border border-slate-950 cursor-ns-resize rounded-[2px] z-30 shadow hover:scale-125 transition-transform"
+                    :style="{ transform: `translateX(-50%) scale(${invCanvasZoom})`, transformOrigin: 'center center' }"
                     title="拉伸 (上边)"
                   />
                   <div
                     @mousedown.stop="handleStartResizeComp(comp, 'ne', $event)"
                     class="pointer-events-auto absolute -top-1.5 -right-1.5 w-3 h-3 bg-cyan-400 border border-slate-950 cursor-nesw-resize rounded-[2px] z-30 shadow hover:scale-125 transition-transform"
+                    :style="{ transform: `scale(${invCanvasZoom})`, transformOrigin: 'center center' }"
                     title="拉伸 (右上角)"
                   />
                   <div
                     v-if="comp.width >= 20"
                     @mousedown.stop="handleStartResizeComp(comp, 'e', $event)"
                     class="pointer-events-auto absolute top-1/2 -translate-y-1/2 -right-1.5 w-3 h-3 bg-cyan-400 border border-slate-950 cursor-ew-resize rounded-[2px] z-30 shadow hover:scale-125 transition-transform"
+                    :style="{ transform: `translateY(-50%) scale(${invCanvasZoom})`, transformOrigin: 'center center' }"
                     title="拉伸 (右边)"
                   />
                   <div
                     @mousedown.stop="handleStartResizeComp(comp, 'se', $event)"
                     class="pointer-events-auto absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-cyan-400 border border-slate-950 cursor-nwse-resize rounded-[2px] z-30 shadow hover:scale-125 transition-transform"
+                    :style="{ transform: `scale(${invCanvasZoom})`, transformOrigin: 'center center' }"
                     title="拉伸 (右下角)"
                   />
                   <div
                     v-if="comp.height >= 20"
                     @mousedown.stop="handleStartResizeComp(comp, 's', $event)"
                     class="pointer-events-auto absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-cyan-400 border border-slate-950 cursor-ns-resize rounded-[2px] z-30 shadow hover:scale-125 transition-transform"
+                    :style="{ transform: `translateX(-50%) scale(${invCanvasZoom})`, transformOrigin: 'center center' }"
                     title="拉伸 (下边)"
                   />
                   <div
                     @mousedown.stop="handleStartResizeComp(comp, 'sw', $event)"
                     class="pointer-events-auto absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-cyan-400 border border-slate-950 cursor-nesw-resize rounded-[2px] z-30 shadow hover:scale-125 transition-transform"
+                    :style="{ transform: `scale(${invCanvasZoom})`, transformOrigin: 'center center' }"
                     title="拉伸 (左下角)"
                   />
                   <div
                     v-if="comp.width >= 20"
                     @mousedown.stop="handleStartResizeComp(comp, 'w', $event)"
                     class="pointer-events-auto absolute top-1/2 -translate-y-1/2 -left-1.5 w-3 h-3 bg-cyan-400 border border-slate-950 cursor-ew-resize rounded-[2px] z-30 shadow hover:scale-125 transition-transform"
+                    :style="{ transform: `translateY(-50%) scale(${invCanvasZoom})`, transformOrigin: 'center center' }"
                     title="拉伸 (左边)"
                   />
 
-                  <!-- Rotation Handle -->
+                  <!-- Rotation Handle (恒定屏幕大小) -->
                   <div
                     @mousedown.stop="handleStartRotateComp(comp, $event)"
                     class="pointer-events-auto absolute -top-7 left-1/2 -translate-x-1/2 flex flex-col items-center cursor-grab active:cursor-grabbing z-30 group/rot"
+                    :style="{ transform: `translateX(-50%) scale(${invCanvasZoom})`, transformOrigin: 'bottom center' }"
                     title="旋转角度 (按住拖拽，Shift 键以 15° 步长对齐)"
                   >
                     <div class="w-4 h-4 rounded-full bg-cyan-950 border border-cyan-400 flex items-center justify-center text-cyan-300 shadow group-hover/rot:scale-110 group-hover/rot:border-white transition-transform">

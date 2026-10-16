@@ -230,16 +230,14 @@ const themeStyleMap = computed(() => {
 <template>
   <button
     type="button"
-    class="w-full h-full relative select-none flex items-center justify-center gap-2 px-3 py-1.5 transition-all duration-150 overflow-hidden outline-hidden focus:ring-2 focus:ring-cyan-400/50"
+    class="w-full h-full relative select-none flex items-center justify-center gap-2 px-3 py-1.5 transition-colors duration-150 overflow-hidden outline-none focus:outline-none"
     :class="[
-      previewMode ? 'cursor-pointer' : 'cursor-default',
+      previewMode ? 'cursor-pointer active:brightness-90 hover:brightness-105' : 'cursor-default pointer-events-none',
       variant === 'outline'
         ? [themeStyleMap.outlineBg, 'border', themeStyleMap.outlineBorder, themeStyleMap.outlineText]
         : variant === 'flat'
         ? [themeStyleMap.flatBg, 'border border-transparent', themeStyleMap.flatText]
         : [themeStyleMap.solidBg, 'border', themeStyleMap.solidBorder, themeStyleMap.solidText, themeStyleMap.glow],
-      previewMode && isPressed ? 'scale-[0.97] brightness-90' : '',
-      previewMode && !isPressed ? 'hover:scale-[1.01] hover:brightness-110' : '',
       justTriggered ? 'ring-2 ring-white animate-pulse' : ''
     ]"
     :style="{

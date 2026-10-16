@@ -278,7 +278,7 @@ const handleConfirmSaveTemplate = async () => {
 </script>
 
 <template>
-  <div class="h-10.5 bg-white border-t border-slate-200 flex items-center justify-between px-3 z-30 select-none font-sans text-slate-800 shadow-2xs relative tracking-wide">
+  <div class="h-10.5 bg-[#ebe4d4] border-t border-[#cfc5b0] flex items-center justify-between px-3 z-30 select-none font-sans text-slate-800 shadow-2xs relative tracking-wide">
     <!-- Toast 通知浮层 -->
     <div 
       v-if="toastMessage" 
@@ -292,7 +292,7 @@ const handleConfirmSaveTemplate = async () => {
     <div class="flex items-center gap-2.5">
       <!-- Label -->
       <div class="flex items-center gap-2 text-[13px] text-slate-700 font-bold px-1 shrink-0">
-        <Layout class="w-4 h-4 text-sky-600 stroke-[2]" />
+        <Layout class="w-4 h-4 text-sky-700 stroke-[2]" />
         <span>画面列表:</span>
       </div>
 
@@ -300,28 +300,28 @@ const handleConfirmSaveTemplate = async () => {
       <div class="relative">
         <button
           @click="isDropdownOpen = !isDropdownOpen"
-          class="flex items-center justify-between gap-2.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 text-slate-800 rounded-lg text-[13px] font-bold transition-colors cursor-pointer min-w-[210px] shadow-2xs tracking-wide"
+          class="flex items-center justify-between gap-2.5 px-3 py-1.5 bg-[#f4efe4] hover:bg-[#eae3d2] border border-[#cfc5b0] text-slate-800 rounded-lg text-[13px] font-bold transition-colors cursor-pointer min-w-[210px] shadow-2xs tracking-wide"
         >
           <div class="flex items-center gap-2 truncate">
-            <Monitor class="w-4 h-4 text-sky-600 shrink-0 stroke-[2]" />
+            <Monitor class="w-4 h-4 text-sky-700 shrink-0 stroke-[2]" />
             <span class="font-bold truncate max-w-[180px]">{{ currentScreen?.name || '选择画面' }}</span>
           </div>
           <div class="flex items-center gap-2 shrink-0">
-            <span class="text-[11px] px-1.5 py-0.2 rounded bg-white text-slate-600 border border-slate-200 font-mono font-bold">
+            <span class="text-[11px] px-1.5 py-0.2 rounded bg-[#eae3d2] text-slate-700 border border-[#cfc5b0] font-mono font-bold">
               {{ currentScreen?.components?.length || 0 }}图元
             </span>
-            <ChevronDown class="w-4 h-4 text-slate-400 transition-transform stroke-[2]" :class="{ 'rotate-180': isDropdownOpen }" />
+            <ChevronDown class="w-4 h-4 text-slate-500 transition-transform stroke-[2]" :class="{ 'rotate-180': isDropdownOpen }" />
           </div>
         </button>
 
         <!-- Dropdown Menu Popover -->
         <div
           v-if="isDropdownOpen"
-          class="absolute bottom-full left-0 mb-1.5 w-80 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-50 divide-y divide-slate-100 animate-in fade-in zoom-in-95 duration-100 text-slate-800 tracking-wide"
+          class="absolute bottom-full left-0 mb-1.5 w-80 bg-[#f4efe4] border border-[#cfc5b0] rounded-xl shadow-xl overflow-hidden z-50 divide-y divide-[#ded5bf] animate-in fade-in zoom-in-95 duration-100 text-slate-800 tracking-wide"
         >
-          <div class="px-3.5 py-2 bg-slate-50 text-xs text-slate-600 flex items-center justify-between font-bold">
+          <div class="px-3.5 py-2 bg-[#eae3d2] text-xs text-slate-700 flex items-center justify-between font-bold">
             <span>切换监控画面 (共 {{ screens.length }} 画面)</span>
-            <span class="text-slate-400 font-normal">名称唯一识别</span>
+            <span class="text-slate-500 font-normal">名称唯一识别</span>
           </div>
 
           <div class="max-h-64 overflow-y-auto p-1.5 space-y-1">
@@ -331,127 +331,127 @@ const handleConfirmSaveTemplate = async () => {
               @click="handleSelectScreen(item.id)"
               class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-[13px] text-left cursor-pointer transition-colors"
               :class="item.id === activeScreenId 
-                ? 'bg-sky-50 text-sky-900 font-bold border border-sky-300' 
-                : 'text-slate-700 hover:bg-slate-50 border border-transparent'"
+                ? 'bg-sky-100 text-sky-900 font-bold border border-sky-300' 
+                : 'text-slate-700 hover:bg-[#eae3d2] border border-transparent'"
             >
               <div class="flex items-center gap-2.5 truncate">
-                <Monitor class="w-4 h-4 shrink-0 stroke-[2]" :class="item.id === activeScreenId ? 'text-sky-600' : 'text-slate-400'" />
+                <Monitor class="w-4 h-4 shrink-0 stroke-[2]" :class="item.id === activeScreenId ? 'text-sky-700' : 'text-slate-500'" />
                 <span class="truncate">{{ item.name }}</span>
                 <span 
                   v-if="item.id === indexScreenId || (indexScreenName && item.name.toLowerCase() === indexScreenName.toLowerCase())"
-                  class="text-[10px] px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 font-mono shrink-0 font-bold"
+                  class="text-[10px] px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300 font-mono shrink-0 font-bold"
                   title="登录成功后默认显示的主索引大屏"
                 >
                   ★主索引
                 </span>
               </div>
               <div class="flex items-center gap-2 shrink-0">
-                <span class="text-[11px] text-slate-400 font-mono font-medium">
+                <span class="text-[11px] text-slate-500 font-mono font-medium">
                   {{ item.components?.length || 0 }} 项
                 </span>
-                <Check v-if="item.id === activeScreenId" class="w-4 h-4 text-sky-600 stroke-[2.5]" />
+                <Check v-if="item.id === activeScreenId" class="w-4 h-4 text-sky-700 stroke-[2.5]" />
               </div>
             </button>
           </div>
 
           <!-- Bottom Action in Dropdown -->
-          <div class="p-2 bg-slate-50 flex items-center gap-1">
+          <div class="p-2 bg-[#eae3d2] flex items-center gap-1">
             <button
               @click="isDropdownOpen = false; handleOpenAddModal();"
-              class="w-full flex items-center justify-center gap-2 py-2 px-3 bg-white hover:bg-sky-50 text-sky-700 border border-slate-200 rounded-lg text-[13px] font-bold cursor-pointer transition-colors shadow-2xs"
+              class="w-full flex items-center justify-center gap-2 py-2 px-3 bg-[#f4efe4] hover:bg-sky-100 text-sky-800 border border-[#cfc5b0] rounded-lg text-[13px] font-bold cursor-pointer transition-colors shadow-2xs"
             >
-              <Plus class="w-4 h-4 text-sky-600 stroke-[2]" />
+              <Plus class="w-4 h-4 text-sky-700 stroke-[2]" />
               <span>新建画面</span>
             </button>
           </div>
         </div>
       </div>
 
-      <!-- Quick Action Buttons (纯图标按钮，全白主题，增大点击热区与清晰度) -->
-      <div class="flex items-center gap-1 pl-2 border-l border-slate-200">
-        <!-- Add Screen (纯图标) -->
+      <!-- Quick Action Buttons -->
+      <div class="flex items-center gap-1 pl-2 border-l border-[#cfc5b0]">
+        <!-- Add Screen -->
         <button
           @click="handleOpenAddModal"
-          class="p-1.5 rounded-md bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-900 transition-colors cursor-pointer flex items-center justify-center"
+          class="p-1.5 rounded-md bg-[#f4efe4] hover:bg-[#eae3d2] border border-[#cfc5b0] text-slate-700 hover:text-slate-900 transition-colors cursor-pointer flex items-center justify-center"
           title="新建画面页面"
         >
-          <Plus class="w-4 h-4 text-sky-600 stroke-[2]" />
+          <Plus class="w-4 h-4 text-sky-700 stroke-[2]" />
         </button>
 
-        <!-- Rename Current Screen (纯图标) -->
+        <!-- Rename Current Screen -->
         <button
           @click="handleOpenRenameModal"
-          class="p-1.5 rounded-md bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-900 transition-colors cursor-pointer flex items-center justify-center"
+          class="p-1.5 rounded-md bg-[#f4efe4] hover:bg-[#eae3d2] border border-[#cfc5b0] text-slate-700 hover:text-slate-900 transition-colors cursor-pointer flex items-center justify-center"
           title="重命名当前画面"
         >
           <Edit3 class="w-4 h-4 text-slate-600 stroke-[2]" />
         </button>
 
-        <!-- Duplicate Current Screen (纯图标) -->
+        <!-- Duplicate Current Screen -->
         <button
           @click="handleDuplicateCurrent"
-          class="p-1.5 rounded-md bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-900 transition-colors cursor-pointer flex items-center justify-center"
+          class="p-1.5 rounded-md bg-[#f4efe4] hover:bg-[#eae3d2] border border-[#cfc5b0] text-slate-700 hover:text-slate-900 transition-colors cursor-pointer flex items-center justify-center"
           title="复制当前画面"
         >
-          <Copy class="w-4 h-4 text-emerald-600 stroke-[2]" />
+          <Copy class="w-4 h-4 text-emerald-700 stroke-[2]" />
         </button>
 
-        <!-- Delete Current Screen (纯图标) -->
+        <!-- Delete Current Screen -->
         <button
           v-if="screens.length > 1"
           @click="handleDeleteCurrent"
-          class="p-1.5 rounded-md bg-slate-50 hover:bg-rose-50 border border-slate-200 text-slate-700 hover:text-rose-600 transition-colors cursor-pointer flex items-center justify-center"
+          class="p-1.5 rounded-md bg-[#f4efe4] hover:bg-rose-100 border border-[#cfc5b0] text-slate-700 hover:text-rose-700 transition-colors cursor-pointer flex items-center justify-center"
           title="删除当前画面"
         >
-          <Trash2 class="w-4 h-4 text-rose-500 stroke-[2]" />
+          <Trash2 class="w-4 h-4 text-rose-600 stroke-[2]" />
         </button>
 
-        <!-- Save As Template (存为模板到 model/ - 纯图标) -->
+        <!-- Save As Template (存为模板到 model/) -->
         <button
           @click="handleOpenSaveTemplateModal"
-          class="p-1.5 rounded-md bg-slate-50 hover:bg-amber-50 border border-slate-200 text-slate-700 hover:text-amber-700 transition-colors cursor-pointer flex items-center justify-center"
+          class="p-1.5 rounded-md bg-[#f4efe4] hover:bg-amber-100 border border-[#cfc5b0] text-slate-700 hover:text-amber-800 transition-colors cursor-pointer flex items-center justify-center"
           title="将当前画面的完整图元组装保存为模板 (model/ 目录)"
         >
-          <FolderDown class="w-4 h-4 text-amber-600 stroke-[2]" />
+          <FolderDown class="w-4 h-4 text-amber-700 stroke-[2]" />
         </button>
 
-        <!-- Login Index Screen Toggle Button (纯图标) -->
-        <div class="h-4 w-px bg-slate-200 mx-1"></div>
+        <!-- Login Index Screen Toggle Button -->
+        <div class="h-4 w-px bg-[#cfc5b0] mx-1"></div>
         <button
           v-if="!isCurrentIndexScreen && currentScreen"
           @click="emit('set:index-screen', currentScreen.id)"
-          class="p-1.5 rounded-md bg-slate-50 hover:bg-amber-50 border border-slate-200 text-slate-700 hover:text-amber-700 transition-colors cursor-pointer flex items-center justify-center"
+          class="p-1.5 rounded-md bg-[#f4efe4] hover:bg-amber-100 border border-[#cfc5b0] text-slate-700 hover:text-amber-800 transition-colors cursor-pointer flex items-center justify-center"
           title="将当前画面设为用户登录后默认展示的主索引大屏"
         >
-          <Star class="w-4 h-4 text-amber-500 stroke-[2]" />
+          <Star class="w-4 h-4 text-amber-600 stroke-[2]" />
         </button>
         <div
           v-else
-          class="p-1.5 rounded-md bg-amber-50 border border-amber-300 text-amber-700 flex items-center justify-center"
+          class="p-1.5 rounded-md bg-amber-100 border border-amber-300 text-amber-800 flex items-center justify-center"
           title="当前画面已是登录主索引大屏"
         >
-          <Star class="w-4 h-4 text-amber-600 fill-amber-500 stroke-[2]" />
+          <Star class="w-4 h-4 text-amber-700 fill-amber-500 stroke-[2]" />
         </div>
 
-        <div class="h-4 w-px bg-slate-200 mx-1"></div>
+        <div class="h-4 w-px bg-[#cfc5b0] mx-1"></div>
 
-        <!-- Open Disk Storage Library (纯图标) -->
+        <!-- Open Disk Storage Library -->
         <button
           @click="emit('open:disk-storage')"
-          class="p-1.5 rounded-md bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-900 transition-colors cursor-pointer flex items-center justify-center"
+          class="p-1.5 rounded-md bg-[#f4efe4] hover:bg-[#eae3d2] border border-[#cfc5b0] text-slate-700 hover:text-slate-900 transition-colors cursor-pointer flex items-center justify-center"
           title="管理磁盘 graph/ 目录下的所有独立大屏文件"
         >
-          <HardDrive class="w-4 h-4 text-sky-600 stroke-[2]" />
+          <HardDrive class="w-4 h-4 text-sky-700 stroke-[2]" />
         </button>
 
-        <!-- Save to Disk Action (仅保存当前这一个大屏 - 纯图标) -->
+        <!-- Save to Disk Action (仅保存当前这一个大屏) -->
         <button
           @click="emit('save:current-disk')"
           :disabled="isSavingDisk"
-          class="p-1.5 rounded-md bg-slate-50 hover:bg-sky-50 border border-slate-200 text-slate-700 hover:text-sky-700 transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center"
+          class="p-1.5 rounded-md bg-[#f4efe4] hover:bg-sky-100 border border-[#cfc5b0] text-slate-700 hover:text-sky-800 transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center"
           :title="isSavingDisk ? '保存中...' : `保存当前画面「${currentScreen?.name}」到 graph/${currentScreen?.name}.json`"
         >
-          <Save class="w-4 h-4 text-sky-600 stroke-[2]" :class="{ 'animate-spin': isSavingDisk }" />
+          <Save class="w-4 h-4 text-sky-700 stroke-[2]" :class="{ 'animate-spin': isSavingDisk }" />
         </button>
       </div>
     </div>

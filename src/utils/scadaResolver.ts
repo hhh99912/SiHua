@@ -507,6 +507,43 @@ export function resolveDynamicObjectValues(
 }
 
 /**
+/**
+ * 400+ 测点精准局部响应式订阅解析器 (极速硬件低载核心)
+ * 无论传入纯数字 ID (62000001)、设备复合键 (7000001_YC_62000001) 还是绑定表达式，
+ * 均能精准剥离提取出测点 ID，订阅独立的轻量响应式触发器。
+ * 彻底杜绝回退到全局脉冲 scadaLiveTick 引发全图 400+ 图元同时重绘！
+ */
+export function subscribeComponentPointReactive(component: ScreenComponent, candidateKeys: any[] = []): void {
+  const keys = [
+    component?.data?.mapping?.pointId,
+    component?.data?.mapping?.valueKey,
+    component?.data?.bindings?.value,
+    component?.data?.mapping?.stateKey,
+    component?.data?.bindings?.state,
+    ...candidateKeys
+  ];
+
+  let resolvedPid = -1;
+  for (let i = 0; i < keys.length; i++) {
+    const k = keys[i];
+    if (k !== undefined && k !== null && k !== '') {
+      const parsed = parseScadaPointKey(k);
+      if (parsed.pointId > 0) {
+        resolvedPid = parsed.pointId;
+        break;
+      }
+    }
+  }
+
+  if (resolvedPid > 0) {
+    const _ = getPointReactiveRef(resolvedPid).value;
+  } else {
+    // 仅针对完全没有绑定任何测点的纯静态图元或未关联图元，挂载兜底脉冲
+    const _ = scadaLiveTick.value;
+  }
+}
+
+/**
  * Comprehensive Component Live Value Resolver
  */
 export function getComponentLiveValue(
@@ -515,13 +552,7 @@ export function getComponentLiveValue(
   subscribeLive = false
 ): any {
   if (subscribeLive) {
-    const rawPid = component?.data?.mapping?.pointId ?? component?.data?.bindings?.value ?? component?.data?.mapping?.valueKey ?? component?.data?.bindings?.state ?? component?.data?.mapping?.stateKey;
-    const numPid = Number(rawPid);
-    if (!isNaN(numPid) && numPid > 0) {
-      const _ = getPointReactiveRef(numPid).value;
-    } else {
-      const _ = scadaLiveTick.value;
-    }
+    subscribeComponentPointReactive(component);
   }
   if (!component) return { value: 0, state: 0, unit: '', label: '', quality: 0 };
 
@@ -603,13 +634,7 @@ export function getComponentLiveNumericValue(
   subscribeLive = false
 ): number {
   if (subscribeLive) {
-    const rawPid = component?.data?.mapping?.pointId ?? component?.data?.bindings?.value ?? component?.data?.mapping?.valueKey;
-    const numPid = Number(rawPid);
-    if (!isNaN(numPid) && numPid > 0) {
-      const _ = getPointReactiveRef(numPid).value;
-    } else {
-      const _ = scadaLiveTick.value;
-    }
+    subscribeComponentPointReactive(component);
   }
   if (!component) return fallback;
 
@@ -701,13 +726,7 @@ export function resolveTeleSignalState(
   color: string;
 } {
   if (subscribeLive) {
-    const rawPid = component?.data?.mapping?.pointId ?? stateKey ?? component?.data?.bindings?.state ?? component?.data?.mapping?.stateKey;
-    const numPid = Number(rawPid);
-    if (!isNaN(numPid) && numPid > 0) {
-      const _ = getPointReactiveRef(numPid).value;
-    } else {
-      const _ = scadaLiveTick.value;
-    }
+    subscribeComponentPointReactive(component, [stateKey]);
   }
   let num: number | undefined = undefined;
 

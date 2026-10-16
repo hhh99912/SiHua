@@ -36,6 +36,7 @@ import MdiWindow from './components/MdiWindow.vue';
 import PrsBottomBar, { BottomWindowItem } from './components/PrsBottomBar.vue';
 import LoginModal from './components/LoginModal.vue';
 import DiskStorageModal from './components/DiskStorageModal.vue';
+import SystemHealthModal from './components/SystemHealthModal.vue';
 import { windowClose } from './utils/platform';
 import { 
   loadScreensFromDisk, 
@@ -96,10 +97,12 @@ const showRuler = ref<boolean>(false);
 const canvasEditorRef = ref<any>(null);
 const showPropertyInspector = ref<boolean>(false);
 
-// Watch selectedIds to automatically hide property inspector when nothing is selected
+// Watch selectedIds to automatically sync property inspector visibility
 watch(selectedIds, (newIds) => {
   if (!newIds || newIds.length === 0) {
     showPropertyInspector.value = false;
+  } else {
+    showPropertyInspector.value = true;
   }
 });
 
@@ -172,7 +175,7 @@ const mdiWindows = ref<MdiWindowItem[]>([
     icon: Bell,
     isOpen: false,
     isMinimized: false,
-    isMaximized: false,
+    isMaximized: true,
     zIndex: 35,
     x: 80,
     y: 40,
@@ -191,6 +194,9 @@ const openWindow = (id: string) => {
   if (win) {
     win.isOpen = true;
     win.isMinimized = false;
+    if (id === 'alarm-window') {
+      win.isMaximized = true;
+    }
     focusWindow(id);
   }
 };
@@ -369,6 +375,7 @@ const batchAssociationComponents = ref<ScreenComponent[]>([]);
 const batchAssociationCategory = ref<'yc' | 'yx'>('yc');
 const showLoginModal = ref(false);
 const showDiskStorageModal = ref(false);
+const showSystemHealthModal = ref(false);
 const loginNotice = ref('');
 const componentsToSave = ref<ScreenComponent[]>([]);
 
@@ -796,7 +803,13 @@ const handleSelectBasicShape = (shapeType: string) => {
     name: shapeType.replace('draw-', ''),
     defaultWidth: 160,
     defaultHeight: 120,
-    defaultStyle: { fill: '#00f2ff', fillOpacity: 0.15, stroke: '#00f2ff', strokeWidth: 2 }
+    defaultStyle: {
+      fill: drawingPreset.value.fill || 'transparent',
+      fillOpacity: drawingPreset.value.fillOpacity !== undefined ? drawingPreset.value.fillOpacity : 1,
+      stroke: drawingPreset.value.stroke || '#00f2ff',
+      strokeWidth: drawingPreset.value.strokeWidth || 2,
+      lineStyle: drawingPreset.value.lineStyle || 'solid'
+    }
   };
 
   activePlacementDef.value = JSON.parse(JSON.stringify(def));
@@ -832,8 +845,22 @@ const handleAddComponentAt = (def: any, x: number, y: number) => {
   };
 
   components.value.push(newComp);
-  selectedIds.value = [newComp.id];
+  // 绘制工具激活时保持清空选中，避免选框与手柄阻挡后续连续绘制的起始点点击
+  if (drawTool.value === 'select') {
+    selectedIds.value = [newComp.id];
+  } else {
+    selectedIds.value = [];
+  }
   recordHistory();
+};
+
+const handleFinishDraw = () => {
+  if (drawTool.value === 'place-component') {
+    drawTool.value = 'select';
+    activePlacementDef.value = null;
+    activeShapeType.value = '';
+  }
+  // 折线与箭头工具绘制完一条后保持工具激活状态，支持连续快速画第二条线；按 ESC / 右击画布即可随时切回指针
 };
 
 const handleAddCustomSymbolToCanvas = (sym: CustomSymbolDef) => {
@@ -890,6 +917,61 @@ const handleUpdateComponents = (updatedComps: ScreenComponent[], record = false)
   if (record) recordHistory();
 };
 
+// =========================================================================
+// 顶栏动态属性与画笔全局预设 (预设模式与选中模式双逻辑)
+// =========================================================================
+const drawingPreset = ref({
+  stroke: '#00f2ff',
+  fill: 'transparent',
+  fillOpacity: 1,
+  strokeWidth: 2,
+  lineStyle: 'solid' as 'solid' | 'dashed' | 'dotted',
+  fontSize: 14,
+  fontWeight: 'bold' as 'normal' | 'bold'
+});
+
+const handleUpdateDrawingStyle = (payload: { key: string; value: any }) => {
+  const { key, value } = payload;
+  (drawingPreset.value as any)[key] = value;
+
+  // 当有选中图元时：即时批量同步生效至选中的图元，并压入撤销历史栈
+  if (selectedIds.value.length > 0) {
+    const updatedList = selectedComponents.value.map(comp => {
+      const st = { ...(comp.style || {}) };
+      const isText = comp.type === 'draw-text' || comp.type === 'metric-header' || comp.type.includes('text') || comp.type.includes('sign');
+      if (key === 'stroke') {
+        st.stroke = value;
+        st.borderColor = value;
+        if (isText) {
+          st.textColor = value;
+          st.color = value;
+        }
+      } else if (key === 'fill') {
+        st.fill = value;
+        st.bgColor = value;
+      } else if (key === 'fillOpacity') {
+        st.fillOpacity = value;
+        st.bgOpacity = value;
+      } else if (key === 'strokeWidth') {
+        st.strokeWidth = value;
+        st.borderWidth = value;
+      } else if (key === 'lineStyle') {
+        st.lineStyle = value;
+      } else if (key === 'fontSize') {
+        st.fontSize = value;
+        delete st.fontSizeMode;
+      } else if (key === 'fontWeight') {
+        st.fontWeight = value;
+      }
+      return {
+        ...comp,
+        style: st
+      };
+    });
+    handleUpdateComponents(updatedList, true);
+  }
+};
+
 // Component Clipboard Buffer
 const clipboard = ref<ScreenComponent[]>([]);
 
@@ -922,12 +1004,35 @@ const handlePaste = (pos?: { x: number; y: number }) => {
     if (c.y < minY) minY = c.y;
   });
 
+  const isSnap = snapToGrid.value && gridSize.value > 0;
+  const gs = isSnap ? gridSize.value : 20;
+
+  // 严格基于网格基准点进行位移计算：无论多选还是单选，严格保证对齐到物理格点
+  let baseTargetX = 0;
+  let baseTargetY = 0;
+  if (pos) {
+    baseTargetX = isSnap ? Math.round(pos.x / gs) * gs : pos.x;
+    baseTargetY = isSnap ? Math.round(pos.y / gs) * gs : pos.y;
+  } else {
+    baseTargetX = isSnap ? Math.round((minX + gs) / gs) * gs : (minX + gs);
+    baseTargetY = isSnap ? Math.round((minY + gs) / gs) * gs : (minY + gs);
+  }
+
+  const shiftX = baseTargetX - minX;
+  const shiftY = baseTargetY - minY;
+
   const existingNames = components.value.map(c => c.name);
   const pasted: ScreenComponent[] = clipboard.value.map((comp, idx) => {
-    const targetX = pos ? Math.max(0, pos.x + (comp.x - minX)) : (comp.x + 24);
-    const targetY = pos ? Math.max(0, pos.y + (comp.y - minY)) : (comp.y + 24);
+    let targetX = comp.x + shiftX;
+    let targetY = comp.y + shiftY;
+
+    if (isSnap) {
+      targetX = Math.round(targetX / gs) * gs;
+      targetY = Math.round(targetY / gs) * gs;
+    }
+
     const uniqueName = generateUniqueDuplicateName(comp.name, existingNames, '组件');
-    existingNames.push(uniqueName); // Register immediately for consecutive items in same batch
+    existingNames.push(uniqueName);
     return {
       ...JSON.parse(JSON.stringify(comp)),
       id: `comp-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`,
@@ -940,8 +1045,6 @@ const handlePaste = (pos?: { x: number; y: number }) => {
 
   components.value.push(...pasted);
   selectedIds.value = pasted.map(p => p.id);
-  // Cascade next paste
-  clipboard.value = pasted.map(p => ({ ...p, x: p.x + 20, y: p.y + 20 }));
   recordHistory();
 };
 
@@ -949,17 +1052,35 @@ const handleDuplicate = (target: ScreenComponent | ScreenComponent[]) => {
   const items = Array.isArray(target) ? target : [target];
   if (!items || items.length === 0) return;
 
+  const isSnap = snapToGrid.value && gridSize.value > 0;
+  const gs = isSnap ? gridSize.value : 20;
+
   const maxZ = components.value.reduce((max, c) => Math.max(max, c.zIndex || 1), 0);
   const existingNames = components.value.map(c => c.name);
+
+  // 以首个组件为吸附锚点，整体平移精确的格点步长，杜绝多选组件内部相对位置错位
+  const anchor = items[0];
+  const targetAnchorX = isSnap ? Math.round((anchor.x + gs) / gs) * gs : (anchor.x + gs);
+  const targetAnchorY = isSnap ? Math.round((anchor.y + gs) / gs) * gs : (anchor.y + gs);
+  const shiftX = targetAnchorX - anchor.x;
+  const shiftY = targetAnchorY - anchor.y;
+
   const duplicates: ScreenComponent[] = items.map((comp, idx) => {
+    let targetX = comp.x + shiftX;
+    let targetY = comp.y + shiftY;
+    if (isSnap) {
+      targetX = Math.round(targetX / gs) * gs;
+      targetY = Math.round(targetY / gs) * gs;
+    }
+
     const uniqueName = generateUniqueDuplicateName(comp.name, existingNames, '组件');
     existingNames.push(uniqueName);
     return {
       ...JSON.parse(JSON.stringify(comp)),
       id: `comp-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 4)}`,
       name: uniqueName,
-      x: comp.x + 24,
-      y: comp.y + 24,
+      x: targetX,
+      y: targetY,
       zIndex: maxZ + idx + 1
     };
   });
@@ -1245,6 +1366,30 @@ const handleUngroup = (groupTarget?: ScreenComponent) => {
   components.value = [...remaining, ...unpackedChildren];
   selectedIds.value = unpackedChildren.map(c => c.id);
   recordHistory();
+};
+
+const handleLockSelected = () => {
+  if (selectedIds.value.length === 0) return;
+  let changed = false;
+  components.value.forEach(c => {
+    if (selectedIds.value.includes(c.id) && !c.locked) {
+      c.locked = true;
+      changed = true;
+    }
+  });
+  if (changed) recordHistory();
+};
+
+const handleUnlockSelected = () => {
+  if (selectedIds.value.length === 0) return;
+  let changed = false;
+  components.value.forEach(c => {
+    if (selectedIds.value.includes(c.id) && c.locked) {
+      c.locked = false;
+      changed = true;
+    }
+  });
+  if (changed) recordHistory();
 };
 
 // Batch Point Generation & Binding Handlers (批量生成与批量绑定生效)
@@ -1662,10 +1807,17 @@ const handleOpenControlModalFromApp = (payload: any) => {
   }
 };
 
-// Global keyboard shortcut: Ctrl+S / Cmd+S to save active screen only
+// Global keyboard shortcut: Ctrl+S to save active screen, F8 to toggle orthogonal lock
 const handleKeyDown = (e: KeyboardEvent) => {
   if (e.isComposing || e.keyCode === 229) return;
   if ((e.code === 'Space' || e.key === ' ' || e.keyCode === 32) && (e.ctrlKey || e.metaKey || e.altKey)) return;
+
+  if (e.key === 'F8') {
+    e.preventDefault();
+    orthogonalLock.value = !orthogonalLock.value;
+    showDiskNotification(orthogonalLock.value ? '已开启正交锁定模式 (F8)' : '已关闭正交锁定，可在任意格点自由连线 (F8)');
+    return;
+  }
 
   if ((e.ctrlKey || e.metaKey) && e.key?.toLowerCase() === 's') {
     e.preventDefault();
@@ -1877,6 +2029,8 @@ onBeforeUnmount(() => {
             :orthogonalLock="orthogonalLock"
             :showRuler="showRuler"
             :isMaximized="getWindow('graphic-editor').isMaximized"
+            :drawingPreset="drawingPreset"
+            @update:drawing-style="handleUpdateDrawingStyle"
             @minimize:window="minimizeWindow('graphic-editor')"
             @restore:window="restoreWindow('graphic-editor')"
             @maximize:window="maximizeWindow('graphic-editor')"
@@ -1911,6 +2065,8 @@ onBeforeUnmount(() => {
             @align="handleAlignComponent"
             @group="handleGroup"
             @ungroup="handleUngroup"
+            @lock="handleLockSelected"
+            @unlock="handleUnlockSelected"
             @save:symbol="() => handleOpenSaveSymbolModal(selectedComponents)"
             @center:all="fitToScreen"
             @snap:all="handleSnapAllToGrid"
@@ -1919,29 +2075,29 @@ onBeforeUnmount(() => {
           <!-- Main Workspace Studio (Sidebar + Canvas + ScreenManagerBar) -->
           <div class="flex-1 flex overflow-hidden relative">
             <!-- Left Sidebar Navigation Tabs -->
-            <div class="w-11 shrink-0 bg-slate-100 border-r border-slate-200 flex flex-col items-center py-2.5 gap-2.5 z-30">
+            <div class="w-11 shrink-0 bg-[#f7f5ef] border-r border-[#e1ddd4] flex flex-col items-center py-2.5 gap-2.5 z-30">
               <button
                 @click="leftSidebarTab = 'palette'"
                 class="w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer"
                 :class="leftSidebarTab === 'palette' 
-                  ? 'bg-white text-sky-700 border border-slate-300 shadow-xs font-bold' 
-                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/60'"
-                title="图元浏览器 (树状层级列表)"
+                  ? 'bg-[#efeae0] text-sky-700 border border-[#ded8cc] font-medium' 
+                  : 'text-slate-500 hover:text-slate-900 hover:bg-[#e4ded2]'"
+                title="图元浏览器"
               >
-                <Box class="w-4 h-4 stroke-[2]" />
+                <Box class="w-4.5 h-4.5 stroke-[2]" />
               </button>
               <button
                 @click="leftSidebarTab = 'layers'"
                 class="w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer relative"
                 :class="leftSidebarTab === 'layers' 
-                  ? 'bg-white text-sky-700 border border-slate-300 shadow-xs font-bold' 
-                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-200/60'"
-                title="图层层级列表"
+                  ? 'bg-[#efeae0] text-sky-700 border border-[#ded8cc] font-medium' 
+                  : 'text-slate-500 hover:text-slate-900 hover:bg-[#e4ded2]'"
+                title="图层管理"
               >
-                <Layers class="w-4 h-4 stroke-[2]" />
+                <Layers class="w-4.5 h-4.5 stroke-[2]" />
                 <span 
                   v-if="components.length > 0" 
-                  class="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-sky-600 text-white text-[8px] font-mono font-bold flex items-center justify-center"
+                  class="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-sky-600 text-white text-[8px] font-mono font-medium flex items-center justify-center"
                 >
                   {{ components.length }}
                 </span>
@@ -1985,6 +2141,7 @@ onBeforeUnmount(() => {
                 :snapToGrid="snapToGrid"
                 :orthogonalLock="orthogonalLock"
                 :showRuler="showRuler"
+                :drawingPreset="drawingPreset"
                 @update:zoom="zoom = $event"
                 @update:screen="screen = $event; recordHistory();"
                 @update:drawTool="drawTool = $event"
@@ -2007,7 +2164,7 @@ onBeforeUnmount(() => {
                 @save:symbol="handleOpenSaveSymbolModal"
                 @undo="handleUndo"
                 @redo="handleRedo"
-                @finish:draw="drawTool = 'select'; activePlacementDef = null; activeShapeType = '';"
+                @finish:draw="handleFinishDraw"
                 @open:property-inspector="showPropertyInspector = true"
                 @open:data-association="handleOpenDataAssociation"
                 @open:batch-association="handleOpenBatchAssociation"
@@ -2161,6 +2318,7 @@ onBeforeUnmount(() => {
       @logout="handleLogout"
       @switch:user="showLoginModal = true"
       @open:login="showLoginModal = true"
+      @open:health="showSystemHealthModal = true"
       @exit:app="handleExitApp"
     />
 
@@ -2279,6 +2437,12 @@ onBeforeUnmount(() => {
       @reload:screens="handleReloadScreensFromDisk"
       @update:index-screen="payload => { indexScreenName = payload.indexScreenName; indexScreenId = payload.indexScreenId; }"
       @notify="showDiskNotification"
+    />
+
+    <!-- 8.5 系统运行健康与重启黑匣子监控模态框 -->
+    <SystemHealthModal
+      :visible="showSystemHealthModal"
+      @close="showSystemHealthModal = false"
     />
 
     <!-- Floating Disk Sync Status Toast -->

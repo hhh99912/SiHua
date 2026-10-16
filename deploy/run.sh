@@ -112,13 +112,18 @@ fi
 # 8. 参数处理与运行模式识别
 FILTERED_ARGS=()
 ENABLE_DEBUG=0
-ENABLE_FORCE_SOFT_GPU=0
+ENABLE_FORCE_SOFT_GPU=1
+RUN_DIAGNOSE_ONLY=0
 
 for arg in "$@"; do
   if [ "$arg" = "--debug" ]; then
     ENABLE_DEBUG=1
+  elif [ "$arg" = "--enable-gpu" ] || [ "$arg" = "--hardware-gpu" ]; then
+    ENABLE_FORCE_SOFT_GPU=0
   elif [ "$arg" = "--disable-gpu" ] || [ "$arg" = "--soft-render" ] || [ "$arg" = "--cpu-render" ] || [ "$arg" = "--safe-mode" ]; then
     ENABLE_FORCE_SOFT_GPU=1
+  elif [ "$arg" = "--diagnose" ] || [ "$arg" = "-d" ] || [ "$arg" = "--check" ]; then
+    RUN_DIAGNOSE_ONLY=1
   elif [[ "$arg" == --ime=* ]]; then
     continue
   else
@@ -126,9 +131,36 @@ for arg in "$@"; do
   fi
 done
 
+# 如果用户传入 --diagnose 参数，则直接进入诊断分析模式
+if [ "$RUN_DIAGNOSE_ONLY" = "1" ]; then
+  if [ -f "$SCRIPT_DIR/linx-crash-diagnose.sh" ]; then
+    exec bash "$SCRIPT_DIR/linx-crash-diagnose.sh"
+  elif [ -f "$SCRIPT_DIR/diagnose.sh" ]; then
+    exec bash "$SCRIPT_DIR/diagnose.sh"
+  elif [ -f "$SCRIPT_DIR/logs/reboot_diagnosis_report.txt" ]; then
+    echo "=== SCADA 上次重启诊断报告 ==="
+    cat "$SCRIPT_DIR/logs/reboot_diagnosis_report.txt"
+    exit 0
+  else
+    echo "[诊断] 尚未捕获到异常重启日志，请先正常运行一次 SCADA。"
+    exit 0
+  fi
+fi
+
 if [ "$ENABLE_DEBUG" = "1" ]; then
   export SCADA_DEBUG=1
   echo "[调试模式] 已通过 SCADA_DEBUG=1 激活 F12 开发者调试工具"
+fi
+
+# 8.1 启动前自动显示黑匣子上次诊断结果
+if [ -f "$SCRIPT_DIR/logs/reboot_diagnosis_report.txt" ]; then
+  LAST_REASON=$(grep "诊断推断原因:" "$SCRIPT_DIR/logs/reboot_diagnosis_report.txt" | head -n 1 | cut -d':' -f2- | xargs || true)
+  if [ -n "$LAST_REASON" ]; then
+    echo "------------------------------------------------------------"
+    echo "🔍 [黑匣子诊断提示] 上次退出判定: $LAST_REASON"
+    echo "   (查看完整报告: ./run.sh --diagnose 或查看 logs/reboot_diagnosis_report.txt)"
+    echo "------------------------------------------------------------"
+  fi
 fi
 
 # 9. 针对凝思安全系统 (Linux 4.9 内核) / Intel 核显的工业抗重启与低消耗模式
@@ -164,12 +196,17 @@ else
 fi
 
 echo "============================================================"
-echo " 正在启动 KND科能达 SCADA 工业大屏客户端 (凝思 Linux 4.9 稳定版)..."
+echo " 正在启动 KND科能达 SCADA 工业大屏客户端 (凝思 LinxOS 6.0.80 / Linux 4.9 稳定版)..."
 echo " 目标程序: $TARGET_BIN"
+echo " 目标系统: 凝思安全操作系统 V6.0 (LinxOS 6.0.80, Kernel 4.9.0, GLIBC 2.24)"
 echo " 进程架构: Chromium 标准双进程 (1个主调度进程 + 1个画面渲染进程)"
-echo " 虚拟内存: VIRT 为 V8 预分配指针压缩 Cage，实际物理内存约 300MB"
+# 9.1 提升工控机系统文件句柄上限，杜绝 EMFILE 导致的突然闪退
+ulimit -n 65535 2>/dev/null || ulimit -n 4096 2>/dev/null || true
+
+echo " 图形加速: 已默认彻底禁用 GPU 硬件加速 (纯 CPU 软渲染，杜绝 i915 核显死机)"
+echo " 内存优化: 已配置 2048MB Chromium JS引擎堆内存 (Google V8)，彻底解除 512MB 闪退限制"
 echo " 测点优化: 400+ 测点局部精准订阅已激活，消除 CPU 跑满卡顿"
-echo " 防死机保护: 已禁用 zero-copy 与 GPU 看门狗，消除 Linux 4.9 重启隐患"
+echo " 崩溃监控: 工业黑匣子与秒级心跳已激活，自动记录并分析异常退出原因"
 echo " 消除白屏: 已启用 Vue 首帧挂载握手与深蓝背景锁定"
 echo " 输入法适配: $DETECTED_IME (Ctrl+空格 瞬时呼出)"
 echo "============================================================"
@@ -192,8 +229,7 @@ exec "$TARGET_BIN" \
   --disable-gpu-rasterization \
   --force-color-profile=srgb \
   --gtk-version=3 \
-  --js-flags="--max-old-space-size=512 --max-semi-space-size=64" \
-  --disable-breakpad \
+  --js-flags="--max-old-space-size=2048 --expose-gc" \
   --disable-component-update \
   --disable-sync \
   --disable-domain-reliability \
@@ -203,3 +239,4 @@ exec "$TARGET_BIN" \
   --no-pings \
   "${EXTRA_GPU_FLAGS[@]}" \
   "${FILTERED_ARGS[@]}"
+

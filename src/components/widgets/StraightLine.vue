@@ -28,6 +28,11 @@ const points = computed(() => {
 
 const startArrow = computed(() => style.value.startArrow || false);
 const endArrow = computed(() => style.value.endArrow || props.component.type === 'draw-arrow');
+
+const isOrthogonal = computed(() => {
+  const p = points.value;
+  return Math.abs(p.y1 - p.y2) < 0.5 || Math.abs(p.x1 - p.x2) < 0.5;
+});
 </script>
 
 <template>
@@ -36,7 +41,7 @@ const endArrow = computed(() => style.value.endArrow || props.component.type ===
       class="w-full h-full overflow-visible pointer-events-none"
       :viewBox="`0 0 ${component.width} ${component.height}`"
       preserveAspectRatio="none"
-      shape-rendering="geometricPrecision"
+      :shape-rendering="isOrthogonal ? 'crispEdges' : 'geometricPrecision'"
     >
       <defs v-if="startArrow || endArrow">
         <marker

@@ -36,6 +36,14 @@ interface Props {
   snapToGrid?: boolean;
   orthogonalLock?: boolean;
   showRuler?: boolean;
+  drawingPreset?: {
+    stroke: string;
+    fill: string;
+    strokeWidth: number;
+    lineStyle: 'solid' | 'dashed' | 'dotted';
+    fontSize: number;
+    fontWeight: 'normal' | 'bold';
+  };
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -45,7 +53,15 @@ const props = withDefaults(defineProps<Props>(), {
   gridSize: 40,
   snapToGrid: false,
   orthogonalLock: false,
-  showRuler: false
+  showRuler: false,
+  drawingPreset: () => ({
+    stroke: '#00f2ff',
+    fill: 'transparent',
+    strokeWidth: 2,
+    lineStyle: 'solid',
+    fontSize: 14,
+    fontWeight: 'bold'
+  })
 });
 
 const emit = defineEmits<{
@@ -140,11 +156,19 @@ watch(() => props.zoom, (val) => {
     zoom.value = val;
   }
 });
+
+// 保持抓手与节点在物理屏幕上的绝对恒定像素尺寸 (不随画面缩放而放大或缩小，无论放大到 300% 还是 500%，抓手均保持标准手感，绝不遮挡小组件)
+const invZoom = computed(() => {
+  const z = Number(props.zoom) || Number(zoom.value) || 1;
+  return z > 0 ? (1 / z) : 1;
+});
 watch(() => props.showGrid, (val) => { if (val !== undefined) showGrid.value = val; });
 watch(() => props.gridSize, (val) => { if (val !== undefined) gridSize.value = val; });
 watch(() => props.snapToGrid, (val) => { if (val !== undefined) snapToGrid.value = val; });
 watch(() => props.orthogonalLock, (val) => { if (val !== undefined) orthogonalLock.value = val; });
 watch(() => props.drawTool, (newTool) => {
+  suppressNextCanvasClick.value = false;
+  lastInteractionTime.value = 0;
   if (newTool === 'draw-polyline') {
     emit('select', []);
     isDragging.value = false;
@@ -222,10 +246,41 @@ let cachedMarqueeAABBs: Array<{ id: string; minX: number; maxX: number; minY: nu
 
 // Dragging & Resizing & Rotating state
 const isDragging = ref(false);
+const isDragCandidate = ref(false);
+let pendingDragSelSet = new Set<string>();
 const hasMovedDrag = ref(false);
 let dragOffset = { dx: 0, dy: 0 };
 const dragStartPositions = ref<Map<string, { x: number; y: number }>>(new Map());
 const dragStartMouse = ref({ x: 0, y: 0 });
+
+// 极速 Compositor 零重绘图元直接拖拽节点缓存
+interface DragNodeItem {
+  el: HTMLElement;
+  baseTransform: string;
+}
+let cachedDragNodes: DragNodeItem[] = [];
+
+// 仅在真实发生超过 3px 的鼠标位移时才批量提升 willChange 与收集 DOM，彻底杜绝单纯点击导致的文字模糊与微晃
+const collectDragNodes = () => {
+  cachedDragNodes = [];
+  if (canvasWrapperRef.value && pendingDragSelSet.size > 0) {
+    pendingDragSelSet.forEach(cid => {
+      const els = canvasWrapperRef.value!.querySelectorAll<HTMLElement>(`[data-component-id="${cid}"]`);
+      els.forEach(el => {
+        const targetComp = props.components.find(c => c.id === cid);
+        const rot = targetComp?.rotation || 0;
+        const baseTransform = rot ? `rotate(${rot}deg)` : '';
+        el.style.willChange = 'transform';
+        cachedDragNodes.push({ el, baseTransform });
+      });
+    });
+    const groupBbox = canvasWrapperRef.value.querySelector<HTMLElement>('.selected-group-bbox');
+    if (groupBbox) {
+      groupBbox.style.willChange = 'transform';
+      cachedDragNodes.push({ el: groupBbox, baseTransform: '' });
+    }
+  }
+};
 
 const isResizing = ref(false);
 const hasMovedResize = ref(false);
@@ -319,6 +374,23 @@ const effectiveGridColor = computed(() => {
   return col;
 });
 
+// 防止双击完成绘制时的残留点击事件引发幽灵折线/箭头
+const lastFinishDrawTime = ref<number>(0);
+
+// 数学级精确对齐的背景网格边界（严格按 gridSize 的整数倍扩充，确保网格交点与画布坐标绝对 1:1 重合）
+const gridSvgBounds = computed(() => {
+  const gs = gridSize.value || 40;
+  const pad = Math.ceil(8000 / gs) * gs;
+  const w = (props.screen?.width || 1920) + pad * 2;
+  const h = (props.screen?.height || 1080) + pad * 2;
+  return {
+    x: -pad,
+    y: -pad,
+    width: w,
+    height: h
+  };
+});
+
 // Context Menu
 const contextMenu = ref<{ visible: boolean; x: number; y: number; canvasX: number; canvasY: number; targetCompId: string | null }>({
   visible: false,
@@ -398,7 +470,17 @@ const placementPreviewComponent = computed<ScreenComponent | null>(() => {
     states: def.states ? JSON.parse(JSON.stringify(def.states)) : undefined,
     activeState: def.activeState || (def.states?.[0]?.id ?? '1'),
     children: def.children ? JSON.parse(JSON.stringify(def.children)) : (def.states?.[0]?.children ? JSON.parse(JSON.stringify(def.states[0].children)) : undefined),
-    style: JSON.parse(JSON.stringify(def.style || def.defaultStyle || { fill: '#00f2ff', fillOpacity: 0.15, stroke: '#00f2ff', strokeWidth: 2 })),
+    style: {
+      ...JSON.parse(JSON.stringify(def.style || def.defaultStyle || { fill: '#00f2ff', fillOpacity: 0.15, stroke: '#00f2ff', strokeWidth: 2 })),
+      ...(props.drawingPreset ? {
+        stroke: props.drawingPreset.stroke || '#00f2ff',
+        borderColor: props.drawingPreset.stroke || '#00f2ff',
+        ...(props.drawingPreset.fill !== undefined ? { fill: props.drawingPreset.fill, bgColor: props.drawingPreset.fill } : {}),
+        strokeWidth: props.drawingPreset.strokeWidth || 2,
+        borderWidth: props.drawingPreset.strokeWidth || 2,
+        lineStyle: props.drawingPreset.lineStyle || 'solid'
+      } : {})
+    },
     animation: def.animation ? JSON.parse(JSON.stringify(def.animation)) : (def.defaultAnimation ? JSON.parse(JSON.stringify(def.defaultAnimation)) : undefined),
     data: JSON.parse(JSON.stringify(def.data || def.defaultData || { mapping: {} })),
     customProps: def.customProps ? JSON.parse(JSON.stringify(def.customProps)) : (def.defaultCustomProps ? JSON.parse(JSON.stringify(def.defaultCustomProps)) : undefined)
@@ -570,7 +652,17 @@ const processMouseMove = (e: MouseEvent) => {
     return;
   }
 
-  // 1.5. Batch Component Dragging (GPU 硬件加速零重绘极速帧级平移 - 避免多余的 mousePos 触发 Ruler 及全局响应式重绘)
+  // 1.5. Batch Component Dragging (延迟拖拽判定：仅当鼠标移动超过 3px 阈值才启动拖拽，杜绝单击抖动与字体模糊)
+  if (isDragCandidate.value && !isDragging.value && props.selectedIds.length > 0) {
+    const rawDx = (e.clientX - dragStartMouse.value.x) / (props.zoom || 1);
+    const rawDy = (e.clientY - dragStartMouse.value.y) / (props.zoom || 1);
+    if (Math.hypot(rawDx, rawDy) >= 3) {
+      isDragging.value = true;
+      hasMovedDrag.value = true;
+      collectDragNodes();
+    }
+  }
+
   if (isDragging.value && props.selectedIds.length > 0) {
     const rawDx = (e.clientX - dragStartMouse.value.x) / (props.zoom || 1);
     const rawDy = (e.clientY - dragStartMouse.value.y) / (props.zoom || 1);
@@ -579,8 +671,15 @@ const processMouseMove = (e: MouseEvent) => {
     let dy = rawDy;
 
     if (snapToGrid.value && gridSize.value > 0) {
-      dx = Math.round(rawDx / gridSize.value) * gridSize.value;
-      dy = Math.round(rawDy / gridSize.value) * gridSize.value;
+      // 锚定选中组件的绝对坐标吸附到最近格点，确保拖动后组件 100% 严丝合缝吸在格点上，绝不错位
+      const primaryId = primarySelected.value?.id || props.selectedIds[0];
+      const anchorStart = dragStartPositions.value.get(primaryId) || { x: 0, y: 0 };
+      const targetX = anchorStart.x + rawDx;
+      const targetY = anchorStart.y + rawDy;
+      const snappedTargetX = Math.round(targetX / gridSize.value) * gridSize.value;
+      const snappedTargetY = Math.round(targetY / gridSize.value) * gridSize.value;
+      dx = snappedTargetX - anchorStart.x;
+      dy = snappedTargetY - anchorStart.y;
     } else {
       dx = Math.round(rawDx);
       dy = Math.round(rawDy);
@@ -593,9 +692,13 @@ const processMouseMove = (e: MouseEvent) => {
     if (dragOffset.dx !== dx || dragOffset.dy !== dy) {
       dragOffset.dx = dx;
       dragOffset.dy = dy;
-      if (canvasWrapperRef.value) {
-        canvasWrapperRef.value.style.setProperty('--drag-dx', `${dx}px`);
-        canvasWrapperRef.value.style.setProperty('--drag-dy', `${dy}px`);
+      for (let i = 0; i < cachedDragNodes.length; i++) {
+        const item = cachedDragNodes[i];
+        if (item.baseTransform) {
+          item.el.style.transform = `translate3d(${dx}px, ${dy}px, 0) ${item.baseTransform}`;
+        } else {
+          item.el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+        }
       }
     }
     return;
@@ -604,18 +707,19 @@ const processMouseMove = (e: MouseEvent) => {
   const coords = getCanvasCoords(e.clientX, e.clientY);
   mousePos.value = coords;
 
-  // 2. Polyline Drawing Preview (with optional orthogonal lock)
+  // 2. Polyline Drawing Preview (仅当开启正交锁定按钮或按住 Shift 时强制正交，默认可在任意格点自由连线)
   if (props.drawTool === 'draw-polyline') {
     if (polylineDrawing.value.active && polylineDrawing.value.points.length > 0) {
       const lastPt = polylineDrawing.value.points[polylineDrawing.value.points.length - 1];
+      let pX = coords.x;
+      let pY = coords.y;
       if (lastPt && (orthogonalLock.value || e.shiftKey)) {
-        const ortho = calculateOrthogonalPoint(lastPt.x, lastPt.y, coords.x, coords.y);
-        polylineDrawing.value.currentX = ortho.x;
-        polylineDrawing.value.currentY = ortho.y;
-      } else {
-        polylineDrawing.value.currentX = coords.x;
-        polylineDrawing.value.currentY = coords.y;
+        const ortho = calculateOrthogonalPoint(lastPt.x, lastPt.y, pX, pY);
+        pX = ortho.x;
+        pY = ortho.y;
       }
+      polylineDrawing.value.currentX = pX;
+      polylineDrawing.value.currentY = pY;
     } else {
       polylineDrawing.value.currentX = coords.x;
       polylineDrawing.value.currentY = coords.y;
@@ -623,17 +727,18 @@ const processMouseMove = (e: MouseEvent) => {
     return;
   }
 
-  // 3. Arrow Drawing Preview (with optional orthogonal lock)
+  // 3. Arrow Drawing Preview (仅当开启正交锁定按钮或按住 Shift 时强制正交，默认可在任意格点自由连线)
   if (props.drawTool === 'draw-arrow') {
     if (arrowDrawing.value.active) {
+      let pX = coords.x;
+      let pY = coords.y;
       if (orthogonalLock.value || e.shiftKey) {
-        const ortho = calculateOrthogonalPoint(arrowDrawing.value.startX, arrowDrawing.value.startY, coords.x, coords.y);
-        arrowDrawing.value.currentX = ortho.x;
-        arrowDrawing.value.currentY = ortho.y;
-      } else {
-        arrowDrawing.value.currentX = coords.x;
-        arrowDrawing.value.currentY = coords.y;
+        const ortho = calculateOrthogonalPoint(arrowDrawing.value.startX, arrowDrawing.value.startY, pX, pY);
+        pX = ortho.x;
+        pY = ortho.y;
       }
+      arrowDrawing.value.currentX = pX;
+      arrowDrawing.value.currentY = pY;
     } else {
       arrowDrawing.value.startX = coords.x;
       arrowDrawing.value.startY = coords.y;
@@ -736,14 +841,18 @@ const processMouseMove = (e: MouseEvent) => {
     }
 
     const comp = primarySelected.value;
-    const isTextOrButton = comp.type === 'draw-text' || comp.type === 'ctrl-button' || comp.type === 'metric-header';
+    const isTelemetry = comp.type === 'metric-float' || comp.type === 'metric-flipper' || comp.type === 'metric-counter' || comp.type === 'metric-digital';
+    const isTextOrButton = comp.type === 'draw-text' || comp.type === 'ctrl-button' || comp.type === 'metric-header' || isTelemetry;
     let updatedStyle = { ...comp.style };
     if (isTextOrButton) {
-      const initH = resizeStart.value.height || 36;
-      const initFontSize = resizeStart.value.fontSize || comp.style?.fontSize || Math.max(12, Math.round(initH * 0.65));
+      const initH = resizeStart.value.height || (isTelemetry ? 26 : 36);
+      const ratio = isTelemetry ? 0.82 : 0.65;
+      const initFontSize = resizeStart.value.fontSize || comp.style?.fontSize || Math.max(12, Math.round(initH * ratio));
       const scaleFactor = newH / initH;
-      const newFontSize = Math.max(10, Math.min(Math.round(initFontSize * scaleFactor), 96));
+      const maxLimit = isTelemetry ? 180 : 96;
+      const newFontSize = Math.max(10, Math.min(Math.round(initFontSize * scaleFactor), maxLimit));
       updatedStyle.fontSize = newFontSize;
+      delete updatedStyle.fontSizeMode;
     }
 
     if (newX !== comp.x || newY !== comp.y || newW !== comp.width || newH !== comp.height) {
@@ -772,14 +881,24 @@ const processMouseMove = (e: MouseEvent) => {
       targetY = Math.round(targetY / props.gridSize) * props.gridSize;
     }
 
-    // Orthogonal snap support for straight lines & arrows
-    if ((props.orthogonalLock || e.shiftKey) && (comp.type === 'draw-line' || comp.type === 'draw-arrow' || comp.type === 'straight-line')) {
-      const otherIdx = 1 - activeVertexIdx.value;
-      const otherPt = vertexDragStart.value.points[otherIdx];
-      if (otherPt) {
-        const ortho = calculateOrthogonalPoint(otherPt.x, otherPt.y, targetX, targetY);
-        targetX = ortho.x;
-        targetY = ortho.y;
+    // Orthogonal snap support for straight lines, arrows & polylines (仅在正交开启时生效)
+    if ((props.orthogonalLock || e.shiftKey)) {
+      if (comp.type === 'draw-line' || comp.type === 'draw-arrow' || comp.type === 'straight-line') {
+        const otherIdx = 1 - activeVertexIdx.value;
+        const otherPt = vertexDragStart.value.points[otherIdx];
+        if (otherPt) {
+          const ortho = calculateOrthogonalPoint(otherPt.x, otherPt.y, targetX, targetY);
+          targetX = ortho.x;
+          targetY = ortho.y;
+        }
+      } else if (comp.type === 'draw-polyline' || comp.type === 'polyline') {
+        const adjIdx = activeVertexIdx.value > 0 ? activeVertexIdx.value - 1 : 1;
+        const adjPt = vertexDragStart.value.points[adjIdx];
+        if (adjPt) {
+          const ortho = calculateOrthogonalPoint(adjPt.x, adjPt.y, targetX, targetY);
+          targetX = ortho.x;
+          targetY = ortho.y;
+        }
       }
     }
 
@@ -892,20 +1011,31 @@ const handleMouseUpWorkspace = () => {
     const finalDx = dragOffset.dx;
     const finalDy = dragOffset.dy;
 
-    if (canvasWrapperRef.value) {
-      canvasWrapperRef.value.style.setProperty('--drag-dx', '0px');
-      canvasWrapperRef.value.style.setProperty('--drag-dy', '0px');
+    for (let i = 0; i < cachedDragNodes.length; i++) {
+      const item = cachedDragNodes[i];
+      item.el.style.transform = item.baseTransform;
+      item.el.style.willChange = '';
     }
+    cachedDragNodes = [];
 
     if (hasMovedDrag.value && (finalDx !== 0 || finalDy !== 0)) {
       const updatedComps = props.components
         .filter(c => props.selectedIds.includes(c.id) && !c.locked && dragStartPositions.value.has(c.id))
         .map(c => {
           const startPos = dragStartPositions.value.get(c.id)!;
+          let finalX = startPos.x + finalDx;
+          let finalY = startPos.y + finalDy;
+          if (snapToGrid.value && gridSize.value > 0) {
+            finalX = Math.round(finalX / gridSize.value) * gridSize.value;
+            finalY = Math.round(finalY / gridSize.value) * gridSize.value;
+          } else {
+            finalX = Math.round(finalX);
+            finalY = Math.round(finalY);
+          }
           return {
             ...c,
-            x: Math.round(startPos.x + finalDx),
-            y: Math.round(startPos.y + finalDy)
+            x: finalX,
+            y: finalY
           };
         });
 
@@ -924,6 +1054,9 @@ const handleMouseUpWorkspace = () => {
       suppressNextCanvasClick.value = false;
     }, 200);
   }
+
+  isDragCandidate.value = false;
+  pendingDragSelSet.clear();
 
   if (isResizing.value) {
     suppressNextCanvasClick.value = true;
@@ -1006,13 +1139,10 @@ const handleStartDrag = (e: MouseEvent, comp: ScreenComponent) => {
 
   if (comp.locked) return;
 
-  isDragging.value = true;
+  isDragCandidate.value = true;
+  isDragging.value = false;
   hasMovedDrag.value = false;
   dragOffset = { dx: 0, dy: 0 };
-  if (canvasWrapperRef.value) {
-    canvasWrapperRef.value.style.setProperty('--drag-dx', '0px');
-    canvasWrapperRef.value.style.setProperty('--drag-dy', '0px');
-  }
   dragStartMouse.value = { x: e.clientX, y: e.clientY };
   
   const map = new Map<string, { x: number; y: number }>();
@@ -1022,10 +1152,25 @@ const handleStartDrag = (e: MouseEvent, comp: ScreenComponent) => {
     }
   });
   dragStartPositions.value = map;
+
+  // 记录候选待拖拽图元 ID 集合，仅在真实发生超过 3px 位移时才收集提升 DOM 节点
+  const selSet = new Set(activeIds);
+  selSet.add(comp.id);
+  pendingDragSelSet = selSet;
 };
 
-// Component Click Handler (maintains sustained selection on click)
+// Component Mouse Down & Click Handlers (仅指针模式下有效，绘制模式下完全穿透到画布用于拾取起点)
+const handleCompMouseDown = (e: MouseEvent, comp: ScreenComponent) => {
+  // 严格限制：仅鼠标左键 (e.button === 0) 允许触发拖拽或选中！
+  // 鼠标右键 (e.button === 2) 严禁启动任何组件拖动与位移，直接返回让 @contextmenu 专心接管右键菜单
+  if (e.button !== 0) return;
+  if (props.drawTool !== 'select') return;
+  e.stopPropagation();
+  handleStartDrag(e, comp);
+};
+
 const handleCompClick = (e: MouseEvent, comp: ScreenComponent) => {
+  if (props.drawTool !== 'select') return;
   e.stopPropagation();
   lastInteractionTime.value = Date.now();
   suppressNextCanvasClick.value = true;
@@ -1045,10 +1190,20 @@ const handleCompClick = (e: MouseEvent, comp: ScreenComponent) => {
 
 // Canvas Background Click & Drawing Tool Handlers
 const handleCanvasClick = (e: MouseEvent) => {
-  // If user just interacted with a component, handle, or drag/resize/rotate, DO NOT deselect!
-  if (suppressNextCanvasClick.value || (Date.now() - lastInteractionTime.value) < 260) {
-    suppressNextCanvasClick.value = false;
+  // 刚结束上一次绘制后的 220ms 冷却期内，吸收丢弃双击操作留下的残留事件，杜绝产生幽灵折线/箭头
+  if (Date.now() - lastFinishDrawTime.value < 220) {
     return;
+  }
+
+  // 绘制模式下点击为明确的起点/拐点确定动作，绝不能被 suppress 拦截！
+  if (props.drawTool !== 'select') {
+    suppressNextCanvasClick.value = false;
+  } else {
+    // 仅指针选择模式（用于点击空白处取消选中）在拖拽/框选后需做防误触拦截
+    if (suppressNextCanvasClick.value || (Date.now() - lastInteractionTime.value) < 260) {
+      suppressNextCanvasClick.value = false;
+      return;
+    }
   }
 
   const coords = getCanvasCoords(e.clientX, e.clientY);
@@ -1142,7 +1297,7 @@ const handleCanvasClick = (e: MouseEvent) => {
   }
 };
 
-// Finish Arrow Drawing & Auto-crop to minimal bounding box
+// Finish Arrow Drawing & Auto-crop to minimal bounding box (精确对齐格点，杜绝内边距偏移导致的错位)
 const finishArrowDrawing = () => {
   if (!arrowDrawing.value.active) return;
   const { startX, startY, currentX, currentY } = arrowDrawing.value;
@@ -1152,18 +1307,18 @@ const finishArrowDrawing = () => {
     return;
   }
 
-  const pad = 12;
-  const minX = Math.min(startX, currentX) - pad;
-  const minY = Math.min(startY, currentY) - pad;
-  const maxX = Math.max(startX, currentX) + pad;
-  const maxY = Math.max(startY, currentY) + pad;
+  // 严格贴合格点边缘，不添加伪内边距，确保组件 top-left 100% 严谨吸附在格点坐标上
+  const minX = Math.min(startX, currentX);
+  const minY = Math.min(startY, currentY);
+  const maxX = Math.max(startX, currentX);
+  const maxY = Math.max(startY, currentY);
 
-  const compW = Math.max(24, maxX - minX);
-  const compH = Math.max(24, maxY - minY);
+  const compW = Math.max(20, maxX - minX);
+  const compH = Math.max(20, maxY - minY);
 
   const relPoints = [
-    { xRatio: (startX - minX) / compW, yRatio: (startY - minY) / compH, x: startX - minX, y: startY - minY },
-    { xRatio: (currentX - minX) / compW, yRatio: (currentY - minY) / compH, x: currentX - minX, y: currentY - minY }
+    { xRatio: compW > 0 ? (startX - minX) / compW : 0, yRatio: compH > 0 ? (startY - minY) / compH : 0, x: startX - minX, y: startY - minY },
+    { xRatio: compW > 0 ? (currentX - minX) / compW : 0, yRatio: compH > 0 ? (currentY - minY) / compH : 0, x: currentX - minX, y: currentY - minY }
   ];
 
   emit('add:component:at', {
@@ -1173,11 +1328,11 @@ const finishArrowDrawing = () => {
     width: compW,
     height: compH,
     style: { 
-      stroke: '#00f2ff', 
-      strokeWidth: 3, 
+      stroke: props.drawingPreset?.stroke || '#00f2ff', 
+      strokeWidth: props.drawingPreset?.strokeWidth || 3, 
       endArrow: true,
       startArrow: false,
-      lineStyle: 'solid'
+      lineStyle: props.drawingPreset?.lineStyle || 'solid'
     },
     customProps: {
       points: relPoints
@@ -1185,6 +1340,9 @@ const finishArrowDrawing = () => {
   }, minX, minY);
 
   arrowDrawing.value.active = false;
+  suppressNextCanvasClick.value = false;
+  lastInteractionTime.value = 0;
+  lastFinishDrawTime.value = Date.now();
   emit('finish:draw');
 };
 
@@ -1204,23 +1362,65 @@ const finishPlaceDrawing = () => {
   let w = Math.abs(currentX - startX);
   let h = Math.abs(currentY - startY);
 
+  const isTelemetry = def.type === 'metric-float' || def.type === 'metric-flipper' || def.type === 'metric-counter' || def.type === 'metric-digital';
+
   // If user made a fast single click (distance < 12px), use component's default width and height
   if (w < 12 && h < 12) {
-    w = def.defaultWidth || def.width || 140;
-    h = def.defaultHeight || def.height || 100;
+    w = def.defaultWidth || def.width || (isTelemetry ? 72 : 140);
+    h = def.defaultHeight || def.height || (isTelemetry ? 26 : 100);
   } else {
     w = Math.max(16, w);
     h = Math.max(16, h);
   }
 
+  let finalStyle = { ...(def.defaultStyle || def.style || {}) };
+  // 全局画笔预设继承 (专业 SCADA 预设模式精髓)
+  if (props.drawingPreset) {
+    if (props.drawingPreset.stroke) {
+      finalStyle.stroke = props.drawingPreset.stroke;
+      finalStyle.borderColor = props.drawingPreset.stroke;
+    }
+    if (props.drawingPreset.fill && props.drawingPreset.fill !== 'transparent') {
+      finalStyle.fill = props.drawingPreset.fill;
+      finalStyle.bgColor = props.drawingPreset.fill;
+    } else if (props.drawingPreset.fill === 'transparent') {
+      finalStyle.fill = 'transparent';
+      finalStyle.bgColor = 'transparent';
+    }
+    if (props.drawingPreset.strokeWidth) {
+      finalStyle.strokeWidth = props.drawingPreset.strokeWidth;
+      finalStyle.borderWidth = props.drawingPreset.strokeWidth;
+    }
+    if (props.drawingPreset.lineStyle) {
+      finalStyle.lineStyle = props.drawingPreset.lineStyle;
+    }
+    if (def.type === 'draw-text' || def.type === 'ctrl-button') {
+      if (props.drawingPreset.fontSize) finalStyle.fontSize = props.drawingPreset.fontSize;
+      if (props.drawingPreset.fontWeight) finalStyle.fontWeight = props.drawingPreset.fontWeight;
+    }
+  }
+
+  if (isTelemetry) {
+    // 遥测组件矩形拉框自适应计算：无论是单点创建还是拉框创建很大矩形，
+    // 立即根据所绘边框高宽计算字号，使数字始终紧紧贴合抓手矩形边框，杜绝数字小小的挤在中间
+    const fitByH = Math.max(10, Math.floor(h * 0.82));
+    const fitByW = Math.max(10, Math.floor((w - 4) / (4 * 0.61)));
+    const targetSize = Math.max(10, Math.min(180, Math.min(fitByH, fitByW)));
+    finalStyle.fontSize = targetSize;
+  }
+
   const compPayload = {
     ...def,
     width: w,
-    height: h
+    height: h,
+    style: finalStyle
   };
 
   emit('add:component:at', compPayload, minX, minY);
   placeDrawing.value.active = false;
+  suppressNextCanvasClick.value = false;
+  lastInteractionTime.value = 0;
+  lastFinishDrawTime.value = Date.now();
   emit('finish:draw');
 };
 
@@ -1231,7 +1431,7 @@ const handleCanvasDblClick = () => {
     return;
   }
   if (props.drawTool === 'draw-polyline' && polylineDrawing.value.active) {
-    // 严格清洗顶点：过滤掉因双击连续触发 click 而产生的重复尾部顶点及所有相邻重合节点 (<= 4px)
+    // 严格清洗顶点：过滤掉因双击连续触发 click 而产生的重复尾部顶点及相邻微小重合节点 (<= 4px)
     const rawPts = polylineDrawing.value.points;
     const pts: Array<{ x: number; y: number }> = [];
     for (const p of rawPts) {
@@ -1268,10 +1468,10 @@ const handleCanvasDblClick = () => {
         width: compW,
         height: compH,
         style: { 
-          stroke: '#00f2ff', 
-          strokeWidth: 3, 
-          lineType: 'step-horizontal',
-          lineStyle: 'solid'
+          stroke: props.drawingPreset?.stroke || '#00f2ff', 
+          strokeWidth: props.drawingPreset?.strokeWidth || 3, 
+          lineType: 'direct',
+          lineStyle: props.drawingPreset?.lineStyle || 'solid'
         },
         customProps: {
           points: relPoints
@@ -1281,8 +1481,9 @@ const handleCanvasDblClick = () => {
 
     polylineDrawing.value.active = false;
     polylineDrawing.value.points = [];
-    suppressNextCanvasClick.value = true;
-    lastInteractionTime.value = Date.now();
+    suppressNextCanvasClick.value = false;
+    lastInteractionTime.value = 0;
+    lastFinishDrawTime.value = Date.now();
     emit('finish:draw');
   }
 };
@@ -1329,6 +1530,8 @@ const handleCanvasMouseDown = (e: MouseEvent) => {
 
 // Start Resizing
 const handleStartResize = (e: MouseEvent, handle: string) => {
+  // 严格限制：仅允许鼠标左键 (e.button === 0) 触发尺寸缩放调整！右键严禁触发缩放
+  if (e.button !== 0) return;
   if (isSpacePressed.value || e.ctrlKey || e.metaKey) {
     e.preventDefault();
     startPan(e.clientX, e.clientY);
@@ -1341,6 +1544,8 @@ const handleStartResize = (e: MouseEvent, handle: string) => {
   if (!primarySelected.value || primarySelected.value.locked) return;
 
   const comp = primarySelected.value;
+  const isTelemetry = comp.type === 'metric-float' || comp.type === 'metric-flipper' || comp.type === 'metric-counter' || comp.type === 'metric-digital';
+  const ratio = isTelemetry ? 0.82 : 0.65;
   isResizing.value = true;
   hasMovedResize.value = false;
   resizeHandle.value = handle;
@@ -1351,12 +1556,14 @@ const handleStartResize = (e: MouseEvent, handle: string) => {
     y: comp.y,
     width: comp.width,
     height: comp.height,
-    fontSize: comp.style?.fontSize || Math.max(12, Math.round(comp.height * 0.65))
+    fontSize: comp.style?.fontSize || Math.max(12, Math.round(comp.height * ratio))
   };
 };
 
 // Start Rotating (自由旋转功能)
 const handleStartRotate = (e: MouseEvent) => {
+  // 严格限制：仅允许鼠标左键 (e.button === 0) 触发旋转调整！右键严禁触发旋转
+  if (e.button !== 0) return;
   if (isSpacePressed.value || e.ctrlKey || e.metaKey) {
     e.preventDefault();
     startPan(e.clientX, e.clientY);
@@ -1384,6 +1591,9 @@ const handleStartRotate = (e: MouseEvent) => {
 
 // Start Dragging/Stretching a specific Vertex Node on Line/Polyline/Arrow (折线、箭头、直线节点拖动拉伸)
 const handleStartVertexDrag = (e: MouseEvent, comp: ScreenComponent, vertexIndex: number) => {
+  // 核心修复：仅允许鼠标左键 (e.button === 0) 拖动拐点与端点！
+  // 鼠标右键 (e.button === 2) 绝不能启动拉伸拖动，杜绝右击准备打开菜单时误移动组件节点！
+  if (e.button !== 0) return;
   if (isSpacePressed.value || e.ctrlKey || e.metaKey) {
     e.preventDefault();
     startPan(e.clientX, e.clientY);
@@ -1989,10 +2199,11 @@ const handleKeyUp = (e: KeyboardEvent) => {
 
 const handleWindowBlur = () => {
   isSpacePressed.value = false;
-  if (canvasWrapperRef.value) {
-    canvasWrapperRef.value.style.setProperty('--drag-dx', '0px');
-    canvasWrapperRef.value.style.setProperty('--drag-dy', '0px');
+  for (let i = 0; i < cachedDragNodes.length; i++) {
+    const item = cachedDragNodes[i];
+    item.el.style.transform = item.baseTransform;
   }
+  cachedDragNodes = [];
   dragOffset = { dx: 0, dy: 0 };
   isDragging.value = false;
   hasMovedDrag.value = false;
@@ -2075,12 +2286,7 @@ defineExpose({
         'cursor-default': drawTool === 'select' && !isSpacePressed && !isPanning
       }"
       :style="{
-        backgroundColor: (screen.backgroundColor && screen.backgroundColor !== '#0f223d') ? screen.backgroundColor : '#000000',
-        backgroundImage: showGrid 
-          ? `radial-gradient(circle, ${effectiveGridColor} 1.2px, transparent 1.2px)` 
-          : 'none',
-        backgroundPosition: `${panOffset.x - (gridSize * zoom) / 2}px ${panOffset.y - (gridSize * zoom) / 2}px`,
-        backgroundSize: `${gridSize * zoom}px ${gridSize * zoom}px`
+        backgroundColor: (screen.backgroundColor && screen.backgroundColor !== '#0f223d') ? screen.backgroundColor : '#000000'
       }"
       @mousedown="handleCanvasMouseDown"
       @click="handleCanvasClick"
@@ -2097,24 +2303,81 @@ defineExpose({
         :style="{
           left: `${panOffset.x}px`,
           top: `${panOffset.y}px`,
-          transform: `scale(${zoom})`,
-          '--drag-dx': '0px',
-          '--drag-dy': '0px'
+          transform: `scale(${zoom})`
         }"
       >
+        <!-- Strict Mathematical Canvas Grid (严格一致的格点尺寸，与图元坐标空间 100% 同步缩放，彻底消除亚像素位移与伪歪斜) -->
+        <svg
+          v-if="showGrid"
+          class="absolute pointer-events-none overflow-visible select-none -z-10"
+          :style="{
+            left: `${gridSvgBounds.x}px`,
+            top: `${gridSvgBounds.y}px`,
+            width: `${gridSvgBounds.width}px`,
+            height: `${gridSvgBounds.height}px`
+          }"
+        >
+          <defs>
+            <pattern
+              :id="`scada-strict-grid-${gridSize}`"
+              :width="gridSize"
+              :height="gridSize"
+              patternUnits="userSpaceOnUse"
+              overflow="visible"
+            >
+              <!-- 在网格交点 (0,0) 及四角完整绘制微调圆点，shape-rendering crispEdges 保障每个交点格点尺寸绝对严格一致 -->
+              <circle
+                :cx="0"
+                :cy="0"
+                r="1.25"
+                :fill="effectiveGridColor"
+                shape-rendering="crispEdges"
+              />
+              <circle
+                :cx="gridSize"
+                :cy="0"
+                r="1.25"
+                :fill="effectiveGridColor"
+                shape-rendering="crispEdges"
+              />
+              <circle
+                :cx="0"
+                :cy="gridSize"
+                r="1.25"
+                :fill="effectiveGridColor"
+                shape-rendering="crispEdges"
+              />
+              <circle
+                :cx="gridSize"
+                :cy="gridSize"
+                r="1.25"
+                :fill="effectiveGridColor"
+                shape-rendering="crispEdges"
+              />
+            </pattern>
+          </defs>
+          <rect
+            x="0"
+            y="0"
+            width="100%"
+            height="100%"
+            :fill="`url(#scada-strict-grid-${gridSize})`"
+          />
+        </svg>
+
         <!-- Render All Screen Components in Layer Order -->
         <div
           v-for="comp in components"
           :key="comp.id"
           :data-component-id="comp.id"
-          @mousedown.stop="drawTool === 'select' && handleStartDrag($event, comp)"
-          @click.stop="drawTool === 'select' && handleCompClick($event, comp)"
+          @mousedown="handleCompMouseDown($event, comp)"
+          @click="handleCompClick($event, comp)"
           @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
           class="absolute group component-node select-none"
           :class="{
-            'cursor-move': drawTool === 'select' && !comp.locked && !isLineComponent(comp.type) && !isHollowComponent(comp),
-            'pointer-events-auto': drawTool === 'select' && comp.visible !== false && !isLineComponent(comp.type) && !isHollowComponent(comp),
-            'pointer-events-none': drawTool !== 'select' || comp.visible === false || isLineComponent(comp.type) || isHollowComponent(comp),
+            'cursor-move': drawTool === 'select' && !comp.locked && !isLineComponent(comp.type),
+            'pointer-events-auto': drawTool === 'select' && comp.visible !== false && !isLineComponent(comp.type),
+            'pointer-events-none': drawTool !== 'select' || comp.visible === false || isLineComponent(comp.type),
             'opacity-40': comp.visible === false,
             'cursor-default': comp.locked && drawTool === 'select'
           }"
@@ -2125,17 +2388,9 @@ defineExpose({
             height: `${Math.max(2, comp.height)}px`,
             minWidth: '4px',
             minHeight: '4px',
-            transform: comp.rotation
-              ? (selectedSet.has(comp.id) && !comp.locked
-                  ? `translate3d(var(--drag-dx, 0px), var(--drag-dy, 0px), 0) rotate(${comp.rotation}deg)`
-                  : `rotate(${comp.rotation}deg)`)
-              : (selectedSet.has(comp.id) && !comp.locked
-                  ? `translate3d(var(--drag-dx, 0px), var(--drag-dy, 0px), 0)`
-                  : undefined),
+            transform: comp.rotation ? `rotate(${comp.rotation}deg)` : undefined,
             transformOrigin: 'center center',
-            zIndex: comp.zIndex || 1,
-            contain: 'layout style',
-            willChange: selectedSet.has(comp.id) && !comp.locked ? 'transform' : undefined
+            zIndex: comp.zIndex || 1
           }"
         >
           <!-- Component Content -->
@@ -2150,6 +2405,7 @@ defineExpose({
             v-if="comp.locked" 
             @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
             class="absolute top-1 right-1 p-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-500/40 z-30 pointer-events-auto cursor-pointer"
+            :style="{ transform: `scale(${invZoom})`, transformOrigin: 'top right' }"
             title="图元已锁定 (右击可解锁)"
           >
             <Lock class="w-3 h-3 stroke-[2]" />
@@ -2172,64 +2428,91 @@ defineExpose({
               top: `${comp.y}px`,
               width: `${Math.max(4, comp.width)}px`,
               height: `${Math.max(4, comp.height)}px`,
-              transform: comp.rotation
-                ? (!comp.locked
-                    ? `translate3d(var(--drag-dx, 0px), var(--drag-dy, 0px), 0) rotate(${comp.rotation}deg)`
-                    : `rotate(${comp.rotation}deg)`)
-                : (!comp.locked
-                    ? `translate3d(var(--drag-dx, 0px), var(--drag-dy, 0px), 0)`
-                    : 'translateZ(0)'),
+              transform: comp.rotation ? `rotate(${comp.rotation}deg)` : undefined,
               transformOrigin: 'center center',
-              zIndex: 99999,
-              willChange: !comp.locked ? 'transform' : undefined
+              zIndex: 99999
             }"
           >
             <!-- 1. Line / Polyline Dedicated Selection & Transform State (Preserve real stroke color, show vertex nodes) -->
             <template v-if="isLineComponent(comp.type)">
-              <!-- Polyline Vertex Control Node Handles (Inflection points & endpoints) -->
+              <!-- Polyline Vertex Control Node Handles (Inflection points & endpoints: 恒定屏幕物理像素尺寸，放大不膨胀) -->
               <template v-if="comp.type === 'draw-polyline' || comp.type === 'polyline'">
                 <div
                   v-for="(pt, idx) in getPolylinePoints(comp)"
                   :key="idx"
-                  class="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto flex items-center justify-center group/node cursor-crosshair z-50"
-                  :style="{ left: `${pt.x}px`, top: `${pt.y}px`, width: '22px', height: '22px' }"
+                  class="absolute pointer-events-auto flex items-center justify-center group/node cursor-crosshair z-50 select-none"
+                  :style="{
+                    left: `${pt.x}px`,
+                    top: `${pt.y}px`,
+                    width: '22px',
+                    height: '22px',
+                    transform: `translate(-50%, -50%) scale(${invZoom})`,
+                    transformOrigin: 'center center'
+                  }"
                   @mousedown="handleStartVertexDrag($event, comp, idx)"
+                  @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
                   :title="`拖动拐点/端点 ${idx + 1} 进行拉伸调整`"
                 >
                   <div 
-                    class="w-3.5 h-3.5 rounded-full bg-cyan-400 border-2 border-slate-950 shadow-[0_0_8px_rgba(0,242,255,0.9)] group-hover/node:scale-130 group-hover/node:bg-amber-400 active:scale-140 transition-transform"
+                    class="w-3.5 h-3.5 rounded-full bg-cyan-400 border-2 border-slate-950 shadow-[0_0_8px_rgba(0,242,255,0.9)] group-hover/node:scale-125 group-hover/node:bg-amber-400 active:scale-135 transition-transform"
                   />
                 </div>
               </template>
 
-              <!-- Straight Line / Arrow Endpoint Handles -->
+              <!-- Straight Line / Arrow Endpoint Handles (恒定屏幕像素尺寸) -->
               <template v-else-if="comp.type === 'draw-line' || comp.type === 'draw-arrow' || comp.type === 'straight-line'">
                 <!-- Start Node -->
                 <div
-                  class="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto flex items-center justify-center group/node cursor-crosshair z-50"
-                  :style="{ left: `${getStraightLinePoints(comp).x1}px`, top: `${getStraightLinePoints(comp).y1}px`, width: '22px', height: '22px' }"
+                  class="absolute pointer-events-auto flex items-center justify-center group/node cursor-crosshair z-50 select-none"
+                  :style="{
+                    left: `${getStraightLinePoints(comp).x1}px`,
+                    top: `${getStraightLinePoints(comp).y1}px`,
+                    width: '22px',
+                    height: '22px',
+                    transform: `translate(-50%, -50%) scale(${invZoom})`,
+                    transformOrigin: 'center center'
+                  }"
                   @mousedown="handleStartVertexDrag($event, comp, 0)"
+                  @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
                   title="拖动起点进行拉伸调整"
                 >
                   <div 
-                    class="w-3.5 h-3.5 rounded-full bg-cyan-400 border-2 border-slate-950 shadow-[0_0_8px_rgba(0,242,255,0.9)] group-hover/node:scale-130 group-hover/node:bg-amber-400 active:scale-140 transition-transform"
+                    class="w-3.5 h-3.5 rounded-full bg-cyan-400 border-2 border-slate-950 shadow-[0_0_8px_rgba(0,242,255,0.9)] group-hover/node:scale-125 group-hover/node:bg-amber-400 active:scale-135 transition-transform"
                   />
                 </div>
                 <!-- End Node -->
                 <div
-                  class="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-auto flex items-center justify-center group/node cursor-crosshair z-50"
-                  :style="{ left: `${getStraightLinePoints(comp).x2}px`, top: `${getStraightLinePoints(comp).y2}px`, width: '22px', height: '22px' }"
+                  class="absolute pointer-events-auto flex items-center justify-center group/node cursor-crosshair z-50 select-none"
+                  :style="{
+                    left: `${getStraightLinePoints(comp).x2}px`,
+                    top: `${getStraightLinePoints(comp).y2}px`,
+                    width: '22px',
+                    height: '22px',
+                    transform: `translate(-50%, -50%) scale(${invZoom})`,
+                    transformOrigin: 'center center'
+                  }"
                   @mousedown="handleStartVertexDrag($event, comp, 1)"
+                  @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
                   title="拖动终点进行拉伸调整"
                 >
                   <div 
-                    class="w-3.5 h-3.5 rounded-full bg-cyan-400 border-2 border-slate-950 shadow-[0_0_8px_rgba(0,242,255,0.9)] group-hover/node:scale-130 group-hover/node:bg-amber-400 active:scale-140 transition-transform"
+                    class="w-3.5 h-3.5 rounded-full bg-cyan-400 border-2 border-slate-950 shadow-[0_0_8px_rgba(0,242,255,0.9)] group-hover/node:scale-125 group-hover/node:bg-amber-400 active:scale-135 transition-transform"
                   />
                 </div>
               </template>
 
-              <!-- Line Rotation Grip -->
-              <div v-if="!comp.locked" class="absolute -top-8 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-auto z-50">
+              <!-- Line Rotation Grip (恒定屏幕大小) -->
+              <div 
+                v-if="!comp.locked" 
+                class="absolute left-1/2 flex flex-col items-center pointer-events-auto z-50 select-none"
+                :style="{
+                  top: '0px',
+                  transform: `translate(-50%, -100%) scale(${invZoom})`,
+                  transformOrigin: 'bottom center',
+                  paddingBottom: '6px'
+                }"
+                @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
+              >
                 <div 
                   @mousedown="handleStartRotate"
                   class="w-6 h-6 bg-cyan-400 text-slate-950 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg hover:scale-115 transition-transform"
@@ -2246,15 +2529,24 @@ defineExpose({
               v-else-if="selectedIds.length === 1"
               class="absolute inset-0 pointer-events-none"
             >
-              <!-- 4 Subtle Corner Accent Markers (No full solid rectangular border) -->
-              <div class="absolute -top-1 -left-1 w-2.5 h-2.5 border-t-2 border-l-2 border-cyan-400 pointer-events-none" />
-              <div class="absolute -top-1 -right-1 w-2.5 h-2.5 border-t-2 border-r-2 border-cyan-400 pointer-events-none" />
-              <div class="absolute -bottom-1 -left-1 w-2.5 h-2.5 border-b-2 border-l-2 border-cyan-400 pointer-events-none" />
-              <div class="absolute -bottom-1 -right-1 w-2.5 h-2.5 border-b-2 border-r-2 border-cyan-400 pointer-events-none" />
+              <!-- 4 Subtle Corner Accent Markers (恒定屏幕细度) -->
+              <div class="absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-cyan-400 pointer-events-none" :style="{ transform: `scale(${invZoom})`, transformOrigin: 'top left' }" />
+              <div class="absolute top-0 right-0 w-2.5 h-2.5 border-t-2 border-r-2 border-cyan-400 pointer-events-none" :style="{ transform: `scale(${invZoom})`, transformOrigin: 'top right' }" />
+              <div class="absolute bottom-0 left-0 w-2.5 h-2.5 border-b-2 border-l-2 border-cyan-400 pointer-events-none" :style="{ transform: `scale(${invZoom})`, transformOrigin: 'bottom left' }" />
+              <div class="absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-cyan-400 pointer-events-none" :style="{ transform: `scale(${invZoom})`, transformOrigin: 'bottom right' }" />
 
-              <!-- Top Rotation Handle -->
+              <!-- Top Rotation Handle (恒定屏幕大小) -->
               <template v-if="!comp.locked">
-                <div class="absolute -top-8 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-auto z-50">
+                <div 
+                  class="absolute left-1/2 flex flex-col items-center pointer-events-auto z-50 select-none"
+                  :style="{
+                    top: '0px',
+                    transform: `translate(-50%, -100%) scale(${invZoom})`,
+                    transformOrigin: 'bottom center',
+                    paddingBottom: '6px'
+                  }"
+                  @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
+                >
                   <div 
                     @mousedown="handleStartRotate"
                     class="w-6 h-6 bg-cyan-400 text-slate-950 rounded-full flex items-center justify-center cursor-grab active:cursor-grabbing shadow-lg hover:scale-115 transition-transform"
@@ -2265,30 +2557,54 @@ defineExpose({
                   <div class="w-[1.5px] h-2 bg-cyan-400" />
                 </div>
 
-                <!-- 4 Interactive Edge Resize Bars (For Solid Components) -->
+                <!-- 4 Interactive Edge Resize Bars (For Solid Components: 恒定屏幕触控宽度) -->
                 <template v-if="!isHollowComponent(comp)">
                   <div 
-                    v-if="comp.height >= 24"
+                    v-if="comp.height * (Number(props.zoom) || Number(zoom) || 1) >= 24"
                     @mousedown="handleStartResize($event, 'n')"
-                    class="pointer-events-auto absolute -top-2 left-2 right-2 h-4 cursor-ns-resize z-40 group/edge hover:bg-cyan-400/20 rounded-xs transition-colors"
+                    @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
+                    class="pointer-events-auto absolute left-2 right-2 cursor-ns-resize z-40 group/edge hover:bg-cyan-400/20 rounded-xs transition-colors"
+                    :style="{
+                      top: '0px',
+                      height: `${12 * invZoom}px`,
+                      transform: 'translateY(-50%)'
+                    }"
                     title="拖动调整高度 (上边框)"
                   />
                   <div 
-                    v-if="comp.height >= 24"
+                    v-if="comp.height * (Number(props.zoom) || Number(zoom) || 1) >= 24"
                     @mousedown="handleStartResize($event, 's')"
-                    class="pointer-events-auto absolute -bottom-2 left-2 right-2 h-4 cursor-ns-resize z-40 group/edge hover:bg-cyan-400/20 rounded-xs transition-colors"
+                    @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
+                    class="pointer-events-auto absolute left-2 right-2 cursor-ns-resize z-40 group/edge hover:bg-cyan-400/20 rounded-xs transition-colors"
+                    :style="{
+                      bottom: '0px',
+                      height: `${12 * invZoom}px`,
+                      transform: 'translateY(50%)'
+                    }"
                     title="拖动调整高度 (下边框)"
                   />
                   <div 
-                    v-if="comp.width >= 24"
+                    v-if="comp.width * (Number(props.zoom) || Number(zoom) || 1) >= 24"
                     @mousedown="handleStartResize($event, 'w')"
-                    class="pointer-events-auto absolute top-2 bottom-2 -left-2 w-4 cursor-ew-resize z-40 group/edge hover:bg-cyan-400/20 rounded-xs transition-colors"
+                    @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
+                    class="pointer-events-auto absolute top-2 bottom-2 cursor-ew-resize z-40 group/edge hover:bg-cyan-400/20 rounded-xs transition-colors"
+                    :style="{
+                      left: '0px',
+                      width: `${12 * invZoom}px`,
+                      transform: 'translateX(-50%)'
+                    }"
                     title="拖动调整宽度 (左边框)"
                   />
                   <div 
-                    v-if="comp.width >= 24"
+                    v-if="comp.width * (Number(props.zoom) || Number(zoom) || 1) >= 24"
                     @mousedown="handleStartResize($event, 'e')"
-                    class="pointer-events-auto absolute top-2 bottom-2 -right-2 w-4 cursor-ew-resize z-40 group/edge hover:bg-cyan-400/20 rounded-xs transition-colors"
+                    @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
+                    class="pointer-events-auto absolute top-2 bottom-2 cursor-ew-resize z-40 group/edge hover:bg-cyan-400/20 rounded-xs transition-colors"
+                    :style="{
+                      right: '0px',
+                      width: `${12 * invZoom}px`,
+                      transform: 'translateX(50%)'
+                    }"
                     title="拖动调整宽度 (右边框)"
                   />
                 </template>
@@ -2297,29 +2613,39 @@ defineExpose({
                 <template v-else>
                   <div 
                     @mousedown.stop="handleStartDrag($event, comp)"
+                    @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
                     class="pointer-events-auto absolute -top-2.5 left-4 right-4 h-5 cursor-move z-30 group/edge-drag hover:bg-cyan-400/20 transition-colors"
                     title="按住边框拖动位置"
                   />
                   <div 
                     @mousedown.stop="handleStartDrag($event, comp)"
+                    @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
                     class="pointer-events-auto absolute -bottom-2.5 left-4 right-4 h-5 cursor-move z-30 group/edge-drag hover:bg-cyan-400/20 transition-colors"
                     title="按住边框拖动位置"
                   />
                   <div 
                     @mousedown.stop="handleStartDrag($event, comp)"
+                    @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
                     class="pointer-events-auto absolute top-4 bottom-4 -left-2.5 w-5 cursor-move z-30 group/edge-drag hover:bg-cyan-400/20 transition-colors"
                     title="按住边框拖动位置"
                   />
                   <div 
                     @mousedown.stop="handleStartDrag($event, comp)"
+                    @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
                     class="pointer-events-auto absolute top-4 bottom-4 -right-2.5 w-5 cursor-move z-30 group/edge-drag hover:bg-cyan-400/20 transition-colors"
                     title="按住边框拖动位置"
                   />
 
-                  <!-- Dedicated Floating Move Grip Badge for Cyber Border -->
+                  <!-- Dedicated Floating Move Grip Badge for Cyber Border (恒定屏幕大小) -->
                   <div 
                     @mousedown.stop="handleStartDrag($event, comp)"
-                    class="pointer-events-auto absolute -top-7 left-3 px-2 py-0.5 rounded-t bg-cyan-950/95 text-cyan-300 border border-b-0 border-cyan-500/60 text-[11px] font-mono flex items-center gap-1.5 cursor-move shadow-md z-40 hover:bg-cyan-900 transition-colors select-none"
+                    @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
+                    class="pointer-events-auto absolute left-3 px-2 py-0.5 rounded-t bg-cyan-950/95 text-cyan-300 border border-b-0 border-cyan-500/60 text-[11px] font-mono flex items-center gap-1.5 cursor-move shadow-md z-40 hover:bg-cyan-900 transition-colors select-none"
+                    :style="{
+                      top: '0px',
+                      transform: `translateY(-100%) scale(${invZoom})`,
+                      transformOrigin: 'bottom left'
+                    }"
                     title="按住拖动科技边框"
                   >
                     <Move class="w-3 h-3 text-cyan-400" />
@@ -2327,94 +2653,150 @@ defineExpose({
                   </div>
                 </template>
 
-                <!-- 8 Resize Corner & Mid-point Handles -->
+                <!-- 8 Resize Corner & Mid-point Handles (严格恒定 10px 物理屏幕抓手尺寸，放大绝不膨胀遮挡小图元) -->
                 <!-- NW (Top-Left) -->
                 <div 
                   @mousedown="handleStartResize($event, 'nw')"
-                  class="group pointer-events-auto absolute -top-2.5 -left-2.5 w-5 h-5 flex items-center justify-center cursor-nwse-resize z-50"
+                  @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
+                  class="group pointer-events-auto absolute w-5 h-5 flex items-center justify-center cursor-nwse-resize z-50 select-none"
+                  :style="{
+                    left: '0%',
+                    top: '0%',
+                    transform: `translate(-50%, -50%) scale(${invZoom})`,
+                    transformOrigin: 'center center'
+                  }"
                   title="缩放调整 (左上角)"
                 >
-                  <div class="w-2.5 h-2.5 bg-cyan-400 border-[1.5px] border-slate-950 rounded-[2px] shadow-[0_0_6px_rgba(0,242,255,0.8)] group-hover:scale-130 transition-transform" />
+                  <div class="w-2.5 h-2.5 bg-cyan-400 border-[1.5px] border-slate-950 rounded-[2px] shadow-[0_0_6px_rgba(0,242,255,0.8)] group-hover:scale-125 transition-transform" />
                 </div>
 
                 <!-- N (Top-Center) -->
                 <div 
-                  v-if="comp.height >= 20"
+                  v-if="comp.height * (Number(props.zoom) || Number(zoom) || 1) >= 28"
                   @mousedown="handleStartResize($event, 'n')"
-                  class="group pointer-events-auto absolute -top-2.5 left-1/2 -translate-x-1/2 w-5 h-5 flex items-center justify-center cursor-ns-resize z-50"
+                  @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
+                  class="group pointer-events-auto absolute w-5 h-5 flex items-center justify-center cursor-ns-resize z-50 select-none"
+                  :style="{
+                    left: '50%',
+                    top: '0%',
+                    transform: `translate(-50%, -50%) scale(${invZoom})`,
+                    transformOrigin: 'center center'
+                  }"
                   title="调整高度 (上中点)"
                 >
-                  <div class="w-2.5 h-2.5 bg-cyan-400 border-[1.5px] border-slate-950 rounded-[2px] shadow-[0_0_6px_rgba(0,242,255,0.8)] group-hover:scale-130 transition-transform" />
+                  <div class="w-2.5 h-2.5 bg-cyan-400 border-[1.5px] border-slate-950 rounded-[2px] shadow-[0_0_6px_rgba(0,242,255,0.8)] group-hover:scale-125 transition-transform" />
                 </div>
 
                 <!-- NE (Top-Right) -->
                 <div 
                   @mousedown="handleStartResize($event, 'ne')"
-                  class="group pointer-events-auto absolute -top-2.5 -right-2.5 w-5 h-5 flex items-center justify-center cursor-nesw-resize z-50"
+                  @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
+                  class="group pointer-events-auto absolute w-5 h-5 flex items-center justify-center cursor-nesw-resize z-50 select-none"
+                  :style="{
+                    left: '100%',
+                    top: '0%',
+                    transform: `translate(-50%, -50%) scale(${invZoom})`,
+                    transformOrigin: 'center center'
+                  }"
                   title="缩放调整 (右上角)"
                 >
-                  <div class="w-2.5 h-2.5 bg-cyan-400 border-[1.5px] border-slate-950 rounded-[2px] shadow-[0_0_6px_rgba(0,242,255,0.8)] group-hover:scale-130 transition-transform" />
+                  <div class="w-2.5 h-2.5 bg-cyan-400 border-[1.5px] border-slate-950 rounded-[2px] shadow-[0_0_6px_rgba(0,242,255,0.8)] group-hover:scale-125 transition-transform" />
                 </div>
 
                 <!-- E (Right-Center) -->
                 <div 
-                  v-if="comp.width >= 20"
+                  v-if="comp.width * (Number(props.zoom) || Number(zoom) || 1) >= 28"
                   @mousedown="handleStartResize($event, 'e')"
-                  class="group pointer-events-auto absolute top-1/2 -translate-y-1/2 -right-2.5 w-5 h-5 flex items-center justify-center cursor-ew-resize z-50"
+                  @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
+                  class="group pointer-events-auto absolute w-5 h-5 flex items-center justify-center cursor-ew-resize z-50 select-none"
+                  :style="{
+                    left: '100%',
+                    top: '50%',
+                    transform: `translate(-50%, -50%) scale(${invZoom})`,
+                    transformOrigin: 'center center'
+                  }"
                   title="调整宽度 (右中点)"
                 >
-                  <div class="w-2.5 h-2.5 bg-cyan-400 border-[1.5px] border-slate-950 rounded-[2px] shadow-[0_0_6px_rgba(0,242,255,0.8)] group-hover:scale-130 transition-transform" />
+                  <div class="w-2.5 h-2.5 bg-cyan-400 border-[1.5px] border-slate-950 rounded-[2px] shadow-[0_0_6px_rgba(0,242,255,0.8)] group-hover:scale-125 transition-transform" />
                 </div>
 
                 <!-- SE (Bottom-Right) -->
                 <div 
                   @mousedown="handleStartResize($event, 'se')"
-                  class="group pointer-events-auto absolute -bottom-2.5 -right-2.5 w-5 h-5 flex items-center justify-center cursor-nwse-resize z-50"
+                  @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
+                  class="group pointer-events-auto absolute w-5 h-5 flex items-center justify-center cursor-nwse-resize z-50 select-none"
+                  :style="{
+                    left: '100%',
+                    top: '100%',
+                    transform: `translate(-50%, -50%) scale(${invZoom})`,
+                    transformOrigin: 'center center'
+                  }"
                   title="缩放调整 (右下角)"
                 >
-                  <div class="w-2.5 h-2.5 bg-cyan-400 border-[1.5px] border-slate-950 rounded-[2px] shadow-[0_0_6px_rgba(0,242,255,0.8)] group-hover:scale-130 transition-transform" />
+                  <div class="w-2.5 h-2.5 bg-cyan-400 border-[1.5px] border-slate-950 rounded-[2px] shadow-[0_0_6px_rgba(0,242,255,0.8)] group-hover:scale-125 transition-transform" />
                 </div>
 
                 <!-- S (Bottom-Center) -->
                 <div 
-                  v-if="comp.height >= 20"
+                  v-if="comp.height * (Number(props.zoom) || Number(zoom) || 1) >= 28"
                   @mousedown="handleStartResize($event, 's')"
-                  class="group pointer-events-auto absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-5 h-5 flex items-center justify-center cursor-ns-resize z-50"
+                  @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
+                  class="group pointer-events-auto absolute w-5 h-5 flex items-center justify-center cursor-ns-resize z-50 select-none"
+                  :style="{
+                    left: '50%',
+                    top: '100%',
+                    transform: `translate(-50%, -50%) scale(${invZoom})`,
+                    transformOrigin: 'center center'
+                  }"
                   title="调整高度 (下中点)"
                 >
-                  <div class="w-2.5 h-2.5 bg-cyan-400 border-[1.5px] border-slate-950 rounded-[2px] shadow-[0_0_6px_rgba(0,242,255,0.8)] group-hover:scale-130 transition-transform" />
+                  <div class="w-2.5 h-2.5 bg-cyan-400 border-[1.5px] border-slate-950 rounded-[2px] shadow-[0_0_6px_rgba(0,242,255,0.8)] group-hover:scale-125 transition-transform" />
                 </div>
 
                 <!-- SW (Bottom-Left) -->
                 <div 
                   @mousedown="handleStartResize($event, 'sw')"
-                  class="group pointer-events-auto absolute -bottom-2.5 -left-2.5 w-5 h-5 flex items-center justify-center cursor-nesw-resize z-50"
+                  @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
+                  class="group pointer-events-auto absolute w-5 h-5 flex items-center justify-center cursor-nesw-resize z-50 select-none"
+                  :style="{
+                    left: '0%',
+                    top: '100%',
+                    transform: `translate(-50%, -50%) scale(${invZoom})`,
+                    transformOrigin: 'center center'
+                  }"
                   title="缩放调整 (左下角)"
                 >
-                  <div class="w-2.5 h-2.5 bg-cyan-400 border-[1.5px] border-slate-950 rounded-[2px] shadow-[0_0_6px_rgba(0,242,255,0.8)] group-hover:scale-130 transition-transform" />
+                  <div class="w-2.5 h-2.5 bg-cyan-400 border-[1.5px] border-slate-950 rounded-[2px] shadow-[0_0_6px_rgba(0,242,255,0.8)] group-hover:scale-125 transition-transform" />
                 </div>
 
                 <!-- W (Left-Center) -->
                 <div 
-                  v-if="comp.width >= 20"
+                  v-if="comp.width * (Number(props.zoom) || Number(zoom) || 1) >= 28"
                   @mousedown="handleStartResize($event, 'w')"
-                  class="group pointer-events-auto absolute top-1/2 -translate-y-1/2 -left-2.5 w-5 h-5 flex items-center justify-center cursor-ew-resize z-50"
+                  @contextmenu.stop.prevent="handleContextMenu($event, comp.id)"
+                  class="group pointer-events-auto absolute w-5 h-5 flex items-center justify-center cursor-ew-resize z-50 select-none"
+                  :style="{
+                    left: '0%',
+                    top: '50%',
+                    transform: `translate(-50%, -50%) scale(${invZoom})`,
+                    transformOrigin: 'center center'
+                  }"
                   title="调整宽度 (左中点)"
                 >
-                  <div class="w-2.5 h-2.5 bg-cyan-400 border-[1.5px] border-slate-950 rounded-[2px] shadow-[0_0_6px_rgba(0,242,255,0.8)] group-hover:scale-130 transition-transform" />
+                  <div class="w-2.5 h-2.5 bg-cyan-400 border-[1.5px] border-slate-950 rounded-[2px] shadow-[0_0_6px_rgba(0,242,255,0.8)] group-hover:scale-125 transition-transform" />
                 </div>
               </template>
             </div>
 
-            <!-- 3. Multi-Selection Active State: Clean subtle corner accents, no enclosing box or tint -->
+            <!-- 3. Multi-Selection Active State: Clean subtle corner accents (恒定屏幕大小) -->
             <div 
               v-else
               class="absolute inset-0 pointer-events-none"
             >
-              <div class="absolute -top-1 -left-1 w-2 h-2 border-t-2 border-l-2 border-cyan-400/80 pointer-events-none" />
-              <div class="absolute -top-1 -right-1 w-2 h-2 border-t-2 border-r-2 border-cyan-400/80 pointer-events-none" />
-              <div class="absolute -bottom-1 -left-1 w-2 h-2 border-b-2 border-l-2 border-cyan-400/80 pointer-events-none" />
-              <div class="absolute -bottom-1 -right-1 w-2 h-2 border-b-2 border-r-2 border-cyan-400/80 pointer-events-none" />
+              <div class="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-cyan-400/80 pointer-events-none" :style="{ transform: `scale(${invZoom})`, transformOrigin: 'top left' }" />
+              <div class="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-cyan-400/80 pointer-events-none" :style="{ transform: `scale(${invZoom})`, transformOrigin: 'top right' }" />
+              <div class="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-cyan-400/80 pointer-events-none" :style="{ transform: `scale(${invZoom})`, transformOrigin: 'bottom left' }" />
+              <div class="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-cyan-400/80 pointer-events-none" :style="{ transform: `scale(${invZoom})`, transformOrigin: 'bottom right' }" />
             </div>
           </div>
         </div>
@@ -2422,14 +2804,12 @@ defineExpose({
         <!-- Overall Multi-Selection Group Bounding Box (Visual Only, No Floating Menu) -->
         <div
           v-if="drawTool === 'select' && selectedGroupBBox && selectedIds.length > 1"
-          class="absolute border-2 border-dashed border-cyan-300/80 bg-cyan-400/[0.04] pointer-events-none z-45 shadow-[0_0_25px_rgba(0,242,255,0.25)] rounded-xs"
+          class="absolute border-2 border-dashed border-cyan-300/80 bg-cyan-400/[0.04] pointer-events-none z-45 shadow-[0_0_25px_rgba(0,242,255,0.25)] rounded-xs selected-group-bbox"
           :style="{
             left: `${selectedGroupBBox.minX - 4}px`,
             top: `${selectedGroupBBox.minY - 4}px`,
             width: `${selectedGroupBBox.width + 8}px`,
-            height: `${selectedGroupBBox.height + 8}px`,
-            transform: 'translate3d(var(--drag-dx, 0px), var(--drag-dy, 0px), 0)',
-            willChange: 'transform'
+            height: `${selectedGroupBBox.height + 8}px`
           }"
         >
           <!-- 4 Corner Grip Markers for Group Frame -->
@@ -2472,8 +2852,8 @@ defineExpose({
             <polyline
               :points="getPolylinePreviewPoints()"
               fill="none"
-              stroke="#00f2ff"
-              stroke-width="7"
+              :stroke="props.drawingPreset?.stroke || '#00f2ff'"
+              :stroke-width="(props.drawingPreset?.strokeWidth || 3) + 4"
               stroke-opacity="0.35"
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -2482,9 +2862,9 @@ defineExpose({
             <polyline
               :points="getPolylinePreviewPoints()"
               fill="none"
-              stroke="#00f2ff"
-              stroke-width="3"
-              stroke-dasharray="8 4"
+              :stroke="props.drawingPreset?.stroke || '#00f2ff'"
+              :stroke-width="props.drawingPreset?.strokeWidth || 3"
+              :stroke-dasharray="props.drawingPreset?.lineStyle === 'dashed' ? '8 4' : (props.drawingPreset?.lineStyle === 'dotted' ? '3 3' : undefined)"
               stroke-linecap="round"
               stroke-linejoin="round"
             />
@@ -2494,8 +2874,8 @@ defineExpose({
               :y1="polylineDrawing.points[polylineDrawing.points.length - 1].y"
               :x2="polylineDrawing.currentX"
               :y2="polylineDrawing.currentY"
-              stroke="#00e5a3"
-              stroke-width="2"
+              :stroke="props.drawingPreset?.stroke || '#00e5a3'"
+              :stroke-width="props.drawingPreset?.strokeWidth || 2"
               stroke-dasharray="4 3"
             />
             <!-- Placed vertices -->
@@ -2504,7 +2884,7 @@ defineExpose({
                 :cx="p.x" 
                 :cy="p.y" 
                 r="5" 
-                fill="#00f2ff" 
+                :fill="props.drawingPreset?.stroke || '#00f2ff'" 
                 stroke="#040810"
                 stroke-width="1.5"
               />
@@ -2517,7 +2897,7 @@ defineExpose({
               cx="0" 
               cy="0" 
               r="6" 
-              fill="#00e5a3" 
+              :fill="props.drawingPreset?.stroke || '#00e5a3'" 
               stroke="#040810"
               stroke-width="2"
             />
@@ -2526,7 +2906,7 @@ defineExpose({
               cy="0" 
               r="12" 
               fill="none" 
-              stroke="#00e5a3" 
+              :stroke="props.drawingPreset?.stroke || '#00e5a3'" 
               stroke-width="1.5"
               stroke-dasharray="3 3"
             />
@@ -2548,7 +2928,7 @@ defineExpose({
               refY="3"
               orient="auto"
             >
-              <path d="M0,0 L0,6 L9,3 z" fill="#00f2ff" />
+              <path d="M0,0 L0,6 L9,3 z" :fill="props.drawingPreset?.stroke || '#00f2ff'" />
             </marker>
           </defs>
           <template v-if="arrowDrawing.active">
@@ -2558,8 +2938,8 @@ defineExpose({
               :y1="arrowDrawing.startY"
               :x2="arrowDrawing.currentX"
               :y2="arrowDrawing.currentY"
-              stroke="#00f2ff"
-              stroke-width="7"
+              :stroke="props.drawingPreset?.stroke || '#00f2ff'"
+              :stroke-width="(props.drawingPreset?.strokeWidth || 3) + 4"
               stroke-opacity="0.35"
               stroke-linecap="round"
             />
@@ -2569,9 +2949,9 @@ defineExpose({
               :y1="arrowDrawing.startY"
               :x2="arrowDrawing.currentX"
               :y2="arrowDrawing.currentY"
-              stroke="#00f2ff"
-              stroke-width="3"
-              stroke-dasharray="6 3"
+              :stroke="props.drawingPreset?.stroke || '#00f2ff'"
+              :stroke-width="props.drawingPreset?.strokeWidth || 3"
+              :stroke-dasharray="props.drawingPreset?.lineStyle === 'dashed' ? '6 3' : (props.drawingPreset?.lineStyle === 'dotted' ? '3 3' : undefined)"
               stroke-linecap="round"
               marker-end="url(#preview-arrow-head)"
             />
@@ -2580,7 +2960,7 @@ defineExpose({
               :cx="arrowDrawing.startX"
               :cy="arrowDrawing.startY"
               r="6"
-              fill="#00f2ff"
+              :fill="props.drawingPreset?.stroke || '#00f2ff'"
               stroke="#040810"
               stroke-width="2"
             />

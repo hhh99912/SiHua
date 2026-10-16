@@ -37,10 +37,9 @@ import {
   AlignHorizontalSpaceAround,
   AlignVerticalSpaceAround,
   Layers,
+  Lock,
   Unlock,
   BookmarkPlus,
-  ShieldCheck,
-  UserCheck,
   MoveRight,
   Target,
   HardDrive,
@@ -81,7 +80,6 @@ import {
 } from 'lucide-vue-next';
 import { ScreenConfig, ScreenComponent } from '../types';
 import { detectPlatform, windowToggleFullscreen } from '../utils/platform';
-import { currentUser } from '../utils/auth';
 
 interface Props {
   screen: ScreenConfig;
@@ -101,6 +99,15 @@ interface Props {
   isMaximized?: boolean;
   windowTitle?: string;
   isElectron?: boolean;
+  drawingPreset?: {
+    stroke: string;
+    fill: string;
+    fillOpacity?: number;
+    strokeWidth: number;
+    lineStyle: 'solid' | 'dashed' | 'dotted';
+    fontSize: number;
+    fontWeight: 'normal' | 'bold';
+  };
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -115,7 +122,16 @@ const props = withDefaults(defineProps<Props>(), {
   showRuler: false,
   isMaximized: true,
   windowTitle: '图形编辑界面 (SCADA Studio)',
-  isElectron: false
+  isElectron: false,
+  drawingPreset: () => ({
+    stroke: '#00f2ff',
+    fill: 'transparent',
+    fillOpacity: 1,
+    strokeWidth: 2,
+    lineStyle: 'solid',
+    fontSize: 14,
+    fontWeight: 'bold'
+  })
 });
 
 const emit = defineEmits<{
@@ -145,6 +161,8 @@ const emit = defineEmits<{
   (e: 'align', direction: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'distribute-h' | 'distribute-v' | 'equal-width' | 'equal-height' | 'equal-size' | 'equal-max-size' | 'equal-min-size' | 'make-square'): void;
   (e: 'group'): void;
   (e: 'ungroup'): void;
+  (e: 'lock'): void;
+  (e: 'unlock'): void;
   (e: 'save:symbol'): void;
   (e: 'center:all'): void;
   (e: 'snap:all'): void;
@@ -156,6 +174,10 @@ const emit = defineEmits<{
   (e: 'maximize:window'): void;
   (e: 'close:window'): void;
   (e: 'exit:app'): void;
+  (e: 'update:drawing-style', payload: {
+    key: 'stroke' | 'fill' | 'fillOpacity' | 'strokeWidth' | 'lineStyle' | 'fontSize' | 'fontWeight';
+    value: any;
+  }): void;
 }>();
 
 const currentPlatform = detectPlatform();
@@ -240,68 +262,113 @@ onBeforeUnmount(() => {
   document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
   window.removeEventListener('click', handleGlobalClick);
 });
+
+// =========================================================================
+// 顶栏动态属性工具条 (常规绘图样式与预设/选中双模式)
+// =========================================================================
+const isSelectionMode = computed(() => (props.selectedIds?.length || 0) > 0);
+
+const activeDrawingStyle = computed(() => {
+  if (props.selectedComponents && props.selectedComponents.length >= 1) {
+    const c = props.selectedComponents[0];
+    const st = c.style || {};
+    return {
+      stroke: st.stroke || st.borderColor || props.drawingPreset?.stroke || '#00f2ff',
+      fill: st.fill || st.bgColor || props.drawingPreset?.fill || 'transparent',
+      fillOpacity: st.fillOpacity !== undefined ? Number(st.fillOpacity) : (props.drawingPreset?.fillOpacity !== undefined ? Number(props.drawingPreset.fillOpacity) : 1),
+      strokeWidth: typeof st.strokeWidth === 'number' ? st.strokeWidth : (typeof st.borderWidth === 'number' ? st.borderWidth : (props.drawingPreset?.strokeWidth || 2)),
+      lineStyle: (st.lineStyle as 'solid' | 'dashed' | 'dotted') || props.drawingPreset?.lineStyle || 'solid',
+      fontSize: typeof st.fontSize === 'number' && st.fontSize > 0 ? st.fontSize : (props.drawingPreset?.fontSize || 14),
+      fontWeight: (st.fontWeight as 'normal' | 'bold') || props.drawingPreset?.fontWeight || 'bold'
+    };
+  }
+  return {
+    stroke: props.drawingPreset?.stroke || '#00f2ff',
+    fill: props.drawingPreset?.fill || 'transparent',
+    fillOpacity: props.drawingPreset?.fillOpacity !== undefined ? Number(props.drawingPreset.fillOpacity) : 1,
+    strokeWidth: props.drawingPreset?.strokeWidth || 2,
+    lineStyle: props.drawingPreset?.lineStyle || 'solid',
+    fontSize: props.drawingPreset?.fontSize || 14,
+    fontWeight: props.drawingPreset?.fontWeight || 'bold'
+  };
+});
+
+const handleStyleChange = (key: 'stroke' | 'fill' | 'fillOpacity' | 'strokeWidth' | 'lineStyle' | 'fontSize' | 'fontWeight', value: any) => {
+  emit('update:drawing-style', { key, value });
+};
+
+const standardPalette = [
+  '#00f2ff', // 工业青
+  '#00e5a3', // 电力绿
+  '#eab308', // 调度黄
+  '#ef4444', // 警示红
+  '#ffffff', // 纯白
+  '#94a3b8', // 灰度
+  '#1e293b', // 暗蓝
+  '#000000'  // 纯黑
+];
 </script>
 
 <template>
   <!-- GE-SCADA 标准图形编辑界面顶部导航与菜单工具栏 (护眼暖白/米白主题背景) -->
-  <header class="bg-[#f7f5ef] border-b border-[#e1ddd4] px-3 py-1 flex flex-col gap-1 select-none z-40 relative shadow-xs text-slate-800 font-sans">
+  <header class="bg-[#ebe4d4] border-b border-[#cfc5b0] px-3 py-1 flex flex-col gap-1 select-none z-40 relative shadow-xs text-slate-800 font-sans">
     <!-- ========================================================================= -->
     <!-- Row 1: 系统标题、标准下拉菜单栏、当前大屏名称与运行控制 (柔和暖白) -->
     <!-- ========================================================================= -->
-    <div class="flex items-center justify-between h-9.5 prs-menu-container">
+    <div class="flex items-center justify-between h-11 prs-menu-container">
       <!-- Left: KND科能达 品牌标识与标准顶级菜单行 (文件/编辑/视图/格式/图元/数据/运行/帮助) -->
       <div class="flex items-center gap-3">
         <!-- 品牌标识 (用户指定：(KND)科能达，红圈包裹更圆润) -->
-        <div class="flex items-center gap-2 pr-3 border-r border-[#e1ddd4] select-none shrink-0">
-          <div class="px-2 py-0.5 rounded-full bg-[#d81e06] text-white flex items-center justify-center font-black text-xs shadow-2xs tracking-wide">
+        <div class="flex items-center gap-2 pr-3 border-r border-[#cfc5b0] select-none shrink-0">
+          <div class="px-2 py-0.5 rounded-full bg-[#d81e06] text-white flex items-center justify-center font-bold text-xs shadow-2xs tracking-wide">
             KND
           </div>
-          <span class="text-[#d81e06] font-black tracking-wide text-base">
+          <span class="text-[#d81e06] font-bold tracking-wide text-[17px]">
             科能达
           </span>
         </div>
 
         <!-- 当前窗口与画面指示标签 (无卡片包裹，纯净文本) -->
-        <div class="hidden lg:flex items-center gap-1.5 text-xs text-slate-700 select-none tracking-wide">
-          <PenTool class="w-3.5 h-3.5 text-sky-600" />
+        <div class="hidden lg:flex items-center gap-1.5 text-[13px] text-slate-700 select-none tracking-wide">
+          <PenTool class="w-4 h-4 text-sky-600" />
           <span>图形编辑</span>
           <span class="text-slate-300">·</span>
-          <span class="text-slate-800 font-mono font-semibold truncate max-w-[140px]">{{ screen.name || '主接线图' }}</span>
+          <span class="text-slate-800 font-mono font-medium truncate max-w-[140px]">{{ screen.name || '主接线图' }}</span>
         </div>
 
         <!-- 经典顶级下拉菜单列表 (删除英文后缀) -->
-        <nav class="flex items-center gap-1 text-[13.5px] text-slate-800 font-bold relative tracking-wide">
+        <nav class="flex items-center gap-1 text-[15px] text-slate-800 font-medium relative tracking-wide">
           <!-- 1. 文件 -->
           <div class="relative">
             <button
               @click.stop="toggleMenu('file')"
-              class="px-3 py-1.5 rounded hover:bg-[#efeae0] text-slate-800 transition-colors flex items-center gap-1 cursor-pointer tracking-wide"
-              :class="{ 'bg-[#efeae0] text-sky-700 font-bold': activeMenu === 'file' }"
+              class="px-3 py-1.5 rounded hover:bg-[#e4dcce] text-slate-800 transition-colors flex items-center gap-1 cursor-pointer tracking-wide"
+              :class="{ 'bg-[#e4dcce] text-sky-700': activeMenu === 'file' }"
             >
               <span>文件</span>
-              <ChevronDown class="w-3.5 h-3.5 text-slate-400" />
+              <ChevronDown class="w-4 h-4 text-slate-400" />
             </button>
             <div
               v-if="activeMenu === 'file'"
-              class="absolute left-0 top-full mt-1 w-60 bg-[#faf8f5] border border-[#e2ddd4] rounded-lg shadow-xl py-1 z-50 text-[13px] text-slate-800 divide-y divide-[#eee9df] tracking-wide"
+              class="absolute left-0 top-full mt-1 w-64 bg-[#f2eee3] border border-[#cfc5b0] rounded-lg shadow-xl py-1 z-50 text-[14px] text-slate-800 divide-y divide-[#ded5bf] tracking-wide"
             >
               <div class="py-1">
                 <button
                   @click="emit('save:screen'); closeMenus();"
-                  class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center justify-between cursor-pointer"
+                  class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center justify-between cursor-pointer"
                 >
                   <span class="flex items-center gap-2.5">
-                    <Save class="w-4 h-4 text-sky-600" />
+                    <Save class="w-4.5 h-4.5 text-sky-600" />
                     <span>保存当前画面</span>
                   </span>
-                  <span class="text-[11px] text-slate-400 font-mono">Ctrl+S</span>
+                  <span class="text-xs text-slate-400 font-mono">Ctrl+S</span>
                 </button>
                 <button
                   @click="emit('open:disk-storage'); closeMenus();"
-                  class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center justify-between cursor-pointer"
+                  class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center justify-between cursor-pointer"
                 >
                   <span class="flex items-center gap-2.5">
-                    <HardDrive class="w-4 h-4 text-sky-600" />
+                    <HardDrive class="w-4.5 h-4.5 text-sky-600" />
                     <span>磁盘大屏文件管理 (graph/)</span>
                   </span>
                 </button>
@@ -312,20 +379,20 @@ onBeforeUnmount(() => {
                   class="w-full px-3.5 py-2 text-left hover:bg-rose-50 text-rose-600 flex items-center justify-between cursor-pointer"
                 >
                   <span class="flex items-center gap-2.5">
-                    <Trash2 class="w-4 h-4 text-rose-500" />
+                    <Trash2 class="w-4.5 h-4.5 text-rose-500" />
                     <span>清空当前画布图元</span>
                   </span>
                 </button>
                 <button
                   @click="emit('exit:app'); closeMenus();"
-                  class="w-full px-3.5 py-2 text-left hover:bg-rose-50 text-rose-700 flex items-center justify-between cursor-pointer font-bold border-t border-slate-100"
+                  class="w-full px-3.5 py-2 text-left hover:bg-rose-50 text-rose-700 flex items-center justify-between cursor-pointer font-medium border-t border-slate-100"
                   title="安全退出程序"
                 >
                   <span class="flex items-center gap-2.5">
-                    <Power class="w-4 h-4 text-rose-600" />
+                    <Power class="w-4.5 h-4.5 text-rose-600" />
                     <span>退出程序</span>
                   </span>
-                  <span class="text-[11px] text-rose-400 font-mono">Alt+F4</span>
+                  <span class="text-xs text-rose-400 font-mono">Alt+F4</span>
                 </button>
               </div>
             </div>
@@ -335,49 +402,49 @@ onBeforeUnmount(() => {
           <div class="relative">
             <button
               @click.stop="toggleMenu('edit')"
-              class="px-3 py-1.5 rounded hover:bg-slate-100 text-slate-800 transition-colors flex items-center gap-1 cursor-pointer tracking-wide"
-              :class="{ 'bg-slate-100 text-sky-700 font-bold': activeMenu === 'edit' }"
+              class="px-3 py-1.5 rounded hover:bg-[#e4dcce] text-slate-800 transition-colors flex items-center gap-1 cursor-pointer tracking-wide"
+              :class="{ 'bg-[#e4dcce] text-sky-700': activeMenu === 'edit' }"
             >
               <span>编辑</span>
-              <ChevronDown class="w-3.5 h-3.5 text-slate-400" />
+              <ChevronDown class="w-4 h-4 text-slate-400" />
             </button>
             <div
               v-if="activeMenu === 'edit'"
-              class="absolute left-0 top-full mt-1 w-56 bg-[#faf8f5] border border-[#e2ddd4] rounded-lg shadow-xl py-1 z-50 text-[13px] text-slate-800 divide-y divide-[#eee9df] tracking-wide"
+              class="absolute left-0 top-full mt-1 w-60 bg-[#f2eee3] border border-[#cfc5b0] rounded-lg shadow-xl py-1 z-50 text-[14px] text-slate-800 divide-y divide-[#ded5bf] tracking-wide"
             >
               <div class="py-1">
                 <button
                   @click="emit('undo'); closeMenus();"
                   :disabled="!canUndo"
-                  class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center justify-between disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                  class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center justify-between disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
                 >
-                  <span class="flex items-center gap-2.5"><Undo2 class="w-4 h-4 text-slate-500" />撤销</span>
-                  <span class="text-[11px] text-slate-400 font-mono">Ctrl+Z</span>
+                  <span class="flex items-center gap-2.5"><Undo2 class="w-4.5 h-4.5 text-slate-500" />撤销</span>
+                  <span class="text-xs text-slate-400 font-mono">Ctrl+Z</span>
                 </button>
                 <button
                   @click="emit('redo'); closeMenus();"
                   :disabled="!canRedo"
-                  class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center justify-between disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                  class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center justify-between disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
                 >
-                  <span class="flex items-center gap-2.5"><Redo2 class="w-4 h-4 text-slate-500" />重做</span>
-                  <span class="text-[11px] text-slate-400 font-mono">Ctrl+Y</span>
+                  <span class="flex items-center gap-2.5"><Redo2 class="w-4.5 h-4.5 text-slate-500" />重做</span>
+                  <span class="text-xs text-slate-400 font-mono">Ctrl+Y</span>
                 </button>
               </div>
               <div class="py-1">
                 <button
                   @click="emit('group'); closeMenus();"
                   :disabled="(selectedIds?.length || 0) < 2"
-                  class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center justify-between disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                  class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center justify-between disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
                 >
-                  <span class="flex items-center gap-2.5"><Layers class="w-4 h-4 text-sky-600" />组合成图符</span>
-                  <span class="text-[11px] text-slate-400 font-mono">Ctrl+G</span>
+                  <span class="flex items-center gap-2.5"><Layers class="w-4.5 h-4.5 text-sky-600" />组合成图符</span>
+                  <span class="text-xs text-slate-400 font-mono">Ctrl+G</span>
                 </button>
                 <button
                   @click="emit('ungroup'); closeMenus();"
-                  class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center justify-between cursor-pointer"
+                  class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center justify-between cursor-pointer"
                 >
-                  <span class="flex items-center gap-2.5"><Unlock class="w-4 h-4 text-amber-600" />取消组合</span>
-                  <span class="text-[11px] text-slate-400 font-mono">Ctrl+U</span>
+                  <span class="flex items-center gap-2.5"><Unlock class="w-4.5 h-4.5 text-amber-600" />取消组合</span>
+                  <span class="text-xs text-slate-400 font-mono">Ctrl+U</span>
                 </button>
               </div>
             </div>
@@ -387,50 +454,50 @@ onBeforeUnmount(() => {
           <div class="relative">
             <button
               @click.stop="toggleMenu('view')"
-              class="px-3 py-1.5 rounded hover:bg-[#efeae0] text-slate-800 transition-colors flex items-center gap-1 cursor-pointer tracking-wide"
-              :class="{ 'bg-[#efeae0] text-sky-700 font-bold': activeMenu === 'view' }"
+              class="px-3 py-1.5 rounded hover:bg-[#e4dcce] text-slate-800 transition-colors flex items-center gap-1 cursor-pointer tracking-wide"
+              :class="{ 'bg-[#e4dcce] text-sky-700': activeMenu === 'view' }"
             >
               <span>视图</span>
-              <ChevronDown class="w-3.5 h-3.5 text-slate-400" />
+              <ChevronDown class="w-4 h-4 text-slate-400" />
             </button>
             <div
               v-if="activeMenu === 'view'"
-              class="absolute left-0 top-full mt-1 w-60 bg-[#faf8f5] border border-[#e2ddd4] rounded-lg shadow-xl py-1 z-50 text-[13px] text-slate-800 tracking-wide"
+              class="absolute left-0 top-full mt-1 w-64 bg-[#f2eee3] border border-[#cfc5b0] rounded-lg shadow-xl py-1 z-50 text-[14px] text-slate-800 tracking-wide"
             >
               <button
                 @click="emit('update:showGrid', !showGrid); closeMenus();"
-                class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center justify-between cursor-pointer"
+                class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center justify-between cursor-pointer"
               >
-                <span class="flex items-center gap-2.5"><Grid class="w-4 h-4 text-slate-500" />显示网格底点</span>
-                <Check v-if="showGrid" class="w-4 h-4 text-sky-600" />
+                <span class="flex items-center gap-2.5"><Grid class="w-4.5 h-4.5 text-slate-500" />显示网格底点</span>
+                <Check v-if="showGrid" class="w-4.5 h-4.5 text-sky-600" />
               </button>
               <button
                 @click="emit('update:snapToGrid', !snapToGrid); closeMenus();"
-                class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center justify-between cursor-pointer"
+                class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center justify-between cursor-pointer"
               >
-                <span class="flex items-center gap-2.5"><Magnet class="w-4 h-4 text-slate-500" />磁性吸附网格</span>
-                <Check v-if="snapToGrid" class="w-4 h-4 text-sky-600" />
+                <span class="flex items-center gap-2.5"><Magnet class="w-4.5 h-4.5 text-slate-500" />磁性吸附网格</span>
+                <Check v-if="snapToGrid" class="w-4.5 h-4.5 text-sky-600" />
               </button>
               <button
                 @click="emit('update:showRuler', !showRuler); closeMenus();"
-                class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center justify-between cursor-pointer"
+                class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center justify-between cursor-pointer"
               >
-                <span class="flex items-center gap-2.5"><RulerIcon class="w-4 h-4 text-slate-500" />显示像素标尺</span>
-                <Check v-if="showRuler" class="w-4 h-4 text-sky-600" />
+                <span class="flex items-center gap-2.5"><RulerIcon class="w-4.5 h-4.5 text-slate-500" />显示像素标尺</span>
+                <Check v-if="showRuler" class="w-4.5 h-4.5 text-sky-600" />
               </button>
               <button
                 @click="emit('update:orthogonalLock', !orthogonalLock); closeMenus();"
-                class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center justify-between cursor-pointer"
+                class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center justify-between cursor-pointer"
               >
-                <span class="flex items-center gap-2.5"><Maximize class="w-4 h-4 text-slate-500" />正交锁定走线</span>
-                <Check v-if="orthogonalLock" class="w-4 h-4 text-sky-600" />
+                <span class="flex items-center gap-2.5"><Maximize class="w-4.5 h-4.5 text-slate-500" />正交锁定走线</span>
+                <Check v-if="orthogonalLock" class="w-4.5 h-4.5 text-sky-600" />
               </button>
-              <div class="my-1 border-t border-[#eee9df]" />
+              <div class="my-1 border-t border-[#ded5bf]" />
               <button
                 @click="emit('fit:screen'); closeMenus();"
-                class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center justify-between cursor-pointer"
+                class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center justify-between cursor-pointer"
               >
-                <span class="flex items-center gap-2.5"><Crosshair class="w-4 h-4 text-sky-600" />适应屏幕居中</span>
+                <span class="flex items-center gap-2.5"><Crosshair class="w-4.5 h-4.5 text-sky-600" />适应屏幕居中</span>
               </button>
             </div>
           </div>
@@ -439,44 +506,44 @@ onBeforeUnmount(() => {
           <div class="relative">
             <button
               @click.stop="toggleMenu('align')"
-              class="px-3 py-1.5 rounded hover:bg-[#efeae0] text-slate-800 transition-colors flex items-center gap-1 cursor-pointer tracking-wide"
-              :class="{ 'bg-[#efeae0] text-sky-700 font-bold': activeMenu === 'align' }"
+              class="px-3 py-1.5 rounded hover:bg-[#e4dcce] text-slate-800 transition-colors flex items-center gap-1 cursor-pointer tracking-wide"
+              :class="{ 'bg-[#e4dcce] text-sky-700': activeMenu === 'align' }"
             >
               <span>排列</span>
-              <ChevronDown class="w-3.5 h-3.5 text-slate-400" />
+              <ChevronDown class="w-4 h-4 text-slate-400" />
             </button>
             <div
               v-if="activeMenu === 'align'"
-              class="absolute left-0 top-full mt-1 w-56 bg-[#faf8f5] border border-[#e2ddd4] rounded-lg shadow-xl py-1 z-50 text-[13px] text-slate-800 divide-y divide-[#eee9df] tracking-wide"
+              class="absolute left-0 top-full mt-1 w-60 bg-[#f2eee3] border border-[#cfc5b0] rounded-lg shadow-xl py-1 z-50 text-[14px] text-slate-800 divide-y divide-[#ded5bf] tracking-wide"
             >
               <div class="py-1">
-                <button @click="emit('align', 'left'); closeMenus();" class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer">
-                  <AlignLeft class="w-4 h-4 text-slate-500" /><span>左对齐</span>
+                <button @click="emit('align', 'left'); closeMenus();" class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer">
+                  <AlignLeft class="w-4.5 h-4.5 text-slate-500" /><span>左对齐</span>
                 </button>
-                <button @click="emit('align', 'center'); closeMenus();" class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer">
-                  <AlignCenter class="w-4 h-4 text-slate-500" /><span>水平居中</span>
+                <button @click="emit('align', 'center'); closeMenus();" class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer">
+                  <AlignCenter class="w-4.5 h-4.5 text-slate-500" /><span>水平居中</span>
                 </button>
-                <button @click="emit('align', 'right'); closeMenus();" class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer">
-                  <AlignRight class="w-4 h-4 text-slate-500" /><span>右对齐</span>
-                </button>
-              </div>
-              <div class="py-1">
-                <button @click="emit('align', 'top'); closeMenus();" class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer">
-                  <AlignVerticalJustifyStart class="w-4 h-4 text-slate-500" /><span>顶对齐</span>
-                </button>
-                <button @click="emit('align', 'middle'); closeMenus();" class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer">
-                  <AlignVerticalJustifyCenter class="w-4 h-4 text-slate-500" /><span>垂直居中</span>
-                </button>
-                <button @click="emit('align', 'bottom'); closeMenus();" class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer">
-                  <AlignVerticalJustifyEnd class="w-4 h-4 text-slate-500" /><span>底对齐</span>
+                <button @click="emit('align', 'right'); closeMenus();" class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer">
+                  <AlignRight class="w-4.5 h-4.5 text-slate-500" /><span>右对齐</span>
                 </button>
               </div>
               <div class="py-1">
-                <button @click="emit('align', 'distribute-h'); closeMenus();" class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer">
-                  <AlignHorizontalSpaceAround class="w-4 h-4 text-slate-500" /><span>水平均匀分布</span>
+                <button @click="emit('align', 'top'); closeMenus();" class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer">
+                  <AlignVerticalJustifyStart class="w-4.5 h-4.5 text-slate-500" /><span>顶对齐</span>
                 </button>
-                <button @click="emit('align', 'distribute-v'); closeMenus();" class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer">
-                  <AlignVerticalSpaceAround class="w-4 h-4 text-slate-500" /><span>垂直均匀分布</span>
+                <button @click="emit('align', 'middle'); closeMenus();" class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer">
+                  <AlignVerticalJustifyCenter class="w-4.5 h-4.5 text-slate-500" /><span>垂直居中</span>
+                </button>
+                <button @click="emit('align', 'bottom'); closeMenus();" class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer">
+                  <AlignVerticalJustifyEnd class="w-4.5 h-4.5 text-slate-500" /><span>底对齐</span>
+                </button>
+              </div>
+              <div class="py-1">
+                <button @click="emit('align', 'distribute-h'); closeMenus();" class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer">
+                  <AlignHorizontalSpaceAround class="w-4.5 h-4.5 text-slate-500" /><span>水平均匀分布</span>
+                </button>
+                <button @click="emit('align', 'distribute-v'); closeMenus();" class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer">
+                  <AlignVerticalSpaceAround class="w-4.5 h-4.5 text-slate-500" /><span>垂直均匀分布</span>
                 </button>
               </div>
             </div>
@@ -486,28 +553,28 @@ onBeforeUnmount(() => {
           <div class="relative">
             <button
               @click.stop="toggleMenu('data')"
-              class="px-3 py-1.5 rounded hover:bg-[#efeae0] text-slate-800 transition-colors flex items-center gap-1 cursor-pointer tracking-wide"
-              :class="{ 'bg-[#efeae0] text-sky-700 font-bold': activeMenu === 'data' }"
+              class="px-3 py-1.5 rounded hover:bg-[#e4dcce] text-slate-800 transition-colors flex items-center gap-1 cursor-pointer tracking-wide"
+              :class="{ 'bg-[#e4dcce] text-sky-700': activeMenu === 'data' }"
             >
               <span>数据与点位</span>
-              <ChevronDown class="w-3.5 h-3.5 text-slate-400" />
+              <ChevronDown class="w-4 h-4 text-slate-400" />
             </button>
             <div
               v-if="activeMenu === 'data'"
-              class="absolute left-0 top-full mt-1 w-60 bg-[#faf8f5] border border-[#e2ddd4] rounded-lg shadow-xl py-1 z-50 text-[13px] text-slate-800 tracking-wide"
+              class="absolute left-0 top-full mt-1 w-64 bg-[#f2eee3] border border-[#cfc5b0] rounded-lg shadow-xl py-1 z-50 text-[14px] text-slate-800 tracking-wide"
             >
               <button
                 @click="emit('open:datasets'); closeMenus();"
-                class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
+                class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
               >
-                <Database class="w-4 h-4 text-sky-600" />
+                <Database class="w-4.5 h-4.5 text-sky-600" />
                 <span>数据集与测点配置中心</span>
               </button>
               <button
                 @click="emit('open:symbols'); closeMenus();"
-                class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
+                class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
               >
-                <FolderOpen class="w-4 h-4 text-amber-600" />
+                <FolderOpen class="w-4.5 h-4.5 text-amber-600" />
                 <span>自定义多态图元工坊</span>
               </button>
             </div>
@@ -517,43 +584,43 @@ onBeforeUnmount(() => {
           <div class="relative">
             <button
               @click.stop="toggleMenu('window')"
-              class="px-3 py-1.5 rounded hover:bg-[#efeae0] text-slate-800 transition-colors flex items-center gap-1 cursor-pointer tracking-wide"
-              :class="{ 'bg-[#efeae0] text-sky-700 font-bold': activeMenu === 'window' }"
+              class="px-3 py-1.5 rounded hover:bg-[#e4dcce] text-slate-800 transition-colors flex items-center gap-1 cursor-pointer tracking-wide"
+              :class="{ 'bg-[#e4dcce] text-sky-700': activeMenu === 'window' }"
             >
               <span>窗口与组态</span>
-              <ChevronDown class="w-3.5 h-3.5 text-slate-400" />
+              <ChevronDown class="w-4 h-4 text-slate-400" />
             </button>
             <div
               v-if="activeMenu === 'window'"
-              class="absolute left-0 top-full mt-1 w-68 bg-[#faf8f5] border border-[#e2ddd4] rounded-lg shadow-xl py-1 z-50 text-[13px] text-slate-800 divide-y divide-[#eee9df] tracking-wide"
+              class="absolute left-0 top-full mt-1 w-72 bg-[#f2eee3] border border-[#cfc5b0] rounded-lg shadow-xl py-1 z-50 text-[14px] text-slate-800 divide-y divide-[#ded5bf] tracking-wide"
             >
               <div class="py-1">
                 <button
                   @click="emit('open:window', 'graphic-editor'); closeMenus();"
-                  class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
+                  class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
                 >
-                  <PenTool class="w-4 h-4 text-sky-600" />
+                  <PenTool class="w-4.5 h-4.5 text-sky-600" />
                   <span>图形编辑界面</span>
                 </button>
                 <button
                   @click="emit('open:window', 'symbol-editor'); closeMenus();"
-                  class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
+                  class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
                 >
-                  <Box class="w-4 h-4 text-indigo-600" />
+                  <Box class="w-4.5 h-4.5 text-indigo-600" />
                   <span>图元编辑界面 (微元工坊)</span>
                 </button>
                 <button
                   @click="emit('open:window', 'monitor-screen'); closeMenus();"
-                  class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer font-bold text-sky-700"
+                  class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer text-sky-700 font-medium"
                 >
-                  <Zap class="w-4 h-4 text-amber-600" />
+                  <Zap class="w-4.5 h-4.5 text-amber-600" />
                   <span>实时监控主接线</span>
                 </button>
                 <button
                   @click="emit('open:window', 'alarm-window'); closeMenus();"
-                  class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
+                  class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
                 >
-                  <Bell class="w-4 h-4 text-rose-600" />
+                  <Bell class="w-4.5 h-4.5 text-rose-600" />
                   <span>全站实时告警 / SOE</span>
                 </button>
               </div>
@@ -562,16 +629,16 @@ onBeforeUnmount(() => {
               <div class="py-1">
                 <button
                   @click="emit('tile:windows'); closeMenus();"
-                  class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
+                  class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
                 >
-                  <LayoutGrid class="w-4 h-4 text-sky-600" />
+                  <LayoutGrid class="w-4.5 h-4.5 text-sky-600" />
                   <span>平铺所有组态窗口</span>
                 </button>
                 <button
                   @click="emit('cascade:windows'); closeMenus();"
-                  class="w-full px-3.5 py-2 text-left hover:bg-[#efeae0] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
+                  class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
                 >
-                  <Layers class="w-4 h-4 text-sky-600" />
+                  <Layers class="w-4.5 h-4.5 text-sky-600" />
                   <span>层叠所有组态窗口</span>
                 </button>
               </div>
@@ -580,87 +647,68 @@ onBeforeUnmount(() => {
         </nav>
       </div>
 
-      <!-- Right: 自定义画布背景色、当前大屏名称、用户信息与运行按钮 (全白设计) -->
-      <div class="flex items-center gap-2">
-        <!-- 核心：自定义编辑画布背景色快速工具 (满足用户 "还可以自定义背景色") -->
-        <div class="flex items-center gap-1.5 px-2 py-0.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
-          <Palette class="w-3.5 h-3.5 text-slate-500" />
-          <span class="text-[11px] text-slate-600 font-medium hidden sm:inline">画布底色:</span>
+      <!-- Right: 自定义画布背景色、当前大屏名称与运行控制 -->
+      <div class="flex items-center gap-2.5 shrink-0">
+        <!-- 核心：自定义编辑画布背景色快速工具 -->
+        <div class="flex items-center gap-1 bg-[#ded5bf] px-2 py-1 rounded-md border border-[#cfc5b0] shadow-2xs">
+          <Palette class="w-3.5 h-3.5 text-slate-600" />
+          <span class="text-[11px] text-slate-700 font-medium">画布底色:</span>
           
-          <!-- 快捷预设色块 -->
-          <div class="flex items-center gap-1">
+          <!-- 实时拾色器 -->
+          <input
+            type="color"
+            :value="screen.backgroundColor || '#080f1e'"
+            @input="handleSetBgColor(($event.target as HTMLInputElement).value)"
+            class="w-5 h-5 rounded cursor-pointer border border-[#cfc5b0] p-0 bg-transparent"
+            title="自定义画布背景颜色"
+          />
+
+          <!-- 快速推荐预设色块 -->
+          <div class="flex items-center gap-1 ml-0.5">
             <button
               v-for="bg in bgPresets"
               :key="bg.value"
               @click="handleSetBgColor(bg.value)"
-              class="w-3.5 h-3.5 rounded-full border border-slate-300 transition-transform hover:scale-125 cursor-pointer relative"
+              class="w-3.5 h-3.5 rounded border border-black/30 hover:scale-125 transition-transform cursor-pointer"
               :style="{ backgroundColor: bg.value }"
-              :title="`${bg.name} (${bg.value}) - ${bg.desc}`"
-            >
-              <span
-                v-if="screen.backgroundColor === bg.value"
-                class="absolute inset-0 m-auto w-1 h-1 rounded-full bg-sky-400 shadow-xs"
-              />
-            </button>
+              :title="bg.name + ' - ' + bg.desc"
+            />
           </div>
-
-          <!-- 自定义颜色拾色器 -->
-          <label
-            class="relative w-4 h-4 rounded-md border border-slate-300 overflow-hidden cursor-pointer flex items-center justify-center hover:border-sky-500"
-            title="点击自定义拾色器，自由选择任何色值"
-          >
-            <input
-              type="color"
-              :value="screen.backgroundColor || '#080f1e'"
-              @input="handleSetBgColor(($event.target as HTMLInputElement).value)"
-              class="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
-            />
-            <div
-              class="w-full h-full rounded-sm"
-              :style="{ backgroundColor: screen.backgroundColor || '#080f1e' }"
-            />
-          </label>
         </div>
-
-        <!-- 当前编辑大屏分辨率标牌 -->
-        <div class="hidden xl:flex items-center gap-1.5 text-[11px] text-slate-500 font-mono bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md">
-          <span>{{ screen.width }} × {{ screen.height }}</span>
-        </div>
-
-        <!-- 登录用户信息 -->
-        <button
-          @click="emit('open:login')"
-          class="flex items-center gap-1.5 px-2 py-1 rounded bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-mono text-slate-700 transition-colors cursor-pointer"
-          :title="`当前登录: ${currentUser.name} (${currentUser.roleName}) - 点击切换`"
-        >
-          <ShieldCheck v-if="currentUser.role === 'system_admin'" class="w-3.5 h-3.5 text-sky-600" />
-          <UserCheck v-else class="w-3.5 h-3.5 text-emerald-600" />
-          <span class="max-w-[70px] truncate text-xs font-semibold text-slate-900">{{ currentUser.name }}</span>
-        </button>
 
         <!-- 保存当前画面 -->
         <button
           @click="emit('save:screen')"
-          class="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-slate-100 hover:bg-sky-50 hover:text-sky-700 border border-slate-200 text-slate-900 text-[13px] font-bold tracking-wide transition-colors cursor-pointer shadow-2xs"
-          title="保存画面到磁盘 graph/ (Ctrl+S)"
+          class="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#ded5bf] hover:bg-[#d4caaf] hover:text-sky-800 border border-[#cfc5b0] text-slate-800 text-[13px] font-bold tracking-wide transition-colors cursor-pointer shadow-2xs"
+          title="保存当前画面到磁盘 graph/ (Ctrl+S)"
         >
-          <Save class="w-4 h-4 text-sky-600 stroke-[2.2]" />
+          <Save class="w-4 h-4 text-sky-700 stroke-[2]" />
           <span>保存</span>
         </button>
 
-        <!-- MDI / Electron 窗口管理控制按钮群 (最大化时无缝接管，平衡 Electron 窗口栏避免重叠) -->
-        <div v-if="isMaximized || isElectron" class="flex items-center gap-1 ml-1 pl-2 border-l border-slate-200 shrink-0">
+        <!-- 运行监控模式大按钮 -->
+        <button
+          @click="emit('open:preview')"
+          class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#00e5a3] hover:bg-[#00c88f] text-slate-950 font-bold text-[13px] tracking-wide transition-colors cursor-pointer shadow-sm shadow-emerald-500/20 active:translate-y-0.5"
+          title="退出图形编辑，进入实时电网监控主站运行环境"
+        >
+          <Play class="w-4 h-4 fill-slate-950" />
+          <span>进入监控运行</span>
+        </button>
+
+        <!-- MDI / Electron 窗口管理控制按钮群 -->
+        <div v-if="isMaximized || isElectron" class="flex items-center gap-0.5 pl-1.5 border-l border-[#cfc5b0] shrink-0">
           <button
             @click="emit('minimize:window')"
-            class="w-7 h-7 rounded hover:bg-slate-200 text-slate-600 hover:text-slate-900 flex items-center justify-center transition-colors cursor-pointer"
-            title="最小化窗口到底部任务栏"
+            class="w-7 h-7 rounded hover:bg-[#d4caaf] text-slate-600 hover:text-slate-900 flex items-center justify-center transition-colors cursor-pointer"
+            title="最小化窗口"
           >
             <Minus class="w-4 h-4" />
           </button>
           <button
             @click="emit('restore:window')"
-            class="w-7 h-7 rounded hover:bg-slate-200 text-slate-600 hover:text-slate-900 flex items-center justify-center transition-colors cursor-pointer"
-            title="还原为自由拖拽窗口"
+            class="w-7 h-7 rounded hover:bg-[#d4caaf] text-slate-600 hover:text-slate-900 flex items-center justify-center transition-colors cursor-pointer"
+            title="还原窗口"
           >
             <Copy class="w-4 h-4" />
           </button>
@@ -676,81 +724,18 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- ========================================================================= -->
-    <!-- Row 2: GE-SCADA 精准快捷工具栏 (护眼暖白/米白背景) -->
+    <!-- Row 2: 通用功能快捷工具栏 (撤销/重做、网格/标尺/正交/居中、排列对齐、组合/锁定、缩放全屏) -->
     <!-- ========================================================================= -->
-    <div class="flex items-center justify-between bg-[#f4f1ea] border border-[#e2ddd4] px-2 py-1 rounded-lg text-[13px] select-none overflow-x-auto gap-2 tracking-wide">
-      <!-- Left: 指针工具、几何绘图元、撤销重做、对齐与视图吸附 -->
+    <div class="flex items-center justify-between bg-[#dfd6bf] border border-[#cfc5b0] px-2 py-1 rounded-md text-[13px] select-none overflow-x-auto gap-2 tracking-wide">
+      <!-- Left: 通用功能快捷工具条 -->
       <div class="flex items-center gap-1.5 shrink-0">
-        <!-- 1. 交互指针模式 (选择 / 折线 / 导向箭头) -->
-        <div class="flex items-center bg-[#faf8f5] p-0.5 rounded-md border border-[#e2ddd4] shadow-2xs gap-0.5">
-          <button
-            @click="emit('update:drawTool', 'select')"
-            class="p-1.5 rounded transition-colors cursor-pointer"
-            :class="drawTool === 'select' 
-              ? 'bg-sky-100 text-sky-800 font-bold border border-sky-300' 
-              : 'text-slate-600 hover:text-slate-900 hover:bg-[#efeae0]'"
-            title="选择指针 (V / ESC): 框选/平移/缩放图元"
-          >
-            <MousePointer class="w-4 h-4 stroke-[2]" />
-          </button>
-
-          <button
-            @click="emit('update:drawTool', 'draw-polyline')"
-            class="p-1.5 rounded transition-colors cursor-pointer"
-            :class="drawTool === 'draw-polyline' 
-              ? 'bg-amber-100 text-amber-800 font-bold border border-amber-300' 
-              : 'text-slate-600 hover:text-slate-900 hover:bg-[#efeae0]'"
-            title="绘制母线/折线 (L): 连续拐点，双击结束"
-          >
-            <Workflow class="w-4 h-4 stroke-[2]" />
-          </button>
-
-          <button
-            @click="emit('update:drawTool', 'draw-arrow')"
-            class="p-1.5 rounded transition-colors cursor-pointer"
-            :class="drawTool === 'draw-arrow' 
-              ? 'bg-emerald-100 text-emerald-800 font-bold border border-emerald-300' 
-              : 'text-slate-600 hover:text-slate-900 hover:bg-[#efeae0]'"
-            title="绘制导向箭头: 起点到终点"
-          >
-            <MoveRight class="w-4 h-4 stroke-[2]" />
-          </button>
-        </div>
-
-        <div class="h-4 w-[1px] bg-[#e2ddd4] mx-0.5" />
-
-        <!-- 2. 基础几何图元快捷按钮组 (矩形/正圆/三角/菱形等) -->
-        <div class="flex items-center bg-[#faf8f5] p-0.5 rounded-md border border-[#e2ddd4] shadow-2xs gap-0.5">
-          <button
-            v-for="geo in basicGeometryTools"
-            :key="geo.type"
-            @click="emit('select:shape', geo.type)"
-            class="p-1.5 rounded transition-colors cursor-pointer"
-            :class="drawTool === 'place-component' && activeShapeType === geo.type
-              ? 'bg-sky-100 text-sky-800 font-bold border border-sky-300' 
-              : 'text-slate-600 hover:text-slate-900 hover:bg-[#efeae0]'"
-            :title="geo.desc"
-          >
-            <component 
-              :is="geo.icon" 
-              class="w-4 h-4 stroke-[1.8]" 
-              :class="[
-                geo.isDown ? 'rotate-180' : '',
-                geo.isRounded ? 'rounded-xs' : ''
-              ]" 
-            />
-          </button>
-        </div>
-
-        <div class="h-4 w-[1px] bg-[#e2ddd4] mx-0.5" />
-
-        <!-- 3. 撤销 / 重做 -->
-        <div class="flex items-center bg-[#faf8f5] p-0.5 rounded-md border border-[#e2ddd4] shadow-2xs gap-0.5">
+        <!-- 1. 撤销 / 重做 -->
+        <div class="flex items-center bg-[#f2eee3] p-0.5 rounded-md border border-[#cfc5b0] shadow-2xs gap-0.5">
           <button
             @click="emit('undo')"
             :disabled="!canUndo"
             class="p-1.5 rounded transition-colors"
-            :class="canUndo ? 'text-slate-700 hover:bg-[#efeae0] cursor-pointer' : 'text-slate-300 cursor-not-allowed'"
+            :class="canUndo ? 'text-slate-800 hover:bg-[#e4dcce] cursor-pointer' : 'text-slate-400 cursor-not-allowed'"
             title="撤销 (Ctrl+Z)"
           >
             <Undo2 class="w-4 h-4 stroke-[2]" />
@@ -759,21 +744,21 @@ onBeforeUnmount(() => {
             @click="emit('redo')"
             :disabled="!canRedo"
             class="p-1.5 rounded transition-colors"
-            :class="canRedo ? 'text-slate-700 hover:bg-[#efeae0] cursor-pointer' : 'text-slate-300 cursor-not-allowed'"
+            :class="canRedo ? 'text-slate-800 hover:bg-[#e4dcce] cursor-pointer' : 'text-slate-400 cursor-not-allowed'"
             title="重做 (Ctrl+Y)"
           >
             <Redo2 class="w-4 h-4 stroke-[2]" />
           </button>
         </div>
 
-        <div class="h-4 w-[1px] bg-[#e2ddd4] mx-0.5" />
+        <div class="h-4 w-[1px] bg-[#cfc5b0] mx-0.5" />
 
-        <!-- 4. 标尺、网格底图与磁性吸附控制 -->
-        <div class="flex items-center bg-[#faf8f5] p-0.5 rounded-md border border-[#e2ddd4] shadow-2xs gap-0.5">
+        <!-- 2. 标尺、网格底图、磁吸吸附、网格间距下拉(多选项)、正交与适应居中 -->
+        <div class="flex items-center bg-[#f2eee3] p-0.5 rounded-md border border-[#cfc5b0] shadow-2xs gap-0.5">
           <button
             @click="emit('update:showRuler', !showRuler)"
             class="p-1.5 rounded cursor-pointer transition-colors"
-            :class="showRuler ? 'bg-sky-100 text-sky-700 font-bold' : 'text-slate-600 hover:bg-[#efeae0]'"
+            :class="showRuler ? 'bg-sky-100 text-sky-800 font-medium border border-sky-300' : 'text-slate-800 hover:bg-[#e4dcce]'"
             :title="showRuler ? '标尺: 已开启' : '标尺: 已关闭'"
           >
             <RulerIcon class="w-4 h-4 stroke-[2]" />
@@ -782,7 +767,7 @@ onBeforeUnmount(() => {
           <button
             @click="emit('update:showGrid', !showGrid)"
             class="p-1.5 rounded cursor-pointer transition-colors"
-            :class="showGrid ? 'bg-sky-100 text-sky-700 font-bold' : 'text-slate-600 hover:bg-[#efeae0]'"
+            :class="showGrid ? 'bg-sky-100 text-sky-800 font-medium border border-sky-300' : 'text-slate-800 hover:bg-[#e4dcce]'"
             title="切换网格底图"
           >
             <Grid class="w-4 h-4 stroke-[2]" />
@@ -791,190 +776,223 @@ onBeforeUnmount(() => {
           <button
             @click="emit('update:snapToGrid', !snapToGrid)"
             class="p-1.5 rounded cursor-pointer transition-colors"
-            :class="snapToGrid ? 'bg-sky-100 text-sky-700 font-bold' : 'text-slate-600 hover:bg-[#efeae0]'"
+            :class="snapToGrid ? 'bg-sky-100 text-sky-800 font-medium border border-sky-300' : 'text-slate-800 hover:bg-[#e4dcce]'"
             :title="snapToGrid ? '网格吸附: 已开启' : '网格吸附: 已关闭'"
           >
             <Magnet class="w-4 h-4 stroke-[2]" />
           </button>
 
-          <!-- 网格步长下拉 -->
+          <!-- 网格步长下拉 (丰富选项) -->
           <select 
-            :value="gridSize"
+            :value="gridSize" 
             @change="emit('update:gridSize', Number(($event.target as HTMLSelectElement).value))"
-            class="bg-[#faf8f5] border border-[#e2ddd4] rounded px-2 py-0.5 text-xs text-slate-800 font-bold focus:outline-hidden cursor-pointer"
-            title="网格点格步进尺寸"
+            class="bg-[#f8f5ee] hover:bg-[#f0ebe0] border border-[#cfc5b0] text-[11px] font-mono rounded px-1.5 py-0.5 text-slate-800 cursor-pointer focus:outline-hidden"
+            title="网格对齐栅格像素步长 (Grid Size)"
           >
+            <option :value="2">2px (精细)</option>
+            <option :value="4">4px</option>
+            <option :value="5">5px</option>
+            <option :value="8">8px</option>
             <option :value="10">10px</option>
-            <option :value="20">20px</option>
+            <option :value="12">12px</option>
+            <option :value="15">15px</option>
+            <option :value="16">16px</option>
+            <option :value="20">20px (常用)</option>
+            <option :value="25">25px</option>
             <option :value="30">30px</option>
             <option :value="40">40px (标准)</option>
-            <option :value="50">50px</option>
-            <option :value="60">60px</option>
-            <option :value="80">80px</option>
-            <option :value="100">100px</option>
+            <option :value="50">50px (宽松)</option>
           </select>
 
-          <!-- 一键重新吸附全部图元 -->
-          <button
-            @click="emit('snap:all')"
-            class="p-1.5 rounded text-slate-600 hover:bg-[#efeae0] cursor-pointer"
-            title="一键将画布所有图元吸附对齐到最近网格点"
-          >
-            <Target class="w-4 h-4 text-sky-600 stroke-[2]" />
-          </button>
-
-          <!-- 正交锁定 -->
           <button
             @click="emit('update:orthogonalLock', !orthogonalLock)"
-            class="p-1.5 rounded cursor-pointer transition-colors"
-            :class="orthogonalLock ? 'bg-sky-100 text-sky-700 font-bold' : 'text-slate-600 hover:bg-[#efeae0]'"
-            title="正交锁定：连线强制水平/垂直/45度"
+            class="p-1.5 rounded cursor-pointer transition-colors ml-0.5"
+            :class="orthogonalLock ? 'bg-amber-100 text-amber-800 font-medium border border-amber-300' : 'text-slate-800 hover:bg-[#e4dcce]'"
+            :title="orthogonalLock ? '正交走线锁定: 开启 (0°/90°/180°)' : '正交走线锁定: 关闭 (自由角走线)'"
           >
             <Maximize class="w-4 h-4 stroke-[2]" />
           </button>
 
-          <!-- 一键原点自适应居中 -->
           <button
-            @click="emit('center:all')"
-            class="p-1.5 rounded text-slate-600 hover:bg-[#efeae0] cursor-pointer"
-            title="画布原点复位自适应居中"
+            @click="emit('fit:screen')"
+            class="p-1.5 rounded cursor-pointer transition-colors text-slate-800 hover:bg-[#e4dcce]"
+            title="适应屏幕并居中显示全图"
           >
-            <Crosshair class="w-4 h-4 text-slate-700 stroke-[2]" />
+            <Crosshair class="w-4 h-4 stroke-[2]" />
           </button>
         </div>
 
-        <div class="h-4 w-[1px] bg-[#e2ddd4] mx-0.5" />
+        <div class="h-4 w-[1px] bg-[#cfc5b0] mx-0.5" />
 
-        <!-- 5. 对齐工具 (选中 ≥2 个图元时激活) -->
-        <div class="flex items-center bg-[#faf8f5] p-0.5 rounded-md border border-[#e2ddd4] shadow-2xs gap-0.5">
+        <!-- 3. 排列对齐工具组 (左/中/右/顶/居中/底/水平均布/垂直均布/等宽/等高) -->
+        <div class="flex items-center bg-[#f2eee3] p-0.5 rounded-md border border-[#cfc5b0] shadow-2xs gap-0.5">
           <button
             @click="emit('align', 'left')"
             :disabled="(selectedIds?.length || 0) < 2"
             class="p-1.5 rounded transition-colors"
-            :class="(selectedIds?.length || 0) >= 2 ? 'text-slate-700 hover:bg-slate-100 cursor-pointer' : 'text-slate-300 cursor-not-allowed'"
-            title="左对齐 (≥2 个图元)"
+            :class="(selectedIds?.length || 0) >= 2 ? 'text-slate-800 hover:bg-[#e4dcce] cursor-pointer' : 'text-slate-400 cursor-not-allowed'"
+            title="左对齐 (至少选中2个图元)"
           >
             <AlignLeft class="w-4 h-4 stroke-[2]" />
           </button>
+
           <button
             @click="emit('align', 'center')"
             :disabled="(selectedIds?.length || 0) < 2"
             class="p-1.5 rounded transition-colors"
-            :class="(selectedIds?.length || 0) >= 2 ? 'text-slate-700 hover:bg-slate-100 cursor-pointer' : 'text-slate-300 cursor-not-allowed'"
-            title="水平居中 (≥2 个图元)"
+            :class="(selectedIds?.length || 0) >= 2 ? 'text-slate-800 hover:bg-[#e4dcce] cursor-pointer' : 'text-slate-400 cursor-not-allowed'"
+            title="水平居中对齐"
           >
             <AlignCenter class="w-4 h-4 stroke-[2]" />
           </button>
+
           <button
             @click="emit('align', 'right')"
             :disabled="(selectedIds?.length || 0) < 2"
             class="p-1.5 rounded transition-colors"
-            :class="(selectedIds?.length || 0) >= 2 ? 'text-slate-700 hover:bg-slate-100 cursor-pointer' : 'text-slate-300 cursor-not-allowed'"
-            title="右对齐 (≥2 个图元)"
+            :class="(selectedIds?.length || 0) >= 2 ? 'text-slate-800 hover:bg-[#e4dcce] cursor-pointer' : 'text-slate-400 cursor-not-allowed'"
+            title="右对齐"
           >
             <AlignRight class="w-4 h-4 stroke-[2]" />
           </button>
+
           <button
             @click="emit('align', 'top')"
             :disabled="(selectedIds?.length || 0) < 2"
             class="p-1.5 rounded transition-colors"
-            :class="(selectedIds?.length || 0) >= 2 ? 'text-slate-700 hover:bg-slate-100 cursor-pointer' : 'text-slate-300 cursor-not-allowed'"
-            title="顶对齐 (≥2 个图元)"
+            :class="(selectedIds?.length || 0) >= 2 ? 'text-slate-800 hover:bg-[#e4dcce] cursor-pointer' : 'text-slate-400 cursor-not-allowed'"
+            title="顶对齐"
           >
             <AlignVerticalJustifyStart class="w-4 h-4 stroke-[2]" />
           </button>
+
           <button
             @click="emit('align', 'middle')"
             :disabled="(selectedIds?.length || 0) < 2"
             class="p-1.5 rounded transition-colors"
-            :class="(selectedIds?.length || 0) >= 2 ? 'text-slate-700 hover:bg-slate-100 cursor-pointer' : 'text-slate-300 cursor-not-allowed'"
-            title="垂直居中 (≥2 个图元)"
+            :class="(selectedIds?.length || 0) >= 2 ? 'text-slate-800 hover:bg-[#e4dcce] cursor-pointer' : 'text-slate-400 cursor-not-allowed'"
+            title="垂直居中对齐"
           >
             <AlignVerticalJustifyCenter class="w-4 h-4 stroke-[2]" />
           </button>
+
           <button
             @click="emit('align', 'bottom')"
             :disabled="(selectedIds?.length || 0) < 2"
             class="p-1.5 rounded transition-colors"
-            :class="(selectedIds?.length || 0) >= 2 ? 'text-slate-700 hover:bg-slate-100 cursor-pointer' : 'text-slate-300 cursor-not-allowed'"
-            title="底对齐 (≥2 个图元)"
+            :class="(selectedIds?.length || 0) >= 2 ? 'text-slate-800 hover:bg-[#e4dcce] cursor-pointer' : 'text-slate-400 cursor-not-allowed'"
+            title="底对齐"
           >
             <AlignVerticalJustifyEnd class="w-4 h-4 stroke-[2]" />
           </button>
+
           <button
             @click="emit('align', 'distribute-h')"
             :disabled="(selectedIds?.length || 0) < 3"
             class="p-1.5 rounded transition-colors"
-            :class="(selectedIds?.length || 0) >= 3 ? 'text-slate-700 hover:bg-slate-100 cursor-pointer' : 'text-slate-300 cursor-not-allowed'"
-            title="水平均匀分布 (≥3 个图元)"
+            :class="(selectedIds?.length || 0) >= 3 ? 'text-slate-800 hover:bg-[#e4dcce] cursor-pointer' : 'text-slate-400 cursor-not-allowed'"
+            title="水平间距均布 (至少选中3个图元)"
           >
             <AlignHorizontalSpaceAround class="w-4 h-4 stroke-[2]" />
           </button>
+
           <button
             @click="emit('align', 'distribute-v')"
             :disabled="(selectedIds?.length || 0) < 3"
             class="p-1.5 rounded transition-colors"
-            :class="(selectedIds?.length || 0) >= 3 ? 'text-slate-700 hover:bg-slate-100 cursor-pointer' : 'text-slate-300 cursor-not-allowed'"
-            title="垂直均匀分布 (≥3 个图元)"
+            :class="(selectedIds?.length || 0) >= 3 ? 'text-slate-800 hover:bg-[#e4dcce] cursor-pointer' : 'text-slate-400 cursor-not-allowed'"
+            title="垂直间距均布 (至少选中3个图元)"
           >
             <AlignVerticalSpaceAround class="w-4 h-4 stroke-[2]" />
           </button>
+
+          <!-- 等宽 & 等高 -->
+          <button
+            @click="emit('align', 'equal-width')"
+            :disabled="(selectedIds?.length || 0) < 2"
+            class="p-1.5 rounded transition-colors"
+            :class="(selectedIds?.length || 0) >= 2 ? 'text-slate-800 hover:bg-[#e4dcce] cursor-pointer' : 'text-slate-400 cursor-not-allowed'"
+            title="统一等宽 (以首个选中的图元为基准)"
+          >
+            <MoveHorizontal class="w-4 h-4 stroke-[2]" />
+          </button>
+
+          <button
+            @click="emit('align', 'equal-height')"
+            :disabled="(selectedIds?.length || 0) < 2"
+            class="p-1.5 rounded transition-colors"
+            :class="(selectedIds?.length || 0) >= 2 ? 'text-slate-800 hover:bg-[#e4dcce] cursor-pointer' : 'text-slate-400 cursor-not-allowed'"
+            title="统一等高 (以首个选中的图元为基准)"
+          >
+            <MoveVertical class="w-4 h-4 stroke-[2]" />
+          </button>
         </div>
 
-        <div class="h-4 w-[1px] bg-[#e2ddd4] mx-0.5" />
+        <div class="h-4 w-[1px] bg-[#cfc5b0] mx-0.5" />
 
-        <!-- 6. 组合与解构图元 -->
-        <div class="flex items-center bg-[#faf8f5] p-0.5 rounded-md border border-[#e2ddd4] shadow-2xs gap-0.5">
+        <!-- 4. 组合 / 取消组合、锁定 / 解锁 -->
+        <div class="flex items-center bg-[#f2eee3] p-0.5 rounded-md border border-[#cfc5b0] shadow-2xs gap-0.5">
           <button
             @click="emit('group')"
             :disabled="(selectedIds?.length || 0) < 2"
             class="p-1.5 rounded transition-colors"
-            :class="(selectedIds?.length || 0) >= 2 ? 'text-sky-700 hover:bg-[#efeae0] cursor-pointer' : 'text-slate-300 cursor-not-allowed'"
-            title="组合成群组图符 (Ctrl+G)"
+            :class="(selectedIds?.length || 0) >= 2 ? 'text-slate-800 hover:bg-[#e4dcce] cursor-pointer' : 'text-slate-400 cursor-not-allowed'"
+            title="成组组合 (Ctrl+G)"
           >
             <Layers class="w-4 h-4 stroke-[2]" />
           </button>
 
           <button
             @click="emit('ungroup')"
-            :disabled="(selectedIds?.length || 0) !== 1"
-            class="p-1.5 rounded transition-colors"
-            :class="(selectedIds?.length || 0) === 1 ? 'text-amber-700 hover:bg-[#efeae0] cursor-pointer' : 'text-slate-300 cursor-not-allowed'"
-            title="取消组合/解散 (Ctrl+U)"
+            class="p-1.5 rounded text-slate-800 hover:bg-[#e4dcce] transition-colors cursor-pointer"
+            title="取消成组 (Ctrl+U)"
           >
             <Unlock class="w-4 h-4 stroke-[2]" />
           </button>
 
+          <div class="h-3 w-[1px] bg-[#cfc5b0] mx-0.5" />
+
+          <!-- 锁定 / 解锁 -->
           <button
-            @click="emit('save:symbol')"
+            @click="emit('lock')"
             :disabled="(selectedIds?.length || 0) === 0"
             class="p-1.5 rounded transition-colors"
-            :class="(selectedIds?.length || 0) > 0 ? 'text-emerald-700 hover:bg-[#efeae0] cursor-pointer' : 'text-slate-300 cursor-not-allowed'"
-            title="封装为自定义图元"
+            :class="(selectedIds?.length || 0) > 0 ? 'text-slate-800 hover:bg-[#e4dcce] cursor-pointer' : 'text-slate-400 cursor-not-allowed'"
+            title="锁定选中的图元 (防止误触移位)"
           >
-            <BookmarkPlus class="w-4 h-4 stroke-[2]" />
+            <Lock class="w-4 h-4 stroke-[2]" />
+          </button>
+
+          <button
+            @click="emit('unlock')"
+            :disabled="(selectedIds?.length || 0) === 0"
+            class="p-1.5 rounded transition-colors"
+            :class="(selectedIds?.length || 0) > 0 ? 'text-slate-800 hover:bg-[#e4dcce] cursor-pointer' : 'text-slate-400 cursor-not-allowed'"
+            title="解锁选中的图元"
+          >
+            <Unlock class="w-4 h-4 stroke-[2]" />
           </button>
         </div>
       </div>
 
-      <!-- Right: 缩放与全屏控制 -->
+      <!-- Right: 缩放与全屏控制 (从第三行移到第二行) -->
       <div class="flex items-center gap-1.5 shrink-0">
-        <div class="flex items-center bg-[#faf8f5] p-0.5 rounded-md border border-[#e2ddd4] shadow-2xs text-[13px] font-mono gap-0.5">
+        <div class="flex items-center bg-[#f2eee3] p-0.5 rounded-md border border-[#cfc5b0] shadow-2xs text-[13px] font-mono gap-0.5">
           <button
             @click="emit('update:zoom', Math.max(0.1, Number((zoom - 0.1).toFixed(2))))"
-            class="p-1.5 rounded hover:bg-[#efeae0] text-slate-700 cursor-pointer transition-colors"
+            class="p-1.5 rounded hover:bg-[#e4dcce] text-slate-700 cursor-pointer transition-colors"
             title="缩小画面"
           >
             <ZoomOut class="w-4 h-4 stroke-[2]" />
           </button>
           
-          <span class="text-xs font-mono font-bold text-slate-900 bg-[#f4f1ea] border border-[#e2ddd4] rounded px-2 py-0.5 w-14 text-center tracking-wider">
+          <span class="text-xs font-mono font-medium text-slate-900 bg-[#e5decb] border border-[#cfc5b0] rounded px-2 py-0.5 w-14 text-center tracking-wider">
             {{ Math.round(zoom * 100) }}%
           </span>
           
           <button
             @click="emit('update:zoom', Math.min(2.5, Number((zoom + 0.1).toFixed(2))))"
-            class="p-1.5 rounded hover:bg-[#efeae0] text-slate-700 cursor-pointer transition-colors"
+            class="p-1.5 rounded hover:bg-[#e4dcce] text-slate-700 cursor-pointer transition-colors"
             title="放大画面"
           >
             <ZoomIn class="w-4 h-4 stroke-[2]" />
@@ -983,12 +1001,251 @@ onBeforeUnmount(() => {
           <button
             @click="handleFullscreenToggle"
             class="p-1.5 rounded cursor-pointer transition-colors ml-0.5"
-            :class="isFullscreen ? 'bg-sky-100 text-sky-800 font-bold' : 'text-slate-700 hover:bg-[#efeae0]'"
+            :class="isFullscreen ? 'bg-sky-100 text-sky-800 font-medium' : 'text-slate-700 hover:bg-[#e4dcce]'"
             :title="isFullscreen ? '退出全屏 (ESC / F11)' : '全屏显示 (F11)'"
           >
             <Minimize2 v-if="isFullscreen" class="w-4 h-4 stroke-[2]" />
             <Maximize2 v-else class="w-4 h-4 stroke-[2]" />
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- Row 3: 绘图图元工具与动态属性样式工具条 -->
+    <!-- ========================================================================= -->
+    <div class="flex items-center justify-between bg-[#e5decb] border border-[#cfc5b0] px-2 py-1.5 rounded-lg text-[13px] select-none overflow-x-auto gap-2 tracking-wide">
+      <!-- Left: 指针工具、几何绘图元 -->
+      <div class="flex items-center gap-1.5 shrink-0">
+        <!-- 1. 交互指针模式 (选择 / 折线 / 导向箭头) -->
+        <div class="flex items-center bg-[#f2eee3] p-0.5 rounded-md border border-[#cfc5b0] shadow-2xs gap-0.5">
+          <button
+            @click="emit('update:drawTool', 'select')"
+            class="p-1.5 rounded transition-colors cursor-pointer"
+            :class="drawTool === 'select' 
+              ? 'bg-sky-100 text-sky-800 font-medium border border-sky-300' 
+              : 'text-slate-600 hover:text-slate-900 hover:bg-[#e4dcce]'"
+            title="选择指针 (V / ESC): 框选/平移/缩放图元"
+          >
+            <MousePointer class="w-4.5 h-4.5 stroke-[2]" />
+          </button>
+
+          <button
+            @click="emit('update:drawTool', 'draw-polyline')"
+            class="p-1.5 rounded transition-colors cursor-pointer"
+            :class="drawTool === 'draw-polyline' 
+              ? 'bg-amber-100 text-amber-800 font-medium border border-amber-300' 
+              : 'text-slate-600 hover:text-slate-900 hover:bg-[#e4dcce]'"
+            title="绘制母线/折线 (L): 连续拐点，双击结束"
+          >
+            <Workflow class="w-4.5 h-4.5 stroke-[2]" />
+          </button>
+
+          <button
+            @click="emit('update:drawTool', 'draw-arrow')"
+            class="p-1.5 rounded transition-colors cursor-pointer"
+            :class="drawTool === 'draw-arrow' 
+              ? 'bg-emerald-100 text-emerald-800 font-medium border border-emerald-300' 
+              : 'text-slate-600 hover:text-slate-900 hover:bg-[#e4dcce]'"
+            title="绘制导向箭头: 起点到终点"
+          >
+            <MoveRight class="w-4.5 h-4.5 stroke-[2]" />
+          </button>
+        </div>
+
+        <div class="h-4 w-[1px] bg-[#cfc5b0] mx-0.5" />
+
+        <!-- 2. 基础几何图元快捷按钮组 (矩形/正圆/三角/菱形等) -->
+        <div class="flex items-center bg-[#f2eee3] p-0.5 rounded-md border border-[#cfc5b0] shadow-2xs gap-0.5">
+          <button
+            v-for="geo in basicGeometryTools"
+            :key="geo.type"
+            @click="emit('select:shape', geo.type)"
+            class="p-1.5 rounded transition-colors cursor-pointer"
+            :class="drawTool === 'place-component' && activeShapeType === geo.type
+              ? 'bg-sky-100 text-sky-800 font-medium border border-sky-300' 
+              : 'text-slate-600 hover:text-slate-900 hover:bg-[#e4dcce]'"
+            :title="geo.desc"
+          >
+            <component 
+              :is="geo.icon" 
+              class="w-4 h-4 stroke-[2]" 
+              :class="{ 
+                'rounded-xs': geo.isRounded, 
+                'rotate-180': geo.isDown,
+                'rotate-90': geo.type === 'draw-triangle-right'
+              }" 
+            />
+          </button>
+        </div>
+      </div>
+
+      <!-- Center & Right: 动态画笔与图元样式属性工具条 -->
+      <div class="flex items-center gap-1.5 shrink-0 overflow-x-auto">
+        <div class="flex items-center bg-[#f2eee3] px-2 py-0.5 rounded-md border border-[#cfc5b0] shadow-2xs gap-2">
+          <!-- 状态徽章: 画笔预设 vs 批量修改 -->
+          <div 
+            class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider shrink-0 transition-colors"
+            :class="isSelectionMode ? 'bg-sky-100 text-sky-800 border border-sky-300' : 'bg-[#ded5bf] text-slate-700 border border-[#cfc5b0]'"
+            :title="isSelectionMode ? '正在修改当前选中的图元样式属性 (批量生效)' : '当前无选中图元，修改将作为后续绘制的画笔全局预设'"
+          >
+            {{ isSelectionMode ? `选中同步(${selectedIds.length})` : '画笔预设' }}
+          </div>
+
+          <!-- A. 线条颜色 (Stroke Color) -->
+          <div class="flex items-center gap-1" title="线条颜色 (多选/单选一键同步)">
+            <span class="text-[11px] text-slate-600 font-medium">线色:</span>
+            <input
+              type="color"
+              :value="activeDrawingStyle.stroke"
+              @input="handleStyleChange('stroke', ($event.target as HTMLInputElement).value)"
+              class="w-5 h-5 rounded cursor-pointer border border-[#cfc5b0] p-0 bg-transparent"
+              title="拾取线条颜色"
+            />
+            <div class="flex items-center gap-0.5">
+              <button
+                v-for="color in standardPalette"
+                :key="'stk-' + color"
+                @click="handleStyleChange('stroke', color)"
+                class="w-3.5 h-3.5 rounded-full border border-black/20 cursor-pointer transition-transform hover:scale-125"
+                :style="{ backgroundColor: color }"
+                :title="color"
+              />
+            </div>
+          </div>
+
+          <!-- B. 填充底色 (Fill Color 含透明切换) -->
+          <div class="flex items-center gap-1 pl-1 border-l border-[#cfc5b0]" title="填充底色 (含透明切换)">
+            <span class="text-[11px] text-slate-600 font-medium">底色:</span>
+            <!-- 透明按钮 -->
+            <button
+              @click="handleStyleChange('fill', 'transparent')"
+              class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border transition-colors cursor-pointer"
+              :class="activeDrawingStyle.fill === 'transparent' || activeDrawingStyle.fill === 'none'
+                ? 'bg-sky-200 text-sky-900 border-sky-400 font-bold' 
+                : 'bg-[#f8f5ee] text-slate-700 border-[#cfc5b0] hover:bg-[#eae2d3]'"
+              title="切换为无填充底色 (透明)"
+            >
+              透明
+            </button>
+            <input
+              type="color"
+              :value="activeDrawingStyle.fill === 'transparent' ? '#00f2ff' : activeDrawingStyle.fill"
+              @input="handleStyleChange('fill', ($event.target as HTMLInputElement).value)"
+              class="w-5 h-5 rounded cursor-pointer border border-[#cfc5b0] p-0 bg-transparent"
+              title="选择填充底色"
+            />
+          </div>
+
+          <!-- C. 底色不透明度调节 (可调至 100% 完全不透明) -->
+          <div class="flex items-center gap-1 pl-1 border-l border-[#cfc5b0]" title="填充底色不透明度 (0% 透明 ~ 100% 完全不透明)">
+            <span class="text-[11px] text-slate-600 font-medium">不透明度:</span>
+            <select
+              :value="Math.round((activeDrawingStyle.fillOpacity !== undefined ? activeDrawingStyle.fillOpacity : 1) * 100)"
+              @change="handleStyleChange('fillOpacity', Number(($event.target as HTMLSelectElement).value) / 100)"
+              class="bg-[#f8f5ee] hover:bg-[#f0ebe0] border border-[#cfc5b0] rounded px-1.5 py-0.5 text-xs text-slate-800 font-mono font-medium focus:outline-hidden cursor-pointer"
+            >
+              <option :value="0">0% (全透)</option>
+              <option :value="10">10%</option>
+              <option :value="20">20%</option>
+              <option :value="35">35%</option>
+              <option :value="50">50% (半透)</option>
+              <option :value="65">65%</option>
+              <option :value="80">80%</option>
+              <option :value="90">90%</option>
+              <option :value="100">100% (完全不透)</option>
+            </select>
+            <button
+              @click="handleStyleChange('fillOpacity', 1)"
+              class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border transition-colors cursor-pointer"
+              :class="activeDrawingStyle.fillOpacity >= 0.99
+                ? 'bg-emerald-200 text-emerald-900 border-emerald-400 font-bold' 
+                : 'bg-[#f8f5ee] text-slate-700 border-[#cfc5b0] hover:bg-[#eae2d3]'"
+              title="一键设为 100% 完全不透明"
+            >
+              不透
+            </button>
+          </div>
+
+          <!-- D. 线条线宽 (丰富下拉选项) -->
+          <div class="flex items-center gap-1 pl-1 border-l border-[#cfc5b0]" title="线条粗细线宽 (0.5px ~ 10px)">
+            <span class="text-[11px] text-slate-600 font-medium">线宽:</span>
+            <select
+              :value="activeDrawingStyle.strokeWidth"
+              @change="handleStyleChange('strokeWidth', Number(($event.target as HTMLSelectElement).value))"
+              class="bg-[#f8f5ee] hover:bg-[#f0ebe0] border border-[#cfc5b0] rounded px-1.5 py-0.5 text-xs text-slate-800 font-mono font-medium focus:outline-hidden cursor-pointer"
+            >
+              <option :value="0.5">0.5px (极细)</option>
+              <option :value="1">1px (细线)</option>
+              <option :value="1.5">1.5px</option>
+              <option :value="2">2px (标准)</option>
+              <option :value="2.5">2.5px</option>
+              <option :value="3">3px (加粗)</option>
+              <option :value="4">4px (母线)</option>
+              <option :value="5">5px</option>
+              <option :value="6">6px (特粗)</option>
+              <option :value="8">8px (重型母线)</option>
+              <option :value="10">10px (特高压)</option>
+            </select>
+          </div>
+
+          <!-- E. 线型 (实线/虚线/点线) -->
+          <div class="flex items-center gap-1 pl-1 border-l border-[#cfc5b0]" title="线型虚实 (实线/虚线/点线)">
+            <span class="text-[11px] text-slate-600 font-medium">线型:</span>
+            <select
+              :value="activeDrawingStyle.lineStyle"
+              @change="handleStyleChange('lineStyle', ($event.target as HTMLSelectElement).value)"
+              class="bg-[#f8f5ee] hover:bg-[#f0ebe0] border border-[#cfc5b0] rounded px-1.5 py-0.5 text-xs text-slate-800 font-medium focus:outline-hidden cursor-pointer"
+            >
+              <option value="solid">—— 实线</option>
+              <option value="dashed">-- 虚线</option>
+              <option value="dotted">·· 点线</option>
+            </select>
+          </div>
+
+          <!-- F. 文字字号与粗细 (丰富字号选项) -->
+          <div class="flex items-center gap-1 pl-1 border-l border-[#cfc5b0]" title="文字字号与加粗">
+            <span class="text-[11px] text-slate-600 font-medium">字号:</span>
+            <select
+              :value="activeDrawingStyle.fontSize"
+              @change="handleStyleChange('fontSize', Number(($event.target as HTMLSelectElement).value))"
+              class="bg-[#f8f5ee] hover:bg-[#f0ebe0] border border-[#cfc5b0] rounded px-1 py-0.5 text-xs text-slate-800 font-mono font-medium focus:outline-hidden cursor-pointer"
+            >
+              <option :value="8">8px</option>
+              <option :value="9">9px</option>
+              <option :value="10">10px</option>
+              <option :value="11">11px</option>
+              <option :value="12">12px</option>
+              <option :value="13">13px</option>
+              <option :value="14">14px (默认)</option>
+              <option :value="15">15px</option>
+              <option :value="16">16px</option>
+              <option :value="18">18px</option>
+              <option :value="20">20px</option>
+              <option :value="22">22px</option>
+              <option :value="24">24px</option>
+              <option :value="26">26px</option>
+              <option :value="28">28px</option>
+              <option :value="32">32px</option>
+              <option :value="36">36px</option>
+              <option :value="42">42px</option>
+              <option :value="48">48px</option>
+              <option :value="56">56px</option>
+              <option :value="64">64px</option>
+              <option :value="72">72px</option>
+            </select>
+            <!-- 加粗切换 -->
+            <button
+              @click="handleStyleChange('fontWeight', activeDrawingStyle.fontWeight === 'bold' ? 'normal' : 'bold')"
+              class="w-6 h-6 rounded flex items-center justify-center border transition-colors cursor-pointer text-xs font-bold font-serif"
+              :class="activeDrawingStyle.fontWeight === 'bold'
+                ? 'bg-sky-200 text-sky-900 border-sky-400' 
+                : 'bg-[#f8f5ee] text-slate-700 border-[#cfc5b0] hover:bg-[#eae2d3]'"
+              title="切换粗体 / 常规体"
+            >
+              B
+            </button>
+          </div>
         </div>
       </div>
     </div>
