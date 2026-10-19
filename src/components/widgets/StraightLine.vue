@@ -39,9 +39,8 @@ const isOrthogonal = computed(() => {
   <div class="w-full h-full relative overflow-visible select-none pointer-events-none">
     <svg 
       class="w-full h-full overflow-visible pointer-events-none"
-      :viewBox="`0 0 ${component.width} ${component.height}`"
-      preserveAspectRatio="none"
-      :shape-rendering="isOrthogonal ? 'crispEdges' : 'geometricPrecision'"
+      :viewBox="`0 0 ${Math.max(1, component.width)} ${Math.max(1, component.height)}`"
+      shape-rendering="geometricPrecision"
     >
       <defs v-if="startArrow || endArrow">
         <marker

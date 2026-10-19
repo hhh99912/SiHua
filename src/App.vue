@@ -79,6 +79,14 @@ const screen = ref<ScreenConfig>({
 });
 
 const components = ref<ScreenComponent[]>([...currentScreenItem.value.components]);
+
+// 实时监控运行大屏独立状态（与图形编辑界面的草稿解耦：只有在保存后，监控大屏才会同步呈现）
+const monitorActiveScreenId = ref<string>(PRESET_MULTI_SCREENS[0].id);
+const monitorScreen = ref<ScreenConfig>({
+  ...PRESET_MULTI_SCREENS[0].screen,
+  updatedAt: new Date().toISOString()
+});
+const monitorComponents = ref<ScreenComponent[]>(JSON.parse(JSON.stringify(PRESET_MULTI_SCREENS[0].components)));
 const datasets = ref<DatasetItem[]>([...INITIAL_DATASETS]);
 const selectedIds = ref<string[]>([]);
 const zoom = ref<number>(0.62);
@@ -97,12 +105,11 @@ const showRuler = ref<boolean>(false);
 const canvasEditorRef = ref<any>(null);
 const showPropertyInspector = ref<boolean>(false);
 
-// Watch selectedIds to automatically sync property inspector visibility
+// Watch selectedIds: if selection is cleared, close property inspector.
+// 单击组件仅选中，不弹出属性面板；必须右击 -> "查看/编辑属性面板" 才能弹出
 watch(selectedIds, (newIds) => {
   if (!newIds || newIds.length === 0) {
     showPropertyInspector.value = false;
-  } else {
-    showPropertyInspector.value = true;
   }
 });
 
@@ -637,12 +644,21 @@ const handleSaveCurrentScreenToDisk = async () => {
   syncActiveScreenToProject();
   const cur = screens.value.find(s => s.id === activeScreenId.value);
   if (!cur) return;
+  cur.screen = JSON.parse(JSON.stringify(screen.value));
+  cur.components = JSON.parse(JSON.stringify(components.value));
+
   isSavingDisk.value = true;
   try {
     const res = await saveScreenToDisk(cur);
     if (res.success) {
       diskFileCount.value = screens.value.length;
       showDiskNotification(`已保存当前大屏「${cur.name}」到 graph/${res.filename || cur.name + '.json'}`);
+
+      // 关键 SCADA 规则：只有保存后，修改才在实时监控中同步体现！
+      if (monitorActiveScreenId.value === cur.id) {
+        monitorScreen.value = JSON.parse(JSON.stringify(cur.screen));
+        monitorComponents.value = JSON.parse(JSON.stringify(cur.components));
+      }
     } else {
       showDiskNotification(`保存失败: ${res.error || ''}`);
     }
@@ -650,6 +666,39 @@ const handleSaveCurrentScreenToDisk = async () => {
     showDiskNotification(`保存异常: ${err?.message || ''}`);
   } finally {
     isSavingDisk.value = false;
+  }
+};
+
+// 监控大屏独立切换与重载控制 (与图形编辑界面的未保存草稿彻底解耦)
+const handleMonitorSwitchScreen = (screenId: string) => {
+  const target = screens.value.find(s => s.id === screenId);
+  if (!target) return;
+  monitorActiveScreenId.value = screenId;
+  monitorScreen.value = JSON.parse(JSON.stringify(target.screen));
+  monitorComponents.value = JSON.parse(JSON.stringify(target.components));
+};
+
+const handleReloadCurrentMonitorScreen = async () => {
+  try {
+    const res = await loadScreensFromDisk();
+    if (res.success && res.screens && res.screens.length > 0) {
+      screens.value = res.screens;
+      diskFileCount.value = res.screens.length;
+      if (res.indexScreen?.indexScreenId || res.indexScreen?.indexScreenName) {
+        indexScreenId.value = res.indexScreen.indexScreenId || indexScreenId.value;
+        indexScreenName.value = res.indexScreen.indexScreenName || indexScreenName.value;
+      }
+    }
+  } catch (err) {
+    console.warn('[SCADA] 重新加载画面失败:', err);
+  }
+  const curId = monitorActiveScreenId.value || activeScreenId.value;
+  const target = screens.value.find(s => s.id === curId) || screens.value[0];
+  if (target) {
+    monitorActiveScreenId.value = target.id;
+    monitorScreen.value = JSON.parse(JSON.stringify(target.screen));
+    monitorComponents.value = JSON.parse(JSON.stringify(target.components));
+    showDiskNotification(`已重新加载大屏「${target.name}」`);
   }
 };
 
@@ -687,6 +736,13 @@ const handleReloadScreensFromDisk = (newScreens: ScreenItem[], idxCfg?: { indexS
   selectedIds.value = [];
   fitToScreen();
   recordHistory();
+
+  // 同时也刷新监控运行画面独立状态
+  const monitorFound = newScreens.find(s => s.id === monitorActiveScreenId.value) || found;
+  monitorActiveScreenId.value = monitorFound.id;
+  monitorScreen.value = JSON.parse(JSON.stringify(monitorFound.screen));
+  monitorComponents.value = JSON.parse(JSON.stringify(monitorFound.components));
+
   showDiskNotification(`已从 graph/ 目录重新加载 ${newScreens.length} 个大屏文件`);
 };
 
@@ -938,11 +994,19 @@ const handleUpdateDrawingStyle = (payload: { key: string; value: any }) => {
   if (selectedIds.value.length > 0) {
     const updatedList = selectedComponents.value.map(comp => {
       const st = { ...(comp.style || {}) };
-      const isText = comp.type === 'draw-text' || comp.type === 'metric-header' || comp.type.includes('text') || comp.type.includes('sign');
+      const isTextOrTelemetry = comp.type === 'draw-text' || 
+        comp.type === 'metric-header' || 
+        comp.type === 'metric-float' || 
+        comp.type === 'metric-flipper' || 
+        comp.type === 'metric-counter' || 
+        comp.type === 'metric-digital' || 
+        comp.type.includes('text') || 
+        comp.type.includes('sign') || 
+        comp.type.includes('metric');
       if (key === 'stroke') {
         st.stroke = value;
         st.borderColor = value;
-        if (isText) {
+        if (isTextOrTelemetry) {
           st.textColor = value;
           st.color = value;
         }
@@ -1850,6 +1914,12 @@ onMounted(async () => {
       screen.value = JSON.parse(JSON.stringify(targetScreen.screen));
       components.value = JSON.parse(JSON.stringify(targetScreen.components));
       selectedIds.value = [];
+
+      // 初始化实时监控独立大屏状态（加载已发布保存大屏）
+      monitorActiveScreenId.value = targetScreen.id;
+      monitorScreen.value = JSON.parse(JSON.stringify(targetScreen.screen));
+      monitorComponents.value = JSON.parse(JSON.stringify(targetScreen.components));
+
       showDiskNotification(`已自动加载 graph/ 目录: 共 ${res.screens.length} 个合规 JSON 大屏`);
     }
   } catch (err) {
@@ -1927,22 +1997,13 @@ const handleLoginSuccess = async () => {
   fitToScreen();
 };
 
-// 手动进入大屏预览：自动同步保存当前大屏，并确保内存中配置的测点及图元数据即时呈现在大屏中
-const handleOpenPreview = async () => {
-  try {
-    // 1. 同步当前大屏到 screens 列表中，防止配置未落盘前被覆盖
-    const curIdx = screens.value.findIndex(s => s.id === activeScreenId.value);
-    if (curIdx >= 0) {
-      screens.value[curIdx] = {
-        ...screens.value[curIdx],
-        screen: JSON.parse(JSON.stringify(screen.value)),
-        components: JSON.parse(JSON.stringify(components.value))
-      };
-    }
-    // 2. 自动持久化保存当前大屏至 graph/ 磁盘目录
-    await handleSaveCurrentScreenToDisk();
-  } catch (err) {
-    console.warn('[SCADA] 预览前自动保存失败:', err);
+// 进入实时大屏监控：加载当前画面的已保存版本至监控窗口 (修改需保存后才在实时监控中体现)
+const handleOpenPreview = () => {
+  const target = screens.value.find(s => s.id === activeScreenId.value) || screens.value[0];
+  if (target) {
+    monitorActiveScreenId.value = target.id;
+    monitorScreen.value = JSON.parse(JSON.stringify(target.screen));
+    monitorComponents.value = JSON.parse(JSON.stringify(target.components));
   }
   openWindow('monitor-screen');
   fitToScreen();
@@ -2247,16 +2308,19 @@ onBeforeUnmount(() => {
         @update:isMinimized="val => updateWindowProp('monitor-screen', 'isMinimized', val)"
       >
         <PreviewScreen
-          :screen="screen"
-          :components="components"
+          :screen="monitorScreen"
+          :components="monitorComponents"
           :datasets="datasets"
           :isStreaming="isStreaming"
           :screens="screens"
-          :activeScreenId="activeScreenId"
+          :activeScreenId="monitorActiveScreenId"
+          :indexScreenId="indexScreenId"
+          :indexScreenName="indexScreenName"
           :isEmbedded="true"
           @close="closeWindow('monitor-screen')"
           @toggle:streaming="isStreaming = !isStreaming"
-          @switch:screen="handleSwitchScreen"
+          @switch:screen="handleMonitorSwitchScreen"
+          @reload:current-screen="handleReloadCurrentMonitorScreen"
           @logout="handleLogout"
           @open:alarm="openWindow('alarm-window')"
         />

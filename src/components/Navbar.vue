@@ -213,8 +213,9 @@ const handleSetBgColor = (color: string) => {
 // Basic Geometric Primitives Toolbar Data (GE-SCADA Clean CAD Style)
 const basicGeometryTools = [
   { type: 'draw-rect', name: '矩形底座', icon: Square, desc: '矩形底座：单击选中后在屏幕拖拽确定起止点' },
+  { type: 'draw-square', name: '正方形', icon: Square, desc: '正方形：等宽高 1:1 绘制' },
   { type: 'draw-rounded-rect', name: '圆角矩形', icon: Square, isRounded: true, desc: '圆角矩形卡片：确定起止点' },
-  { type: 'draw-circle', name: '正圆形', icon: Circle, desc: '正圆形：确定起止点' },
+  { type: 'draw-circle', name: '正圆形', icon: Circle, desc: '正圆形：等宽高 1:1 绘制' },
   { type: 'draw-ellipse', name: '椭圆形', icon: CircleDot, desc: '椭圆形：确定起止点' },
   { type: 'draw-triangle', name: '正三角形', icon: Triangle, desc: '正三角形：确定起止点' },
   { type: 'draw-triangle-down', name: '倒三角形', icon: Triangle, isDown: true, desc: '倒三角形：确定起止点' },
@@ -1012,102 +1013,92 @@ const standardPalette = [
     </div>
 
     <!-- ========================================================================= -->
-    <!-- Row 3: 绘图图元工具与动态属性样式工具条 -->
+    <!-- Row 3: 绘图图元工具与动态属性样式工具条 (全部左对齐，紧挨在基础图元后面，字体放大放粗) -->
     <!-- ========================================================================= -->
-    <div class="flex items-center justify-between bg-[#e5decb] border border-[#cfc5b0] px-2 py-1.5 rounded-lg text-[13px] select-none overflow-x-auto gap-2 tracking-wide">
-      <!-- Left: 指针工具、几何绘图元 -->
-      <div class="flex items-center gap-1.5 shrink-0">
-        <!-- 1. 交互指针模式 (选择 / 折线 / 导向箭头) -->
-        <div class="flex items-center bg-[#f2eee3] p-0.5 rounded-md border border-[#cfc5b0] shadow-2xs gap-0.5">
-          <button
-            @click="emit('update:drawTool', 'select')"
-            class="p-1.5 rounded transition-colors cursor-pointer"
-            :class="drawTool === 'select' 
-              ? 'bg-sky-100 text-sky-800 font-medium border border-sky-300' 
-              : 'text-slate-600 hover:text-slate-900 hover:bg-[#e4dcce]'"
-            title="选择指针 (V / ESC): 框选/平移/缩放图元"
-          >
-            <MousePointer class="w-4.5 h-4.5 stroke-[2]" />
-          </button>
+    <div class="flex items-center justify-start bg-[#e5decb] border border-[#cfc5b0] px-2.5 py-1.5 rounded-lg text-[13px] select-none overflow-x-auto gap-2 tracking-wide">
+      <!-- 1. 交互指针模式 (选择 / 折线 / 导向箭头) -->
+      <div class="flex items-center bg-[#f2eee3] p-0.5 rounded-md border border-[#cfc5b0] shadow-2xs gap-0.5 shrink-0">
+        <button
+          @click="emit('update:drawTool', 'select')"
+          class="p-1.5 rounded transition-colors cursor-pointer"
+          :class="drawTool === 'select' 
+            ? 'bg-sky-100 text-sky-800 font-bold border border-sky-300' 
+            : 'text-slate-600 hover:text-slate-900 hover:bg-[#e4dcce]'"
+          title="选择指针 (V / ESC): 框选/平移/缩放图元"
+        >
+          <MousePointer class="w-4.5 h-4.5 stroke-[2.2]" />
+        </button>
 
-          <button
-            @click="emit('update:drawTool', 'draw-polyline')"
-            class="p-1.5 rounded transition-colors cursor-pointer"
-            :class="drawTool === 'draw-polyline' 
-              ? 'bg-amber-100 text-amber-800 font-medium border border-amber-300' 
-              : 'text-slate-600 hover:text-slate-900 hover:bg-[#e4dcce]'"
-            title="绘制母线/折线 (L): 连续拐点，双击结束"
-          >
-            <Workflow class="w-4.5 h-4.5 stroke-[2]" />
-          </button>
+        <button
+          @click="emit('update:drawTool', 'draw-polyline')"
+          class="p-1.5 rounded transition-colors cursor-pointer"
+          :class="drawTool === 'draw-polyline' 
+            ? 'bg-amber-100 text-amber-800 font-bold border border-amber-300' 
+            : 'text-slate-600 hover:text-slate-900 hover:bg-[#e4dcce]'"
+          title="绘制母线/折线 (L): 连续拐点，双击结束"
+        >
+          <Workflow class="w-4.5 h-4.5 stroke-[2.2]" />
+        </button>
 
-          <button
-            @click="emit('update:drawTool', 'draw-arrow')"
-            class="p-1.5 rounded transition-colors cursor-pointer"
-            :class="drawTool === 'draw-arrow' 
-              ? 'bg-emerald-100 text-emerald-800 font-medium border border-emerald-300' 
-              : 'text-slate-600 hover:text-slate-900 hover:bg-[#e4dcce]'"
-            title="绘制导向箭头: 起点到终点"
-          >
-            <MoveRight class="w-4.5 h-4.5 stroke-[2]" />
-          </button>
-        </div>
-
-        <div class="h-4 w-[1px] bg-[#cfc5b0] mx-0.5" />
-
-        <!-- 2. 基础几何图元快捷按钮组 (矩形/正圆/三角/菱形等) -->
-        <div class="flex items-center bg-[#f2eee3] p-0.5 rounded-md border border-[#cfc5b0] shadow-2xs gap-0.5">
-          <button
-            v-for="geo in basicGeometryTools"
-            :key="geo.type"
-            @click="emit('select:shape', geo.type)"
-            class="p-1.5 rounded transition-colors cursor-pointer"
-            :class="drawTool === 'place-component' && activeShapeType === geo.type
-              ? 'bg-sky-100 text-sky-800 font-medium border border-sky-300' 
-              : 'text-slate-600 hover:text-slate-900 hover:bg-[#e4dcce]'"
-            :title="geo.desc"
-          >
-            <component 
-              :is="geo.icon" 
-              class="w-4 h-4 stroke-[2]" 
-              :class="{ 
-                'rounded-xs': geo.isRounded, 
-                'rotate-180': geo.isDown,
-                'rotate-90': geo.type === 'draw-triangle-right'
-              }" 
-            />
-          </button>
-        </div>
+        <button
+          @click="emit('update:drawTool', 'draw-arrow')"
+          class="p-1.5 rounded transition-colors cursor-pointer"
+          :class="drawTool === 'draw-arrow' 
+            ? 'bg-emerald-100 text-emerald-800 font-bold border border-emerald-300' 
+            : 'text-slate-600 hover:text-slate-900 hover:bg-[#e4dcce]'"
+          title="绘制导向箭头: 起点到终点"
+        >
+          <MoveRight class="w-4.5 h-4.5 stroke-[2.2]" />
+        </button>
       </div>
 
-      <!-- Center & Right: 动态画笔与图元样式属性工具条 -->
-      <div class="flex items-center gap-1.5 shrink-0 overflow-x-auto">
-        <div class="flex items-center bg-[#f2eee3] px-2 py-0.5 rounded-md border border-[#cfc5b0] shadow-2xs gap-2">
-          <!-- 状态徽章: 画笔预设 vs 批量修改 -->
-          <div 
-            class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider shrink-0 transition-colors"
-            :class="isSelectionMode ? 'bg-sky-100 text-sky-800 border border-sky-300' : 'bg-[#ded5bf] text-slate-700 border border-[#cfc5b0]'"
-            :title="isSelectionMode ? '正在修改当前选中的图元样式属性 (批量生效)' : '当前无选中图元，修改将作为后续绘制的画笔全局预设'"
-          >
-            {{ isSelectionMode ? `选中同步(${selectedIds.length})` : '画笔预设' }}
-          </div>
+      <div class="h-4 w-[1px] bg-[#cfc5b0] mx-0.5 shrink-0" />
 
+      <!-- 2. 基础几何图元快捷按钮组 (矩形/正方形/正圆/椭圆/三角/菱形等) -->
+      <div class="flex items-center bg-[#f2eee3] p-0.5 rounded-md border border-[#cfc5b0] shadow-2xs gap-0.5 shrink-0">
+        <button
+          v-for="geo in basicGeometryTools"
+          :key="geo.type"
+          @click="emit('select:shape', geo.type)"
+          class="p-1.5 rounded transition-colors cursor-pointer"
+          :class="drawTool === 'place-component' && activeShapeType === geo.type
+            ? 'bg-sky-100 text-sky-800 font-bold border border-sky-300' 
+            : 'text-slate-600 hover:text-slate-900 hover:bg-[#e4dcce]'"
+          :title="geo.desc"
+        >
+          <component 
+            :is="geo.icon" 
+            class="w-4 h-4 stroke-[2.2]" 
+            :class="{ 
+              'rounded-xs': geo.isRounded, 
+              'rotate-180': geo.isDown,
+              'rotate-90': geo.type === 'draw-triangle-right'
+            }" 
+          />
+        </button>
+      </div>
+
+      <div class="h-4 w-[1px] bg-[#cfc5b0] mx-0.5 shrink-0" />
+
+      <!-- 3. 动态画笔与图元样式属性工具条 (紧挨在基础图元后面，左对齐，删掉选中同步字样，字体放大放粗) -->
+      <div class="flex items-center shrink-0">
+        <div class="flex items-center bg-[#f2eee3] px-2.5 py-1 rounded-md border border-[#cfc5b0] shadow-2xs gap-2.5">
           <!-- A. 线条颜色 (Stroke Color) -->
-          <div class="flex items-center gap-1" title="线条颜色 (多选/单选一键同步)">
-            <span class="text-[11px] text-slate-600 font-medium">线色:</span>
+          <div class="flex items-center gap-1.5" title="线条颜色 (多选/单选一键同步)">
+            <span class="text-[13px] text-slate-800 font-bold tracking-wide">线色:</span>
             <input
               type="color"
               :value="activeDrawingStyle.stroke"
               @input="handleStyleChange('stroke', ($event.target as HTMLInputElement).value)"
-              class="w-5 h-5 rounded cursor-pointer border border-[#cfc5b0] p-0 bg-transparent"
+              class="w-5.5 h-5.5 rounded cursor-pointer border border-[#cfc5b0] p-0 bg-transparent"
               title="拾取线条颜色"
             />
-            <div class="flex items-center gap-0.5">
+            <div class="flex items-center gap-1">
               <button
                 v-for="color in standardPalette"
                 :key="'stk-' + color"
                 @click="handleStyleChange('stroke', color)"
-                class="w-3.5 h-3.5 rounded-full border border-black/20 cursor-pointer transition-transform hover:scale-125"
+                class="w-4 h-4 rounded-full border border-black/20 cursor-pointer transition-transform hover:scale-125"
                 :style="{ backgroundColor: color }"
                 :title="color"
               />
@@ -1115,15 +1106,15 @@ const standardPalette = [
           </div>
 
           <!-- B. 填充底色 (Fill Color 含透明切换) -->
-          <div class="flex items-center gap-1 pl-1 border-l border-[#cfc5b0]" title="填充底色 (含透明切换)">
-            <span class="text-[11px] text-slate-600 font-medium">底色:</span>
+          <div class="flex items-center gap-1.5 pl-1.5 border-l border-[#cfc5b0]" title="填充底色 (含透明切换)">
+            <span class="text-[13px] text-slate-800 font-bold tracking-wide">底色:</span>
             <!-- 透明按钮 -->
             <button
               @click="handleStyleChange('fill', 'transparent')"
-              class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border transition-colors cursor-pointer"
+              class="px-2 py-0.5 rounded text-[12px] font-bold border transition-colors cursor-pointer"
               :class="activeDrawingStyle.fill === 'transparent' || activeDrawingStyle.fill === 'none'
                 ? 'bg-sky-200 text-sky-900 border-sky-400 font-bold' 
-                : 'bg-[#f8f5ee] text-slate-700 border-[#cfc5b0] hover:bg-[#eae2d3]'"
+                : 'bg-[#f8f5ee] text-slate-800 border-[#cfc5b0] hover:bg-[#eae2d3]'"
               title="切换为无填充底色 (透明)"
             >
               透明
@@ -1132,18 +1123,18 @@ const standardPalette = [
               type="color"
               :value="activeDrawingStyle.fill === 'transparent' ? '#00f2ff' : activeDrawingStyle.fill"
               @input="handleStyleChange('fill', ($event.target as HTMLInputElement).value)"
-              class="w-5 h-5 rounded cursor-pointer border border-[#cfc5b0] p-0 bg-transparent"
+              class="w-5.5 h-5.5 rounded cursor-pointer border border-[#cfc5b0] p-0 bg-transparent"
               title="选择填充底色"
             />
           </div>
 
           <!-- C. 底色不透明度调节 (可调至 100% 完全不透明) -->
-          <div class="flex items-center gap-1 pl-1 border-l border-[#cfc5b0]" title="填充底色不透明度 (0% 透明 ~ 100% 完全不透明)">
-            <span class="text-[11px] text-slate-600 font-medium">不透明度:</span>
+          <div class="flex items-center gap-1.5 pl-1.5 border-l border-[#cfc5b0]" title="填充底色不透明度 (0% 透明 ~ 100% 完全不透明)">
+            <span class="text-[13px] text-slate-800 font-bold tracking-wide">不透明度:</span>
             <select
               :value="Math.round((activeDrawingStyle.fillOpacity !== undefined ? activeDrawingStyle.fillOpacity : 1) * 100)"
               @change="handleStyleChange('fillOpacity', Number(($event.target as HTMLSelectElement).value) / 100)"
-              class="bg-[#f8f5ee] hover:bg-[#f0ebe0] border border-[#cfc5b0] rounded px-1.5 py-0.5 text-xs text-slate-800 font-mono font-medium focus:outline-hidden cursor-pointer"
+              class="bg-[#f8f5ee] hover:bg-[#f0ebe0] border border-[#cfc5b0] rounded px-2 py-0.5 text-[13px] text-slate-900 font-bold focus:outline-hidden cursor-pointer"
             >
               <option :value="0">0% (全透)</option>
               <option :value="10">10%</option>
@@ -1157,10 +1148,10 @@ const standardPalette = [
             </select>
             <button
               @click="handleStyleChange('fillOpacity', 1)"
-              class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border transition-colors cursor-pointer"
+              class="px-2 py-0.5 rounded text-[12px] font-bold border transition-colors cursor-pointer"
               :class="activeDrawingStyle.fillOpacity >= 0.99
                 ? 'bg-emerald-200 text-emerald-900 border-emerald-400 font-bold' 
-                : 'bg-[#f8f5ee] text-slate-700 border-[#cfc5b0] hover:bg-[#eae2d3]'"
+                : 'bg-[#f8f5ee] text-slate-800 border-[#cfc5b0] hover:bg-[#eae2d3]'"
               title="一键设为 100% 完全不透明"
             >
               不透
@@ -1168,12 +1159,12 @@ const standardPalette = [
           </div>
 
           <!-- D. 线条线宽 (丰富下拉选项) -->
-          <div class="flex items-center gap-1 pl-1 border-l border-[#cfc5b0]" title="线条粗细线宽 (0.5px ~ 10px)">
-            <span class="text-[11px] text-slate-600 font-medium">线宽:</span>
+          <div class="flex items-center gap-1.5 pl-1.5 border-l border-[#cfc5b0]" title="线条粗细线宽 (0.5px ~ 10px)">
+            <span class="text-[13px] text-slate-800 font-bold tracking-wide">线宽:</span>
             <select
               :value="activeDrawingStyle.strokeWidth"
               @change="handleStyleChange('strokeWidth', Number(($event.target as HTMLSelectElement).value))"
-              class="bg-[#f8f5ee] hover:bg-[#f0ebe0] border border-[#cfc5b0] rounded px-1.5 py-0.5 text-xs text-slate-800 font-mono font-medium focus:outline-hidden cursor-pointer"
+              class="bg-[#f8f5ee] hover:bg-[#f0ebe0] border border-[#cfc5b0] rounded px-2 py-0.5 text-[13px] text-slate-900 font-bold focus:outline-hidden cursor-pointer"
             >
               <option :value="0.5">0.5px (极细)</option>
               <option :value="1">1px (细线)</option>
@@ -1190,12 +1181,12 @@ const standardPalette = [
           </div>
 
           <!-- E. 线型 (实线/虚线/点线) -->
-          <div class="flex items-center gap-1 pl-1 border-l border-[#cfc5b0]" title="线型虚实 (实线/虚线/点线)">
-            <span class="text-[11px] text-slate-600 font-medium">线型:</span>
+          <div class="flex items-center gap-1.5 pl-1.5 border-l border-[#cfc5b0]" title="线型虚实 (实线/虚线/点线)">
+            <span class="text-[13px] text-slate-800 font-bold tracking-wide">线型:</span>
             <select
               :value="activeDrawingStyle.lineStyle"
               @change="handleStyleChange('lineStyle', ($event.target as HTMLSelectElement).value)"
-              class="bg-[#f8f5ee] hover:bg-[#f0ebe0] border border-[#cfc5b0] rounded px-1.5 py-0.5 text-xs text-slate-800 font-medium focus:outline-hidden cursor-pointer"
+              class="bg-[#f8f5ee] hover:bg-[#f0ebe0] border border-[#cfc5b0] rounded px-2 py-0.5 text-[13px] text-slate-900 font-bold focus:outline-hidden cursor-pointer"
             >
               <option value="solid">—— 实线</option>
               <option value="dashed">-- 虚线</option>
@@ -1204,12 +1195,12 @@ const standardPalette = [
           </div>
 
           <!-- F. 文字字号与粗细 (丰富字号选项) -->
-          <div class="flex items-center gap-1 pl-1 border-l border-[#cfc5b0]" title="文字字号与加粗">
-            <span class="text-[11px] text-slate-600 font-medium">字号:</span>
+          <div class="flex items-center gap-1.5 pl-1.5 border-l border-[#cfc5b0]" title="文字字号与加粗">
+            <span class="text-[13px] text-slate-800 font-bold tracking-wide">字号:</span>
             <select
               :value="activeDrawingStyle.fontSize"
               @change="handleStyleChange('fontSize', Number(($event.target as HTMLSelectElement).value))"
-              class="bg-[#f8f5ee] hover:bg-[#f0ebe0] border border-[#cfc5b0] rounded px-1 py-0.5 text-xs text-slate-800 font-mono font-medium focus:outline-hidden cursor-pointer"
+              class="bg-[#f8f5ee] hover:bg-[#f0ebe0] border border-[#cfc5b0] rounded px-2 py-0.5 text-[13px] text-slate-900 font-bold focus:outline-hidden cursor-pointer"
             >
               <option :value="8">8px</option>
               <option :value="9">9px</option>
@@ -1237,10 +1228,10 @@ const standardPalette = [
             <!-- 加粗切换 -->
             <button
               @click="handleStyleChange('fontWeight', activeDrawingStyle.fontWeight === 'bold' ? 'normal' : 'bold')"
-              class="w-6 h-6 rounded flex items-center justify-center border transition-colors cursor-pointer text-xs font-bold font-serif"
+              class="w-6.5 h-6.5 rounded flex items-center justify-center border transition-colors cursor-pointer text-[13px] font-bold font-serif"
               :class="activeDrawingStyle.fontWeight === 'bold'
-                ? 'bg-sky-200 text-sky-900 border-sky-400' 
-                : 'bg-[#f8f5ee] text-slate-700 border-[#cfc5b0] hover:bg-[#eae2d3]'"
+                ? 'bg-sky-200 text-sky-900 border-sky-400 font-bold' 
+                : 'bg-[#f8f5ee] text-slate-800 border-[#cfc5b0] hover:bg-[#eae2d3]'"
               title="切换粗体 / 常规体"
             >
               B

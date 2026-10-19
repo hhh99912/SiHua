@@ -200,12 +200,26 @@ echo " 正在启动 KND科能达 SCADA 工业大屏客户端 (凝思 LinxOS 6.0.
 echo " 目标程序: $TARGET_BIN"
 echo " 目标系统: 凝思安全操作系统 V6.0 (LinxOS 6.0.80, Kernel 4.9.0, GLIBC 2.24)"
 echo " 进程架构: Chromium 标准双进程 (1个主调度进程 + 1个画面渲染进程)"
+# 9.0 自动防系统重启内核加固 (专治凝思安全系统 vm.panic_on_oom=1 与 kernel.panic=10 导致的夜间整机突然重启)
+if command -v sysctl >/dev/null 2>&1; then
+  SUDO_CMD=""
+  if [ "$(id -u)" != "0" ] && command -v sudo >/dev/null 2>&1; then
+    SUDO_CMD="sudo"
+  fi
+  $SUDO_CMD sysctl -w vm.panic_on_oom=0 >/dev/null 2>&1 || true
+  $SUDO_CMD sysctl -w kernel.panic=0 >/dev/null 2>&1 || true
+  $SUDO_CMD sysctl -w kernel.panic_on_oops=0 >/dev/null 2>&1 || true
+  $SUDO_CMD sysctl -w kernel.hung_task_panic=0 >/dev/null 2>&1 || true
+  $SUDO_CMD sysctl -w kernel.softlockup_panic=0 >/dev/null 2>&1 || true
+fi
+
 # 9.1 提升工控机系统文件句柄上限，杜绝 EMFILE 导致的突然闪退
 ulimit -n 65535 2>/dev/null || ulimit -n 4096 2>/dev/null || true
 
 echo " 图形加速: 已默认彻底禁用 GPU 硬件加速 (纯 CPU 软渲染，杜绝 i915 核显死机)"
-echo " 内存优化: 已配置 2048MB Chromium JS引擎堆内存 (Google V8)，彻底解除 512MB 闪退限制"
-echo " 测点优化: 400+ 测点局部精准订阅已激活，消除 CPU 跑满卡顿"
+echo " 内存优化: 已配置 1536MB Chromium JS引擎堆内存 (Google V8)，兼顾系统物理内存安全"
+echo " 测点优化: 400+ 测点局部精准订阅已激活，静态图元零重绘，消除 CPU 跑满卡顿"
+echo " 系统防护: 已执行 sysctl 内核防重启加固 (vm.panic_on_oom=0, kernel.panic=0)"
 echo " 崩溃监控: 工业黑匣子与秒级心跳已激活，自动记录并分析异常退出原因"
 echo " 消除白屏: 已启用 Vue 首帧挂载握手与深蓝背景锁定"
 echo " 输入法适配: $DETECTED_IME (Ctrl+空格 瞬时呼出)"
@@ -229,7 +243,7 @@ exec "$TARGET_BIN" \
   --disable-gpu-rasterization \
   --force-color-profile=srgb \
   --gtk-version=3 \
-  --js-flags="--max-old-space-size=2048 --expose-gc" \
+  --js-flags="--max-old-space-size=1536 --expose-gc" \
   --disable-component-update \
   --disable-sync \
   --disable-domain-reliability \

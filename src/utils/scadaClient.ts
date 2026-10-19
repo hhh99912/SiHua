@@ -86,6 +86,10 @@ export function getScadaApiBaseUrl(): string {
     const saved = window.localStorage.getItem(STORAGE_KEY_SCADA_API);
     if (saved && saved.trim()) return saved.trim();
   }
+  // 在 Linux 凝思系统打包运行 (file:// 协议) 且未手动配置时，自动兜底本机的 SCADA C++ 接口服务
+  if (typeof window !== 'undefined' && window.location && window.location.protocol === 'file:') {
+    return DEFAULT_SCADA_API_URL;
+  }
   return ''; // default relative '/api/scada' if on same host, or fallback
 }
 
@@ -627,19 +631,20 @@ export async function fetchScadaRealtime(
   const url = baseUrl ? `${baseUrl}/api/scada/realtime` : '/api/scada/realtime';
 
   isRealtimeLoading.value = true;
+  let timeoutId: any = null;
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    timeoutId = setTimeout(() => {
+      try { controller.abort(); } catch {}
+    }, 3500);
 
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Connection': 'keep-alive'
+        'Accept': 'application/json'
       },
-      keepalive: true,
       body: JSON.stringify({
         yc_ids: req.yc_ids || [],
         yx_ids: req.yx_ids || [],
@@ -648,7 +653,10 @@ export async function fetchScadaRealtime(
       signal: controller.signal
     });
 
-    clearTimeout(timeoutId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
 
     if (!response.ok) {
       throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
@@ -657,7 +665,6 @@ export async function fetchScadaRealtime(
     const resJson: ScadaRealtimeResponse = await response.json();
     if (resJson && (resJson.code === 200 || (resJson as any).status === 'success') && resJson.data) {
       const { yc = [], yx = [], dd = [] } = resJson.data;
-      let hasAnyChanged = false;
 
       // Update YC Cache with strict diff detection (400+ points optimization)
       for (let i = 0; i < yc.length; i++) {
@@ -670,7 +677,6 @@ export async function fetchScadaRealtime(
           if (item.status !== undefined) rawYcQuality.set(item.id, item.status);
           cachedRealtimeYc.set(item.id, item);
           notifyPointChanged(item.id, val);
-          hasAnyChanged = true;
         }
       }
 
@@ -685,7 +691,6 @@ export async function fetchScadaRealtime(
           if (item.status !== undefined) rawYxQuality.set(item.id, item.status);
           cachedRealtimeYx.set(item.id, item);
           notifyPointChanged(item.id, val);
-          hasAnyChanged = true;
         }
       }
 
@@ -698,12 +703,11 @@ export async function fetchScadaRealtime(
           rawDdValues.set(item.id, val);
           cachedRealtimeDd.set(item.id, item);
           notifyPointChanged(item.id, val);
-          hasAnyChanged = true;
         }
       }
 
-      // 核心防卡顿：首帧强制唤醒；后续仅在无特定测点订阅的兜底模式下才触发全局脉冲
-      if (scadaLiveTick.value === 0 || hasAnyChanged) {
+      // 核心防卡顿：仅在首帧无数据时触发一次初始化脉冲；后续由各测点精准 notifyPointChanged 独立驱动局部重绘，绝不无脑让全屏 200+ 图元每秒重绘
+      if (scadaLiveTick.value === 0) {
         scadaLiveTick.value++;
       }
 
@@ -721,6 +725,10 @@ export async function fetchScadaRealtime(
     scadaApiErrorMessage.value = msg;
     return { success: false, error: msg };
   } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
     isRealtimeLoading.value = false;
   }
 }

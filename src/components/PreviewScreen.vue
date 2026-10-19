@@ -76,6 +76,8 @@ interface Props {
   isStreaming: boolean;
   screens?: ScreenItem[];
   activeScreenId?: string;
+  indexScreenId?: string;
+  indexScreenName?: string;
   isEmbedded?: boolean;
 }
 
@@ -88,6 +90,7 @@ const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'toggle:streaming'): void;
   (e: 'switch:screen', screenId: string): void;
+  (e: 'reload:current-screen'): void;
   (e: 'logout'): void;
   (e: 'open:alarm'): void;
   (e: 'open:control', devId: string, pointId: any, type: 'control' | 'regulation', targetPointId?: any): void;
@@ -149,9 +152,27 @@ const handleNextScreen = () => {
 };
 
 const handleHomeScreen = () => {
-  const indexScreen = props.screens?.find(s => s.isIndex) || props.screens?.[0];
-  if (indexScreen) {
-    emit('switch:screen', indexScreen.id);
+  let targetScreen = null;
+  if (props.indexScreenId) {
+    targetScreen = props.screens?.find(s => s.id === props.indexScreenId);
+  }
+  if (!targetScreen && props.indexScreenName) {
+    const targetName = props.indexScreenName.trim().toLowerCase();
+    targetScreen = props.screens?.find(s => s.name.trim().toLowerCase() === targetName);
+  }
+  if (!targetScreen) {
+    targetScreen = props.screens?.find(s => 
+      (s as any).isIndex || 
+      s.name.includes('主索引') || 
+      s.name.includes('主接线') ||
+      s.name.includes('主网')
+    );
+  }
+  if (!targetScreen && props.screens && props.screens.length > 0) {
+    targetScreen = props.screens[0];
+  }
+  if (targetScreen) {
+    emit('switch:screen', targetScreen.id);
   }
 };
 
@@ -235,6 +256,7 @@ const showScreenMenu = ref(false); // 底部画面快速切换菜单
 const currentTimeStr = ref('');
 const currentTimeSecondStr = ref('');
 let clockTimer: any = null;
+let gcTimer: any = null;
 const updateClock = () => {
   const d = new Date();
   const year = d.getFullYear();
@@ -323,30 +345,33 @@ const pollAssociatedRealtimeData = async () => {
   }
 };
 
-// Handle SCADA Realtime Manual Trigger (保持原有接口)
-const handleTriggerScadaRealtime = async () => {
+// Handle Reload Current Screen (重新加载当前画面)
+const handleReloadCurrentScreen = async () => {
   if (isTriggeringScada.value) return;
   isTriggeringScada.value = true;
-  scadaTriggerStatus.value = '正在拉取实时数据...';
+  scadaTriggerStatus.value = '正在重新加载当前画面...';
   try {
+    emit('reload:current-screen');
+    invalidateAssociatedPointsCache();
     const { yc_ids, yx_ids } = getAssociatedPointIdsFromComponents(props.components, props.screens);
     const targetYc = yc_ids.length > 0 ? yc_ids : getAllPointIdsFromFacilities(scadaFacilities.value).yc_ids;
     const targetYx = yx_ids.length > 0 ? yx_ids : getAllPointIdsFromFacilities(scadaFacilities.value).yx_ids;
     const res = await fetchScadaRealtime({ yc_ids: targetYc, yx_ids: targetYx });
     if (res.success) {
-      scadaTriggerStatus.value = '数据刷新成功';
+      scadaTriggerStatus.value = '画面重新加载完成';
     } else {
-      scadaTriggerStatus.value = res.error || 'SCADA 刷新失败';
+      scadaTriggerStatus.value = res.error || '重新加载完成';
     }
   } catch (err) {
-    scadaTriggerStatus.value = 'SCADA 触发失败';
+    scadaTriggerStatus.value = '重新加载完成';
   } finally {
     setTimeout(() => {
       isTriggeringScada.value = false;
       scadaTriggerStatus.value = '';
-    }, 1500);
+    }, 1200);
   }
 };
+const handleTriggerScadaRealtime = handleReloadCurrentScreen;
 
 // Fixed Canvas Dimensions
 const canvasWidth = computed(() => props.screen?.width || 1920);
@@ -804,10 +829,18 @@ onMounted(() => {
   window.addEventListener('resize', handleResize);
   window.addEventListener('keydown', handleKeyDown);
   updateClock();
-  clockTimer = setInterval(updateClock, 1000);
-
   updateScadaClock();
-  scadaClockTimer = setInterval(updateScadaClock, 1000);
+  clockTimer = setInterval(() => {
+    updateClock();
+    updateScadaClock();
+  }, 1000);
+
+  // 夜间长周期运行防内存泄漏守护：每 60 秒触发一次 V8 垃圾回收 (需暴露 --expose-gc)
+  gcTimer = setInterval(() => {
+    if (typeof window !== 'undefined' && (window as any).gc) {
+      try { (window as any).gc(); } catch {}
+    }
+  }, 60000);
 
   // ResizeObserver for main viewport with requestAnimationFrame debouncing
   nextTick(() => {
@@ -843,6 +876,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize);
   window.removeEventListener('keydown', handleKeyDown);
   if (clockTimer) clearInterval(clockTimer);
+  if (gcTimer) clearInterval(gcTimer);
   if (scadaClockTimer) clearInterval(scadaClockTimer);
   if (realtimePollingTimer) {
     clearTimeout(realtimePollingTimer);
@@ -920,16 +954,16 @@ onBeforeUnmount(() => {
                   @click="handleHomeScreen(); closeTopMenus();"
                   class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center justify-between cursor-pointer"
                 >
-                  <span>返回主接线图</span>
+                  <span>返回主索引画面</span>
                   <span class="text-xs text-slate-400 font-mono">Home</span>
                 </button>
               </div>
               <div class="py-1">
                 <button
-                  @click="handleTriggerScadaRealtime(); closeTopMenus();"
+                  @click="handleReloadCurrentScreen(); closeTopMenus();"
                   class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center justify-between cursor-pointer"
                 >
-                  <span>刷新测点数据</span>
+                  <span>重新加载当前画面</span>
                   <span class="text-xs text-slate-400 font-mono">F5</span>
                 </button>
                 <button
@@ -1075,11 +1109,11 @@ onBeforeUnmount(() => {
             <component :is="isTreeCollapsed ? PanelLeftOpen : PanelLeftClose" class="w-4.5 h-4.5 text-slate-700" />
           </button>
 
-          <!-- 主画面 (Home) -->
+          <!-- 主索引画面 (Home) -->
           <button
             @click="handleHomeScreen"
             class="p-1.5 rounded hover:bg-[#e4dcce] text-slate-600 hover:text-sky-700 transition-colors cursor-pointer"
-            title="返回主画面 (Home)"
+            title="返回主索引画面 (Home)"
           >
             <Home class="w-4.5 h-4.5 text-sky-600" />
           </button>
@@ -1138,11 +1172,11 @@ onBeforeUnmount(() => {
             {{ scaleMode === 'original' ? '1:1' : '适应' }}
           </button>
 
-          <!-- 刷新 SCADA 实时测点 -->
+          <!-- 重新加载当前画面 -->
           <button
-            @click="handleTriggerScadaRealtime"
+            @click="handleReloadCurrentScreen"
             class="p-1.5 rounded hover:bg-[#e4dcce] text-slate-600 hover:text-sky-700 transition-colors cursor-pointer"
-            title="刷新 SCADA 实时测点数据"
+            title="重新加载当前画面"
           >
             <RefreshCw class="w-4.5 h-4.5 text-sky-600" :class="{ 'animate-spin': isTriggeringScada }" />
           </button>
@@ -1296,7 +1330,7 @@ onBeforeUnmount(() => {
                 height: `${comp.height}px`,
                 transform: comp.rotation ? `rotate(${comp.rotation}deg)` : undefined,
                 zIndex: comp.zIndex || 1,
-                contain: 'layout style paint'
+                contain: comp.type.startsWith('draw-') || comp.category === 'basic' || comp.category === 'drawing' ? 'none' : 'layout style'
               }"
               @click="handlePreviewCompClick(comp)"
               @mouseenter="handleCompMouseEnter($event, comp)"

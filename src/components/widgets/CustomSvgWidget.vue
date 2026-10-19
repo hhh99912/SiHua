@@ -38,7 +38,7 @@ const svgContent = computed(() => {
     class="w-full h-full flex items-center justify-center relative overflow-hidden select-none"
     :style="{
       opacity: component.style.opacity ?? 1,
-      filter: component.style.glowColor ? `drop-shadow(0 0 ${component.style.glowBlur || 8}px ${component.style.glowColor})` : 'none'
+      filter: 'none'
     }"
   >
     <div 

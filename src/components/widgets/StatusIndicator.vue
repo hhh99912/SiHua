@@ -136,22 +136,20 @@ const indicatorStyleType = computed(() => customProps.value.indicatorStyle || st
       class="w-full h-full flex items-center justify-center p-0.5"
     >
       <div 
-        class="w-full h-full rounded-md border-2 p-1 flex items-center justify-center shadow-lg transition-all"
+        class="w-full h-full rounded-md border-2 p-1 flex items-center justify-center transition-colors"
         :style="{
           borderColor: indicatorState.color,
-          backgroundColor: '#030712',
-          boxShadow: `0 0 16px ${indicatorState.glow}`
+          backgroundColor: '#030712'
         }"
       >
         <div 
-          class="w-full h-full rounded-xs transition-all"
+          class="w-full h-full rounded-xs transition-colors"
           :style="{
-            backgroundColor: indicatorState.color,
-            boxShadow: `inset 0 0 8px rgba(255,255,255,0.7), 0 0 12px ${indicatorState.color}`
+            backgroundColor: indicatorState.color
           }"
           :class="{
-            'animate-pulse': indicatorState.blinkSpeed === 'slow',
-            'animate-ping': indicatorState.blinkSpeed === 'fast'
+            'animate-pulse': indicatorState.isBlinking && indicatorState.blinkSpeed === 'slow',
+            'animate-ping': indicatorState.isBlinking && indicatorState.blinkSpeed === 'fast'
           }"
         />
       </div>
@@ -163,22 +161,20 @@ const indicatorStyleType = computed(() => customProps.value.indicatorStyle || st
       class="w-full h-full flex items-center justify-center relative p-0.5"
     >
       <div 
-        class="aspect-square w-full h-full max-w-full max-h-full rounded-full flex items-center justify-center relative shadow-lg"
+        class="aspect-square w-full h-full max-w-full max-h-full rounded-full flex items-center justify-center relative"
         :style="{
           backgroundColor: '#030712',
-          border: `2.5px solid ${indicatorState.color}`,
-          boxShadow: `0 0 20px ${indicatorState.glow}`
+          border: `2.5px solid ${indicatorState.color}`
         }"
       >
         <div 
-          class="w-3/4 h-3/4 rounded-full transition-all"
+          class="w-3/4 h-3/4 rounded-full transition-colors"
           :style="{
-            backgroundColor: indicatorState.color,
-            boxShadow: `0 0 14px ${indicatorState.color}`
+            backgroundColor: indicatorState.color
           }"
           :class="{
-            'animate-pulse': indicatorState.blinkSpeed === 'slow',
-            'animate-ping': indicatorState.blinkSpeed === 'fast'
+            'animate-pulse': indicatorState.isBlinking && indicatorState.blinkSpeed === 'slow',
+            'animate-ping': indicatorState.isBlinking && indicatorState.blinkSpeed === 'fast'
           }"
         />
       </div>
@@ -190,28 +186,26 @@ const indicatorStyleType = computed(() => customProps.value.indicatorStyle || st
       class="w-full h-full flex items-center justify-center p-0.5"
     >
       <div 
-        class="w-full h-full rounded-full border-2 p-1 flex items-center justify-center shadow-lg transition-all"
+        class="w-full h-full rounded-full border-2 p-1 flex items-center justify-center transition-colors"
         :style="{
           borderColor: indicatorState.color,
-          backgroundColor: '#030712',
-          boxShadow: `0 0 16px ${indicatorState.glow}`
+          backgroundColor: '#030712'
         }"
       >
         <div 
-          class="w-full h-full rounded-full transition-all"
+          class="w-full h-full rounded-full transition-colors"
           :style="{
-            backgroundColor: indicatorState.color,
-            boxShadow: `inset 0 0 6px rgba(255,255,255,0.7), 0 0 12px ${indicatorState.color}`
+            backgroundColor: indicatorState.color
           }"
           :class="{
-            'animate-pulse': indicatorState.blinkSpeed === 'slow',
-            'animate-ping': indicatorState.blinkSpeed === 'fast'
+            'animate-pulse': indicatorState.isBlinking && indicatorState.blinkSpeed === 'slow',
+            'animate-ping': indicatorState.isBlinking && indicatorState.blinkSpeed === 'fast'
           }"
         />
       </div>
     </div>
 
-    <!-- 4. STYLE: Ring Pulse / Radar Ring (科技脉冲光环状态点) -->
+    <!-- 4. STYLE: Ring Pulse / Radar Ring (科技脉冲光环状态点 - 零CPU滤镜开销) -->
     <div 
       v-else-if="indicatorStyleType === 'ring-pulse'"
       class="w-full h-full flex items-center justify-center min-w-0 min-h-0"
@@ -220,14 +214,15 @@ const indicatorStyleType = computed(() => customProps.value.indicatorStyle || st
         <!-- Outer dynamic pulse ring -->
         <circle cx="20" cy="20" r="18" fill="none" :stroke="indicatorState.color" stroke-width="1.2" stroke-dasharray="4,2" opacity="0.6" />
         <circle cx="20" cy="20" r="13" fill="none" :stroke="indicatorState.color" stroke-width="1.8" opacity="0.85" />
+        <!-- Soft vector halo (代替昂贵的 Skia CPU drop-shadow 模糊卷积，彻底消除 78 个状态灯导致的 100% CPU 跑满) -->
+        <circle cx="20" cy="20" r="10" :fill="indicatorState.color" opacity="0.3" />
         <!-- Core light dot -->
         <circle 
           cx="20" cy="20" r="7" 
           :fill="indicatorState.color" 
-          :style="{ filter: `drop-shadow(0 0 6px ${indicatorState.color})` }"
           :class="{
-            'animate-pulse': indicatorState.blinkSpeed === 'slow',
-            'animate-ping origin-center': indicatorState.blinkSpeed === 'fast'
+            'animate-pulse': indicatorState.isBlinking && indicatorState.blinkSpeed === 'slow',
+            'animate-ping origin-center': indicatorState.isBlinking && indicatorState.blinkSpeed === 'fast'
           }"
         />
         <circle cx="18" cy="18" r="2" fill="#ffffff" opacity="0.8" />
@@ -241,13 +236,14 @@ const indicatorStyleType = computed(() => customProps.value.indicatorStyle || st
     >
       <svg viewBox="0 0 40 40" class="w-full h-full max-w-full max-h-full" preserveAspectRatio="xMidYMid meet">
         <polygon points="20,2 38,20 20,38 2,20" fill="#040a18" :stroke="indicatorState.color" stroke-width="2" />
+        <!-- Vector halo -->
+        <polygon points="20,5 35,20 20,35 5,20" :fill="indicatorState.color" opacity="0.25" />
         <polygon 
           points="20,7 33,20 20,33 7,20" 
           :fill="indicatorState.color" 
-          :style="{ filter: `drop-shadow(0 0 8px ${indicatorState.color})` }"
           :class="{
-            'animate-pulse': indicatorState.blinkSpeed === 'slow',
-            'animate-ping origin-center': indicatorState.blinkSpeed === 'fast'
+            'animate-pulse': indicatorState.isBlinking && indicatorState.blinkSpeed === 'slow',
+            'animate-ping origin-center': indicatorState.isBlinking && indicatorState.blinkSpeed === 'fast'
           }"
         />
         <polygon points="20,11 29,20 20,20 11,20" fill="#ffffff" opacity="0.4" />
@@ -261,13 +257,14 @@ const indicatorStyleType = computed(() => customProps.value.indicatorStyle || st
     >
       <svg viewBox="0 0 40 40" class="w-full h-full max-w-full max-h-full" preserveAspectRatio="xMidYMid meet">
         <polygon points="20,2 36,11 36,29 20,38 4,29 4,11" fill="#030712" :stroke="indicatorState.color" stroke-width="2" />
+        <!-- Vector halo -->
+        <polygon points="20,5 33,12 33,28 20,35 7,28 7,12" :fill="indicatorState.color" opacity="0.25" />
         <polygon 
           points="20,7 31,14 31,26 20,33 9,26 9,14" 
           :fill="indicatorState.color" 
-          :style="{ filter: `drop-shadow(0 0 8px ${indicatorState.color})` }"
           :class="{
-            'animate-pulse': indicatorState.blinkSpeed === 'slow',
-            'animate-ping origin-center': indicatorState.blinkSpeed === 'fast'
+            'animate-pulse': indicatorState.isBlinking && indicatorState.blinkSpeed === 'slow',
+            'animate-ping origin-center': indicatorState.isBlinking && indicatorState.blinkSpeed === 'fast'
           }"
         />
         <polygon points="20,7 31,14 20,20 9,14" fill="#ffffff" opacity="0.35" />
@@ -286,14 +283,14 @@ const indicatorStyleType = computed(() => customProps.value.indicatorStyle || st
         <line x1="2" y1="20" x2="12" y2="20" :stroke="indicatorState.color" stroke-width="1.5" />
         <line x1="28" y1="20" x2="38" y2="20" :stroke="indicatorState.color" stroke-width="1.5" />
         <circle cx="20" cy="20" r="12" fill="none" :stroke="indicatorState.color" stroke-width="1" stroke-dasharray="2,2" opacity="0.6" />
-        <!-- Target Core Dot -->
+        <!-- Target Core Dot Halo -->
+        <circle cx="20" cy="20" r="8" :fill="indicatorState.color" opacity="0.25" />
         <circle 
           cx="20" cy="20" r="5.5" 
           :fill="indicatorState.color" 
-          :style="{ filter: `drop-shadow(0 0 7px ${indicatorState.color})` }"
           :class="{
-            'animate-pulse': indicatorState.blinkSpeed === 'slow',
-            'animate-ping origin-center': indicatorState.blinkSpeed === 'fast'
+            'animate-pulse': indicatorState.isBlinking && indicatorState.blinkSpeed === 'slow',
+            'animate-ping origin-center': indicatorState.isBlinking && indicatorState.blinkSpeed === 'fast'
           }"
         />
       </svg>
@@ -305,13 +302,15 @@ const indicatorStyleType = computed(() => customProps.value.indicatorStyle || st
       class="w-full h-full flex items-center justify-center min-w-0 min-h-0"
     >
       <svg viewBox="0 0 24 24" class="w-full h-full max-w-full max-h-full" preserveAspectRatio="xMidYMid meet">
+        <!-- Vector layered glow -->
+        <circle cx="12" cy="12" r="10" :fill="indicatorState.color" opacity="0.2" />
+        <circle cx="12" cy="12" r="8.5" :fill="indicatorState.color" opacity="0.35" />
         <circle 
           cx="12" cy="12" r="7" 
           :fill="indicatorState.color" 
-          :style="{ filter: `drop-shadow(0 0 6px ${indicatorState.color}) drop-shadow(0 0 12px ${indicatorState.color})` }"
           :class="{
-            'animate-pulse': indicatorState.blinkSpeed === 'slow',
-            'animate-ping origin-center': indicatorState.blinkSpeed === 'fast'
+            'animate-pulse': indicatorState.isBlinking && indicatorState.blinkSpeed === 'slow',
+            'animate-ping origin-center': indicatorState.isBlinking && indicatorState.blinkSpeed === 'fast'
           }"
         />
         <circle cx="10.5" cy="10.5" r="2.2" fill="#ffffff" opacity="0.9" />
@@ -324,19 +323,18 @@ const indicatorStyleType = computed(() => customProps.value.indicatorStyle || st
       class="w-full h-full flex items-center justify-center p-0.5"
     >
       <div 
-        class="w-full h-full rounded border flex items-center justify-between px-2 py-0.5 shadow-md"
+        class="w-full h-full rounded border flex items-center justify-between px-2 py-0.5"
         :style="{
           borderColor: indicatorState.color,
-          backgroundColor: '#020617',
-          boxShadow: `0 0 10px ${indicatorState.glow}`
+          backgroundColor: '#020617'
         }"
       >
         <div 
           class="w-2.5 h-2.5 rounded-full flex-shrink-0"
-          :style="{ backgroundColor: indicatorState.color, boxShadow: `0 0 6px ${indicatorState.color}` }"
+          :style="{ backgroundColor: indicatorState.color }"
           :class="{
-            'animate-pulse': indicatorState.blinkSpeed === 'slow',
-            'animate-ping': indicatorState.blinkSpeed === 'fast'
+            'animate-pulse': indicatorState.isBlinking && indicatorState.blinkSpeed === 'slow',
+            'animate-ping': indicatorState.isBlinking && indicatorState.blinkSpeed === 'fast'
           }"
         />
         <span 
@@ -378,18 +376,18 @@ const indicatorStyleType = computed(() => customProps.value.indicatorStyle || st
         <circle cx="20" cy="20" r="19" :fill="`url(#bezel-${component.id})`" stroke="#94a3b8" stroke-width="0.8" />
         <circle cx="20" cy="20" r="16" fill="#020617" stroke="#38bdf8" stroke-width="0.8" stroke-opacity="0.5" />
 
+        <!-- Soft vector halo (代替滤镜模糊) -->
+        <circle cx="20" cy="20" r="15.5" :fill="indicatorState.color" opacity="0.35" />
+
         <!-- Glowing Light Core -->
         <circle 
           cx="20" 
           cy="20" 
           r="14" 
           :fill="`url(#core-${component.id})`"
-          :style="{
-            filter: `drop-shadow(0 0 8px ${indicatorState.color})`
-          }"
           :class="{
-            'animate-pulse': indicatorState.blinkSpeed === 'slow',
-            'animate-ping origin-center': indicatorState.blinkSpeed === 'fast'
+            'animate-pulse': indicatorState.isBlinking && indicatorState.blinkSpeed === 'slow',
+            'animate-ping origin-center': indicatorState.isBlinking && indicatorState.blinkSpeed === 'fast'
           }"
         />
 

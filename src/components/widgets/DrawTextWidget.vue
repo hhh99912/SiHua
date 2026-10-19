@@ -17,9 +17,23 @@ const textContent = computed(() => {
 });
 
 const textStyle = computed(() => {
-  const { style } = props.component;
+  const { style, height, width } = props.component;
   const color = style?.textColor || style?.stroke || '#00f2ff';
-  const fontSize = typeof style?.fontSize === 'number' ? `${style.fontSize}px` : (style?.fontSize || '18px');
+  
+  // Dynamic font size: if style.fontSize is defined use it, otherwise calculate from width and height to fit box snugly
+  let fontSizeNum = typeof style?.fontSize === 'number' && style.fontSize > 0 ? style.fontSize : 0;
+  if (!fontSizeNum) {
+    const text = textContent.value || '文本';
+    let visualLen = 0;
+    for (let i = 0; i < text.length; i++) {
+      visualLen += text.charCodeAt(i) > 255 ? 1.0 : 0.55;
+    }
+    visualLen = Math.max(1, visualLen);
+    const h = height || 26;
+    const w = width || 80;
+    fontSizeNum = Math.max(10, Math.min(Math.floor(h * 0.88), Math.floor((w - 2) / visualLen)));
+  }
+  const fontSize = `${fontSizeNum}px`;
   const fontWeight = style?.fontWeight || 'bold';
   const textAlign = style?.textAlign || 'center';
   const fontFamily = style?.fontFamily || `'Noto Sans SC', 'Noto Sans CJK SC', 'Source Han Sans SC', 'WenQuanYi Micro Hei', 'Microsoft YaHei', 'PingFang SC', 'SimHei', 'JetBrains Mono', system-ui, sans-serif`;

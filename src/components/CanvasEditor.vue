@@ -447,12 +447,21 @@ const placementPreviewComponent = computed<ScreenComponent | null>(() => {
   const def = placeDrawing.value.def || props.activeComponentDef;
   if (!def) return null;
 
-  const minX = Math.min(placeDrawing.value.startX, placeDrawing.value.currentX);
-  const minY = Math.min(placeDrawing.value.startY, placeDrawing.value.currentY);
+  const is1to1 = def.type === 'draw-circle' || def.type === 'draw-square';
   const rawW = Math.abs(placeDrawing.value.currentX - placeDrawing.value.startX);
   const rawH = Math.abs(placeDrawing.value.currentY - placeDrawing.value.startY);
-  const w = Math.max(6, rawW);
-  const h = Math.max(6, rawH);
+  let w = Math.max(6, rawW);
+  let h = Math.max(6, rawH);
+  let minX = Math.min(placeDrawing.value.startX, placeDrawing.value.currentX);
+  let minY = Math.min(placeDrawing.value.startY, placeDrawing.value.currentY);
+
+  if (is1to1) {
+    const size = Math.max(w, h);
+    w = size;
+    h = size;
+    minX = placeDrawing.value.currentX >= placeDrawing.value.startX ? placeDrawing.value.startX : placeDrawing.value.startX - size;
+    minY = placeDrawing.value.currentY >= placeDrawing.value.startY ? placeDrawing.value.startY : placeDrawing.value.startY - size;
+  }
 
   return {
     id: 'placement-live-preview-temp',
@@ -841,17 +850,61 @@ const processMouseMove = (e: MouseEvent) => {
     }
 
     const comp = primarySelected.value;
+    const is1to1 = comp.type === 'draw-circle' || comp.type === 'draw-square';
+    if (is1to1) {
+      const s = Math.max(newW, newH);
+      if (handle.includes('w')) {
+        newX = Math.round(resizeStart.value.x + (resizeStart.value.width - s));
+      }
+      if (handle.includes('n')) {
+        newY = Math.round(resizeStart.value.y + (resizeStart.value.height - s));
+      }
+      newW = s;
+      newH = s;
+    }
+
     const isTelemetry = comp.type === 'metric-float' || comp.type === 'metric-flipper' || comp.type === 'metric-counter' || comp.type === 'metric-digital';
-    const isTextOrButton = comp.type === 'draw-text' || comp.type === 'ctrl-button' || comp.type === 'metric-header' || isTelemetry;
+    const isTextWidget = comp.type === 'draw-text' || comp.category === 'text';
+    const isButtonWidget = comp.type === 'ctrl-button' || comp.category === 'buttons';
+    const isTextOrButton = isTextWidget || isButtonWidget || comp.type === 'metric-header' || isTelemetry;
     let updatedStyle = { ...comp.style };
     if (isTextOrButton) {
-      const initH = resizeStart.value.height || (isTelemetry ? 26 : 36);
-      const ratio = isTelemetry ? 0.82 : 0.65;
-      const initFontSize = resizeStart.value.fontSize || comp.style?.fontSize || Math.max(12, Math.round(initH * ratio));
-      const scaleFactor = newH / initH;
-      const maxLimit = isTelemetry ? 180 : 96;
-      const newFontSize = Math.max(10, Math.min(Math.round(initFontSize * scaleFactor), maxLimit));
-      updatedStyle.fontSize = newFontSize;
+      if (isTelemetry) {
+        // 遥测框：自适应高宽，顶满抓手框
+        const valStr = String(comp.data?.value ?? '10.00');
+        const charLen = Math.max(3.5, valStr.length);
+        const fitH = Math.floor(newH * 0.88);
+        const fitW = Math.floor((newW - 2) / (charLen * 0.58));
+        updatedStyle.fontSize = Math.max(10, Math.min(fitH, fitW, 300));
+      } else if (isButtonWidget) {
+        // 按钮框：自适应高宽，文字刚好顶满组件抓手框
+        const text = String(comp.style?.buttonText || comp.customProps?.label || comp.name || '控制按钮');
+        let vLen = 0;
+        for (let i = 0; i < text.length; i++) {
+          vLen += text.charCodeAt(i) > 255 ? 1.0 : 0.55;
+        }
+        vLen = Math.max(1, vLen);
+        const fitH = Math.floor(newH * 0.80);
+        const fitW = Math.floor((newW - 8) / vLen);
+        updatedStyle.fontSize = Math.max(10, Math.min(fitH, fitW, 300));
+      } else {
+        // 文本框：自适应高宽（支持多行），文字刚好顶满组件抓手框
+        const text = String(comp.style?.text || comp.data?.staticData?.text || comp.name || '文本');
+        const lines = text.split('\n');
+        const lineCount = Math.max(1, lines.length);
+        let maxVisualLen = 0;
+        for (const line of lines) {
+          let vLen = 0;
+          for (let i = 0; i < line.length; i++) {
+            vLen += line.charCodeAt(i) > 255 ? 1.0 : 0.55;
+          }
+          if (vLen > maxVisualLen) maxVisualLen = vLen;
+        }
+        maxVisualLen = Math.max(1, maxVisualLen);
+        const fitH = Math.floor((newH * 0.88) / lineCount);
+        const fitW = Math.floor((newW - 2) / maxVisualLen);
+        updatedStyle.fontSize = Math.max(10, Math.min(fitH, fitW, 300));
+      }
       delete updatedStyle.fontSizeMode;
     }
 
@@ -1363,14 +1416,22 @@ const finishPlaceDrawing = () => {
   let h = Math.abs(currentY - startY);
 
   const isTelemetry = def.type === 'metric-float' || def.type === 'metric-flipper' || def.type === 'metric-counter' || def.type === 'metric-digital';
+  const is1to1 = def.type === 'draw-circle' || def.type === 'draw-square';
 
   // If user made a fast single click (distance < 12px), use component's default width and height
   if (w < 12 && h < 12) {
-    w = def.defaultWidth || def.width || (isTelemetry ? 72 : 140);
-    h = def.defaultHeight || def.height || (isTelemetry ? 26 : 100);
+    w = def.defaultWidth || def.width || (isTelemetry ? 72 : (is1to1 ? 100 : 140));
+    h = def.defaultHeight || def.height || (isTelemetry ? 26 : (is1to1 ? 100 : 100));
   } else {
     w = Math.max(16, w);
     h = Math.max(16, h);
+    if (is1to1) {
+      const size = Math.max(w, h);
+      w = size;
+      h = size;
+      minX = currentX >= startX ? startX : startX - size;
+      minY = currentY >= startY ? startY : startY - size;
+    }
   }
 
   let finalStyle = { ...(def.defaultStyle || def.style || {}) };
@@ -1403,10 +1464,21 @@ const finishPlaceDrawing = () => {
   if (isTelemetry) {
     // 遥测组件矩形拉框自适应计算：无论是单点创建还是拉框创建很大矩形，
     // 立即根据所绘边框高宽计算字号，使数字始终紧紧贴合抓手矩形边框，杜绝数字小小的挤在中间
-    const fitByH = Math.max(10, Math.floor(h * 0.82));
-    const fitByW = Math.max(10, Math.floor((w - 4) / (4 * 0.61)));
-    const targetSize = Math.max(10, Math.min(180, Math.min(fitByH, fitByW)));
-    finalStyle.fontSize = targetSize;
+    const fitByH = Math.max(10, Math.floor(h * 0.88));
+    const fitByW = Math.max(10, Math.floor((w - 2) / (4.5 * 0.58)));
+    finalStyle.fontSize = Math.max(10, Math.min(300, Math.min(fitByH, fitByW)));
+  } else if (def.type === 'ctrl-button') {
+    const text = ((finalStyle as any).buttonText || def.name || '控制按钮') as string;
+    let vLen = 0;
+    for (let i = 0; i < text.length; i++) vLen += text.charCodeAt(i) > 255 ? 1.0 : 0.55;
+    vLen = Math.max(1, vLen);
+    finalStyle.fontSize = Math.max(10, Math.min(300, Math.min(Math.floor(h * 0.80), Math.floor((w - 8) / vLen))));
+  } else if (def.type === 'draw-text') {
+    const text = ((finalStyle as any).text || def.name || '文本') as string;
+    let vLen = 0;
+    for (let i = 0; i < text.length; i++) vLen += text.charCodeAt(i) > 255 ? 1.0 : 0.55;
+    vLen = Math.max(1, vLen);
+    finalStyle.fontSize = Math.max(10, Math.min(300, Math.min(Math.floor(h * 0.88), Math.floor((w - 2) / vLen))));
   }
 
   const compPayload = {
@@ -3151,7 +3223,7 @@ defineExpose({
           >
             <div class="flex items-center gap-2.5">
               <Sliders class="w-4 h-4 text-[#38bdf8] stroke-[2]" />
-              <span class="font-bold text-[#38bdf8] group-hover:text-[#00f2ff] tracking-wide text-sm">查看/编辑属性面板</span>
+              <span class="font-bold text-[#38bdf8] group-hover:text-[#00f2ff] tracking-wide text-sm">查看属性面板</span>
             </div>
             <span class="text-xs text-[#00f2ff] font-mono font-bold">打开</span>
           </button>

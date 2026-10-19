@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { ScreenComponent, DatasetItem } from '../../types';
-import { ArrowRight, Power } from 'lucide-vue-next';
 import { isComponentBoundToControlOrRegulation } from '../../utils/scadaClient';
 
 interface Props {
@@ -24,8 +23,8 @@ const justTriggered = ref(false);
 
 const style = computed(() => props.component.style || {});
 const customProps = computed(() => props.component.customProps || {});
-const buttonText = computed(() => style.value.buttonText || props.component.name || '控制按钮');
-const variant = computed(() => style.value.buttonVariant || 'solid');
+const buttonText = computed(() => style.value.buttonText || customProps.value.label || props.component.name || '控制按钮');
+const variant = computed(() => style.value.buttonVariant || 'outline');
 const colorTheme = computed(() => style.value.buttonColorTheme || 'cyan');
 const action = computed(() => props.component.data?.action);
 
@@ -52,18 +51,25 @@ const effectiveBorderWidth = computed(() => {
 
 const effectiveBorderRadius = computed(() => {
   if (typeof style.value.borderRadius === 'number') return `${style.value.borderRadius}px`;
-  return '8px';
+  return '6px';
 });
 
-// 4. 动态计算字号
+// 4. 动态计算字号 (自适应顶满组件抓手框)
 const dynamicFontSize = computed(() => {
-  if (style.value.fontSize) return `${style.value.fontSize}px`;
+  if (style.value.fontSize && typeof style.value.fontSize === 'number' && style.value.fontSize > 0) {
+    return `${style.value.fontSize}px`;
+  }
   const h = props.component.height || 40;
   const w = props.component.width || 120;
-  const textLen = Math.max(buttonText.value.length, 2);
-  const byHeight = Math.round(h * 0.38);
-  const byWidth = Math.round((w - 24) / textLen * 1.1);
-  const size = Math.max(12, Math.min(byHeight, byWidth, 32));
+  const text = buttonText.value || '控制按钮';
+  let visualLen = 0;
+  for (let i = 0; i < text.length; i++) {
+    visualLen += text.charCodeAt(i) > 255 ? 1.0 : 0.55;
+  }
+  visualLen = Math.max(1, visualLen);
+  const byHeight = Math.floor(h * 0.80);
+  const byWidth = Math.floor((w - 8) / visualLen);
+  const size = Math.max(10, Math.min(byHeight, byWidth));
   return `${size}px`;
 });
 
@@ -79,6 +85,14 @@ const triggerAction = () => {
   setTimeout(() => {
     justTriggered.value = false;
   }, 800);
+
+  // 1. Direct screen jump priority
+  const targetId = customProps.value.targetScreenId || action.value?.targetScreenId;
+  if (targetId) {
+    emit('jump:screen', targetId);
+    window.dispatchEvent(new CustomEvent('datav:jump:screen', { detail: targetId }));
+    return;
+  }
 
   if (action.value) {
     if (isJumpAction.value && action.value.targetScreenId) {
@@ -146,7 +160,7 @@ const handlePointerEnter = () => {
   }
 };
 
-// Theme Color Map
+// Theme Color Map (发光阴影已全部移除)
 const themeStyleMap = computed(() => {
   const t = colorTheme.value;
   switch (t) {
@@ -160,7 +174,7 @@ const themeStyleMap = computed(() => {
         outlineText: 'text-emerald-300',
         flatBg: 'bg-emerald-950/60 hover:bg-emerald-900/80',
         flatText: 'text-emerald-300',
-        glow: 'shadow-[0_0_12px_rgba(16,185,129,0.35)]'
+        glow: 'shadow-none'
       };
     case 'rose':
       return {
@@ -172,7 +186,7 @@ const themeStyleMap = computed(() => {
         outlineText: 'text-rose-300',
         flatBg: 'bg-rose-950/60 hover:bg-rose-900/80',
         flatText: 'text-rose-300',
-        glow: 'shadow-[0_0_12px_rgba(244,63,94,0.35)]'
+        glow: 'shadow-none'
       };
     case 'amber':
       return {
@@ -184,7 +198,7 @@ const themeStyleMap = computed(() => {
         outlineText: 'text-amber-300',
         flatBg: 'bg-amber-950/60 hover:bg-amber-900/80',
         flatText: 'text-amber-300',
-        glow: 'shadow-[0_0_12px_rgba(245,158,11,0.35)]'
+        glow: 'shadow-none'
       };
     case 'indigo':
       return {
@@ -196,7 +210,7 @@ const themeStyleMap = computed(() => {
         outlineText: 'text-indigo-300',
         flatBg: 'bg-indigo-950/60 hover:bg-indigo-900/80',
         flatText: 'text-indigo-300',
-        glow: 'shadow-[0_0_12px_rgba(99,102,241,0.35)]'
+        glow: 'shadow-none'
       };
     case 'slate':
       return {
@@ -208,7 +222,7 @@ const themeStyleMap = computed(() => {
         outlineText: 'text-slate-300',
         flatBg: 'bg-slate-800 hover:bg-slate-700',
         flatText: 'text-slate-300',
-        glow: 'shadow-sm'
+        glow: 'shadow-none'
       };
     case 'cyan':
     default:
@@ -221,7 +235,7 @@ const themeStyleMap = computed(() => {
         outlineText: 'text-cyan-300',
         flatBg: 'bg-cyan-950/60 hover:bg-cyan-900/80',
         flatText: 'text-cyan-300',
-        glow: 'shadow-[0_0_12px_rgba(6,182,212,0.35)]'
+        glow: 'shadow-none'
       };
   }
 });
@@ -253,11 +267,7 @@ const themeStyleMap = computed(() => {
     @pointerleave="isPressed = false; isHovered = false"
     @pointerenter="handlePointerEnter"
   >
-    <!-- Action Icon -->
-    <ArrowRight v-if="isJumpAction" class="w-4 h-4 shrink-0 opacity-80" />
-    <Power v-else-if="action?.type === 'tele-control'" class="w-4 h-4 shrink-0 opacity-80" />
-
-    <!-- Button Text Label -->
+    <!-- Button Text Label (纯文本顶满抓手框，无自带箭头) -->
     <span class="truncate tracking-wide select-none leading-none font-medium">
       {{ buttonText }}
     </span>

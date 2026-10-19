@@ -48,9 +48,8 @@ const isAllOrthogonal = computed(() => {
   <div class="w-full h-full relative overflow-visible select-none pointer-events-none">
     <svg 
       class="w-full h-full overflow-visible pointer-events-none"
-      :viewBox="`0 0 ${component.width} ${component.height}`"
-      preserveAspectRatio="none"
-      :shape-rendering="isAllOrthogonal ? 'crispEdges' : 'geometricPrecision'"
+      :viewBox="`0 0 ${Math.max(1, component.width)} ${Math.max(1, component.height)}`"
+      shape-rendering="geometricPrecision"
     >
       <!-- Precise hit corridor on the actual polyline stroke only: must click the line entity to trigger selection -->
       <path

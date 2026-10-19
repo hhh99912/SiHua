@@ -9,11 +9,13 @@ export type ComponentCategory =
   | 'basic'        // 📐 基础几何图元与控制器 (矩形/圆形/多边形/文本/按钮等)
   | 'custom'       // 🧩 复合组合图元与自定义资产
   | 'drawing'      // 矢量绘制
+  | 'gb-standard'  // 🇨🇳 国标图元 (GB/T 43259 / GB/T 4728 / GB/T 44627)
   | 'media';
 
 export type ComponentType = 
   // 1. All Conventional Basic Primitives (常规基础图元与控制器)
   | 'draw-rect'             // 矩形 / 科技卡片底座
+  | 'draw-square'           // 正方形 (严格 1:1)
   | 'draw-rounded-rect'     // 圆角矩形
   | 'draw-circle'           // 正圆形 / 节点
   | 'draw-ellipse'          // 椭圆形

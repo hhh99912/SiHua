@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import {
   LineChart,
   BarChart3,
@@ -64,9 +64,11 @@ import {
   GripVertical,
   Image as ImageIcon
 } from 'lucide-vue-next';
-import { ComponentCategory, ComponentType, CustomSymbolDef } from '../types';
+import { ScreenComponent, ComponentCategory, ComponentType, CustomSymbolDef } from '../types';
 import { COMPONENT_DEFINITIONS, ComponentDefinition } from '../data/componentLibrary';
+import { GB_STANDARD_SYMBOLS } from '../data/gbStandardSymbols';
 import { getCustomSymbols, refreshCustomSymbolsFromDisk } from '../utils/customSymbolStorage';
+import WidgetRenderer from './widgets/WidgetRenderer.vue';
 
 const emit = defineEmits<{
   (e: 'add:component', def: any): void;
@@ -76,6 +78,52 @@ const emit = defineEmits<{
 const customSymbols = ref<CustomSymbolDef[]>([]);
 const searchQuery = ref('');
 
+// 鼠标悬浮预览状态 (悬浮在图元上时在右侧弹出图形预览，仅显示图形)
+const previewModal = ref<{
+  visible: boolean;
+  def: ComponentDefinition | null;
+  top: number;
+}>({
+  visible: false,
+  def: null,
+  top: 100
+});
+
+let hoverTimer: any = null;
+
+const handleItemMouseEnter = (e: MouseEvent, def: ComponentDefinition) => {
+  clearTimeout(hoverTimer);
+  const target = e.currentTarget as HTMLElement | null;
+  const rect = target?.getBoundingClientRect();
+  const clickTop = rect ? rect.top : e.clientY;
+  const clampedTop = Math.max(70, Math.min(window.innerHeight - 340, clickTop - 110));
+
+  previewModal.value = {
+    visible: true,
+    def,
+    top: clampedTop
+  };
+};
+
+const handleItemMouseLeave = () => {
+  clearTimeout(hoverTimer);
+  hoverTimer = setTimeout(() => {
+    previewModal.value.visible = false;
+    previewModal.value.def = null;
+  }, 100);
+};
+
+const handleItemClick = (def: ComponentDefinition) => {
+  emit('add:component', def);
+};
+
+const handleKeyDown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape' && previewModal.value.visible) {
+    previewModal.value.visible = false;
+    previewModal.value.def = null;
+  }
+};
+
 const refreshCustomSymbols = () => {
   customSymbols.value = getCustomSymbols();
 };
@@ -84,6 +132,13 @@ onMounted(() => {
   refreshCustomSymbols();
   refreshCustomSymbolsFromDisk().then(refreshCustomSymbols).catch(() => {});
   window.addEventListener('scada:custom-symbols-updated', refreshCustomSymbols);
+  window.addEventListener('keydown', handleKeyDown);
+});
+
+onUnmounted(() => {
+  clearTimeout(hoverTimer);
+  window.removeEventListener('scada:custom-symbols-updated', refreshCustomSymbols);
+  window.removeEventListener('keydown', handleKeyDown);
 });
 
 // GE-SCADA 图元分类结构体系 (树形目录)
@@ -96,6 +151,12 @@ interface TreeCategoryDef {
 }
 
 const treeCategories: TreeCategoryDef[] = [
+  {
+    id: 'gb-standard',
+    category: 'gb-standard',
+    label: '国标图元',
+    code: 'GB-STD'
+  },
   {
     id: 'electrical',
     category: 'electrical',
@@ -207,7 +268,7 @@ const getIcon = (iconName?: string) => {
   return Layers;
 };
 
-// 动态合并预设图元与自定义多态图元
+// 动态合并国标图元、预设图元与自定义多态图元
 const allComponents = computed<ComponentDefinition[]>(() => {
   const symbolDefs: ComponentDefinition[] = customSymbols.value.map(sym => ({
     type: 'composite-symbol' as ComponentType,
@@ -229,21 +290,28 @@ const allComponents = computed<ComponentDefinition[]>(() => {
     children: sym.states?.[0]?.children || sym.children || []
   }));
 
-  return [...COMPONENT_DEFINITIONS, ...symbolDefs];
+  return [...GB_STANDARD_SYMBOLS, ...COMPONENT_DEFINITIONS, ...symbolDefs];
 });
 
-// 分级展开状态控制 (默认展开一次设备与遥信)
+// 分级展开状态控制 (默认展开国标图元)
 const expandedNodes = ref<Record<string, boolean>>({
-  electrical: true,
-  'electrical-switches': true,
+  'gb-standard': true,
+  'gb-standard-sub-开关与控制设备': true,
+  'gb-standard-sub-变压与变换设备': true,
+  'gb-standard-sub-互感与测量保护': false,
+  'gb-standard-sub-旋转电机与新能源': false,
+  'gb-standard-sub-无功补偿与电抗': false,
+  'gb-standard-sub-线路母线与接地': false,
+  electrical: false,
+  'electrical-switches': false,
   'electrical-transformers': false,
-  status: true,
-  metrics: true,
+  status: false,
+  metrics: false,
   buttons: false,
   charts: false,
   basic: false,
   decoration: false,
-  custom: true
+  custom: false
 });
 
 const toggleNode = (nodeKey: string) => {
@@ -258,10 +326,16 @@ const toggleAllNodes = () => {
   });
 };
 
-// 过滤和分级构造树形数据 (仅两级级联：一级分类 -> 二级具体图元)
+// 过滤和分级构造树形数据
 interface ProcessedLeafItem {
   def: ComponentDefinition;
   key: string;
+}
+
+interface ProcessedSubGroup {
+  id: string;
+  name: string;
+  items: ProcessedLeafItem[];
 }
 
 interface ProcessedTreeBranch {
@@ -270,6 +344,7 @@ interface ProcessedTreeBranch {
   label: string;
   code: string;
   items: ProcessedLeafItem[];
+  subGroups?: ProcessedSubGroup[];
   totalCount: number;
 }
 
@@ -278,30 +353,67 @@ const filteredTreeData = computed<ProcessedTreeBranch[]>(() => {
 
   return treeCategories.map(cat => {
     let pool: ComponentDefinition[] = [];
-    if (cat.id === 'custom') {
-      pool = allComponents.value.filter(c => c.type === 'composite-symbol' || Boolean(c.defaultCustomProps?.isCustomSymbol));
+    if (cat.id === 'gb-standard') {
+      pool = allComponents.value.filter(c => c.category === 'gb-standard' || Boolean(c.defaultCustomProps?.isGbStandard));
+    } else if (cat.id === 'custom') {
+      pool = allComponents.value.filter(c => (c.type === 'composite-symbol' || Boolean(c.defaultCustomProps?.isCustomSymbol)) && c.category !== 'gb-standard' && !c.defaultCustomProps?.isGbStandard);
     } else if (cat.id === 'electrical') {
-      pool = allComponents.value.filter(c => c.category === 'electrical' && c.type !== 'composite-symbol' && !c.defaultCustomProps?.isCustomSymbol);
+      pool = allComponents.value.filter(c => c.category === 'electrical' && c.type !== 'composite-symbol' && !c.defaultCustomProps?.isCustomSymbol && !c.defaultCustomProps?.isGbStandard);
     } else if (cat.id === 'buttons') {
-      pool = allComponents.value.filter(c => c.category === 'buttons' || c.type === 'ctrl-button');
+      pool = allComponents.value.filter(c => (c.category === 'buttons' || c.type === 'ctrl-button') && c.category !== 'gb-standard' && !c.defaultCustomProps?.isGbStandard);
     } else if (cat.id === 'basic') {
-      pool = allComponents.value.filter(c => c.category === 'basic' && c.type !== 'ctrl-button');
+      pool = allComponents.value.filter(c => c.category === 'basic' && c.type !== 'ctrl-button' && c.category !== 'gb-standard' && !c.defaultCustomProps?.isGbStandard);
     } else {
-      pool = allComponents.value.filter(c => c.category === cat.category);
+      pool = allComponents.value.filter(c => c.category === cat.category && !c.defaultCustomProps?.isGbStandard);
     }
 
     if (query) {
       pool = pool.filter(c => 
         c.name.toLowerCase().includes(query) || 
         (c.nameEn && c.nameEn.toLowerCase().includes(query)) ||
-        (c.description && c.description.toLowerCase().includes(query))
+        (c.description && c.description.toLowerCase().includes(query)) ||
+        (c.subCategory && c.subCategory.toLowerCase().includes(query))
       );
     }
 
     const items: ProcessedLeafItem[] = pool.map(c => ({
       def: c,
-      key: `${c.type}-${c.name}-${c.defaultCustomProps?.symbolId || ''}`
+      key: `${c.type}-${c.name}-${c.defaultCustomProps?.symbolId || ''}-${c.subCategory || ''}`
     }));
+
+    // 为国标图元构造二级分组体系 (做好分类)
+    let subGroups: ProcessedSubGroup[] | undefined = undefined;
+    if (cat.id === 'gb-standard') {
+      const standardOrder = [
+        '开关与控制设备',
+        '变压与变换设备',
+        '互感与测量保护',
+        '旋转电机与新能源',
+        '无功补偿与电抗',
+        '线路母线与接地'
+      ];
+
+      subGroups = [];
+      standardOrder.forEach(subName => {
+        const subItems = items.filter(it => it.def.subCategory === subName);
+        if (subItems.length > 0) {
+          subGroups!.push({
+            id: `gb-standard-sub-${subName}`,
+            name: subName,
+            items: subItems
+          });
+        }
+      });
+
+      const otherItems = items.filter(it => !it.def.subCategory || !standardOrder.includes(it.def.subCategory));
+      if (otherItems.length > 0) {
+        subGroups.push({
+          id: 'gb-standard-sub-其他国标图元',
+          name: '其他国标图元',
+          items: otherItems
+        });
+      }
+    }
 
     return {
       id: cat.id,
@@ -309,6 +421,7 @@ const filteredTreeData = computed<ProcessedTreeBranch[]>(() => {
       label: cat.label,
       code: cat.code,
       items,
+      subGroups,
       totalCount: items.length
     };
   }).filter(branch => branch.totalCount > 0);
@@ -333,6 +446,57 @@ const handleDragStart = (e: DragEvent, def: ComponentDefinition) => {
     e.dataTransfer.effectAllowed = 'copy';
   }
 };
+
+// 构造纯图形预览组件对象
+const previewScale = computed(() => {
+  if (!previewModal.value.def) return 1;
+  const def = previewModal.value.def;
+  const maxDim = Math.max(def.defaultWidth || 40, def.defaultHeight || 40);
+  const targetDim = 190;
+  return Math.min(3.5, Math.max(1, targetDim / maxDim));
+});
+
+const previewSize = computed(() => {
+  if (!previewModal.value.def) return { width: 140, height: 140 };
+  const def = previewModal.value.def;
+  const scale = previewScale.value;
+  return {
+    width: Math.round((def.defaultWidth || 40) * scale),
+    height: Math.round((def.defaultHeight || 40) * scale)
+  };
+});
+
+const previewComponent = computed<ScreenComponent | null>(() => {
+  if (!previewModal.value.def) return null;
+  const def = previewModal.value.def;
+  const scale = previewScale.value;
+  const targetW = Math.round((def.defaultWidth || 40) * scale);
+  const targetH = Math.round((def.defaultHeight || 40) * scale);
+
+  return {
+    id: 'preview-comp-temp',
+    type: def.type,
+    category: def.category,
+    name: def.name,
+    x: 0,
+    y: 0,
+    width: targetW,
+    height: targetH,
+    rotation: 0,
+    zIndex: 1,
+    visible: true,
+    locked: false,
+    style: {
+      ...def.defaultStyle,
+      fill: def.defaultStyle?.fill || 'transparent',
+      stroke: def.defaultStyle?.stroke || '#00f2ff'
+    },
+    data: def.defaultData || { mapping: {} },
+    customProps: def.defaultCustomProps,
+    states: def.states,
+    children: def.states?.[0]?.children || def.children || []
+  };
+});
 </script>
 
 <template>
@@ -391,14 +555,14 @@ const handleDragStart = (e: DragEvent, def: ComponentDefinition) => {
       </div>
     </div>
 
-    <!-- 3. 图元分级列表 (标准两级级联：一级分类 -> 二级具体图元，明显导引线缩进) -->
+    <!-- 3. 图元分级列表 -->
     <div class="flex-1 overflow-y-auto bg-[#ebe4d4]">
       <div 
         v-for="branch in filteredTreeData" 
         :key="branch.id" 
         class="border-b border-[#ded5bf]"
       >
-        <!-- 一级分类目录节点 (Level 1: 简洁专业，折叠小箭头，中文大类名称，数量角标) -->
+        <!-- 一级分类目录节点 (Level 1) -->
         <div 
           @click="toggleNode(branch.id)"
           class="w-full px-3.5 py-2.5 hover:bg-[#e4dcce] flex items-center justify-between cursor-pointer select-none transition-colors group"
@@ -411,8 +575,11 @@ const handleDragStart = (e: DragEvent, def: ComponentDefinition) => {
                 :class="{ '-rotate-90': !expandedNodes[branch.id] }"
               />
             </button>
-            <span class="text-[14px] font-semibold text-slate-800 group-hover:text-sky-900 truncate tracking-wide">
-              {{ branch.label }}
+            <span class="text-[14px] font-semibold text-slate-800 group-hover:text-sky-900 truncate tracking-wide flex items-center gap-1.5">
+              <span>{{ branch.label }}</span>
+              <span v-if="branch.id === 'gb-standard'" class="text-[10px] bg-red-600/10 text-red-600 px-1 py-0.2 rounded font-mono font-medium border border-red-500/20">
+                GB
+              </span>
             </span>
           </div>
 
@@ -423,37 +590,106 @@ const handleDragStart = (e: DragEvent, def: ComponentDefinition) => {
           </div>
         </div>
 
-        <!-- 二级图元直属列表 (Level 2: 明显缩进，带树形竖导引线，层级一目了然) -->
+        <!-- 二级图元直属列表 / 子分类分组列表 -->
         <div v-show="expandedNodes[branch.id]" class="bg-[#ebe4d4] pb-1.5">
-          <div class="ml-6 pl-4 border-l-2 border-[#cfc5b0]/70 space-y-0.5 my-1 mr-2">
-            <div
-              v-for="item in branch.items"
-              :key="item.key"
-              draggable="true"
-              @dragstart="handleDragStart($event, item.def)"
-              @click="emit('add:component', item.def)"
-              class="group w-full px-2.5 py-1.5 hover:bg-[#e4dcce] rounded transition-colors cursor-pointer flex items-center justify-between gap-2"
-              :title="item.def.description || item.def.name"
+          <!-- A. 国标图元带标准子分类结构 (做好分类) -->
+          <template v-if="branch.subGroups && branch.subGroups.length > 0">
+            <div 
+              v-for="sub in branch.subGroups" 
+              :key="sub.id" 
+              class="ml-3 my-1"
             >
-              <!-- 左侧：图元纯中文名称 -->
-              <div class="flex items-center min-w-0 flex-1">
-                <span class="text-[13.5px] font-normal text-slate-800 group-hover:text-sky-800 truncate tracking-wide">
-                  {{ item.def.name }}
+              <!-- 子分类小标题 (可独立折叠) -->
+              <div 
+                @click="toggleNode(sub.id)"
+                class="px-3 py-1.5 hover:bg-[#ded5bf] rounded flex items-center justify-between cursor-pointer text-slate-700 select-none transition-colors mr-2 group/sub"
+              >
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <ChevronDown 
+                    class="w-3.5 h-3.5 text-slate-400 group-hover/sub:text-sky-700 transition-transform duration-150"
+                    :class="{ '-rotate-90': expandedNodes[sub.id] === false }"
+                  />
+                  <span class="text-[13px] font-semibold text-slate-700 group-hover/sub:text-sky-900 tracking-wide">
+                    {{ sub.name }}
+                  </span>
+                </div>
+                <span class="text-[11px] font-mono text-slate-400">
+                  {{ sub.items.length }}
                 </span>
               </div>
 
-              <!-- 右侧：简洁快捷添加图标与拖拽手柄 -->
-              <div class="flex items-center gap-1 shrink-0">
-                <button
-                  class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-[#ded5bf] text-sky-700 transition-opacity cursor-pointer"
-                  title="点击直接添加至画布中央"
+              <!-- 子分类下的图元列表 (鼠标悬浮即时显示右侧纯图形预览) -->
+              <div 
+                v-show="expandedNodes[sub.id] !== false"
+                class="ml-4 pl-3 border-l-2 border-[#cfc5b0]/60 space-y-0.5 my-1 mr-2"
+              >
+                <div
+                  v-for="item in sub.items"
+                  :key="item.key"
+                  draggable="true"
+                  @dragstart="handleDragStart($event, item.def)"
+                  @mouseenter="handleItemMouseEnter($event, item.def)"
+                  @mouseleave="handleItemMouseLeave"
+                  @click="handleItemClick(item.def)"
+                  class="group w-full px-2 py-1.5 hover:bg-[#ded5bf] rounded transition-colors cursor-pointer flex items-center justify-between gap-2"
+                  :class="{ 'bg-[#ded5bf] text-sky-800 font-medium': previewModal.visible && previewModal.def?.name === item.def.name }"
+                  :title="item.def.description || item.def.name"
                 >
-                  <Plus class="w-3.5 h-3.5" />
-                </button>
-                <GripVertical class="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 shrink-0" />
+                  <div class="flex items-center min-w-0 flex-1">
+                    <span class="text-[13px] font-normal text-slate-800 group-hover:text-sky-800 truncate tracking-wide">
+                      {{ item.def.name }}
+                    </span>
+                  </div>
+
+                  <div class="flex items-center gap-1 shrink-0">
+                    <button
+                      class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-[#cfc5b0] text-sky-700 transition-opacity cursor-pointer"
+                      title="点击直接添加至画布中央"
+                    >
+                      <Plus class="w-3.5 h-3.5" />
+                    </button>
+                    <GripVertical class="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 shrink-0" />
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </template>
+
+          <!-- B. 常规未分二级子组列表 (同样支持鼠标悬浮预览) -->
+          <template v-else>
+            <div class="ml-6 pl-4 border-l-2 border-[#cfc5b0]/70 space-y-0.5 my-1 mr-2">
+              <div
+                v-for="item in branch.items"
+                :key="item.key"
+                draggable="true"
+                @dragstart="handleDragStart($event, item.def)"
+                @mouseenter="handleItemMouseEnter($event, item.def)"
+                @mouseleave="handleItemMouseLeave"
+                @click="handleItemClick(item.def)"
+                class="group w-full px-2.5 py-1.5 hover:bg-[#e4dcce] rounded transition-colors cursor-pointer flex items-center justify-between gap-2"
+                :class="{ 'bg-[#e4dcce] text-sky-800 font-medium': previewModal.visible && previewModal.def?.name === item.def.name }"
+                :title="item.def.description || item.def.name"
+              >
+                <!-- 左侧：图元名称 -->
+                <div class="flex items-center min-w-0 flex-1">
+                  <span class="text-[13.5px] font-normal text-slate-800 group-hover:text-sky-800 truncate tracking-wide">
+                    {{ item.def.name }}
+                  </span>
+                </div>
+
+                <!-- 右侧：快捷添加与拖拽手柄 -->
+                <div class="flex items-center gap-1 shrink-0">
+                  <button
+                    class="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-[#ded5bf] text-sky-700 transition-opacity cursor-pointer"
+                    title="点击直接添加至画布中央"
+                  >
+                    <Plus class="w-3.5 h-3.5" />
+                  </button>
+                  <GripVertical class="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 shrink-0" />
+                </div>
+              </div>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -482,4 +718,41 @@ const handleDragStart = (e: DragEvent, def: ComponentDefinition) => {
       <span>共 {{ allComponents.length }} 个元件</span>
     </div>
   </aside>
+
+  <!-- 5. 鼠标悬浮纯图形预览弹框 (右侧轻量浮动展示，仅显示纯图形，不要做任何多余解释，pointer-events-none零阻碍) -->
+  <teleport to="body">
+    <div 
+      v-if="previewModal.visible && previewModal.def" 
+      class="fixed pointer-events-none z-50 transition-all duration-75"
+      :style="{
+        left: '326px',
+        top: previewModal.top + 'px'
+      }"
+    >
+      <div 
+        class="w-[280px] h-[280px] bg-[#0c1322]/95 border-2 border-cyan-500/80 rounded-xl shadow-2xl shadow-cyan-950/90 flex flex-col items-center justify-center p-4 select-none overflow-hidden backdrop-blur-md"
+        :style="{
+          backgroundImage: 'radial-gradient(circle, rgba(56, 189, 248, 0.12) 1px, transparent 1px)',
+          backgroundSize: '16px 16px'
+        }"
+      >
+        <!-- 纯图形预览区域 (只显示图形，没有任何多余解释或文字) -->
+        <div class="w-full h-full flex items-center justify-center relative overflow-hidden">
+          <div 
+            class="relative flex items-center justify-center"
+            :style="{
+              width: previewSize.width + 'px',
+              height: previewSize.height + 'px'
+            }"
+          >
+            <WidgetRenderer 
+              v-if="previewComponent"
+              :component="previewComponent"
+              :preview-mode="true"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  </teleport>
 </template>

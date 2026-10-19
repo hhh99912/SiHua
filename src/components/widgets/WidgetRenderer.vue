@@ -43,13 +43,17 @@ const compType = computed(() => props.component?.type || '');
 const compCategory = computed(() => props.component?.category || '');
 const isComposite = computed(() => props.component?.type === 'composite-symbol' || Boolean(props.component?.children?.length) || Boolean(props.component?.states?.length));
 const isLineType = computed(() => isLineComponent(compType.value));
+const isVectorShape = computed(() => {
+  const t = compType.value;
+  return t.startsWith('draw-') || compCategory.value === 'basic' || compCategory.value === 'drawing';
+});
 </script>
 
 <template>
   <div 
     v-if="component" 
     class="w-full h-full relative pointer-events-none"
-    :class="{ 'overflow-visible': isLineType, 'overflow-hidden': !isLineType }"
+    :class="{ 'overflow-visible': isLineType || isVectorShape, 'overflow-hidden': !isLineType && !isVectorShape }"
   >
     <!-- 1. Float Metric Fast Route (Most Common SCADA Component - 400+ points fast-path) -->
     <FloatMetric 

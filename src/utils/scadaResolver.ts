@@ -537,10 +537,9 @@ export function subscribeComponentPointReactive(component: ScreenComponent, cand
 
   if (resolvedPid > 0) {
     const _ = getPointReactiveRef(resolvedPid).value;
-  } else {
-    // 仅针对完全没有绑定任何测点的纯静态图元或未关联图元，挂载兜底脉冲
-    const _ = scadaLiveTick.value;
   }
+  // 核心优化：未绑定测点的图元属于纯静态文本/线条/装饰框，绝不挂载全局 scadaLiveTick！
+  // 彻底消除变电站任一测点波动导致全图数百个静态图元每秒被动重复 diff 与重绘。
 }
 
 /**
@@ -569,10 +568,23 @@ export function getComponentLiveValue(
   let value: any = undefined;
   let state: any = undefined;
 
-  if (valueKey !== undefined && valueKey !== null && valueKey !== '') {
+  // Direct fast check in raw memory maps if pointId is available
+  if (mapping.pointId !== undefined && mapping.pointId !== null && mapping.pointId !== '') {
+    const pid = Number(mapping.pointId);
+    if (!isNaN(pid) && pid > 0) {
+      if (rawYcValues.has(pid)) {
+        value = rawYcValues.get(pid);
+      }
+      if (rawYxValues.has(pid)) {
+        state = rawYxValues.get(pid);
+      }
+    }
+  }
+
+  if (value === undefined && valueKey !== undefined && valueKey !== null && valueKey !== '') {
     value = resolveDataPointValue(datasets, datasetId, String(valueKey), undefined);
   }
-  if (stateKey !== undefined && stateKey !== null && stateKey !== '') {
+  if (state === undefined && stateKey !== undefined && stateKey !== null && stateKey !== '') {
     state = resolveDataPointValue(datasets, datasetId, String(stateKey), undefined);
   }
 

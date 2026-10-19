@@ -44,7 +44,7 @@ if (process.platform === 'linux' && typeof setInterval !== 'undefined') {
     if (isXsetResetRunning) return;
     isXsetResetRunning = true;
     try {
-      exec('xset s reset', () => {
+      exec('xset s reset', { timeout: 3000 }, () => {
         isXsetResetRunning = false;
       });
     } catch {

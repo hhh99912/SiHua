@@ -3,6 +3,7 @@ import { ComponentCategory, ComponentType, ScreenComponent, CustomSymbolStateDef
 export interface ComponentDefinition {
   type: ComponentType;
   category: ComponentCategory;
+  subCategory?: string;
   name: string;
   nameEn: string;
   iconName: string;
@@ -11,7 +12,7 @@ export interface ComponentDefinition {
   defaultHeight: number;
   defaultStyle: ScreenComponent['style'];
   defaultAnimation?: ScreenComponent['animation'];
-  defaultData: ScreenComponent['data'];
+  defaultData?: ScreenComponent['data'];
   defaultCustomProps?: Record<string, any>;
   states?: CustomSymbolStateDef[];
   children?: ScreenComponent[];
@@ -29,6 +30,24 @@ export const COMPONENT_DEFINITIONS: ComponentDefinition[] = [
     iconName: 'Square',
     description: '基础矢量矩形与直角底座，支持描边、半透明背景与渐变填充',
     defaultWidth: 160,
+    defaultHeight: 100,
+    defaultStyle: {
+      fill: '#00f2ff',
+      fillOpacity: 0.15,
+      stroke: '#00f2ff',
+      strokeWidth: 2,
+      borderRadius: 0
+    },
+    defaultData: { mapping: {} }
+  },
+  {
+    type: 'draw-square',
+    category: 'basic',
+    name: '正方形',
+    nameEn: 'Square',
+    iconName: 'Square',
+    description: '严格 1:1 等宽高正方形图元，支持描边与填充',
+    defaultWidth: 100,
     defaultHeight: 100,
     defaultStyle: {
       fill: '#00f2ff',
@@ -537,31 +556,6 @@ export const COMPONENT_DEFINITIONS: ComponentDefinition[] = [
   {
     type: 'ctrl-button',
     category: 'buttons',
-    name: '标准控制按钮',
-    nameEn: 'Standard Solid Button',
-    iconName: 'Power',
-    description: '工业实心微晶控制按钮，支持遥控分合闸、指令触发、画面跳转与色彩定制',
-    defaultWidth: 140,
-    defaultHeight: 46,
-    defaultStyle: {
-      buttonText: '断路器合闸',
-      buttonColorTheme: 'cyan',
-      buttonVariant: 'solid',
-      borderRadius: 8,
-      fill: '',
-      textColor: ''
-    },
-    defaultData: {
-      action: {
-        type: 'none',
-        label: '按钮操作'
-      },
-      mapping: {}
-    }
-  },
-  {
-    type: 'ctrl-button',
-    category: 'buttons',
     name: '线框控制按钮',
     nameEn: 'Outline Cyber Button',
     iconName: 'Sparkles',
@@ -572,7 +566,7 @@ export const COMPONENT_DEFINITIONS: ComponentDefinition[] = [
       buttonText: '画面跳转/监控',
       buttonColorTheme: 'cyan',
       buttonVariant: 'outline',
-      borderRadius: 8,
+      borderRadius: 6,
       fill: 'transparent',
       textColor: '#00f2ff'
     },
@@ -580,31 +574,6 @@ export const COMPONENT_DEFINITIONS: ComponentDefinition[] = [
       action: {
         type: 'jump-screen',
         label: '画面跳转'
-      },
-      mapping: {}
-    }
-  },
-  {
-    type: 'ctrl-button',
-    category: 'buttons',
-    name: '扁平控制按钮',
-    nameEn: 'Flat Control Button',
-    iconName: 'Sliders',
-    description: '轻量化扁平控制按钮，适合密集控制柜与快速操作面板',
-    defaultWidth: 140,
-    defaultHeight: 46,
-    defaultStyle: {
-      buttonText: '复归确认',
-      buttonColorTheme: 'slate',
-      buttonVariant: 'flat',
-      borderRadius: 6,
-      fill: '#1e293b',
-      textColor: '#e2e8f0'
-    },
-    defaultData: {
-      action: {
-        type: 'none',
-        label: '按钮操作'
       },
       mapping: {}
     }
@@ -809,29 +778,6 @@ export const COMPONENT_DEFINITIONS: ComponentDefinition[] = [
     defaultWidth: 320,
     defaultHeight: 180,
     defaultStyle: {},
-    defaultData: { mapping: {} }
-  },
-
-  // ==========================================
-  // 2. Electrical Power System Primary Components (电力一次系统图元)
-  // 注：断路器、隔离开关、接地刀闸、变压器、互感器、手车等图元均统一使用
-  // cell/ 目录下规范的自定义设计工坊图元（零边距、无闸符、多状态几何装配），
-  // 在 ComponentPalette 中通过 customSymbols 自动无缝聚合展示与拖拽。
-  // ==========================================
-  {
-    type: 'elec-busbar',
-    category: 'electrical',
-    name: '高低压母线段 Busbar',
-    nameEn: 'Power Distribution Busbar',
-    iconName: 'Minus',
-    description: '变电站高低压铜铝主母线段，支持电压等级色彩定制与能量粒子流',
-    defaultWidth: 320,
-    defaultHeight: 16,
-    defaultStyle: {
-      stroke: '#00f2ff',
-      strokeWidth: 6,
-      voltageLevel: '10kV'
-    },
     defaultData: { mapping: {} }
   },
 

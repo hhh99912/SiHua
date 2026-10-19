@@ -28,11 +28,15 @@ const staticStyle = computed(() => {
     ? Boolean(style.trimZeros) 
     : (customProps?.trimZeros !== undefined ? Boolean(customProps.trimZeros) : true);
 
-  // Text color
-  const textColor = style?.textColor || customProps?.textColor || '#00f2ff';
+  // Text color (strictly font color)
+  const textColor = style?.textColor || style?.color || customProps?.textColor || customProps?.color || '#00f2ff';
 
-  // Background color
-  const rawFill = style?.fill !== undefined ? style.fill : (customProps?.bgColor !== undefined ? customProps.bgColor : 'transparent');
+  // Background color (strictly separate from textColor!)
+  const rawFill = style?.bgColor !== undefined 
+    ? style.bgColor 
+    : (customProps?.bgColor !== undefined 
+      ? customProps.bgColor 
+      : (style?.fill && style?.fill !== 'transparent' && style?.fill !== textColor ? style.fill : 'transparent'));
   const bgColor = rawFill && rawFill !== 'transparent' ? rawFill : 'transparent';
 
   // Border
@@ -56,9 +60,6 @@ const staticStyle = computed(() => {
     trimZeros,
     textColor,
     bgColor,
-    hasBorder,
-    borderColor: strokeColor || 'transparent',
-    borderWidth: hasBorder ? strokeWidth : 0,
     fontSize,
     fontWeight,
     textAlign
@@ -71,14 +72,19 @@ const formattedValue = computed(() => {
   return formatTruncatedNumber(num, staticStyle.value.decimals, staticStyle.value.trimZeros);
 });
 
-// 3. Telemetry Font Size (统一直接使用 style.fontSize，支持抓手拉伸实时更新与属性面板批量修改)
+// 3. Telemetry Font Size (抓手拉伸实时更新与自适应顶满抓手框，无边框纯净显示)
 const dynamicFontSize = computed(() => {
   const fs = props.component.style?.fontSize;
   if (typeof fs === 'number' && fs > 0) {
     return `${fs}px`;
   }
   const compH = props.component.height || 26;
-  return `${Math.max(10, Math.floor(compH * 0.82))}px`;
+  const compW = props.component.width || 72;
+  const valStr = formattedValue.value || '10.00';
+  const charLen = Math.max(3.5, valStr.length);
+  const fitH = Math.floor(compH * 0.88);
+  const fitW = Math.floor((compW - 2) / (charLen * 0.58));
+  return `${Math.max(10, Math.min(fitH, fitW))}px`;
 });
 </script>
 
@@ -90,38 +96,25 @@ const dynamicFontSize = computed(() => {
       'justify-center': staticStyle.textAlign === 'center',
       'justify-end': staticStyle.textAlign === 'right'
     }"
+    :style="{
+      backgroundColor: staticStyle.bgColor
+    }"
   >
-    <!-- 紧贴数字或细微边距的数码边框包装盒 (边框紧贴数字，无模糊) -->
-    <div
-      class="inline-flex items-center justify-center select-none overflow-hidden"
-      :class="[
-        staticStyle.hasBorder ? 'px-1 py-[1.5px] rounded-[2px]' : 'px-0 py-0'
-      ]"
-      :style="{ 
-        backgroundColor: staticStyle.bgColor,
-        borderStyle: staticStyle.hasBorder ? 'solid' : 'none',
-        borderColor: staticStyle.borderColor,
-        borderWidth: `${staticStyle.borderWidth}px`,
-        boxSizing: 'border-box',
-        maxWidth: '100%',
-        maxHeight: '100%'
+    <!-- 纯净数码数字，无数字边框，顶满组件抓手框 -->
+    <span
+      class="font-mono font-bold leading-none tracking-tight p-0 m-0 block whitespace-nowrap overflow-hidden select-none"
+      :style="{
+        color: staticStyle.textColor,
+        fontSize: dynamicFontSize,
+        fontWeight: staticStyle.fontWeight,
+        textAlign: staticStyle.textAlign as any,
+        fontFamily: `'Chakra Petch', 'JetBrains Mono', Consolas, monospace`,
+        fontVariantNumeric: 'tabular-nums',
+        lineHeight: 1
       }"
     >
-      <span
-        class="font-mono font-bold leading-none tracking-tight p-0 m-0 block whitespace-nowrap overflow-hidden select-none"
-        :style="{
-          color: staticStyle.textColor,
-          fontSize: dynamicFontSize,
-          fontWeight: staticStyle.fontWeight,
-          textAlign: staticStyle.textAlign as any,
-          fontFamily: `'Chakra Petch', 'JetBrains Mono', Consolas, monospace`,
-          fontVariantNumeric: 'tabular-nums',
-          lineHeight: 1
-        }"
-      >
-        {{ formattedValue }}
-      </span>
-    </div>
+      {{ formattedValue }}
+    </span>
   </div>
 </template>
 

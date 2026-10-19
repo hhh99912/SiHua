@@ -132,6 +132,7 @@ const textLineHeight = computed(() => {
 const pad = computed(() => Math.max(1, Math.ceil(strokeWidth.value / 2)));
 const innerW = computed(() => Math.max(1, width.value - pad.value * 2));
 const innerH = computed(() => Math.max(1, height.value - pad.value * 2));
+const circleRadius = computed(() => Math.max(1, Math.min(innerW.value, innerH.value) / 2));
 
 // Helper to compute polygon points for regular N-gon
 const getRegularPolygonPoints = (sides: number) => {
@@ -270,16 +271,16 @@ const cylPaths = computed(() => {
 
 <template>
   <div 
-    class="w-full h-full relative overflow-hidden select-none flex items-center justify-center pointer-events-none transform-gpu"
+    class="w-full h-full relative select-none flex items-center justify-center pointer-events-none transform-gpu"
+    :class="{ 'overflow-hidden': isTextType, 'overflow-visible': !isTextType }"
     :style="{ 
       opacity,
-      contain: 'strict',
-      contentVisibility: 'auto'
+      contain: isTextType ? 'layout style' : 'none'
     }"
   >
-    <!-- 1. FAST PATH: Standard Rectangle (Zero SVG Overhead, Pure Hardware-Accelerated CSS Box) -->
+    <!-- 1. FAST PATH: Standard Rectangle & Square (Zero SVG Overhead, Pure Hardware-Accelerated CSS Box) -->
     <div
-      v-if="type === 'draw-rect' && !style.gradient"
+      v-if="(type === 'draw-rect' || type === 'draw-square') && !style.gradient"
       class="w-full h-full box-border"
       :style="{
         backgroundColor: effectiveBgColor,
@@ -328,7 +329,7 @@ const cylPaths = computed(() => {
         lineHeight: textLineHeight,
         textDecoration: style.textDecoration || 'none',
         fontStyle: style.fontStyle || 'normal',
-        textShadow: style.textShadow || (style.glow ? `0 0 8px ${textColor}` : 'none'),
+        textShadow: style.textShadow || 'none',
         whiteSpace: style.whiteSpace || 'pre-wrap',
         wordBreak: 'break-word',
         overflow: 'hidden'
@@ -350,7 +351,7 @@ const cylPaths = computed(() => {
       v-else
       class="w-full h-full overflow-visible"
       :viewBox="`0 0 ${width} ${height}`"
-      preserveAspectRatio="none"
+      :preserveAspectRatio="type === 'draw-circle' ? 'xMidYMid meet' : 'none'"
       shape-rendering="geometricPrecision"
       text-rendering="geometricPrecision"
     >
@@ -372,9 +373,9 @@ const cylPaths = computed(() => {
         </linearGradient>
       </defs>
 
-      <!-- 1. Rectangle (Fallback for gradient) -->
+      <!-- 1. Rectangle & Square (Fallback for gradient) -->
       <rect
-        v-if="type === 'draw-rect'"
+        v-if="type === 'draw-rect' || type === 'draw-square'"
         :x="pad"
         :y="pad"
         :width="innerW"
@@ -403,9 +404,22 @@ const cylPaths = computed(() => {
         :stroke-dasharray="strokeDasharray"
       />
 
-      <!-- 3. Circle (正圆 / 椭圆) -->
+      <!-- 3. Circle (正圆: 严格使用 circle 闭合实体，绝对无缺口) -->
+      <circle
+        v-else-if="type === 'draw-circle'"
+        :cx="width / 2"
+        :cy="height / 2"
+        :r="circleRadius"
+        :fill="style.gradient ? 'url(#custom-gradient)' : fill"
+        :fill-opacity="fillOpacity"
+        :stroke="stroke"
+        :stroke-width="strokeWidth"
+        :stroke-dasharray="strokeDasharray"
+      />
+
+      <!-- 3.1 Ellipse (椭圆) -->
       <ellipse
-        v-else-if="type === 'draw-circle' || type === 'draw-ellipse'"
+        v-else-if="type === 'draw-ellipse'"
         :cx="width / 2"
         :cy="height / 2"
         :rx="innerW / 2"
