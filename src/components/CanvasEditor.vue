@@ -851,16 +851,30 @@ const processMouseMove = (e: MouseEvent) => {
 
     const comp = primarySelected.value;
     const is1to1 = comp.type === 'draw-circle' || comp.type === 'draw-square';
-    if (is1to1) {
-      const s = Math.max(newW, newH);
-      if (handle.includes('w')) {
-        newX = Math.round(resizeStart.value.x + (resizeStart.value.width - s));
+    // 仅在圆形/正方形或用户显式按住 Shift 键时锁定等比拉伸；平时完全支持自由拉伸宽高
+    if (is1to1 || (e.shiftKey && ['nw', 'ne', 'se', 'sw'].includes(handle) && resizeStart.value.width > 0 && resizeStart.value.height > 0)) {
+      const baseRatio = resizeStart.value.width / resizeStart.value.height;
+      if (is1to1) {
+        const s = Math.max(newW, newH);
+        if (handle.includes('w')) {
+          newX = Math.round(resizeStart.value.x + (resizeStart.value.width - s));
+        }
+        if (handle.includes('n')) {
+          newY = Math.round(resizeStart.value.y + (resizeStart.value.height - s));
+        }
+        newW = s;
+        newH = s;
+      } else {
+        const scale = Math.max(newW / resizeStart.value.width, newH / resizeStart.value.height);
+        newW = Math.max(10, Math.round(resizeStart.value.width * scale));
+        newH = Math.max(10, Math.round(resizeStart.value.height * scale));
+        if (handle.includes('w')) {
+          newX = Math.round(resizeStart.value.x + resizeStart.value.width - newW);
+        }
+        if (handle.includes('n')) {
+          newY = Math.round(resizeStart.value.y + resizeStart.value.height - newH);
+        }
       }
-      if (handle.includes('n')) {
-        newY = Math.round(resizeStart.value.y + (resizeStart.value.height - s));
-      }
-      newW = s;
-      newH = s;
     }
 
     const isTelemetry = comp.type === 'metric-float' || comp.type === 'metric-flipper' || comp.type === 'metric-counter' || comp.type === 'metric-digital';

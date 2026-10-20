@@ -92,19 +92,40 @@ const children = computed<ScreenComponent[]>(() => {
   return props.component.children || props.component.customProps?.children || [];
 });
 
-// Calculate bounding box of children if defined to scale appropriately
+// Calculate canonical base bounds of children
 const baseBounds = computed(() => {
-  if (children.value.length === 0) return { width: props.component.width, height: props.component.height };
-  const maxX = children.value.reduce((max, c) => Math.max(max, c.x + c.width), 0);
-  const maxY = children.value.reduce((max, c) => Math.max(max, c.y + c.height), 0);
+  const defW = (props.component as any).defaultWidth;
+  const defH = (props.component as any).defaultHeight;
+  if (children.value.length === 0) {
+    return {
+      width: Math.max(10, defW || props.component.width || 40),
+      height: Math.max(10, defH || props.component.height || 80)
+    };
+  }
+  let maxX = 0;
+  let maxY = 0;
+  for (const c of children.value) {
+    maxX = Math.max(maxX, (c.x || 0) + (c.width || 0));
+    maxY = Math.max(maxY, (c.y || 0) + (c.height || 0));
+  }
   return {
-    width: Math.max(10, maxX),
-    height: Math.max(10, maxY)
+    width: Math.max(10, Math.max(maxX, defW || 0)),
+    height: Math.max(10, Math.max(maxY, defH || 0))
   };
 });
 
-const scaleX = computed(() => props.component.width / (baseBounds.value.width || 1));
-const scaleY = computed(() => props.component.height / (baseBounds.value.height || 1));
+// 自由刚性缩放比例：将图元内部作为一个不可拆分的整体进行几何变换，同时完全支持用户自由非等比拉伸宽高
+const scaleX = computed(() => {
+  const compW = Math.max(1, props.component.width);
+  const baseW = Math.max(1, baseBounds.value.width);
+  return compW / baseW;
+});
+
+const scaleY = computed(() => {
+  const compH = Math.max(1, props.component.height);
+  const baseH = Math.max(1, baseBounds.value.height);
+  return compH / baseH;
+});
 
 // Memoize child objects with forwarded dataset/telemetry configuration to avoid inline object allocation churn
 const resolvedChildren = computed(() => {
@@ -124,11 +145,15 @@ const resolvedChildren = computed(() => {
 </script>
 
 <template>
-  <div class="w-full h-full relative overflow-visible select-none">
-    <!-- Composite Container Canvas -->
+  <div class="w-full h-full relative overflow-visible select-none flex items-center justify-center">
+    <!-- Composite Container Canvas: 统一刚性画板 (作为整体缩放，内部零件相对位置绝对锁定，绝不分离散架) -->
     <div 
-      class="w-full h-full relative"
+      class="relative"
       :style="{
+        width: `${baseBounds.width}px`,
+        height: `${baseBounds.height}px`,
+        transform: `scale(${scaleX}, ${scaleY})`,
+        transformOrigin: 'center center',
         backgroundColor: component.style?.fill || 'transparent',
         borderRadius: (component.style?.borderRadius || 0) + 'px'
       }"
@@ -138,10 +163,10 @@ const resolvedChildren = computed(() => {
         :key="item.child.id"
         class="absolute"
         :style="{
-          left: `${item.child.x * scaleX}px`,
-          top: `${item.child.y * scaleY}px`,
-          width: `${item.child.width * scaleX}px`,
-          height: `${item.child.height * scaleY}px`,
+          left: `${item.child.x}px`,
+          top: `${item.child.y}px`,
+          width: `${item.child.width}px`,
+          height: `${item.child.height}px`,
           transform: item.child.rotation ? `rotate(${item.child.rotation}deg)` : 'none',
           zIndex: item.child.zIndex || 1
         }"

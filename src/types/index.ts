@@ -66,6 +66,8 @@ export type ComponentType =
   // 4. Charts
   | 'chart-line'
   | 'chart-bar'
+  | 'chart-realtime-curve'  // SCADA 多测点工业实时曲线 (同预览弹框风格)
+  | 'chart-realtime-bar'    // SCADA 多测点工业实时柱状图 (当前实时变化值)
   | 'chart-pie'
   | 'chart-gauge'
   | 'chart-radar'
@@ -712,3 +714,15 @@ export interface UserProfile {
   description: string;
   permissions: string[];
 }
+
+export interface ScadaChartPoint {
+  id: number;
+  name: string;
+  category: 'yc' | 'dd';
+  color?: string;
+  unit?: string;
+  facName?: string;
+  bayName?: string;
+  devName?: string;
+}
+

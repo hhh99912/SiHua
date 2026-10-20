@@ -46,7 +46,8 @@ import {
   Folder,
   Terminal,
   Database,
-  SlidersHorizontal
+  SlidersHorizontal,
+  TrendingUp
 } from 'lucide-vue-next';
 import { ScreenConfig, ScreenComponent, DatasetItem, ScreenItem, ScadaDeviceItem } from '../types';
 import { PRESET_SCADA_DEVICES } from '../data/presetDatasets';
@@ -68,6 +69,7 @@ import RealtimeAlarmModal from './RealtimeAlarmModal.vue';
 import LoginModal from './LoginModal.vue';
 import ScadaTeleControlModal from './ScadaTeleControlModal.vue';
 import ScadaTeleRegulationModal from './ScadaTeleRegulationModal.vue';
+import ScadaRealtimeCurveModal from './ScadaRealtimeCurveModal.vue';
 
 interface Props {
   screen: ScreenConfig;
@@ -269,7 +271,7 @@ const updateClock = () => {
   currentTimeStr.value = currentTimeSecondStr.value;
 };
 
-// Context Menu State (支持遥控遥调、测点层级与直接退出编辑)
+// Context Menu State (支持遥控遥调、实时曲线与直接退出编辑)
 const contextMenu = ref<{
   visible: boolean;
   x: number;
@@ -277,6 +279,7 @@ const contextMenu = ref<{
   targetComponent: ScreenComponent | null;
   hasControl: boolean;
   hasRegulation: boolean;
+  isTelemetry: boolean;
   hierarchyText: string;
   pointType: string;
 }>({
@@ -286,9 +289,21 @@ const contextMenu = ref<{
   targetComponent: null,
   hasControl: false,
   hasRegulation: false,
+  isTelemetry: false,
   hierarchyText: '',
   pointType: ''
 });
+
+// 实时曲线模态框状态 (遥测组件专用)
+const showRealtimeCurveModal = ref(false);
+const realtimeCurveTargetComp = ref<ScreenComponent | null>(null);
+
+const openRealtimeCurve = (comp: ScreenComponent | null) => {
+  if (!comp) return;
+  realtimeCurveTargetComp.value = comp;
+  showRealtimeCurveModal.value = true;
+  closeContextMenu();
+};
 
 // Hovered Point Tooltip State (浮标格式: 间隔-设备-测点名称，简洁紧凑)
 const hoverTooltip = ref<{
@@ -326,15 +341,15 @@ const scheduleNextPoll = (delayMs: number = 1000) => {
 const pollAssociatedRealtimeData = async () => {
   if (isPollingRealtime || isUnmounted) return;
   // 关键优化：仅提取当前激活画面的测点，严禁将全工程全部画面的几千个测点全量叠加发送
-  const { yc_ids, yx_ids } = getAssociatedPointIdsFromComponents(props.components);
-  const totalPoints = yc_ids.length + yx_ids.length;
+  const { yc_ids, yx_ids, dd_ids } = getAssociatedPointIdsFromComponents(props.components);
+  const totalPoints = yc_ids.length + yx_ids.length + (dd_ids ? dd_ids.length : 0);
   if (totalPoints === 0) {
     scheduleNextPoll(2000);
     return;
   }
   isPollingRealtime = true;
   try {
-    await fetchScadaRealtime({ yc_ids, yx_ids });
+    await fetchScadaRealtime({ yc_ids, yx_ids, dd_ids });
   } catch (err) {
     // Background polling silent failure
   } finally {
@@ -353,10 +368,11 @@ const handleReloadCurrentScreen = async () => {
   try {
     emit('reload:current-screen');
     invalidateAssociatedPointsCache();
-    const { yc_ids, yx_ids } = getAssociatedPointIdsFromComponents(props.components, props.screens);
+    const { yc_ids, yx_ids, dd_ids } = getAssociatedPointIdsFromComponents(props.components, props.screens);
     const targetYc = yc_ids.length > 0 ? yc_ids : getAllPointIdsFromFacilities(scadaFacilities.value).yc_ids;
     const targetYx = yx_ids.length > 0 ? yx_ids : getAllPointIdsFromFacilities(scadaFacilities.value).yx_ids;
-    const res = await fetchScadaRealtime({ yc_ids: targetYc, yx_ids: targetYx });
+    const targetDd = dd_ids && dd_ids.length > 0 ? dd_ids : getAllPointIdsFromFacilities(scadaFacilities.value).dd_ids;
+    const res = await fetchScadaRealtime({ yc_ids: targetYc, yx_ids: targetYx, dd_ids: targetDd });
     if (res.success) {
       scadaTriggerStatus.value = '画面重新加载完成';
     } else {
@@ -724,13 +740,25 @@ const handleCompMouseLeave = () => {
   hoverTooltip.value = null;
 };
 
-// Right-click Context Menu (右击菜单承接全部遥控遥调操作，样式参考编辑界面，删除显示比例，退出监控直接跳转编辑界面)
+// 判断组件是否属于遥测组件 (具备遥测数据流、数值指标或映射了 YC 测点)
+const isTelemetryComponent = (comp?: ScreenComponent | null, info?: any): boolean => {
+  if (!comp) return false;
+  if (info?.pointType === 'YC') return true;
+  if (comp.type === 'metric-float' || comp.type === 'metric-flipper' || comp.type === 'metric-digital' || comp.type === 'metric-counter') return true;
+  if (comp.category === 'metrics' && !comp.type.includes('clock') && !comp.type.includes('date') && !comp.type.includes('time')) return true;
+  const pCat = comp.data?.mapping?.pointCategory || (comp.customProps as any)?.category;
+  if (pCat === 'telemetry' || pCat === 'yc') return true;
+  return false;
+};
+
+// Right-click Context Menu (右击菜单承接全部遥控遥调操作、实时曲线，退出监控直接跳转编辑界面)
 const handlePreviewContextMenu = (e: MouseEvent, comp?: ScreenComponent) => {
   e.preventDefault();
   e.stopPropagation();
 
   let hasControl = false;
   let hasRegulation = false;
+  let isTelemetry = false;
   let hierarchyText = '';
   let pointType = '';
 
@@ -750,10 +778,12 @@ const handlePreviewContextMenu = (e: MouseEvent, comp?: ScreenComponent) => {
     hasControl = isBreakerOrSwitch || comp.type === 'ctrl-button' || act?.type === 'tele-control' || mapping.pointCategory === 'teleControl' || (bound.isBound && bound.type === 'yk');
 
     hasRegulation = isTransform || act?.type === 'tele-regulation' || mapping.pointCategory === 'teleRegulation' || (bound.isBound && bound.type === 'yt');
+
+    isTelemetry = isTelemetryComponent(comp, info);
   }
 
   const menuWidth = 288;
-  const menuHeight = hasControl || hasRegulation ? 230 : 120;
+  const menuHeight = (hasControl || hasRegulation ? 200 : 110) + (isTelemetry ? 45 : 0);
   const x = Math.min(window.innerWidth - menuWidth - 10, Math.max(10, e.clientX));
   const y = Math.min(window.innerHeight - menuHeight - 10, Math.max(10, e.clientY));
 
@@ -764,6 +794,7 @@ const handlePreviewContextMenu = (e: MouseEvent, comp?: ScreenComponent) => {
     targetComponent: comp || null,
     hasControl,
     hasRegulation,
+    isTelemetry,
     hierarchyText,
     pointType
   };
@@ -1348,7 +1379,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <!-- 悬浮测点浮标 (格式: 间隔-设备-测点名称，极简紧凑工业风，仅关联好测点的图元展示) -->
+        <!-- 悬浮测点浮标 (格式: 间隔-设备-测点名称，极简紧凑工业风，按用户要求删掉实时值) -->
         <div
           v-if="hoverTooltip && hoverTooltip.visible"
           class="fixed z-50 pointer-events-none px-2.5 py-1 rounded-md bg-[#091528]/95 backdrop-blur-md border border-[#00f2ff]/60 shadow-[0_6px_20px_rgba(0,0,0,0.85)] flex items-center gap-1.5 text-xs font-sans whitespace-nowrap"
@@ -1372,17 +1403,14 @@ onBeforeUnmount(() => {
           <span class="text-slate-100 font-mono text-[11.5px] font-medium tracking-wide">
             {{ hoverTooltip.hierarchyText }}
           </span>
-          <span v-if="hoverTooltip.displayValueText" class="text-[#00f2ff] font-mono font-bold text-[11.5px] ml-1 pl-1.5 border-l border-slate-700">
-            {{ hoverTooltip.displayValueText }}
-          </span>
         </div>
 
-        <!-- 右键操作菜单 (布局样式参考编辑界面，统一高对比度微光质感，承载遥控遥调操作，删除显示比例，退出监控直接跳转编辑界面) -->
+        <!-- 右键操作菜单 (大小、布局风格严格与编辑界面 CanvasEditor 保持一致，每一项不加背景卡片) -->
         <div
           v-if="contextMenu.visible"
           @click.stop
           @contextmenu.stop.prevent
-          class="fixed z-50 bg-[#091528] border-2 border-[#00f2ff]/80 rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.95)] p-2 w-72 text-sm font-sans divide-y divide-[#00f2ff]/30"
+          class="fixed z-50 bg-[#091528] border-2 border-[#00f2ff]/80 rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.95)] p-2 w-72 max-h-[calc(100vh-20px)] overflow-y-auto custom-scrollbar text-sm font-sans divide-y divide-[#00f2ff]/30"
           :style="{
             left: `${Math.round(contextMenu.x)}px`,
             top: `${Math.round(contextMenu.y)}px`,
@@ -1399,46 +1427,45 @@ onBeforeUnmount(() => {
             <span v-else class="text-xs text-slate-400 font-mono">SCADA</span>
           </div>
 
-          <!-- 测点层级信息展示 (如有点位) -->
-          <div v-if="contextMenu.hierarchyText" class="py-1.5">
-            <div class="px-2.5 py-1.5 bg-[#040914] rounded-lg border border-[#00f2ff]/20 text-xs">
-              <div class="text-slate-400 text-[10px] mb-0.5">测点层级信息:</div>
-              <div class="text-[#00f2ff] font-mono font-bold text-[11px] truncate" :title="contextMenu.hierarchyText">
-                {{ contextMenu.hierarchyText }}
+          <!-- 遥测/遥控/遥调功能区 (每一项不加背景卡片，与编辑界面操作菜单项一致) -->
+          <div v-if="contextMenu.isTelemetry || contextMenu.hasControl || contextMenu.hasRegulation" class="py-1.5 space-y-1">
+            <!-- 遥测组件实时曲线 -->
+            <button
+              v-if="contextMenu.isTelemetry"
+              @click="openRealtimeCurve(contextMenu.targetComponent)"
+              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-[#00f2ff]/20 rounded-lg text-[#00f2ff] hover:text-[#38bdf8] cursor-pointer flex items-center justify-between group transition-colors"
+            >
+              <div class="flex items-center gap-2.5">
+                <TrendingUp class="w-4 h-4 text-[#00f2ff] stroke-[2]" />
+                <span class="font-bold text-[#00f2ff] group-hover:text-[#38bdf8] tracking-wide text-sm">实时曲线</span>
               </div>
-            </div>
-          </div>
+              <span class="text-xs text-[#38bdf8] font-mono font-bold">10分钟</span>
+            </button>
 
-          <!-- 遥控/遥调执行按钮区 (用户要求：遥控遥调全部通过右击菜单实现) -->
-          <div v-if="contextMenu.hasControl || contextMenu.hasRegulation" class="py-1.5 space-y-1">
             <!-- 执行遥控 (YK) -->
             <button
               v-if="contextMenu.hasControl"
               @click="executeContextMenuControl('control')"
-              class="w-full text-left px-3 py-2 bg-[#fbbf24]/15 hover:bg-[#fbbf24]/25 border border-[#fbbf24]/50 rounded-lg text-[#fbbf24] hover:text-[#fde047] cursor-pointer flex items-center justify-between group transition-colors shadow-xs"
+              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-[#fbbf24]/20 rounded-lg text-[#fbbf24] hover:text-[#fde047] cursor-pointer flex items-center justify-between group transition-colors"
             >
               <div class="flex items-center gap-2.5">
-                <Radio class="w-4 h-4 text-[#fbbf24] stroke-[2.5]" />
+                <Radio class="w-4 h-4 text-[#fbbf24] stroke-[2]" />
                 <span class="font-bold text-[#fbbf24] tracking-wide text-sm">执行工业遥控 (YK)</span>
               </div>
-              <span class="text-xs bg-[#451a03] text-[#fbbf24] border border-[#f59e0b] px-2 py-0.5 rounded font-mono font-bold">
-                操作合分
-              </span>
+              <span class="text-xs text-[#fbbf24] font-mono font-bold">合分</span>
             </button>
 
             <!-- 执行遥调 (YT) -->
             <button
               v-if="contextMenu.hasRegulation"
               @click="executeContextMenuControl('regulation')"
-              class="w-full text-left px-3 py-2 bg-[#38bdf8]/15 hover:bg-[#38bdf8]/25 border border-[#38bdf8]/50 rounded-lg text-[#38bdf8] hover:text-[#7dd3fc] cursor-pointer flex items-center justify-between group transition-colors shadow-xs"
+              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-[#38bdf8]/20 rounded-lg text-[#38bdf8] hover:text-[#7dd3fc] cursor-pointer flex items-center justify-between group transition-colors"
             >
               <div class="flex items-center gap-2.5">
-                <SlidersHorizontal class="w-4 h-4 text-[#38bdf8] stroke-[2.5]" />
+                <SlidersHorizontal class="w-4 h-4 text-[#38bdf8] stroke-[2]" />
                 <span class="font-bold text-[#38bdf8] tracking-wide text-sm">执行工业遥调 (YT)</span>
               </div>
-              <span class="text-xs bg-[#082f49] text-[#38bdf8] border border-[#0284c7] px-2 py-0.5 rounded font-mono font-bold">
-                升降/档位
-              </span>
+              <span class="text-xs text-[#38bdf8] font-mono font-bold">档位</span>
             </button>
           </div>
 
@@ -1446,13 +1473,13 @@ onBeforeUnmount(() => {
           <div class="pt-1.5">
             <button
               @click="handleExitPreview(); closeContextMenu();"
-              class="w-full text-left px-3 py-2 bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/40 rounded-lg text-rose-300 hover:text-rose-100 cursor-pointer flex items-center justify-between group transition-colors"
+              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-rose-500/20 rounded-lg text-rose-300 hover:text-rose-100 cursor-pointer flex items-center justify-between group transition-colors"
             >
               <div class="flex items-center gap-2.5">
                 <Edit3 class="w-4 h-4 text-rose-400 stroke-[2]" />
                 <span class="font-bold text-rose-300 group-hover:text-rose-100 tracking-wide text-sm">退出监控 / 跳转编辑界面</span>
               </div>
-              <span class="text-xs bg-rose-950 text-rose-400 border border-rose-800 px-1.5 py-0.5 rounded font-mono font-bold">ESC</span>
+              <span class="text-xs text-rose-400 font-mono font-bold">ESC</span>
             </button>
           </div>
         </div>
@@ -1635,6 +1662,15 @@ onBeforeUnmount(() => {
       :initialTargetVerificationPointId="controlInitialTargetVerificationPointId"
       @close="showTeleRegulationModal = false"
       @success="() => { showTeleRegulationModal = false; scadaLiveTick++; }"
+    />
+
+    <!-- 4.5 遥测组件实时曲线弹窗 (用户要求：黑底、大字体、1s一点、最新10min数据、支持启动暂停清空、简洁无冗余) -->
+    <ScadaRealtimeCurveModal
+      v-if="showRealtimeCurveModal && realtimeCurveTargetComp"
+      :visible="showRealtimeCurveModal"
+      :component="realtimeCurveTargetComp"
+      :datasets="datasets"
+      @close="showRealtimeCurveModal = false; realtimeCurveTargetComp = null;"
     />
   </div>
 </template>

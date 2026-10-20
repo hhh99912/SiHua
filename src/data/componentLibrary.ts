@@ -929,6 +929,61 @@ export const COMPONENT_DEFINITIONS: ComponentDefinition[] = [
   // 5. Visual Charts (可视化图表)
   // ==========================================
   {
+    type: 'chart-realtime-curve',
+    category: 'charts',
+    name: '实时曲线',
+    nameEn: 'Realtime Curve',
+    iconName: 'LineChart',
+    description: '工业级多测点实时曲线，支持同时关联多个遥测(YC)或电度(DD)测点，时序连续采样，风格与预览实时曲线一致',
+    defaultWidth: 420,
+    defaultHeight: 240,
+    defaultStyle: {
+      fill: '#000000',
+      stroke: '#333333',
+      textColor: '#ffffff'
+    },
+    defaultCustomProps: {
+      title: '实时曲线',
+      unit: '',
+      timeWindow: 10,
+      sampleInterval: 1,
+      smooth: true,
+      showArea: false,
+      showLegend: false,
+      points: [
+        { id: 101, name: 'A相电流', category: 'yc', color: '#ffffff', unit: 'A', facName: '示范站', bayName: '10kV进线', devName: '测控装置' }
+      ]
+    },
+    defaultData: { mapping: {} }
+  },
+  {
+    type: 'chart-realtime-bar',
+    category: 'charts',
+    name: '实时柱状图',
+    nameEn: 'Realtime Bar Chart',
+    iconName: 'BarChart3',
+    description: '工业级多测点实时柱状图，支持同时关联多个遥测(YC)或电度(DD)测点，柱体直接反映各测点当前瞬时变化值，不记录历史',
+    defaultWidth: 380,
+    defaultHeight: 240,
+    defaultStyle: {
+      fill: '#000000',
+      stroke: '#333333',
+      textColor: '#ffffff'
+    },
+    defaultCustomProps: {
+      unit: '',
+      barWidth: 26,
+      showValueLabel: true,
+      showLegend: false,
+      points: [
+        { id: 101, name: 'A相电流', category: 'yc', color: '#ffffff', unit: 'A', facName: '示范站', bayName: '10kV进线', devName: '测控装置' },
+        { id: 102, name: 'B相电流', category: 'yc', color: '#38bdf8', unit: 'A', facName: '示范站', bayName: '10kV进线', devName: '测控装置' },
+        { id: 103, name: 'C相电流', category: 'yc', color: '#fbbf24', unit: 'A', facName: '示范站', bayName: '10kV进线', devName: '测控装置' }
+      ]
+    },
+    defaultData: { mapping: {} }
+  },
+  {
     type: 'chart-line',
     category: 'charts',
     name: '实时负荷折线趋势图',

@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { ScreenComponent, DatasetItem } from '../../types';
 import EChartWidget from './EChartWidget.vue';
+import RealtimeChartWidget from './RealtimeChartWidget.vue';
 import FluidTank from './FluidTank.vue';
 import PipeFlow from './PipeFlow.vue';
 import DigitalCounter from './DigitalCounter.vue';
@@ -110,6 +111,14 @@ const isVectorShape = computed(() => {
     <!-- 7. Digital Counter / Tabular Readout -->
     <DigitalCounter 
       v-else-if="compType === 'ind-counter' || compType === 'metric-counter' || compType === 'metric-digital'"
+      :component="component"
+      :datasets="datasets"
+      :preview-mode="previewMode"
+    />
+
+    <!-- 7.5 SCADA Realtime Multi-Point Curve & Bar Charts (工业级高对比零动画) -->
+    <RealtimeChartWidget
+      v-else-if="compType === 'chart-realtime-curve' || compType === 'chart-realtime-bar'"
       :component="component"
       :datasets="datasets"
       :preview-mode="previewMode"

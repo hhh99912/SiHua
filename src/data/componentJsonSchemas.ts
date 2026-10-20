@@ -220,10 +220,10 @@ export const COMPONENT_JSON_SCHEMAS: Record<string, ComponentJsonSchemaInfo> = {
  * 根据图元类型或分类获取最匹配的 JSON Schema 规范定义
  */
 export function getComponentSchemaInfo(type: string, category: ComponentCategory): ComponentJsonSchemaInfo {
-  if (type === 'chart-line') {
+  if (type === 'chart-line' || type === 'chart-realtime-curve') {
     return COMPONENT_JSON_SCHEMAS['chart-line'];
   }
-  if (type === 'chart-bar') {
+  if (type === 'chart-bar' || type === 'chart-realtime-bar') {
     return COMPONENT_JSON_SCHEMAS['chart-bar'];
   }
   if (type === 'chart-pie' || type === 'chart-gauge' || type === 'chart-radar') {

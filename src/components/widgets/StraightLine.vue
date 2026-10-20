@@ -40,6 +40,7 @@ const isOrthogonal = computed(() => {
     <svg 
       class="w-full h-full overflow-visible pointer-events-none"
       :viewBox="`0 0 ${Math.max(1, component.width)} ${Math.max(1, component.height)}`"
+      preserveAspectRatio="none"
       shape-rendering="geometricPrecision"
     >
       <defs v-if="startArrow || endArrow">

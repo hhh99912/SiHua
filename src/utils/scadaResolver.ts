@@ -607,7 +607,7 @@ export function getComponentLiveValue(
   if (value === undefined) value = 0;
   if (state === undefined) state = value;
 
-  const isChart = ['chart-line', 'chart-bar', 'chart-pie', 'chart-gauge', 'chart-radar', 'gauge-dashboard'].includes(component.type);
+  const isChart = ['chart-line', 'chart-bar', 'chart-pie', 'chart-gauge', 'chart-radar', 'gauge-dashboard', 'chart-realtime-curve', 'chart-realtime-bar'].includes(component.type);
   if (!isChart) {
     const hasBinding = !!(valueKey || stateKey);
     const floatVal = typeof value === 'number' ? (isNaN(value) ? 0 : value) : (parseFloat(String(value)) || 0);

@@ -1182,6 +1182,25 @@ export function getAssociatedPointIdsFromComponents(
       addPointByClassification(mapping.pointId, cat);
     }
 
+    // B2. Realtime Multi-point Charts: points array in customProps or mapping
+    const multiPoints = comp.customProps?.points || mapping.points;
+    if (Array.isArray(multiPoints)) {
+      for (let p = 0; p < multiPoints.length; p++) {
+        const item = multiPoints[p];
+        if (typeof item === 'number') {
+          addPointByClassification(item);
+        } else if (item && typeof item === 'object') {
+          addPointByClassification(item.id || item.pointId, item.category || item.type);
+        }
+      }
+    }
+    const multiPointIds = comp.customProps?.pointIds || mapping.pointIds;
+    if (Array.isArray(multiPointIds)) {
+      for (let p = 0; p < multiPointIds.length; p++) {
+        addPointByClassification(multiPointIds[p]);
+      }
+    }
+
     // C. Target Return Verification points for Control (YK) / Regulation (YT)
     const targetV = mapping.targetVerificationPointId || mapping.targetYcPointId || mapping.targetYxPointId || action?.targetVerificationPointId || action?.targetPointId;
     if (targetV !== undefined && targetV !== null && targetV !== '') {

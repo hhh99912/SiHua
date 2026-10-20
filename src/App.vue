@@ -64,9 +64,36 @@ import {
   Tv
 } from 'lucide-vue-next';
 
-// 1. Initial State: Load Multi-Screen Electrical Project
-const screens = ref<ScreenItem[]>(JSON.parse(JSON.stringify(PRESET_MULTI_SCREENS)));
-const activeScreenId = ref<string>(PRESET_MULTI_SCREENS[0].id);
+// 1. Initial State: Load Multi-Screen Electrical Project (快速本地缓存引导与主索引初态加载，彻底消除一次系统图一闪而过)
+function getInitialBootstrapData(): { screens: ScreenItem[]; initialScreen: ScreenItem; indexId: string; indexName: string } {
+  try {
+    const cached = localStorage.getItem('ge_scada_screens_cache_v3');
+    const cachedIndexId = localStorage.getItem('scada_index_screen_id') || 'screen-transformer-detail';
+    const cachedIndexName = localStorage.getItem('scada_index_screen_name') || '#1主变压器及测控画面';
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const target = parsed.find((s: ScreenItem) => 
+          (cachedIndexId && s.id === cachedIndexId) || 
+          (cachedIndexName && s.name.trim().toLowerCase() === cachedIndexName.trim().toLowerCase())
+        ) || parsed.find((s: ScreenItem) => s.id === 'screen-transformer-detail') || parsed[0];
+        return { screens: parsed, initialScreen: target, indexId: cachedIndexId, indexName: cachedIndexName };
+      }
+    }
+  } catch {}
+
+  const defaultIndex = PRESET_MULTI_SCREENS.find(s => s.name === '#1主变压器及测控画面' || s.id === 'screen-transformer-detail') || PRESET_MULTI_SCREENS[0];
+  return { 
+    screens: JSON.parse(JSON.stringify(PRESET_MULTI_SCREENS)), 
+    initialScreen: JSON.parse(JSON.stringify(defaultIndex)), 
+    indexId: defaultIndex.id, 
+    indexName: defaultIndex.name 
+  };
+}
+
+const bootstrapData = getInitialBootstrapData();
+const screens = ref<ScreenItem[]>(bootstrapData.screens);
+const activeScreenId = ref<string>(bootstrapData.initialScreen.id);
 
 // Current active screen object & components ref
 const currentScreenItem = computed(() => {
@@ -74,19 +101,20 @@ const currentScreenItem = computed(() => {
 });
 
 const screen = ref<ScreenConfig>({
-  ...currentScreenItem.value.screen,
+  ...bootstrapData.initialScreen.screen,
   updatedAt: new Date().toISOString()
 });
 
-const components = ref<ScreenComponent[]>([...currentScreenItem.value.components]);
+const components = ref<ScreenComponent[]>(JSON.parse(JSON.stringify(bootstrapData.initialScreen.components)));
 
-// 实时监控运行大屏独立状态（与图形编辑界面的草稿解耦：只有在保存后，监控大屏才会同步呈现）
-const monitorActiveScreenId = ref<string>(PRESET_MULTI_SCREENS[0].id);
+// 实时监控运行大屏独立状态（启动时严格同步主索引大屏，杜绝一次系统图闪烁）
+const monitorActiveScreenId = ref<string>(bootstrapData.initialScreen.id);
 const monitorScreen = ref<ScreenConfig>({
-  ...PRESET_MULTI_SCREENS[0].screen,
+  ...bootstrapData.initialScreen.screen,
   updatedAt: new Date().toISOString()
 });
-const monitorComponents = ref<ScreenComponent[]>(JSON.parse(JSON.stringify(PRESET_MULTI_SCREENS[0].components)));
+const monitorComponents = ref<ScreenComponent[]>(JSON.parse(JSON.stringify(bootstrapData.initialScreen.components)));
+const isBootLoading = ref<boolean>(true);
 const datasets = ref<DatasetItem[]>([...INITIAL_DATASETS]);
 const selectedIds = ref<string[]>([]);
 const zoom = ref<number>(0.62);
@@ -390,8 +418,8 @@ const componentsToSave = ref<ScreenComponent[]>([]);
 const storageDirectory = ref('graph');
 const diskFileCount = ref(PRESET_MULTI_SCREENS.length);
 const isSavingDisk = ref(false);
-const indexScreenId = ref<string>('');
-const indexScreenName = ref<string>('');
+const indexScreenId = ref<string>(bootstrapData.indexId);
+const indexScreenName = ref<string>(bootstrapData.indexName);
 const diskNotification = ref('');
 let diskNotificationTimer: any = null;
 
@@ -1900,6 +1928,10 @@ onMounted(async () => {
       if (res.indexScreen?.indexScreenId || res.indexScreen?.indexScreenName) {
         indexScreenId.value = res.indexScreen.indexScreenId || '';
         indexScreenName.value = res.indexScreen.indexScreenName || '';
+        try {
+          localStorage.setItem('scada_index_screen_id', indexScreenId.value);
+          localStorage.setItem('scada_index_screen_name', indexScreenName.value);
+        } catch {}
       }
       // 匹配已配置的主索引大屏作为初始界面，否则取首个大屏
       let targetScreen = res.screens[0];
@@ -1924,6 +1956,8 @@ onMounted(async () => {
     }
   } catch (err) {
     console.warn('[SCADA] 扫描 graph 磁盘大屏失败，回退到默认大屏:', err);
+  } finally {
+    isBootLoading.value = false;
   }
 
   // 2. 启动时自动检索并加载 cell/ 目录下的所有独立自定义图元 JSON 文件
@@ -2307,23 +2341,38 @@ onBeforeUnmount(() => {
         @update:isMaximized="val => updateWindowProp('monitor-screen', 'isMaximized', val)"
         @update:isMinimized="val => updateWindowProp('monitor-screen', 'isMinimized', val)"
       >
-        <PreviewScreen
-          :screen="monitorScreen"
-          :components="monitorComponents"
-          :datasets="datasets"
-          :isStreaming="isStreaming"
-          :screens="screens"
-          :activeScreenId="monitorActiveScreenId"
-          :indexScreenId="indexScreenId"
-          :indexScreenName="indexScreenName"
-          :isEmbedded="true"
-          @close="closeWindow('monitor-screen')"
-          @toggle:streaming="isStreaming = !isStreaming"
-          @switch:screen="handleMonitorSwitchScreen"
-          @reload:current-screen="handleReloadCurrentMonitorScreen"
-          @logout="handleLogout"
-          @open:alarm="openWindow('alarm-window')"
-        />
+        <div class="w-full h-full relative overflow-hidden bg-[#080f1e]">
+          <PreviewScreen
+            :screen="monitorScreen"
+            :components="monitorComponents"
+            :datasets="datasets"
+            :isStreaming="isStreaming"
+            :screens="screens"
+            :activeScreenId="monitorActiveScreenId"
+            :indexScreenId="indexScreenId"
+            :indexScreenName="indexScreenName"
+            :isEmbedded="true"
+            @close="closeWindow('monitor-screen')"
+            @toggle:streaming="isStreaming = !isStreaming"
+            @switch:screen="handleMonitorSwitchScreen"
+            @reload:current-screen="handleReloadCurrentMonitorScreen"
+            @logout="handleLogout"
+            @open:alarm="openWindow('alarm-window')"
+          />
+          <!-- 极速冷启动闪烁屏蔽帘：在确认真实主索引大屏解析完成前提供平滑暗黑背景，彻底杜绝一次系统图一闪而过 -->
+          <div 
+            v-if="isBootLoading"
+            class="absolute inset-0 bg-[#080f1e] z-50 flex flex-col items-center justify-center select-none pointer-events-none transition-opacity duration-300"
+          >
+            <div class="flex items-center gap-3 mb-4">
+              <div class="w-7 h-7 rounded-md bg-[#d81e06] text-white flex items-center justify-center font-bold text-sm shadow-[0_0_10px_rgba(216,30,6,0.5)]">K</div>
+              <span class="text-sm font-bold tracking-wider text-slate-200">系统就绪载入中...</span>
+            </div>
+            <div class="w-48 h-1 bg-[#1e293b] rounded-full overflow-hidden relative">
+              <div class="absolute inset-y-0 left-0 bg-[#0284c7] rounded-full w-2/5 animate-pulse" />
+            </div>
+          </div>
+        </div>
       </MdiWindow>
 
       <!-- ======================================================== -->

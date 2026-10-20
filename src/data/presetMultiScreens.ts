@@ -2,13 +2,96 @@ import { ScreenItem } from '../types';
 import { PV_HIGH_VOLTAGE_TEMPLATE } from './pvHighVoltageTemplate';
 
 export const PRESET_MULTI_SCREENS: ScreenItem[] = [
-  // Screen 0: 35kV高压光伏一次系统图 (全新高压光伏电力系统模板)
+  // Screen 0: #1 主变压器测控画面 (默认启动主索引监控大屏)
   {
-    id: PV_HIGH_VOLTAGE_TEMPLATE.schema.screen.id || 'screen-pv-high-voltage',
-    name: PV_HIGH_VOLTAGE_TEMPLATE.name,
-    description: PV_HIGH_VOLTAGE_TEMPLATE.description || '35kV高压光伏一次系统图',
-    screen: PV_HIGH_VOLTAGE_TEMPLATE.schema.screen,
-    components: PV_HIGH_VOLTAGE_TEMPLATE.schema.components
+    id: 'screen-transformer-detail',
+    name: '#1主变压器及测控画面',
+    description: '110kV/10kV #1主变压器绕组温度、高低压侧负荷、油温及瓦斯信号',
+    screen: {
+      id: 'screen-transformer-detail',
+      name: '#1主变压器及测控画面',
+      width: 1980,
+      height: 1100,
+      backgroundColor: '#000000',
+      backgroundGrid: true,
+      gridSize: 20,
+      gridColor: 'rgba(0, 242, 255, 0.22)',
+      theme: 'cyber-dark',
+      version: '2.0.0',
+      updatedAt: new Date().toISOString()
+    },
+    components: [
+      {
+        id: 'comp-tf-main',
+        name: '#1 主变压器双绕组',
+        type: 'elec-transformer',
+        category: 'electrical',
+        x: 200,
+        y: 250,
+        width: 180,
+        height: 220,
+        rotation: 0,
+        zIndex: 3,
+        style: {
+          stroke: '#00f2ff',
+          strokeWidth: 3,
+          voltageLevel: '10kV'
+        },
+        data: { mapping: {} }
+      },
+      {
+        id: 'comp-tf-temp-metric',
+        name: '主变顶层油温遥测',
+        type: 'metric-float',
+        category: 'metrics',
+        x: 460,
+        y: 250,
+        width: 220,
+        height: 90,
+        rotation: 0,
+        zIndex: 4,
+        style: {
+          decimals: 1,
+          suffix: ' ℃',
+          fontSize: 26,
+          textColor: '#00f2ff',
+          stroke: '#00f2ff',
+          fill: 'rgba(0, 242, 255, 0.1)'
+        },
+        data: {
+          datasetId: 'ds-scada-station',
+          mapping: {
+            valueKey: 'DEV-102_YC_3'
+          }
+        }
+      },
+      {
+        id: 'comp-tf-load-metric',
+        name: '主变实时负荷率',
+        type: 'metric-float',
+        category: 'metrics',
+        x: 460,
+        y: 360,
+        width: 220,
+        height: 90,
+        rotation: 0,
+        zIndex: 4,
+        style: {
+          decimals: 1,
+          suffix: ' %',
+          fontSize: 26,
+          textColor: '#00e5a3',
+          stroke: '#00e5a3',
+          fill: 'rgba(0, 229, 163, 0.1)'
+        },
+        data: {
+          datasetId: 'ds-scada-station',
+          mapping: {
+            valueKey: 'DEV-102_YC_5'
+          }
+        }
+      }
+    ]
   },
   // Screen 1: 10kV配电室一次系统接线图
   {
@@ -302,96 +385,13 @@ export const PRESET_MULTI_SCREENS: ScreenItem[] = [
     ]
   },
 
-  // Screen 2: #1 主变压器测控画面
+  // Screen 2: 35kV高压光伏一次系统图
   {
-    id: 'screen-transformer-detail',
-    name: '#1主变压器及测控画面',
-    description: '110kV/10kV #1主变压器绕组温度、高低压侧负荷、油温及瓦斯信号',
-    screen: {
-      id: 'screen-transformer-detail',
-      name: '#1主变压器及测控画面',
-      width: 1980,
-      height: 1100,
-      backgroundColor: '#000000',
-      backgroundGrid: true,
-      gridSize: 20,
-      gridColor: 'rgba(0, 242, 255, 0.22)',
-      theme: 'cyber-dark',
-      version: '2.0.0',
-      updatedAt: new Date().toISOString()
-    },
-    components: [
-      {
-        id: 'comp-tf-main',
-        name: '#1 主变压器双绕组',
-        type: 'elec-transformer',
-        category: 'electrical',
-        x: 200,
-        y: 250,
-        width: 180,
-        height: 220,
-        rotation: 0,
-        zIndex: 3,
-        style: {
-          stroke: '#00f2ff',
-          strokeWidth: 3,
-          voltageLevel: '10kV'
-        },
-        data: { mapping: {} }
-      },
-      {
-        id: 'comp-tf-temp-metric',
-        name: '主变顶层油温遥测',
-        type: 'metric-float',
-        category: 'metrics',
-        x: 460,
-        y: 250,
-        width: 220,
-        height: 90,
-        rotation: 0,
-        zIndex: 4,
-        style: {
-          decimals: 1,
-          suffix: ' ℃',
-          fontSize: 26,
-          textColor: '#00f2ff',
-          stroke: '#00f2ff',
-          fill: 'rgba(0, 242, 255, 0.1)'
-        },
-        data: {
-          datasetId: 'ds-scada-station',
-          mapping: {
-            valueKey: 'DEV-102_YC_3'
-          }
-        }
-      },
-      {
-        id: 'comp-tf-load-metric',
-        name: '主变实时负荷率',
-        type: 'metric-float',
-        category: 'metrics',
-        x: 460,
-        y: 360,
-        width: 220,
-        height: 90,
-        rotation: 0,
-        zIndex: 4,
-        style: {
-          decimals: 1,
-          suffix: ' %',
-          fontSize: 26,
-          textColor: '#00e5a3',
-          stroke: '#00e5a3',
-          fill: 'rgba(0, 229, 163, 0.1)'
-        },
-        data: {
-          datasetId: 'ds-scada-station',
-          mapping: {
-            valueKey: 'DEV-102_YC_5'
-          }
-        }
-      }
-    ]
+    id: PV_HIGH_VOLTAGE_TEMPLATE.schema.screen.id || 'screen-pv-high-voltage',
+    name: PV_HIGH_VOLTAGE_TEMPLATE.name,
+    description: PV_HIGH_VOLTAGE_TEMPLATE.description || '35kV高压光伏一次系统图',
+    screen: PV_HIGH_VOLTAGE_TEMPLATE.schema.screen,
+    components: PV_HIGH_VOLTAGE_TEMPLATE.schema.components
   },
 
   // Screen 3: 0.4kV 低压综合配电画面
