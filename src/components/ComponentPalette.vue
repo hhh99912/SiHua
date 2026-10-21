@@ -447,14 +447,15 @@ const handleDragStart = (e: DragEvent, def: ComponentDefinition) => {
   }
 };
 
-// 构造纯图形预览组件对象
+// 构造纯图形预览组件对象 (适配小图元放大、大图表等比缩小完全装入预览容器)
 const previewScale = computed(() => {
   if (!previewModal.value.def) return 1;
   const def = previewModal.value.def;
   const maxDim = Math.max(def.defaultWidth || 40, def.defaultHeight || 40);
-  const targetDim = 190;
-  return Math.min(3.5, Math.max(1, targetDim / maxDim));
+  const targetDim = 240; // 适配 280x280 容器内部留白
+  return Math.min(3.0, targetDim / maxDim);
 });
+
 
 const previewSize = computed(() => {
   if (!previewModal.value.def) return { width: 140, height: 140 };
@@ -748,7 +749,7 @@ const previewComponent = computed<ScreenComponent | null>(() => {
             <WidgetRenderer 
               v-if="previewComponent"
               :component="previewComponent"
-              :preview-mode="true"
+              :preview-mode="false"
             />
           </div>
         </div>

@@ -18,7 +18,9 @@ import {
   Info,
   FileText,
   Code,
-  ShieldCheck
+  ShieldCheck,
+  Maximize2,
+  Minimize2
 } from 'lucide-vue-next';
 import {
   DatasetItem,
@@ -55,7 +57,7 @@ const emit = defineEmits<{
   (e: 'update:datasets', datasets: DatasetItem[]): void;
 }>();
 
-// IP Parsing and Reconstruction (固定 http 与固定端口 36581，仅向用户开放修改 IP)
+// IP Parsing and Reconstruction
 const extractIpFromUrl = (url: string): string => {
   if (!url) return '127.0.0.1';
   const clean = url.trim();
@@ -68,7 +70,7 @@ const buildUrlFromIp = (ip: string): string => {
   return `http://${cleanIp}:36581`;
 };
 
-// API IP Configuration (只显示和编辑 IP)
+// API IP Configuration
 const apiIpInput = ref<string>(extractIpFromUrl(getScadaApiBaseUrl()));
 
 // Hierarchy Navigation Selection
@@ -81,6 +83,94 @@ const toastMessage = ref<{ text: string; type: 'success' | 'info' | 'error' } | 
 
 // Search and filtering
 const searchQuery = ref<string>('');
+
+// 弹框拖拽与尺寸管理 (与数据关联弹框风格统一)
+const modalRef = ref<HTMLElement | null>(null);
+const isMaximized = ref(false);
+const isDragging = ref(false);
+const modalPos = ref({ x: 0, y: 0 });
+const modalSize = ref({ width: 1100, height: 720 });
+let dragStart = { mouseX: 0, mouseY: 0, posX: 0, posY: 0 };
+let preMaxState = { x: 0, y: 0, width: 1100, height: 720 };
+
+const initModalPosition = () => {
+  const w = Math.min(window.innerWidth - 32, 1140);
+  const h = Math.min(window.innerHeight - 32, 740);
+  modalSize.value = { width: w, height: h };
+  modalPos.value = {
+    x: Math.max(16, (window.innerWidth - w) / 2),
+    y: Math.max(16, (window.innerHeight - h) / 2)
+  };
+};
+
+const toggleMaximize = () => {
+  if (!isMaximized.value) {
+    preMaxState = {
+      x: modalPos.value.x,
+      y: modalPos.value.y,
+      width: modalSize.value.width,
+      height: modalSize.value.height
+    };
+    modalPos.value = { x: 8, y: 8 };
+    modalSize.value = {
+      width: window.innerWidth - 16,
+      height: window.innerHeight - 16
+    };
+    isMaximized.value = true;
+  } else {
+    isMaximized.value = false;
+    modalPos.value = { x: preMaxState.x, y: preMaxState.y };
+    modalSize.value = { width: preMaxState.width, height: preMaxState.height };
+  }
+};
+
+const onHeaderMouseDown = (e: MouseEvent) => {
+  if ((e.target as HTMLElement).closest('button, input, select, a')) return;
+
+  if (isMaximized.value) {
+    const restoreW = preMaxState.width;
+    const restoreH = preMaxState.height;
+    isMaximized.value = false;
+    modalSize.value = { width: restoreW, height: restoreH };
+    modalPos.value = {
+      x: Math.max(8, Math.min(window.innerWidth - restoreW - 8, e.clientX - restoreW / 2)),
+      y: Math.max(8, Math.min(window.innerHeight - restoreH - 8, e.clientY - 18))
+    };
+  }
+
+  isDragging.value = true;
+  dragStart = {
+    mouseX: e.clientX,
+    mouseY: e.clientY,
+    posX: modalPos.value.x,
+    posY: modalPos.value.y
+  };
+
+  const onMouseMove = (ev: MouseEvent) => {
+    if (!isDragging.value) return;
+    const dx = ev.clientX - dragStart.mouseX;
+    const dy = ev.clientY - dragStart.mouseY;
+    const modalW = modalSize.value.width;
+    const modalH = modalSize.value.height;
+
+    const maxX = Math.max(0, window.innerWidth - modalW - 8);
+    const maxY = Math.max(0, window.innerHeight - modalH - 8);
+
+    modalPos.value = {
+      x: Math.min(maxX, Math.max(8, dragStart.posX + dx)),
+      y: Math.min(maxY, Math.max(8, dragStart.posY + dy))
+    };
+  };
+
+  const onMouseUp = () => {
+    isDragging.value = false;
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+  };
+
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp);
+};
 
 // Current Selected Facility
 const currentFacility = computed<ScadaFacilityNode | undefined>(() => {
@@ -172,7 +262,7 @@ const filteredYtList = computed<ScadaYtItem[]>(() => {
   );
 });
 
-// JSON View computed (Only serialize on demand)
+// JSON View computed
 const scadaConfigJsonString = computed(() => {
   if (activeTab.value !== 'json') return '';
   return JSON.stringify(
@@ -232,515 +322,556 @@ const syncToParentDatasets = () => {
 // Watch visibility
 watch(() => props.visible, (isOpen) => {
   if (isOpen) {
+    initModalPosition();
     apiIpInput.value = extractIpFromUrl(getScadaApiBaseUrl());
   }
 });
 </script>
 
 <template>
-  <div
-    v-if="visible"
-    id="dataset-manager-modal"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 font-sans select-none"
-    style="transform: translateZ(0); will-change: transform;"
-  >
+  <Teleport to="body">
     <div
-      class="bg-[#0e172a] border-2 border-sky-400 rounded-2xl w-full max-w-7xl h-[88vh] max-h-[880px] flex flex-col shadow-2xl overflow-hidden text-white"
-      style="contain: paint layout;"
+      v-if="visible"
+      id="dataset-manager-modal"
+      class="fixed inset-0 z-[9999] pointer-events-none select-none font-sans"
     >
-      <!-- Header: 简洁统一大方，无冗余卡片标签 -->
-      <div class="px-6 py-4 border-b-2 border-slate-700 bg-[#080d1a] flex items-center justify-between shrink-0">
-        <div class="flex items-center gap-3">
-          <div class="w-3 h-3 rounded-full bg-sky-400"></div>
-          <h2 class="text-lg font-bold tracking-wide text-white">SCADA 数据集与测点配置中心</h2>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <button
-            id="close-dataset-modal-btn"
-            class="p-1 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-            @click="emit('close')"
-          >
-            <X class="w-6 h-6" />
-          </button>
-        </div>
-      </div>
-
-      <!-- Top SCADA API Config Bar: 仅显示修改 IP -->
-      <div class="px-6 py-3 bg-[#0c1427] border-b-2 border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
-        <div class="flex items-center gap-3 flex-1 min-w-[300px]">
-          <div class="flex items-center gap-2 text-sky-300 font-bold shrink-0 text-sm">
-            <Server class="w-4 h-4 text-sky-400" />
-            <span>服务 IP 地址:</span>
-          </div>
-          <input
-            v-model="apiIpInput"
-            id="scada-api-ip-input"
-            type="text"
-            placeholder="127.0.0.1"
-            class="w-56 px-3 py-1.5 bg-[#111c34] border border-sky-400 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:border-sky-300 font-mono font-bold shadow-inner"
-            @blur="handleSaveApiIp"
-            @keyup.enter="handleFetchConfig"
-          />
-          <button
-            id="btn-fetch-scada-config"
-            :disabled="isConfigLoading"
-            class="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white rounded-lg font-bold flex items-center gap-1.5 transition-colors shadow-md cursor-pointer border border-sky-400 active:scale-95 text-xs"
-            @click="handleFetchConfig"
-          >
-            <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isConfigLoading }" />
-            <span>获取配置 (GET /config)</span>
-          </button>
-        </div>
-
-        <div class="flex items-center gap-3 shrink-0">
-          <!-- Connection status indicator -->
-          <div class="flex items-center gap-2 px-3 py-1.5 bg-[#111c34] border border-slate-700 rounded-lg">
-            <span
-              class="w-2.5 h-2.5 rounded-full"
-              :class="scadaApiConnStatus === 'connected' ? 'bg-emerald-400 shadow-[0_0_8px_#34d399]' : (scadaApiConnStatus === 'disconnected' ? 'bg-rose-400 shadow-[0_0_8px_#f43f5e]' : 'bg-amber-400 shadow-[0_0_8px_#fbbf24]')"
-            />
-            <span class="text-slate-100 font-mono font-bold text-xs">
-              {{ scadaApiConnStatus === 'connected' ? '已连接生产服务' : (scadaApiConnStatus === 'disconnected' ? '未连接 (等待上线)' : '服务就绪 (本地已就绪)') }}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Main Body (3-Column Hierarchy + Point Tables) -->
-      <div class="flex-1 flex overflow-hidden bg-[#0a1120]">
-        <!-- 1. 厂站 (Facility) Column -->
-        <div class="w-56 border-r-2 border-slate-800 bg-[#0c1427] flex flex-col shrink-0">
-          <div class="p-3.5 border-b-2 border-slate-800 bg-[#080d1a] flex items-center justify-between">
-            <div class="flex items-center gap-1.5 text-sm font-bold text-sky-300">
-              <Building2 class="w-4 h-4 text-sky-400" />
-              <span>1. 厂站选择</span>
-            </div>
-            <span class="px-2 py-0.5 text-xs bg-slate-800 rounded font-mono font-bold text-slate-100 border border-slate-700">
-              {{ scadaFacilities.length }}
-            </span>
-          </div>
-
-          <div
-            class="flex-1 overflow-y-auto p-2 space-y-2"
-            style="contain: strict; will-change: scroll-position; transform: translateZ(0); scrollbar-gutter: stable;"
-          >
-            <div
-              v-for="fac in scadaFacilities"
-              :key="fac.fac_id"
-              :id="`facility-item-${fac.fac_id}`"
-              class="p-3 rounded-xl cursor-pointer border-2 transition-colors text-left"
-              :class="selectedFacId === fac.fac_id ? 'bg-sky-600/30 border-sky-400 text-white font-bold' : 'bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-800'"
-              @click="selectedFacId = fac.fac_id; if (fac.bays?.[0]) selectedBayId = fac.bays[0].bay_id; if (fac.bays?.[0]?.devices?.[0]) selectedDevId = fac.bays[0].devices[0].dev_id;"
-            >
-              <div class="truncate text-white font-bold text-sm mb-1">{{ fac.fac_name }}</div>
-              <div class="flex items-center justify-between text-xs text-sky-300 font-mono font-bold">
-                <span>ID: {{ fac.fac_id }}</span>
-                <span>{{ fac.bays?.length || 0 }} 间隔</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 2. 间隔 (Bay) Column -->
-        <div class="w-60 border-r-2 border-slate-800 bg-[#0c1427] flex flex-col shrink-0">
-          <div class="p-3.5 border-b-2 border-slate-800 bg-[#080d1a] flex items-center justify-between">
-            <div class="flex items-center gap-1.5 text-sm font-bold text-slate-200">
-              <Layers class="w-4 h-4 text-sky-400" />
-              <span>2. 间隔选择</span>
-            </div>
-            <span class="px-2 py-0.5 text-xs bg-slate-800 rounded font-mono font-bold text-slate-100 border border-slate-700">
-              {{ currentFacility?.bays?.length || 0 }}
-            </span>
-          </div>
-
-          <div
-            class="flex-1 overflow-y-auto p-2 space-y-2"
-            style="contain: strict; will-change: scroll-position; transform: translateZ(0); scrollbar-gutter: stable;"
-          >
-            <div
-              v-for="bay in (currentFacility?.bays || [])"
-              :key="bay.bay_id"
-              :id="`bay-item-${bay.bay_id}`"
-              class="p-3 rounded-xl cursor-pointer border-2 transition-colors text-left"
-              :class="selectedBayId === bay.bay_id ? 'bg-sky-600/30 border-sky-400 text-white font-bold' : 'bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-800'"
-              @click="selectedBayId = bay.bay_id; if (bay.devices?.[0]) selectedDevId = bay.devices[0].dev_id;"
-            >
-              <div class="truncate text-white font-bold text-sm mb-1">{{ bay.bay_name }}</div>
-              <div class="flex items-center justify-between text-xs text-slate-200 font-mono font-bold">
-                <span>ID: {{ bay.bay_id }}</span>
-                <span>{{ bay.devices?.length || 0 }} 装置</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 3. 装置 (Device) Column -->
-        <div class="w-64 border-r-2 border-slate-800 bg-[#0c1427] flex flex-col shrink-0">
-          <div class="p-3.5 border-b-2 border-slate-800 bg-[#080d1a] flex items-center justify-between">
-            <div class="flex items-center gap-1.5 text-sm font-bold text-slate-200">
-              <Cpu class="w-4 h-4 text-sky-400" />
-              <span>3. 装置选择</span>
-            </div>
-            <span class="px-2 py-0.5 text-xs bg-slate-800 rounded font-mono font-bold text-slate-100 border border-slate-700">
-              {{ currentBay?.devices?.length || currentBay?.cb_devices?.length || 0 }}
-            </span>
-          </div>
-
-          <div
-            class="flex-1 overflow-y-auto p-2 space-y-2"
-            style="contain: strict; will-change: scroll-position; transform: translateZ(0); scrollbar-gutter: stable;"
-          >
-            <div
-              v-for="dev in (currentBay?.devices || currentBay?.cb_devices || [])"
-              :key="dev.dev_id || dev.id"
-              :id="`device-item-${dev.dev_id || dev.id}`"
-              class="p-3 rounded-xl cursor-pointer border-2 transition-colors text-left"
-              :class="selectedDevId === (dev.dev_id || dev.id) ? 'bg-sky-600/30 border-sky-400 text-white font-bold' : 'bg-slate-900 border-slate-800 text-slate-200 hover:bg-slate-800'"
-              @click="selectedDevId = (dev.dev_id || dev.id)"
-            >
-              <div class="flex items-center justify-between mb-1">
-                <span class="text-sm truncate font-bold text-white">{{ dev.dev_name || dev.name }}</span>
-                <span class="px-1.5 py-0.5 bg-slate-800 text-slate-200 text-xs rounded border border-slate-700 font-mono font-bold">
-                  {{ dev.cbty_name || '开关' }}
-                </span>
-              </div>
-              <div class="grid grid-cols-3 gap-1 text-xs text-slate-200 font-mono font-bold mt-1">
-                <span>YC: {{ (dev.yc_list || dev.yc_points || []).length }}</span>
-                <span>YX: {{ (dev.yx_list || dev.yx_points || []).length }}</span>
-                <span>DD: {{ (dev.dd_list || dev.dd_points || []).length }}</span>
-                <span>YK: {{ (dev.yk_list || dev.yk_points || []).length }}</span>
-                <span>YT: {{ (dev.yt_list || dev.yt_points || []).length }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 4. Point Data Workspace (YC / YX / DD / YK / YT / JSON) -->
-        <div class="flex-1 flex flex-col bg-[#0f172a] overflow-hidden min-w-0">
-          <!-- Point Tab Bar & Search: 统一边框与样式 -->
-          <div class="p-3 border-b-2 border-slate-800 bg-[#080d1a] flex flex-wrap items-center justify-between gap-3 shrink-0">
-            <div class="flex items-center gap-2 flex-wrap">
-              <!-- YC Tab -->
-              <button
-                id="tab-btn-yc"
-                class="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border-2"
-                :class="activeTab === 'yc' ? 'bg-sky-600 border-sky-400 text-white font-black shadow-md' : 'bg-slate-800 border-slate-700 text-slate-100 hover:bg-slate-700'"
-                @click="activeTab = 'yc'"
-              >
-                <Zap class="w-3.5 h-3.5 text-sky-200" />
-                <span>遥测 (YC)</span>
-                <span class="px-1.5 py-0.2 text-xs rounded font-mono font-bold bg-black/40 text-sky-200">
-                  {{ (currentDevice?.yc_list || currentDevice?.yc_points || []).length }}
-                </span>
-              </button>
-
-              <!-- YX Tab -->
-              <button
-                id="tab-btn-yx"
-                class="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border-2"
-                :class="activeTab === 'yx' ? 'bg-sky-600 border-sky-400 text-white font-black shadow-md' : 'bg-slate-800 border-slate-700 text-slate-100 hover:bg-slate-700'"
-                @click="activeTab = 'yx'"
-              >
-                <Radio class="w-3.5 h-3.5 text-sky-200" />
-                <span>遥信 (YX)</span>
-                <span class="px-1.5 py-0.2 text-xs rounded font-mono font-bold bg-black/40 text-sky-200">
-                  {{ (currentDevice?.yx_list || currentDevice?.yx_points || []).length }}
-                </span>
-              </button>
-
-              <!-- DD Tab -->
-              <button
-                id="tab-btn-dd"
-                class="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border-2"
-                :class="activeTab === 'dd' ? 'bg-sky-600 border-sky-400 text-white font-black shadow-md' : 'bg-slate-800 border-slate-700 text-slate-100 hover:bg-slate-700'"
-                @click="activeTab = 'dd'"
-              >
-                <Activity class="w-3.5 h-3.5 text-sky-200" />
-                <span>电度 (DD)</span>
-                <span class="px-1.5 py-0.2 text-xs rounded font-mono font-bold bg-black/40 text-sky-200">
-                  {{ (currentDevice?.dd_list || currentDevice?.dd_points || []).length }}
-                </span>
-              </button>
-
-              <!-- YK Tab -->
-              <button
-                id="tab-btn-yk"
-                class="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border-2"
-                :class="activeTab === 'yk' ? 'bg-sky-600 border-sky-400 text-white font-black shadow-md' : 'bg-slate-800 border-slate-700 text-slate-100 hover:bg-slate-700'"
-                @click="activeTab = 'yk'"
-              >
-                <Zap class="w-3.5 h-3.5 text-sky-200" />
-                <span>遥控 (YK)</span>
-                <span class="px-1.5 py-0.2 text-xs rounded font-mono font-bold bg-black/40 text-sky-200">
-                  {{ (currentDevice?.yk_list || currentDevice?.yk_points || []).length }}
-                </span>
-              </button>
-
-              <!-- YT Tab -->
-              <button
-                id="tab-btn-yt"
-                class="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border-2"
-                :class="activeTab === 'yt' ? 'bg-sky-600 border-sky-400 text-white font-black shadow-md' : 'bg-slate-800 border-slate-700 text-slate-100 hover:bg-slate-700'"
-                @click="activeTab = 'yt'"
-              >
-                <Sliders class="w-3.5 h-3.5 text-sky-200" />
-                <span>遥调 (YT)</span>
-                <span class="px-1.5 py-0.2 text-xs rounded font-mono font-bold bg-black/40 text-sky-200">
-                  {{ (currentDevice?.yt_list || currentDevice?.yt_points || []).length }}
-                </span>
-              </button>
-
-              <!-- JSON Viewer -->
-              <button
-                id="tab-btn-json"
-                class="px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ml-2 border-2 border-slate-700"
-                :class="activeTab === 'json' ? 'bg-slate-700 border-sky-400 text-sky-300' : 'bg-slate-800 text-slate-100 hover:bg-slate-700'"
-                @click="activeTab = 'json'"
-              >
-                <Code class="w-3.5 h-3.5 text-sky-300" />
-                <span>JSON 树</span>
-              </button>
-            </div>
-
-            <!-- Search Input -->
-            <div v-if="activeTab !== 'json'" class="relative w-64">
-              <input
-                v-model="searchQuery"
-                type="text"
-                placeholder="搜索测点 ID / 名称 / 别名..."
-                class="w-full pl-8 pr-3 py-1.5 bg-[#111c34] border border-slate-600 rounded-lg text-xs text-white placeholder-slate-400 focus:outline-none focus:border-sky-400 font-medium"
-              />
-              <FileText class="w-3.5 h-3.5 text-sky-400 absolute left-2.5 top-2.5" />
-            </div>
-          </div>
-
-          <!-- Tab Content 1: 遥测 (YC) Table (丝滑滚轮 + 亮色大字体) -->
-          <div
-            v-if="activeTab === 'yc'"
-            class="flex-1 overflow-y-auto p-3"
-            style="contain: strict; will-change: scroll-position; transform: translateZ(0); scrollbar-gutter: stable;"
-          >
-            <table class="w-full text-left text-sm border-collapse" style="table-layout: fixed;">
-              <thead>
-                <tr class="border-b-2 border-slate-700 text-sky-300 bg-[#080d1a] font-bold sticky top-0 z-10">
-                  <th class="p-3 w-44">测点 ID</th>
-                  <th class="p-3">测点名称</th>
-                  <th class="p-3 w-56">点位别名 / 类型</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-800 font-mono">
-                <tr
-                  v-for="yc in filteredYcList"
-                  :key="yc.id"
-                  :id="`yc-row-${yc.id}`"
-                  class="hover:bg-slate-800 transition-colors"
-                >
-                  <td class="p-3 font-bold text-sky-300 text-sm">{{ yc.id }}</td>
-                  <td class="p-3 font-sans font-bold text-white text-sm truncate">{{ yc.name }}</td>
-                  <td class="p-3 text-slate-200 text-xs truncate">{{ yc.alias || '-' }}</td>
-                </tr>
-                <tr v-if="filteredYcList.length === 0">
-                  <td colspan="3" class="p-8 text-center text-slate-200 font-sans font-medium text-sm">
-                    暂无符合条件的遥测测点
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Tab Content 2: 遥信 (YX) Table -->
-          <div
-            v-if="activeTab === 'yx'"
-            class="flex-1 overflow-y-auto p-3"
-            style="contain: strict; will-change: scroll-position; transform: translateZ(0); scrollbar-gutter: stable;"
-          >
-            <table class="w-full text-left text-sm border-collapse" style="table-layout: fixed;">
-              <thead>
-                <tr class="border-b-2 border-slate-700 text-sky-300 bg-[#080d1a] font-bold sticky top-0 z-10">
-                  <th class="p-3 w-44">测点 ID</th>
-                  <th class="p-3">测点名称</th>
-                  <th class="p-3 w-56">点位别名 / 类型</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-800 font-mono">
-                <tr
-                  v-for="yx in filteredYxList"
-                  :key="yx.id"
-                  :id="`yx-row-${yx.id}`"
-                  class="hover:bg-slate-800 transition-colors"
-                >
-                  <td class="p-3 font-bold text-sky-300 text-sm">{{ yx.id }}</td>
-                  <td class="p-3 font-sans font-bold text-white text-sm truncate">{{ yx.name }}</td>
-                  <td class="p-3 text-slate-200 text-xs truncate">{{ yx.alias || '-' }}</td>
-                </tr>
-                <tr v-if="filteredYxList.length === 0">
-                  <td colspan="3" class="p-8 text-center text-slate-200 font-sans font-medium text-sm">
-                    暂无符合条件的遥信测点
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Tab Content 3: 电度 (DD) Table -->
-          <div
-            v-if="activeTab === 'dd'"
-            class="flex-1 overflow-y-auto p-3"
-            style="contain: strict; will-change: scroll-position; transform: translateZ(0); scrollbar-gutter: stable;"
-          >
-            <table class="w-full text-left text-sm border-collapse" style="table-layout: fixed;">
-              <thead>
-                <tr class="border-b-2 border-slate-700 text-sky-300 bg-[#080d1a] font-bold sticky top-0 z-10">
-                  <th class="p-3 w-44">电度 ID</th>
-                  <th class="p-3">测点名称</th>
-                  <th class="p-3 w-56">点位别名 / 单位</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-800 font-mono">
-                <tr
-                  v-for="dd in filteredDdList"
-                  :key="dd.id"
-                  :id="`dd-row-${dd.id}`"
-                  class="hover:bg-slate-800 transition-colors"
-                >
-                  <td class="p-3 font-bold text-sky-300 text-sm">{{ dd.id }}</td>
-                  <td class="p-3 font-sans font-bold text-white text-sm truncate">{{ dd.name }}</td>
-                  <td class="p-3 text-slate-200 text-xs truncate">{{ dd.alias || dd.unit || 'kWh' }}</td>
-                </tr>
-                <tr v-if="filteredDdList.length === 0">
-                  <td colspan="3" class="p-8 text-center text-slate-200 font-sans font-medium text-sm">
-                    暂无符合条件的电度测点
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Tab Content 4: 遥控 (YK) Table -->
-          <div
-            v-if="activeTab === 'yk'"
-            class="flex-1 overflow-y-auto p-3"
-            style="contain: strict; will-change: scroll-position; transform: translateZ(0); scrollbar-gutter: stable;"
-          >
-            <table class="w-full text-left text-sm border-collapse" style="table-layout: fixed;">
-              <thead>
-                <tr class="border-b-2 border-slate-700 text-sky-300 bg-[#080d1a] font-bold sticky top-0 z-10">
-                  <th class="p-3 w-44">遥控 ID</th>
-                  <th class="p-3">控制名称</th>
-                  <th class="p-3 w-44">别名 / 编号</th>
-                  <th class="p-3 w-48">关联返校遥信点 (YX)</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-800 font-mono">
-                <tr
-                  v-for="yk in filteredYkList"
-                  :key="yk.id"
-                  :id="`yk-row-${yk.id}`"
-                  class="hover:bg-slate-800 transition-colors"
-                >
-                  <td class="p-3 font-bold text-sky-300 text-sm">{{ yk.id }}</td>
-                  <td class="p-3 font-sans font-bold text-white text-sm truncate">{{ yk.name }}</td>
-                  <td class="p-3 text-slate-200 text-xs truncate">{{ yk.alias || '-' }}</td>
-                  <td class="p-3 text-sky-200 text-xs font-bold">
-                    <span v-if="yk.targetVerificationPointId" class="px-2 py-0.5 rounded bg-sky-950 border border-sky-400">
-                      YX_{{ yk.targetVerificationPointId }}
-                    </span>
-                    <span v-else class="text-slate-400">未指定默认</span>
-                  </td>
-                </tr>
-                <tr v-if="filteredYkList.length === 0">
-                  <td colspan="4" class="p-8 text-center text-slate-200 font-sans font-medium text-sm">
-                    暂无符合条件的遥控点位
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Tab Content 5: 遥调 (YT) Table -->
-          <div
-            v-if="activeTab === 'yt'"
-            class="flex-1 overflow-y-auto p-3"
-            style="contain: strict; will-change: scroll-position; transform: translateZ(0); scrollbar-gutter: stable;"
-          >
-            <table class="w-full text-left text-sm border-collapse" style="table-layout: fixed;">
-              <thead>
-                <tr class="border-b-2 border-slate-700 text-sky-300 bg-[#080d1a] font-bold sticky top-0 z-10">
-                  <th class="p-3 w-44">遥调 ID</th>
-                  <th class="p-3">遥调名称</th>
-                  <th class="p-3 w-44">别名 / 编号</th>
-                  <th class="p-3 w-48">关联返校遥测点 (YC)</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-800 font-mono">
-                <tr
-                  v-for="yt in filteredYtList"
-                  :key="yt.id"
-                  :id="`yt-row-${yt.id}`"
-                  class="hover:bg-slate-800 transition-colors"
-                >
-                  <td class="p-3 font-bold text-sky-300 text-sm">{{ yt.id }}</td>
-                  <td class="p-3 font-sans font-bold text-white text-sm truncate">{{ yt.name }}</td>
-                  <td class="p-3 text-slate-200 text-xs truncate">{{ yt.alias || '-' }}</td>
-                  <td class="p-3 text-sky-200 text-xs font-bold">
-                    <span v-if="yt.targetVerificationPointId" class="px-2 py-0.5 rounded bg-sky-950 border border-sky-400">
-                      YC_{{ yt.targetVerificationPointId }}
-                    </span>
-                    <span v-else class="text-slate-400">未指定默认</span>
-                  </td>
-                </tr>
-                <tr v-if="filteredYtList.length === 0">
-                  <td colspan="4" class="p-8 text-center text-slate-200 font-sans font-medium text-sm">
-                    暂无符合条件的遥调点位
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Tab Content 6: JSON Config Viewer -->
-          <div v-if="activeTab === 'json'" class="flex-1 p-4 overflow-hidden flex flex-col">
-            <div class="mb-2 flex items-center justify-between text-xs text-sky-300 font-bold">
-              <span>SCADA 配置结构体 (符合 GET /api/scada/config 格式):</span>
-            </div>
-            <textarea
-              readonly
-              class="flex-1 w-full p-3 bg-slate-950 border-2 border-slate-700 rounded-xl text-xs font-mono text-sky-300 resize-none focus:outline-none font-bold"
-              :value="scadaConfigJsonString"
-            ></textarea>
-          </div>
-        </div>
-      </div>
-
-      <!-- Toast Notification -->
+      <!-- 统一数据关联弹框风格：纯黑背景、硬质深灰边框、纯白高对比字体、支持拖动与拉伸 -->
       <div
-        v-if="toastMessage"
-        class="fixed bottom-6 right-6 px-5 py-3 rounded-xl text-sm font-bold shadow-2xl flex items-center gap-2.5 z-50 transition-all border border-white/20"
-        :class="toastMessage.type === 'success' ? 'bg-emerald-600 text-white' : (toastMessage.type === 'error' ? 'bg-rose-600 text-white' : 'bg-sky-600 text-white')"
+        ref="modalRef"
+        class="pointer-events-auto absolute bg-black text-white rounded-lg border border-neutral-700 shadow-2xl flex flex-col overflow-hidden"
+        :style="{
+          left: `${modalPos.x}px`,
+          top: `${modalPos.y}px`,
+          width: `${modalSize.width}px`,
+          height: `${modalSize.height}px`
+        }"
       >
-        <Check v-if="toastMessage.type === 'success'" class="w-5 h-5" />
-        <AlertCircle v-else class="w-5 h-5" />
-        <span>{{ toastMessage.text }}</span>
+        <!-- Header -->
+        <header
+          class="h-12 px-4 bg-[#111111] border-b border-[#2a2a2a] flex items-center justify-between shrink-0 cursor-move"
+          @mousedown="onHeaderMouseDown"
+          @dblclick="toggleMaximize"
+        >
+          <div class="flex items-center gap-2.5">
+            <Server class="w-4 h-4 text-white" />
+            <h2 class="text-sm font-bold tracking-wide text-white">SCADA 数据集与测点配置中心</h2>
+          </div>
+
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              class="p-1.5 text-white hover:bg-neutral-800 rounded transition-colors cursor-pointer"
+              :title="isMaximized ? '向下还原' : '最大化'"
+              @click.stop="toggleMaximize"
+            >
+              <Minimize2 v-if="isMaximized" class="w-4 h-4" />
+              <Maximize2 v-else class="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              class="p-1.5 text-white hover:bg-neutral-800 rounded transition-colors cursor-pointer"
+              title="关闭"
+              @click.stop="emit('close')"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+        </header>
+
+        <!-- Top SCADA API Config Bar -->
+        <div class="px-4 py-2.5 bg-[#141414] border-b border-[#2a2a2a] flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
+          <div class="flex items-center gap-3 flex-1 min-w-[300px]">
+            <div class="flex items-center gap-2 text-white font-bold shrink-0 text-xs">
+              <Server class="w-3.5 h-3.5 text-white" />
+              <span>服务 IP 地址:</span>
+            </div>
+            <input
+              v-model="apiIpInput"
+              id="scada-api-ip-input"
+              type="text"
+              placeholder="127.0.0.1"
+              class="w-52 px-3 py-1 bg-[#181818] border border-neutral-700 rounded text-xs text-white placeholder-neutral-400 focus:outline-none focus:border-white font-mono font-bold"
+              @blur="handleSaveApiIp"
+              @keyup.enter="handleFetchConfig"
+            />
+            <button
+              id="btn-fetch-scada-config"
+              :disabled="isConfigLoading"
+              class="px-3.5 py-1 bg-white hover:bg-neutral-200 text-black rounded text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+              @click="handleFetchConfig"
+            >
+              <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isConfigLoading }" />
+              <span>获取配置 (GET /config)</span>
+            </button>
+          </div>
+
+          <div class="flex items-center gap-3 shrink-0">
+            <!-- Connection status indicator -->
+            <div class="flex items-center gap-2 px-3 py-1 bg-[#181818] border border-[#2a2a2a] rounded">
+              <span
+                class="w-2 h-2 rounded-full"
+                :class="scadaApiConnStatus === 'connected' ? 'bg-emerald-400' : (scadaApiConnStatus === 'disconnected' ? 'bg-rose-400' : 'bg-amber-400')"
+              />
+              <span class="text-white font-bold text-xs">
+                {{ scadaApiConnStatus === 'connected' ? '已连接生产服务' : (scadaApiConnStatus === 'disconnected' ? '未连接 (等待上线)' : '服务就绪 (本地已就绪)') }}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main Body (3-Column Hierarchy + Point Tables) -->
+        <div class="flex-1 flex overflow-hidden bg-black">
+          <!-- 1. 厂站 (Facility) Column -->
+          <div class="w-52 border-r border-[#2a2a2a] bg-[#111111] flex flex-col shrink-0">
+            <div class="p-3 border-b border-[#2a2a2a] bg-[#141414] flex items-center justify-between">
+              <div class="flex items-center gap-1.5 text-xs font-bold text-white">
+                <Building2 class="w-4 h-4 text-white" />
+                <span>1. 厂站选择</span>
+              </div>
+              <span class="px-1.5 py-0.2 text-[11px] bg-black rounded font-mono font-bold text-white border border-neutral-700">
+                {{ scadaFacilities.length }}
+              </span>
+            </div>
+
+            <div
+              class="flex-1 overflow-y-auto p-2 space-y-1.5"
+              style="scrollbar-gutter: stable;"
+            >
+              <div
+                v-for="fac in scadaFacilities"
+                :key="fac.fac_id"
+                :id="`facility-item-${fac.fac_id}`"
+                class="p-2.5 rounded cursor-pointer border transition-colors text-left"
+                :class="selectedFacId === fac.fac_id ? 'bg-neutral-800 border-neutral-500 text-white font-bold' : 'bg-[#161616] border-[#262626] text-white hover:bg-neutral-800'"
+                @click="selectedFacId = fac.fac_id; if (fac.bays?.[0]) selectedBayId = fac.bays[0].bay_id; if (fac.bays?.[0]?.devices?.[0]) selectedDevId = fac.bays[0].devices[0].dev_id;"
+              >
+                <div class="truncate text-white font-bold text-xs mb-1">{{ fac.fac_name }}</div>
+                <div class="flex items-center justify-between text-[11px] text-white font-mono">
+                  <span>ID: {{ fac.fac_id }}</span>
+                  <span>{{ fac.bays?.length || 0 }} 间隔</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. 间隔 (Bay) Column -->
+          <div class="w-56 border-r border-[#2a2a2a] bg-[#111111] flex flex-col shrink-0">
+            <div class="p-3 border-b border-[#2a2a2a] bg-[#141414] flex items-center justify-between">
+              <div class="flex items-center gap-1.5 text-xs font-bold text-white">
+                <Layers class="w-4 h-4 text-white" />
+                <span>2. 间隔选择</span>
+              </div>
+              <span class="px-1.5 py-0.2 text-[11px] bg-black rounded font-mono font-bold text-white border border-neutral-700">
+                {{ currentFacility?.bays?.length || 0 }}
+              </span>
+            </div>
+
+            <div
+              class="flex-1 overflow-y-auto p-2 space-y-1.5"
+              style="scrollbar-gutter: stable;"
+            >
+              <div
+                v-for="bay in (currentFacility?.bays || [])"
+                :key="bay.bay_id"
+                :id="`bay-item-${bay.bay_id}`"
+                class="p-2.5 rounded cursor-pointer border transition-colors text-left"
+                :class="selectedBayId === bay.bay_id ? 'bg-neutral-800 border-neutral-500 text-white font-bold' : 'bg-[#161616] border-[#262626] text-white hover:bg-neutral-800'"
+                @click="selectedBayId = bay.bay_id; if (bay.devices?.[0]) selectedDevId = bay.devices[0].dev_id; else if (bay.cb_devices?.[0]) selectedDevId = bay.cb_devices[0].dev_id;"
+              >
+                <div class="truncate text-white font-bold text-xs mb-1">{{ bay.bay_name }}</div>
+                <div class="flex items-center justify-between text-[11px] text-white font-mono">
+                  <span>ID: {{ bay.bay_id }}</span>
+                  <span>{{ (bay.devices || bay.cb_devices || []).length }} 设备</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. 设备 (Device) Column -->
+          <div class="w-56 border-r border-[#2a2a2a] bg-[#111111] flex flex-col shrink-0">
+            <div class="p-3 border-b border-[#2a2a2a] bg-[#141414] flex items-center justify-between">
+              <div class="flex items-center gap-1.5 text-xs font-bold text-white">
+                <Cpu class="w-4 h-4 text-white" />
+                <span>3. 设备选择</span>
+              </div>
+              <span class="px-1.5 py-0.2 text-[11px] bg-black rounded font-mono font-bold text-white border border-neutral-700">
+                {{ (currentBay?.devices || currentBay?.cb_devices || []).length }}
+              </span>
+            </div>
+
+            <div
+              class="flex-1 overflow-y-auto p-2 space-y-1.5"
+              style="scrollbar-gutter: stable;"
+            >
+              <div
+                v-for="dev in (currentBay?.devices || currentBay?.cb_devices || [])"
+                :key="dev.dev_id"
+                :id="`dev-item-${dev.dev_id}`"
+                class="p-2.5 rounded cursor-pointer border transition-colors text-left"
+                :class="selectedDevId === dev.dev_id ? 'bg-neutral-800 border-neutral-500 text-white font-bold' : 'bg-[#161616] border-[#262626] text-white hover:bg-neutral-800'"
+                @click="selectedDevId = dev.dev_id"
+              >
+                <div class="truncate text-white font-bold text-xs mb-1">{{ dev.dev_name }}</div>
+                <div class="flex items-center justify-between text-[11px] text-white font-mono">
+                  <span>ID: {{ dev.dev_id }}</span>
+                  <span>测点 {{ (dev.yc_list || dev.yc_points || []).length + (dev.yx_list || dev.yx_points || []).length }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. 测点数据主展示区 (Point Tabs & Tables) -->
+          <div class="flex-1 flex flex-col overflow-hidden bg-black">
+            <!-- Tabs & Filter Bar -->
+            <div class="h-12 px-4 bg-[#111111] border-b border-[#2a2a2a] flex items-center justify-between gap-3 shrink-0">
+              <div class="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  class="px-3 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border"
+                  :class="activeTab === 'yc' ? 'bg-white text-black border-white shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+                  @click="activeTab = 'yc'"
+                >
+                  <Activity class="w-3.5 h-3.5" />
+                  <span>遥测 (YC)</span>
+                  <span class="px-1.5 py-0.2 rounded text-[10px] font-mono" :class="activeTab === 'yc' ? 'bg-black text-white' : 'bg-black/60 text-white'">
+                    {{ (currentDevice?.yc_list || currentDevice?.yc_points || []).length }}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  class="px-3 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border"
+                  :class="activeTab === 'yx' ? 'bg-white text-black border-white shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+                  @click="activeTab = 'yx'"
+                >
+                  <Radio class="w-3.5 h-3.5" />
+                  <span>遥信 (YX)</span>
+                  <span class="px-1.5 py-0.2 rounded text-[10px] font-mono" :class="activeTab === 'yx' ? 'bg-black text-white' : 'bg-black/60 text-white'">
+                    {{ (currentDevice?.yx_list || currentDevice?.yx_points || []).length }}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  class="px-3 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border"
+                  :class="activeTab === 'dd' ? 'bg-white text-black border-white shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+                  @click="activeTab = 'dd'"
+                >
+                  <Zap class="w-3.5 h-3.5" />
+                  <span>电度 (DD)</span>
+                  <span class="px-1.5 py-0.2 rounded text-[10px] font-mono" :class="activeTab === 'dd' ? 'bg-black text-white' : 'bg-black/60 text-white'">
+                    {{ (currentDevice?.dd_list || currentDevice?.dd_points || []).length }}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  class="px-3 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border"
+                  :class="activeTab === 'yk' ? 'bg-white text-black border-white shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+                  @click="activeTab = 'yk'"
+                >
+                  <Sliders class="w-3.5 h-3.5" />
+                  <span>遥控 (YK)</span>
+                  <span class="px-1.5 py-0.2 rounded text-[10px] font-mono" :class="activeTab === 'yk' ? 'bg-black text-white' : 'bg-black/60 text-white'">
+                    {{ (currentDevice?.yk_list || currentDevice?.yk_points || []).length }}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  class="px-3 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border"
+                  :class="activeTab === 'yt' ? 'bg-white text-black border-white shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+                  @click="activeTab = 'yt'"
+                >
+                  <Workflow class="w-3.5 h-3.5" />
+                  <span>遥调 (YT)</span>
+                  <span class="px-1.5 py-0.2 rounded text-[10px] font-mono" :class="activeTab === 'yt' ? 'bg-black text-white' : 'bg-black/60 text-white'">
+                    {{ (currentDevice?.yt_list || currentDevice?.yt_points || []).length }}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  class="px-3 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border"
+                  :class="activeTab === 'json' ? 'bg-white text-black border-white shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+                  @click="activeTab = 'json'"
+                >
+                  <Code class="w-3.5 h-3.5" />
+                  <span>JSON 树</span>
+                </button>
+              </div>
+
+              <!-- Search Input -->
+              <div v-if="activeTab !== 'json'" class="relative w-44">
+                <input
+                  v-model="searchQuery"
+                  type="text"
+                  placeholder="搜索测点..."
+                  class="w-full pl-8 pr-2.5 py-1 bg-[#181818] border border-neutral-700 rounded text-xs text-white placeholder-neutral-400 focus:outline-none focus:border-white font-medium"
+                />
+                <FileText class="w-3.5 h-3.5 text-white absolute left-2.5 top-1/2 -translate-y-1/2" />
+              </div>
+            </div>
+
+            <!-- Tab Content 1: 遥测 (YC) Table -->
+            <div
+              v-if="activeTab === 'yc'"
+              class="flex-1 overflow-y-auto p-2.5"
+              style="contain: strict; will-change: scroll-position; transform: translateZ(0); scrollbar-gutter: stable;"
+            >
+              <table class="w-full text-left text-xs border-collapse" style="table-layout: fixed;">
+                <colgroup>
+                  <col style="width: 140px;" />
+                  <col style="width: auto;" />
+                  <col style="width: 220px;" />
+                </colgroup>
+                <thead>
+                  <tr class="border-b border-[#2a2a2a] text-white bg-[#141414] font-bold sticky top-0 z-10 h-10">
+                    <th class="p-2.5">测点 ID</th>
+                    <th class="p-2.5">测点名称</th>
+                    <th class="p-2.5">点位别名 / 类型</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[#1e1e1e] font-mono text-white">
+                  <tr
+                    v-for="yc in filteredYcList"
+                    :key="yc.id"
+                    :id="`yc-row-${yc.id}`"
+                    class="hover:bg-[#161616] transition-colors h-10"
+                  >
+                    <td class="p-2.5 font-bold text-white">{{ yc.id }}</td>
+                    <td class="p-2.5 font-sans font-bold text-white truncate">{{ yc.name }}</td>
+                    <td class="p-2.5 text-white truncate">{{ yc.alias || yc.type_name || '-' }}</td>
+                  </tr>
+                  <tr v-if="filteredYcList.length === 0">
+                    <td colspan="3" class="p-8 text-center text-white font-sans font-medium text-xs">
+                      暂无符合条件的遥测测点
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Tab Content 2: 遥信 (YX) Table -->
+            <div
+              v-if="activeTab === 'yx'"
+              class="flex-1 overflow-y-auto p-2.5"
+              style="scrollbar-gutter: stable;"
+            >
+              <table class="w-full text-left text-xs border-collapse" style="table-layout: fixed;">
+                <colgroup>
+                  <col style="width: 140px;" />
+                  <col style="width: auto;" />
+                  <col style="width: 220px;" />
+                </colgroup>
+                <thead>
+                  <tr class="border-b border-[#2a2a2a] text-white bg-[#141414] font-bold sticky top-0 z-10 h-10">
+                    <th class="p-2.5">测点 ID</th>
+                    <th class="p-2.5">测点名称</th>
+                    <th class="p-2.5">点位别名 / 类型</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[#1e1e1e] font-mono text-white">
+                  <tr
+                    v-for="yx in filteredYxList"
+                    :key="yx.id"
+                    :id="`yx-row-${yx.id}`"
+                    class="hover:bg-[#161616] transition-colors h-10"
+                  >
+                    <td class="p-2.5 font-bold text-white">{{ yx.id }}</td>
+                    <td class="p-2.5 font-sans font-bold text-white truncate">{{ yx.name }}</td>
+                    <td class="p-2.5 text-white truncate">{{ yx.alias || yx.type_name || '-' }}</td>
+                  </tr>
+                  <tr v-if="filteredYxList.length === 0">
+                    <td colspan="3" class="p-8 text-center text-white font-sans font-medium text-xs">
+                      暂无符合条件的遥信测点
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Tab Content 3: 电度 (DD) Table -->
+            <div
+              v-if="activeTab === 'dd'"
+              class="flex-1 overflow-y-auto p-2.5"
+              style="scrollbar-gutter: stable;"
+            >
+              <table class="w-full text-left text-xs border-collapse" style="table-layout: fixed;">
+                <colgroup>
+                  <col style="width: 140px;" />
+                  <col style="width: auto;" />
+                  <col style="width: 220px;" />
+                </colgroup>
+                <thead>
+                  <tr class="border-b border-[#2a2a2a] text-white bg-[#141414] font-bold sticky top-0 z-10 h-10">
+                    <th class="p-2.5">电度 ID</th>
+                    <th class="p-2.5">测点名称</th>
+                    <th class="p-2.5">点位别名 / 单位</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[#1e1e1e] font-mono text-white">
+                  <tr
+                    v-for="dd in filteredDdList"
+                    :key="dd.id"
+                    :id="`dd-row-${dd.id}`"
+                    class="hover:bg-[#161616] transition-colors h-10"
+                  >
+                    <td class="p-2.5 font-bold text-white">{{ dd.id }}</td>
+                    <td class="p-2.5 font-sans font-bold text-white truncate">{{ dd.name }}</td>
+                    <td class="p-2.5 text-white truncate">{{ dd.alias || dd.unit || 'kWh' }}</td>
+                  </tr>
+                  <tr v-if="filteredDdList.length === 0">
+                    <td colspan="3" class="p-8 text-center text-white font-sans font-medium text-xs">
+                      暂无符合条件的电度测点
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Tab Content 4: 遥控 (YK) Table -->
+            <div
+              v-if="activeTab === 'yk'"
+              class="flex-1 overflow-y-auto p-2.5"
+              style="scrollbar-gutter: stable;"
+            >
+              <table class="w-full text-left text-xs border-collapse" style="table-layout: fixed;">
+                <colgroup>
+                  <col style="width: 140px;" />
+                  <col style="width: auto;" />
+                  <col style="width: 180px;" />
+                  <col style="width: 180px;" />
+                </colgroup>
+                <thead>
+                  <tr class="border-b border-[#2a2a2a] text-white bg-[#141414] font-bold sticky top-0 z-10 h-10">
+                    <th class="p-2.5">遥控 ID</th>
+                    <th class="p-2.5">控制名称</th>
+                    <th class="p-2.5">别名 / 编号</th>
+                    <th class="p-2.5">关联返校遥信点 (YX)</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[#1e1e1e] font-mono text-white">
+                  <tr
+                    v-for="yk in filteredYkList"
+                    :key="yk.id"
+                    :id="`yk-row-${yk.id}`"
+                    class="hover:bg-[#161616] transition-colors h-10"
+                  >
+                    <td class="p-2.5 font-bold text-white">{{ yk.id }}</td>
+                    <td class="p-2.5 font-sans font-bold text-white truncate">{{ yk.name }}</td>
+                    <td class="p-2.5 text-white truncate">{{ yk.alias || '-' }}</td>
+                    <td class="p-2.5 text-white text-xs font-bold">
+                      <span v-if="yk.targetVerificationPointId" class="px-2 py-0.5 rounded bg-neutral-800 border border-neutral-600">
+                        YX_{{ yk.targetVerificationPointId }}
+                      </span>
+                      <span v-else class="text-white">未指定默认</span>
+                    </td>
+                  </tr>
+                  <tr v-if="filteredYkList.length === 0">
+                    <td colspan="4" class="p-8 text-center text-white font-sans font-medium text-xs">
+                      暂无符合条件的遥控点位
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Tab Content 5: 遥调 (YT) Table -->
+            <div
+              v-if="activeTab === 'yt'"
+              class="flex-1 overflow-y-auto p-2.5"
+              style="scrollbar-gutter: stable;"
+            >
+              <table class="w-full text-left text-xs border-collapse" style="table-layout: fixed;">
+                <colgroup>
+                  <col style="width: 140px;" />
+                  <col style="width: auto;" />
+                  <col style="width: 180px;" />
+                  <col style="width: 180px;" />
+                </colgroup>
+                <thead>
+                  <tr class="border-b border-[#2a2a2a] text-white bg-[#141414] font-bold sticky top-0 z-10 h-10">
+                    <th class="p-2.5">遥调 ID</th>
+                    <th class="p-2.5">遥调名称</th>
+                    <th class="p-2.5">别名 / 编号</th>
+                    <th class="p-2.5">关联返校遥测点 (YC)</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[#1e1e1e] font-mono text-white">
+                  <tr
+                    v-for="yt in filteredYtList"
+                    :key="yt.id"
+                    :id="`yt-row-${yt.id}`"
+                    class="hover:bg-[#161616] transition-colors h-10"
+                  >
+                    <td class="p-2.5 font-bold text-white">{{ yt.id }}</td>
+                    <td class="p-2.5 font-sans font-bold text-white truncate">{{ yt.name }}</td>
+                    <td class="p-2.5 text-white truncate">{{ yt.alias || '-' }}</td>
+                    <td class="p-2.5 text-white text-xs font-bold">
+                      <span v-if="yt.targetVerificationPointId" class="px-2 py-0.5 rounded bg-neutral-800 border border-neutral-600">
+                        YC_{{ yt.targetVerificationPointId }}
+                      </span>
+                      <span v-else class="text-white">未指定默认</span>
+                    </td>
+                  </tr>
+                  <tr v-if="filteredYtList.length === 0">
+                    <td colspan="4" class="p-8 text-center text-white font-sans font-medium text-xs">
+                      暂无符合条件的遥调点位
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Tab Content 6: JSON Config Viewer -->
+            <div v-if="activeTab === 'json'" class="flex-1 p-3 overflow-hidden flex flex-col bg-black">
+              <div class="mb-2 flex items-center justify-between text-xs text-white font-bold">
+                <span>SCADA 配置结构体 (符合 GET /api/scada/config 格式):</span>
+              </div>
+              <textarea
+                readonly
+                class="flex-1 w-full p-3 bg-[#0e0e0e] border border-neutral-700 rounded text-xs font-mono text-white resize-none focus:outline-none"
+                :value="scadaConfigJsonString"
+              ></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="h-13 px-5 bg-[#111111] border-t border-[#2a2a2a] flex items-center justify-between shrink-0">
+          <div class="text-xs text-white font-medium">
+            当前选中: {{ currentFacility?.fac_name || '-' }} ➜ {{ currentBay?.bay_name || '-' }} ➜ {{ currentDevice?.dev_name || '-' }}
+          </div>
+
+          <div class="flex items-center gap-2.5">
+            <button
+              type="button"
+              @click="syncToParentDatasets(); showToast('已成功同步测点至全局数据集', 'success');"
+              class="px-4 py-1.5 rounded bg-white hover:bg-neutral-200 text-black text-xs font-bold transition-colors cursor-pointer shadow-sm"
+            >
+              同步全局数据集
+            </button>
+            <button
+              type="button"
+              @click="emit('close')"
+              class="px-4 py-1.5 rounded bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-white text-xs font-bold transition-colors cursor-pointer"
+            >
+              关闭
+            </button>
+          </div>
+        </footer>
+
+        <!-- Toast Notification -->
+        <div
+          v-if="toastMessage"
+          class="fixed bottom-6 right-6 px-4 py-2.5 rounded text-xs font-bold shadow-2xl flex items-center gap-2 z-50 transition-all border border-neutral-600 bg-neutral-900 text-white"
+        >
+          <Check v-if="toastMessage.type === 'success'" class="w-4 h-4 text-emerald-400" />
+          <AlertCircle v-else class="w-4 h-4 text-rose-400" />
+          <span>{{ toastMessage.text }}</span>
+        </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
-
-<style scoped>
-/* 硬件加速极速滚动条与固定列宽排版 */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: #080d1a;
-}
-::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #334155;
-}
-</style>

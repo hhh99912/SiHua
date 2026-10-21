@@ -163,7 +163,7 @@ const buildChartOptions = () => {
 
     return {
       backgroundColor: 'transparent',
-      grid: { top: 35, right: 20, bottom: 25, left: 45, containLabel: false },
+      grid: { top: 32, right: 20, bottom: 24, left: 40, containLabel: true },
       legend: {
         show: customProps?.showLegend !== false && series.length > 1,
         top: 2,
@@ -183,15 +183,15 @@ const buildChartOptions = () => {
         type: 'category',
         data: xData,
         axisLine: { lineStyle: { color: gridColor } },
-        axisLabel: { color: textColor, fontSize: 10, fontFamily: 'monospace' },
+        axisLabel: { color: '#ffffff', fontSize: 10, fontWeight: 'bold', fontFamily: 'monospace' },
         splitLine: { show: false }
       },
       yAxis: {
         type: 'value',
         name: customProps?.unit || data.mapping?.unitKey || '',
-        nameTextStyle: { color: textColor, fontSize: 10, padding: [0, 0, 0, -20] },
+        nameTextStyle: { color: '#ffffff', fontSize: 10, padding: [0, 0, 0, -20] },
         axisLine: { show: false },
-        axisLabel: { color: textColor, fontSize: 10, fontFamily: 'monospace' },
+        axisLabel: { color: '#ffffff', fontSize: 10, fontWeight: 'bold', fontFamily: 'monospace' },
         splitLine: { lineStyle: { color: gridColor, type: 'dashed' } }
       },
       series
@@ -211,7 +211,7 @@ const buildChartOptions = () => {
 
     return {
       backgroundColor: 'transparent',
-      grid: { top: 35, right: 15, bottom: 25, left: 40, containLabel: false },
+      grid: { top: 32, right: 18, bottom: 24, left: 38, containLabel: true },
       tooltip: {
         trigger: 'axis',
         backgroundColor: '#060b17',
@@ -222,14 +222,14 @@ const buildChartOptions = () => {
         type: 'category',
         data: xData,
         axisLine: { lineStyle: { color: gridColor } },
-        axisLabel: { color: textColor, fontSize: 10 }
+        axisLabel: { color: '#ffffff', fontSize: 10, fontWeight: 'bold' }
       },
       yAxis: {
         type: 'value',
         name: customProps?.unit || data.mapping?.unitKey || '',
-        nameTextStyle: { color: textColor, fontSize: 10, padding: [0, 0, 0, -20] },
+        nameTextStyle: { color: '#ffffff', fontSize: 10, padding: [0, 0, 0, -20] },
         axisLine: { show: false },
-        axisLabel: { color: textColor, fontSize: 10 },
+        axisLabel: { color: '#ffffff', fontSize: 10, fontWeight: 'bold' },
         splitLine: { lineStyle: { color: gridColor, type: 'dashed' } }
       },
       series: [
@@ -440,8 +440,7 @@ const renderChart = () => {
     try {
       if (!chartInstance) {
         chartInstance = echarts.init(chartRef.value, undefined, {
-          devicePixelRatio: Math.max(window.devicePixelRatio || 1, 1),
-          renderer: 'canvas'
+          renderer: 'svg'
         });
       }
       const options = buildChartOptions();

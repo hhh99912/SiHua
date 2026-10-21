@@ -16,10 +16,13 @@ import {
   Check,
   TrendingUp,
   BarChart3,
-  Plus
+  Plus,
+  Database,
+  Edit3
 } from 'lucide-vue-next';
 import { ScreenComponent, ScreenConfig, DatasetItem, ScreenItem, ScadaChartPoint } from '../types';
-import { scadaFacilities, findScadaPointDef } from '../utils/scadaClient';
+import { scadaFacilities, findScadaPointDef, getScadaPointDisplayName } from '../utils/scadaClient';
+import ChartPointAssociationModal from './ChartPointAssociationModal.vue';
 
 interface Props {
   component: ScreenComponent | null;
@@ -152,131 +155,42 @@ const ensurePointsArray = () => {
   return draftComponent.value.customProps.points;
 };
 
-// 待添加的测点选择状态
-const selectedCatalogPointId = ref<number | ''>('');
-const selectedPointCategory = ref<'yc' | 'dd'>('yc');
+// 图表测点数据关联模态框状态 (严格遵循普通遥测的厂站-间隔-装置-点表4级关联体系)
+const showChartPointModal = ref(false);
+const chartPointModalMode = ref<'add' | 'edit'>('add');
+const chartPointModalTargetIndex = ref<number | null>(null);
+const chartPointModalInitialPoint = ref<ScadaChartPoint | null>(null);
 
-// 从所有厂站扁平化提取供下拉选择的 YC 和 DD 测点列表
-const availableCatalogPoints = computed(() => {
-  const res: Array<{
-    id: number;
-    name: string;
-    category: 'yc' | 'dd';
-    unit: string;
-    label: string;
-    facName: string;
-    bayName: string;
-    devName: string;
-  }> = [];
-
-  for (const fac of scadaFacilities.value || []) {
-    const facName = fac.fac_name || fac.name || '示范站';
-    for (const bay of fac.bays || []) {
-      const bayName = bay.bay_name || bay.name || '间隔';
-      for (const dev of bay.devices || bay.cb_devices || []) {
-        const devName = dev.dev_name || dev.name || '设备';
-        if (selectedPointCategory.value === 'yc') {
-          const ycs = dev.yc_list || dev.yc_points || [];
-          for (const p of ycs) {
-            res.push({
-              id: p.id,
-              name: p.name,
-              category: 'yc',
-              unit: p.unit || 'A',
-              label: `${facName}-${bayName}-${devName}-${p.name} (#${p.id})`,
-              facName,
-              bayName,
-              devName
-            });
-          }
-        } else {
-          const dds = dev.dd_list || dev.dd_points || [];
-          for (const p of dds) {
-            res.push({
-              id: p.id,
-              name: p.name,
-              category: 'dd',
-              unit: p.unit || 'kWh',
-              label: `${facName}-${bayName}-${devName}-${p.name} (#${p.id})`,
-              facName,
-              bayName,
-              devName
-            });
-          }
-        }
-      }
-    }
-  }
-  return res;
-});
-
-// 添加选中的测点到当前图表
-const handleAddSelectedPoint = () => {
-  if (!selectedCatalogPointId.value || !draftComponent.value) return;
-  const pId = Number(selectedCatalogPointId.value);
-  const found = availableCatalogPoints.value.find(p => p.id === pId);
-  if (!found) return;
-
-  const pts = ensurePointsArray();
-  if (pts.some((p: any) => p.id === pId)) {
-    return;
-  }
-
-  const nextColor = CHART_PALETTE[pts.length % CHART_PALETTE.length];
-  pts.push({
-    id: found.id,
-    name: found.name,
-    category: found.category,
-    color: nextColor,
-    unit: found.unit,
-    facName: found.facName,
-    bayName: found.bayName,
-    devName: found.devName
-  });
-
-  selectedCatalogPointId.value = '';
+// 打开添加关联测点
+const handleOpenAddChartPoint = () => {
+  chartPointModalMode.value = 'add';
+  chartPointModalTargetIndex.value = null;
+  chartPointModalInitialPoint.value = null;
+  showChartPointModal.value = true;
 };
 
-// 快捷批量预设添加
-const handleAddPresetPoints = (presetType: 'current' | 'voltage' | 'power' | 'energy') => {
-  if (!draftComponent.value) return;
-  const pts = ensurePointsArray();
+// 打开修改测点关联
+const handleOpenEditChartPoint = (pt: ScadaChartPoint, idx: number) => {
+  chartPointModalMode.value = 'edit';
+  chartPointModalTargetIndex.value = idx;
+  chartPointModalInitialPoint.value = { ...pt };
+  showChartPointModal.value = true;
+};
 
-  if (presetType === 'current') {
-    const list: ScadaChartPoint[] = [
-      { id: 101, name: 'A相电流', category: 'yc', color: '#ffffff', unit: 'A', facName: '示范站', bayName: '10kV进线', devName: '测控装置' },
-      { id: 102, name: 'B相电流', category: 'yc', color: '#38bdf8', unit: 'A', facName: '示范站', bayName: '10kV进线', devName: '测控装置' },
-      { id: 103, name: 'C相电流', category: 'yc', color: '#fbbf24', unit: 'A', facName: '示范站', bayName: '10kV进线', devName: '测控装置' }
-    ];
-    list.forEach(p => {
-      if (!pts.some((x: any) => x.id === p.id)) pts.push(p);
-    });
-  } else if (presetType === 'voltage') {
-    const list: ScadaChartPoint[] = [
-      { id: 104, name: 'AB线电压', category: 'yc', color: '#ffffff', unit: 'kV', facName: '示范站', bayName: '10kV进线', devName: '测控装置' },
-      { id: 105, name: 'BC线电压', category: 'yc', color: '#34d399', unit: 'kV', facName: '示范站', bayName: '10kV进线', devName: '测控装置' },
-      { id: 106, name: 'CA线电压', category: 'yc', color: '#f472b6', unit: 'kV', facName: '示范站', bayName: '10kV进线', devName: '测控装置' }
-    ];
-    list.forEach(p => {
-      if (!pts.some((x: any) => x.id === p.id)) pts.push(p);
-    });
-  } else if (presetType === 'power') {
-    const list: ScadaChartPoint[] = [
-      { id: 107, name: '总有功功率 P', category: 'yc', color: '#00f2ff', unit: 'kW', facName: '示范站', bayName: '10kV进线', devName: '测控装置' },
-      { id: 108, name: '总无功功率 Q', category: 'yc', color: '#fbbf24', unit: 'kVar', facName: '示范站', bayName: '10kV进线', devName: '测控装置' }
-    ];
-    list.forEach(p => {
-      if (!pts.some((x: any) => x.id === p.id)) pts.push(p);
-    });
-  } else if (presetType === 'energy') {
-    const list: ScadaChartPoint[] = [
-      { id: 501, name: '正向有功总电度', category: 'dd', color: '#38bdf8', unit: 'kWh', facName: '示范站', bayName: '10kV进线', devName: '电能表' },
-      { id: 502, name: '反向有功总电度', category: 'dd', color: '#fbbf24', unit: 'kWh', facName: '示范站', bayName: '10kV进线', devName: '电能表' }
-    ];
-    list.forEach(p => {
-      if (!pts.some((x: any) => x.id === p.id)) pts.push(p);
-    });
+// 提交测点数据关联 (添加或修改)
+const handleChartPointModalSubmit = (payload: { point: ScadaChartPoint; targetIndex?: number | null }) => {
+  const pts = ensurePointsArray();
+  if (payload.targetIndex !== undefined && payload.targetIndex !== null && payload.targetIndex >= 0) {
+    pts[payload.targetIndex] = payload.point;
+  } else {
+    const existIdx = pts.findIndex((p: any) => p.id === payload.point.id);
+    if (existIdx >= 0) {
+      pts[existIdx] = payload.point;
+    } else {
+      pts.push(payload.point);
+    }
   }
+  showChartPointModal.value = false;
 };
 
 const handleRemovePoint = (index: number) => {
@@ -564,17 +478,6 @@ const textLabelContent = computed({
             </span>
           </div>
 
-          <!-- 显示单位 -->
-          <div class="space-y-1">
-            <label class="text-xs text-slate-200 font-bold">默认显示单位</label>
-            <input
-              v-model="draftComponent.customProps.unit"
-              type="text"
-              placeholder="例如: A / kW / kWh (测点独立单位优先)"
-              class="w-full bg-[#080d1a] border border-[#2b3a55] rounded-lg px-2.5 py-1 text-xs text-white font-mono font-bold"
-            />
-          </div>
-
           <!-- 曲线专有配置 -->
           <div v-if="draftComponent.type === 'chart-realtime-curve'" class="space-y-2 pt-1 border-t border-[#1e293b]">
             <div class="grid grid-cols-2 gap-2">
@@ -605,6 +508,20 @@ const textLabelContent = computed({
               </div>
             </div>
 
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <div class="space-y-1">
+                <label class="text-xs text-slate-200 font-bold">坐标轴数字字号 (px)</label>
+                <input
+                  v-model.number="draftComponent.customProps.axisFontSize"
+                  type="number"
+                  min="8"
+                  max="24"
+                  placeholder="默认 10"
+                  class="w-full bg-[#080d1a] border border-[#2b3a55] rounded-lg px-2.5 py-1 text-xs text-white font-mono font-bold"
+                />
+              </div>
+            </div>
+
             <div class="flex items-center justify-between text-xs font-bold text-slate-200 pt-1">
               <label class="flex items-center gap-1.5 cursor-pointer">
                 <input type="checkbox" v-model="draftComponent.customProps.smooth" class="rounded text-cyan-500" />
@@ -622,7 +539,7 @@ const textLabelContent = computed({
           </div>
 
           <!-- 柱状图专有配置 -->
-          <div v-else class="space-y-2 pt-1 border-t border-[#1e293b]">
+          <div v-else class="space-y-2.5 pt-1 border-t border-[#1e293b]">
             <div class="grid grid-cols-2 gap-2">
               <div class="space-y-1">
                 <label class="text-xs text-slate-200 font-bold">柱体宽度 (px)</label>
@@ -647,6 +564,45 @@ const textLabelContent = computed({
                     <span>柱顶显示数值</span>
                   </label>
                 </div>
+              </div>
+            </div>
+
+            <!-- 控制柱顶数字大小与横纵轴数字大小 -->
+            <div class="grid grid-cols-3 gap-2 pt-1 border-t border-[#1e293b]/60">
+              <div class="space-y-1">
+                <label class="text-[11px] text-slate-200 font-bold truncate" title="柱顶数字字号">柱顶数字字号</label>
+                <input
+                  v-model.number="draftComponent.customProps.valueFontSize"
+                  type="number"
+                  min="8"
+                  max="32"
+                  placeholder="11"
+                  class="w-full bg-[#080d1a] border border-[#2b3a55] rounded-lg px-2 py-1 text-xs text-white font-mono font-bold text-center"
+                />
+              </div>
+
+              <div class="space-y-1">
+                <label class="text-[11px] text-slate-200 font-bold truncate" title="横轴文字字号">横轴文字字号</label>
+                <input
+                  v-model.number="draftComponent.customProps.xAxisFontSize"
+                  type="number"
+                  min="8"
+                  max="24"
+                  placeholder="10"
+                  class="w-full bg-[#080d1a] border border-[#2b3a55] rounded-lg px-2 py-1 text-xs text-white font-mono font-bold text-center"
+                />
+              </div>
+
+              <div class="space-y-1">
+                <label class="text-[11px] text-slate-200 font-bold truncate" title="纵轴刻度字号">纵轴刻度字号</label>
+                <input
+                  v-model.number="draftComponent.customProps.yAxisFontSize"
+                  type="number"
+                  min="8"
+                  max="24"
+                  placeholder="10"
+                  class="w-full bg-[#080d1a] border border-[#2b3a55] rounded-lg px-2 py-1 text-xs text-white font-mono font-bold text-center"
+                />
               </div>
             </div>
           </div>
@@ -677,25 +633,22 @@ const textLabelContent = computed({
               <span class="text-[10px] text-slate-400">支持遥测 YC / 电度 DD</span>
             </div>
 
-            <div class="max-h-40 overflow-y-auto custom-scrollbar space-y-1.5 pr-0.5">
+            <div class="max-h-44 overflow-y-auto custom-scrollbar space-y-1.5 pr-0.5">
               <div
                 v-for="(pt, idx) in (draftComponent.customProps?.points || [])"
                 :key="pt.id + '-' + idx"
-                class="p-1.5 bg-[#080d1a] border border-[#23334d] rounded-lg flex items-center justify-between gap-1.5 text-xs"
+                class="p-2 bg-[#080d1a] border border-[#23334d] hover:border-cyan-500/50 rounded-lg flex items-center justify-between gap-2 text-xs transition-colors"
               >
                 <div class="flex items-center gap-1.5 truncate flex-1 min-w-0">
-                  <span 
-                    class="text-[9px] font-mono font-bold px-1 py-0.2 rounded uppercase shrink-0"
-                    :class="pt.category === 'dd' ? 'bg-blue-950 text-blue-300 border border-blue-500/50' : 'bg-cyan-950 text-cyan-300 border border-cyan-500/50'"
-                  >
-                    {{ (pt.category || 'yc').toUpperCase() }}
-                  </span>
-                  <span class="text-white font-medium truncate" :title="pt.name">
-                    {{ pt.name }}
-                  </span>
-                  <span class="text-slate-400 font-mono text-[10px] shrink-0">
-                    #{{ pt.id }}
-                  </span>
+                  <div class="truncate flex-1 min-w-0">
+                    <div class="text-white font-bold truncate flex items-center gap-1" :title="getScadaPointDisplayName(pt)">
+                      <span class="truncate">{{ getScadaPointDisplayName(pt) }}</span>
+                      <span v-if="pt.unit" class="text-white/80 font-mono text-[10px] shrink-0">({{ pt.unit }})</span>
+                    </div>
+                    <div v-if="pt.bayName || pt.devName" class="text-[10px] text-white/80 truncate mt-0.5">
+                      {{ pt.bayName || '' }} {{ pt.devName ? '· ' + pt.devName : '' }}
+                    </div>
+                  </div>
                 </div>
 
                 <div class="flex items-center gap-1.5 shrink-0">
@@ -703,21 +656,24 @@ const textLabelContent = computed({
                   <input
                     type="color"
                     v-model="pt.color"
-                    class="w-4 h-4 rounded cursor-pointer border border-[#1e293b] p-0 bg-transparent"
-                    title="选择曲线/柱体颜色"
+                    class="w-5 h-5 rounded cursor-pointer border border-[#1e293b] p-0 bg-transparent shrink-0"
+                    title="选择柱体/曲线颜色"
                   />
-                  <!-- 单位输入 -->
-                  <input
-                    v-model="pt.unit"
-                    type="text"
-                    placeholder="单位"
-                    class="w-10 bg-[#101b31] border border-[#2b3a55] rounded px-1 py-0.5 text-[10px] text-white font-mono text-center"
-                  />
+                  <!-- 修改关联按钮 -->
+                  <button
+                    type="button"
+                    @click="handleOpenEditChartPoint(pt, idx)"
+                    class="px-2 py-1 bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-700/60 rounded text-[11px] font-bold text-cyan-300 hover:text-cyan-100 flex items-center gap-1 cursor-pointer transition-colors"
+                    title="修改测点数据关联 (从厂站装置点表重新选点)"
+                  >
+                    <Database class="w-3 h-3 text-cyan-400" />
+                    <span>修改</span>
+                  </button>
                   <!-- 删除按钮 -->
                   <button
                     type="button"
                     @click="handleRemovePoint(idx)"
-                    class="text-slate-400 hover:text-rose-400 p-0.5 rounded cursor-pointer"
+                    class="text-slate-400 hover:text-rose-400 p-1 rounded hover:bg-rose-950/30 cursor-pointer transition-colors"
                     title="移除此测点"
                   >
                     <Trash2 class="w-3.5 h-3.5 stroke-[2]" />
@@ -727,102 +683,23 @@ const textLabelContent = computed({
 
               <div 
                 v-if="!draftComponent.customProps?.points || draftComponent.customProps.points.length === 0"
-                class="text-center py-3 text-slate-500 text-xs italic"
+                class="text-center py-4 text-slate-500 text-xs italic bg-[#080d1a] border border-dashed border-[#1e293b] rounded-lg"
               >
-                尚未关联测点，请在下方选择测点添加
+                尚未关联测点，请点击下方按钮关联测点
               </div>
             </div>
           </div>
 
-          <!-- 添加新测点区 -->
-          <div class="space-y-2 p-2 bg-[#080d1a] border border-[#2b3a55] rounded-lg">
-            <div class="flex items-center justify-between">
-              <span class="text-xs text-cyan-300 font-bold flex items-center gap-1">
-                <Plus class="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>添加关联测点</span>
-              </span>
-
-              <!-- 切换类别 YC / DD -->
-              <div class="flex items-center bg-[#101b31] p-0.5 rounded border border-[#2b3a55] text-[10px] font-mono">
-                <button
-                  type="button"
-                  @click="selectedPointCategory = 'yc'"
-                  class="px-2 py-0.5 rounded transition-colors cursor-pointer"
-                  :class="selectedPointCategory === 'yc' ? 'bg-cyan-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
-                >
-                  遥测 (YC)
-                </button>
-                <button
-                  type="button"
-                  @click="selectedPointCategory = 'dd'"
-                  class="px-2 py-0.5 rounded transition-colors cursor-pointer"
-                  :class="selectedPointCategory === 'dd' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400 hover:text-white'"
-                >
-                  电度 (DD)
-                </button>
-              </div>
-            </div>
-
-            <!-- 下拉选择测点 -->
-            <div class="flex items-center gap-1.5">
-              <select
-                v-model="selectedCatalogPointId"
-                class="flex-1 bg-[#101b31] border border-[#2b3a55] rounded-lg px-2 py-1.5 text-xs text-white font-medium cursor-pointer truncate"
-              >
-                <option value="">-- 从厂站测点库选择{{ selectedPointCategory === 'yc' ? '遥测' : '电度' }}点 --</option>
-                <option
-                  v-for="p in availableCatalogPoints"
-                  :key="p.id"
-                  :value="p.id"
-                >
-                  {{ p.label }}
-                </option>
-              </select>
-
-              <button
-                type="button"
-                @click="handleAddSelectedPoint"
-                :disabled="!selectedCatalogPointId"
-                class="px-2.5 py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg shrink-0 cursor-pointer"
-              >
-                添加
-              </button>
-            </div>
-
-            <!-- 快捷批量测点预设 (一键配置常用电力三相测点) -->
-            <div class="pt-1.5 border-t border-[#1e293b]/80 space-y-1">
-              <span class="text-[10px] text-slate-400">常用测点快捷组合:</span>
-              <div class="grid grid-cols-2 gap-1 text-[11px]">
-                <button
-                  type="button"
-                  @click="handleAddPresetPoints('current')"
-                  class="px-1.5 py-1 bg-[#101b31] hover:bg-cyan-950/80 border border-slate-700 hover:border-cyan-500 rounded text-slate-300 hover:text-cyan-300 text-left truncate cursor-pointer font-medium"
-                >
-                  + 三相电流 (Ia/Ib/Ic)
-                </button>
-                <button
-                  type="button"
-                  @click="handleAddPresetPoints('voltage')"
-                  class="px-1.5 py-1 bg-[#101b31] hover:bg-emerald-950/80 border border-slate-700 hover:border-emerald-500 rounded text-slate-300 hover:text-emerald-300 text-left truncate cursor-pointer font-medium"
-                >
-                  + 三相电压 (Ua/Ub/Uc)
-                </button>
-                <button
-                  type="button"
-                  @click="handleAddPresetPoints('power')"
-                  class="px-1.5 py-1 bg-[#101b31] hover:bg-amber-950/80 border border-slate-700 hover:border-amber-500 rounded text-slate-300 hover:text-amber-300 text-left truncate cursor-pointer font-medium"
-                >
-                  + 有功/无功 (P/Q)
-                </button>
-                <button
-                  type="button"
-                  @click="handleAddPresetPoints('energy')"
-                  class="px-1.5 py-1 bg-[#101b31] hover:bg-blue-950/80 border border-slate-700 hover:border-blue-500 rounded text-slate-300 hover:text-blue-300 text-left truncate cursor-pointer font-medium"
-                >
-                  + 回路电度 (正向/反向)
-                </button>
-              </div>
-            </div>
+          <!-- 添加新关联测点按钮 (采用普通遥测相同的 4 级级联关联体系) -->
+          <div class="pt-1">
+            <button
+              type="button"
+              @click="handleOpenAddChartPoint"
+              class="w-full py-2 bg-[#0c162c] hover:bg-cyan-950/80 border border-dashed border-cyan-500/60 hover:border-cyan-400 rounded-lg text-cyan-300 hover:text-cyan-100 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-xs"
+            >
+              <Plus class="w-4 h-4 stroke-[2.5]" />
+              <span>添加关联测点 (从厂站装置点表选择)</span>
+            </button>
           </div>
         </div>
 
@@ -1274,6 +1151,17 @@ const textLabelContent = computed({
         </button>
       </div>
     </div>
+
+    <!-- 4. 测点数据关联弹窗 (用于添加与修改图表关联测点，支持4级级联点表体系) -->
+    <ChartPointAssociationModal
+      v-if="showChartPointModal"
+      :visible="showChartPointModal"
+      :mode="chartPointModalMode"
+      :initial-point="chartPointModalInitialPoint"
+      :target-index="chartPointModalTargetIndex"
+      @close="showChartPointModal = false"
+      @submit="handleChartPointModalSubmit"
+    />
   </aside>
 </template>
 

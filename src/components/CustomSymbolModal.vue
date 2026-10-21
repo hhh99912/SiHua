@@ -1916,133 +1916,135 @@ const handleFileChange = async (e: Event) => {
 </script>
 
 <template>
-  <div v-if="visible" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-xs select-none">
-    <!-- Notification Toast -->
-    <div
-      v-if="notificationMessage"
-      class="fixed top-5 left-1/2 -translate-x-1/2 z-70 px-4 py-2 rounded-xl text-xs font-mono font-bold shadow-2xl flex items-center gap-2 transition-all"
-      :class="notificationType === 'success' ? 'bg-cyan-950 border border-cyan-400 text-cyan-200' : 'bg-rose-950 border border-rose-400 text-rose-200'"
-    >
-      <AlertCircle class="w-4 h-4" />
-      <span>{{ notificationMessage }}</span>
-    </div>
+  <Teleport to="body">
+    <div v-if="visible" class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 select-none font-sans p-3">
+      <!-- Notification Toast -->
+      <div
+        v-if="notificationMessage"
+        class="fixed top-5 left-1/2 -translate-x-1/2 z-70 px-4 py-2 rounded-lg text-xs font-bold shadow-2xl flex items-center gap-2 transition-all"
+        :class="notificationType === 'success' ? 'bg-neutral-900 border border-emerald-500 text-white' : 'bg-neutral-900 border border-rose-500 text-white'"
+      >
+        <AlertCircle class="w-4 h-4 text-white" />
+        <span>{{ notificationMessage }}</span>
+      </div>
 
-    <!-- Hidden file input for import -->
-    <input
-      type="file"
-      ref="fileInputRef"
-      accept=".json"
-      class="hidden"
-      @change="handleFileChange"
-    />
+      <!-- Hidden file input for import -->
+      <input
+        type="file"
+        ref="fileInputRef"
+        accept=".json"
+        class="hidden"
+        @change="handleFileChange"
+      />
 
-    <!-- Main Container -->
-    <div class="w-[96vw] h-[94vh] bg-[#03060f] border border-cyan-500/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-      <!-- ==================== VIEW 1: SYMBOLS GALLERY / ASSET MANAGER ==================== -->
-      <div v-if="currentMode === 'gallery'" class="flex-1 flex flex-col overflow-hidden">
-        <!-- Top Bar -->
-        <div class="h-14 bg-[#060b18] border-b border-slate-800 px-6 flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-              <Box class="w-5 h-5" />
+      <!-- Main Container (纯黑底色、硬质深灰边框、纯白高对比字体) -->
+      <div class="w-full max-w-[1440px] h-[92vh] max-h-[920px] bg-black border border-neutral-700 rounded-lg shadow-2xl flex flex-col overflow-hidden text-white">
+        <!-- ==================== VIEW 1: SYMBOLS GALLERY / ASSET MANAGER ==================== -->
+        <div v-if="currentMode === 'gallery'" class="flex-1 flex flex-col overflow-hidden">
+          <!-- Top Bar -->
+          <header class="h-13 bg-[#111111] border-b border-[#2a2a2a] px-5 flex items-center justify-between shrink-0">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded bg-neutral-800 border border-neutral-600 flex items-center justify-center text-white">
+                <Box class="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <h2 class="text-sm font-bold text-white tracking-wide flex items-center gap-2">
+                  <span>SCADA 工业图元资产库与设计工坊</span>
+                  <span class="px-2 py-0.5 rounded text-[11px] bg-neutral-800 text-white border border-neutral-600 font-mono font-bold">cell/ 独立存储 ({{ symbols.length }})</span>
+                </h2>
+                <p class="text-xs text-white opacity-80">
+                  图元独立保存在 cell/ 目录下（一个图元一个 JSON），由基础几何组件严格组装，启动自动扫描检索
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 class="text-sm font-bold text-slate-100 font-mono tracking-wide flex items-center gap-2">
-                <span>SCADA 工业图元资产库与设计工坊</span>
-                <span class="px-2 py-0.5 rounded text-[10px] bg-cyan-950/80 text-cyan-300 border border-cyan-500/40">cell/ 独立存储 ({{ symbols.length }})</span>
-              </h2>
-              <p class="text-[11px] text-slate-400 font-mono">
-                图元全部独立保存在 cell/ 目录下（一个图元一个 JSON），由基础几何组件 0 边距严格组装，无闸符，启动自动扫描检索
-              </p>
+
+            <!-- Header Actions -->
+            <div class="flex items-center gap-2">
+              <button
+                @click="handleCreateNewBlankSymbol"
+                class="px-3.5 py-1.5 rounded bg-white hover:bg-neutral-200 text-black font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+              >
+                <Plus class="w-4 h-4 stroke-[2.5]" />
+                <span>新建自定义图元</span>
+              </button>
+
+              <button
+                @click="handleImportClick"
+                class="px-3 py-1.5 rounded bg-neutral-900 hover:bg-neutral-800 text-white border border-neutral-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+                title="导入图元 JSON 资产包"
+              >
+                <Upload class="w-3.5 h-3.5 text-white" />
+                <span>导入资产包</span>
+              </button>
+
+              <button
+                @click="handleExportSymbols"
+                class="px-3 py-1.5 rounded bg-neutral-900 hover:bg-neutral-800 text-white border border-neutral-700 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors"
+                title="导出全部图元为 JSON 文件"
+              >
+                <Download class="w-3.5 h-3.5 text-white" />
+                <span>导出资产包</span>
+              </button>
+
+              <div class="h-4 w-[1px] bg-neutral-700 mx-1" />
+
+              <button
+                @click="emit('close')"
+                class="p-1.5 rounded text-white hover:bg-neutral-800 transition-colors cursor-pointer"
+                title="关闭"
+              >
+                <X class="w-4 h-4" />
+              </button>
+            </div>
+          </header>
+
+          <!-- Filter Controls -->
+          <div class="p-3 bg-[#141414] border-b border-[#2a2a2a] flex items-center justify-between gap-4 shrink-0">
+            <div class="flex items-center gap-2">
+              <button
+                @click="activeCategory = 'all'"
+                class="px-3 py-1.5 rounded text-xs font-bold cursor-pointer transition-colors border"
+                :class="activeCategory === 'all' ? 'bg-white text-black border-white shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+              >
+                全部图元 ({{ symbols.length }})
+              </button>
+              <button
+                @click="activeCategory = 'electrical'"
+                class="px-3 py-1.5 rounded text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5 border"
+                :class="activeCategory === 'electrical' ? 'bg-white text-black border-white shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+              >
+                <Zap class="w-3 h-3" />
+                <span>电力一次设备</span>
+              </button>
+              <button
+                @click="activeCategory = 'industrial'"
+                class="px-3 py-1.5 rounded text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5 border"
+                :class="activeCategory === 'industrial' ? 'bg-white text-black border-white shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+              >
+                <Cpu class="w-3 h-3" />
+                <span>工业光储</span>
+              </button>
+              <button
+                @click="activeCategory = 'custom'"
+                class="px-3 py-1.5 rounded text-xs font-bold cursor-pointer transition-colors flex items-center gap-1.5 border"
+                :class="activeCategory === 'custom' ? 'bg-white text-black border-white shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+              >
+                <BookmarkPlus class="w-3 h-3" />
+                <span>自定义封装图元</span>
+              </button>
+            </div>
+
+            <!-- Search Input -->
+            <div class="relative w-56">
+              <Search class="w-3.5 h-3.5 text-white absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                v-model="searchQuery"
+                type="text"
+                placeholder="搜索图元名称或标签..."
+                class="w-full bg-[#181818] border border-neutral-700 focus:border-white rounded pl-8 pr-2.5 py-1 text-xs text-white placeholder-neutral-400 font-medium focus:outline-none"
+              />
             </div>
           </div>
-
-          <!-- Header Actions -->
-          <div class="flex items-center gap-2.5">
-            <button
-              @click="handleCreateNewBlankSymbol"
-              class="px-3.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all font-mono"
-            >
-              <Plus class="w-4 h-4" />
-              <span>新建自定义图元</span>
-            </button>
-
-            <button
-              @click="handleImportClick"
-              class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 hover:border-cyan-500/50 text-xs flex items-center gap-1.5 cursor-pointer transition-all"
-              title="导入图元 JSON 资产包"
-            >
-              <Upload class="w-3.5 h-3.5" />
-              <span>导入资产包</span>
-            </button>
-
-            <button
-              @click="handleExportSymbols"
-              class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 hover:border-cyan-500/50 text-xs flex items-center gap-1.5 cursor-pointer transition-all"
-              title="导出全部图元为 JSON 文件"
-            >
-              <Download class="w-3.5 h-3.5" />
-              <span>导出资产包</span>
-            </button>
-
-            <div class="h-4 w-[1px] bg-slate-800 mx-1" />
-
-            <button
-              @click="emit('close')"
-              class="w-8 h-8 rounded-lg bg-slate-900 hover:bg-red-950/60 text-slate-400 hover:text-red-300 border border-slate-800 flex items-center justify-center cursor-pointer transition-colors"
-            >
-              <X class="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <!-- Filter Controls -->
-        <div class="p-4 bg-[#060b18] border-b border-slate-800/80 flex items-center justify-between gap-4">
-          <div class="flex items-center gap-2">
-            <button
-              @click="activeCategory = 'all'"
-              class="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all"
-              :class="activeCategory === 'all' ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'"
-            >
-              全部图元 ({{ symbols.length }})
-            </button>
-            <button
-              @click="activeCategory = 'electrical'"
-              class="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center gap-1.5"
-              :class="activeCategory === 'electrical' ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'"
-            >
-              <Zap class="w-3 h-3" />
-              <span>电力一次设备</span>
-            </button>
-            <button
-              @click="activeCategory = 'industrial'"
-              class="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center gap-1.5"
-              :class="activeCategory === 'industrial' ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'"
-            >
-              <Cpu class="w-3 h-3" />
-              <span>工业光储</span>
-            </button>
-            <button
-              @click="activeCategory = 'custom'"
-              class="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center gap-1.5"
-              :class="activeCategory === 'custom' ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'"
-            >
-              <BookmarkPlus class="w-3 h-3" />
-              <span>自定义封装图元</span>
-            </button>
-          </div>
-
-          <!-- Search Input -->
-          <div class="relative w-72">
-            <Search class="w-3.5 h-3.5 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              v-model="searchQuery"
-              type="text"
-              placeholder="搜索图元名称或标签..."
-              class="w-full bg-[#040810] border border-slate-800 focus:border-cyan-500 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 focus:outline-hidden font-mono"
-            />
-          </div>
-        </div>
 
         <!-- Symbols Grid View -->
         <div class="flex-1 overflow-y-auto p-5 custom-scrollbar">
@@ -2061,22 +2063,22 @@ const handleFileChange = async (e: Event) => {
             <div
               v-for="sym in filteredSymbols"
               :key="sym.id"
-              class="bg-[#070c18] border border-slate-800 hover:border-cyan-500/50 rounded-xl p-4 flex flex-col justify-between transition-all group hover:shadow-[0_4px_25px_rgba(0,242,255,0.08)]"
+              class="bg-[#121212] border border-[#2a2a2a] hover:border-neutral-500 rounded-lg p-3.5 flex flex-col justify-between transition-colors text-white"
             >
               <!-- Card Top -->
               <div>
                 <div class="flex items-center justify-between mb-2">
                   <div class="flex items-center gap-2">
-                    <div class="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-                      <Zap v-if="sym.category === 'electrical'" class="w-4 h-4" />
-                      <Cpu v-else-if="sym.category === 'industrial'" class="w-4 h-4" />
-                      <Box v-else class="w-4 h-4" />
+                    <div class="w-7 h-7 rounded bg-neutral-800 border border-neutral-700 flex items-center justify-center text-white">
+                      <Zap v-if="sym.category === 'electrical'" class="w-4 h-4 text-white" />
+                      <Cpu v-else-if="sym.category === 'industrial'" class="w-4 h-4 text-white" />
+                      <Box v-else class="w-4 h-4 text-white" />
                     </div>
                     <div>
-                      <h3 class="text-xs font-bold text-slate-200 group-hover:text-cyan-300 transition-colors font-mono">
+                      <h3 class="text-xs font-bold text-white transition-colors">
                         {{ sym.name }}
                       </h3>
-                      <div class="text-[10px] text-slate-500 font-mono">
+                      <div class="text-[10px] text-white opacity-70 font-mono">
                         {{ sym.defaultWidth }} × {{ sym.defaultHeight }} px
                       </div>
                     </div>
@@ -2085,21 +2087,21 @@ const handleFileChange = async (e: Event) => {
                   <!-- States Pill Counter -->
                   <span
                     v-if="sym.states && sym.states.length > 1"
-                    class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-500/40"
+                    class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-neutral-800 text-white border border-neutral-600"
                   >
                     {{ sym.states.length }} 态
                   </span>
                 </div>
 
-                <p class="text-[11px] text-slate-400 line-clamp-2 min-h-8 mb-2">
+                <p class="text-[11px] text-white opacity-80 line-clamp-2 min-h-8 mb-2">
                   {{ sym.description || '支持动态遥信遥测绑定的工业矢量图元' }}
                 </p>
 
                 <!-- State Switcher in Card -->
-                <div v-if="sym.states && sym.states.length > 1" class="mb-2 bg-slate-950/80 p-1 rounded-md border border-slate-800/80">
-                  <div class="text-[9px] text-slate-400 mb-1 flex items-center justify-between">
+                <div v-if="sym.states && sym.states.length > 1" class="mb-2 bg-black p-1.5 rounded border border-[#2a2a2a]">
+                  <div class="text-[9px] text-white opacity-70 mb-1 flex items-center justify-between">
                     <span>状态预览:</span>
-                    <span class="text-cyan-400 font-mono">
+                    <span class="text-white font-mono font-bold">
                       数值: {{ sym.states.find(s => s.id === (previewActiveStates[sym.id] || sym.states?.[0]?.id))?.stateValue ?? 0 }}
                     </span>
                   </div>
@@ -2108,8 +2110,8 @@ const handleFileChange = async (e: Event) => {
                       v-for="st in sym.states"
                       :key="st.id"
                       @click="previewActiveStates[sym.id] = st.id"
-                      class="px-1.5 py-0.5 rounded text-[10px] font-mono cursor-pointer transition-colors"
-                      :class="(previewActiveStates[sym.id] || sym.states[0]?.id) === st.id ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white bg-slate-900'"
+                      class="px-1.5 py-0.5 rounded text-[10px] font-mono cursor-pointer transition-colors border"
+                      :class="(previewActiveStates[sym.id] || sym.states[0]?.id) === st.id ? 'bg-white text-black font-bold border-white' : 'text-white bg-[#181818] border-[#2a2a2a] hover:bg-neutral-800'"
                     >
                       {{ st.name }}
                     </button>
@@ -2117,7 +2119,7 @@ const handleFileChange = async (e: Event) => {
                 </div>
 
                 <!-- Preview Area -->
-                <div class="h-32 bg-[#02050b] rounded-lg border border-slate-900 flex items-center justify-center p-3 relative overflow-hidden group-hover:border-cyan-500/20 transition-colors">
+                <div class="h-32 bg-black rounded border border-[#2a2a2a] flex items-center justify-center p-3 relative overflow-hidden transition-colors">
                   <div
                     class="relative origin-center transform scale-75"
                     :style="{
@@ -2167,7 +2169,7 @@ const handleFileChange = async (e: Event) => {
                   <span
                     v-for="tag in sym.tags"
                     :key="tag"
-                    class="text-[10px] px-1.5 py-0.5 rounded bg-slate-900/80 text-cyan-400/80 border border-cyan-500/20 font-mono"
+                    class="text-[10px] px-1.5 py-0.5 rounded bg-neutral-900 text-white border border-neutral-700 font-mono"
                   >
                     #{{ tag }}
                   </span>
@@ -2175,25 +2177,25 @@ const handleFileChange = async (e: Event) => {
               </div>
 
               <!-- Card Bottom Actions -->
-              <div class="flex items-center justify-between pt-3 border-t border-slate-900 mt-2">
+              <div class="flex items-center justify-between pt-3 border-t border-[#2a2a2a] mt-2">
                 <div class="flex items-center gap-1">
                   <button
                     @click="openEditorWithSymbol(sym)"
-                    class="p-1.5 rounded-md bg-slate-900 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-800 hover:border-cyan-500/40 cursor-pointer"
+                    class="p-1.5 rounded bg-neutral-900 hover:bg-neutral-800 text-white border border-neutral-700 cursor-pointer transition-colors"
                     title="在工坊画布中编辑图元"
                   >
                     <Edit3 class="w-3.5 h-3.5" />
                   </button>
                   <button
                     @click="handleDuplicateSymbol(sym)"
-                    class="p-1.5 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 cursor-pointer"
+                    class="p-1.5 rounded bg-neutral-900 hover:bg-neutral-800 text-white border border-neutral-700 cursor-pointer transition-colors"
                     title="复制图元"
                   >
                     <Copy class="w-3.5 h-3.5" />
                   </button>
                   <button
                     @click="handleDeleteSymbol(sym.id, sym.name)"
-                    class="p-1.5 rounded-md bg-slate-900 hover:bg-rose-950 text-slate-400 hover:text-rose-300 border border-slate-800 cursor-pointer"
+                    class="p-1.5 rounded bg-neutral-900 hover:bg-neutral-800 text-rose-400 border border-neutral-700 cursor-pointer transition-colors"
                     title="删除图元"
                   >
                     <Trash2 class="w-3.5 h-3.5" />
@@ -2202,9 +2204,9 @@ const handleFileChange = async (e: Event) => {
 
                 <button
                   @click="handleUseSymbol(sym)"
-                  class="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors font-mono"
+                  class="px-3 py-1.5 rounded bg-white hover:bg-neutral-200 text-black font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
                 >
-                  <Plus class="w-3.5 h-3.5" />
+                  <Plus class="w-3.5 h-3.5 stroke-[2.5]" />
                   <span>放置到主画布</span>
                 </button>
               </div>
@@ -3304,4 +3306,5 @@ const handleFileChange = async (e: Event) => {
       </div>
     </div>
   </div>
+</Teleport>
 </template>

@@ -971,14 +971,14 @@ export const COMPONENT_DEFINITIONS: ComponentDefinition[] = [
       textColor: '#ffffff'
     },
     defaultCustomProps: {
-      unit: '',
       barWidth: 26,
       showValueLabel: true,
       showLegend: false,
+      valueFontSize: 11,
+      xAxisFontSize: 11,
+      yAxisFontSize: 10,
       points: [
-        { id: 101, name: 'A相电流', category: 'yc', color: '#ffffff', unit: 'A', facName: '示范站', bayName: '10kV进线', devName: '测控装置' },
-        { id: 102, name: 'B相电流', category: 'yc', color: '#38bdf8', unit: 'A', facName: '示范站', bayName: '10kV进线', devName: '测控装置' },
-        { id: 103, name: 'C相电流', category: 'yc', color: '#fbbf24', unit: 'A', facName: '示范站', bayName: '10kV进线', devName: '测控装置' }
+        { id: 101, name: 'A相电流', category: 'yc', color: '#00f2ff', unit: 'A', facName: '示范站', bayName: '10kV进线', devName: '测控装置' }
       ]
     },
     defaultData: { mapping: {} }

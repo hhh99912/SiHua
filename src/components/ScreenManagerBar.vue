@@ -439,12 +439,12 @@ const handleConfirmSaveTemplate = async () => {
         <button
           @click="emit('open:disk-storage')"
           class="p-1.5 rounded-md bg-[#f4efe4] hover:bg-[#eae3d2] border border-[#cfc5b0] text-slate-700 hover:text-slate-900 transition-colors cursor-pointer flex items-center justify-center"
-          title="管理磁盘 graph/ 目录下的所有独立大屏文件"
+          title="磁盘文件管理 (graph/)"
         >
           <HardDrive class="w-4 h-4 text-sky-700 stroke-[2]" />
         </button>
 
-        <!-- Save to Disk Action (仅保存当前这一个大屏) -->
+        <!-- Save to Disk Action (仅保存当前这一个画面) -->
         <button
           @click="emit('save:current-disk')"
           :disabled="isSavingDisk"
@@ -465,7 +465,7 @@ const handleConfirmSaveTemplate = async () => {
       <span class="text-slate-600 font-mono">尺寸: <strong class="text-slate-900 font-bold">{{ currentScreen?.screen.width || 1980 }}×{{ currentScreen?.screen.height || 1100 }}</strong></span>
     </div>
 
-    <!-- ==================== 1. 新建大屏弹窗 (样式完全与数据集弹框一致，清晰大方，无多余小字与冗余解释) ==================== -->
+    <!-- ==================== 1. 新建画面弹窗 (样式完全与数据集弹框一致，清晰大方，无多余小字与冗余解释) ==================== -->
     <div 
       v-if="showAddModal" 
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 font-sans select-none"
@@ -479,7 +479,7 @@ const handleConfirmSaveTemplate = async () => {
         <div class="px-6 py-4 border-b-2 border-slate-700 bg-[#080d1a] flex items-center justify-between shrink-0">
           <div class="flex items-center gap-3">
             <div class="w-3 h-3 rounded-full bg-sky-400"></div>
-            <h2 class="text-lg font-bold tracking-wide text-white">新建大屏画面</h2>
+            <h2 class="text-lg font-bold tracking-wide text-white">新建画面</h2>
           </div>
           <button
             @click="showAddModal = false"

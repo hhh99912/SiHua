@@ -370,30 +370,8 @@ const standardPalette = [
                 >
                   <span class="flex items-center gap-2.5">
                     <HardDrive class="w-4.5 h-4.5 text-sky-600" />
-                    <span>磁盘大屏文件管理 (graph/)</span>
+                    <span>磁盘文件管理 (graph/)</span>
                   </span>
-                </button>
-              </div>
-              <div class="py-1">
-                <button
-                  @click="emit('clear:canvas'); closeMenus();"
-                  class="w-full px-3.5 py-2 text-left hover:bg-rose-50 text-rose-600 flex items-center justify-between cursor-pointer"
-                >
-                  <span class="flex items-center gap-2.5">
-                    <Trash2 class="w-4.5 h-4.5 text-rose-500" />
-                    <span>清空当前画布图元</span>
-                  </span>
-                </button>
-                <button
-                  @click="emit('exit:app'); closeMenus();"
-                  class="w-full px-3.5 py-2 text-left hover:bg-rose-50 text-rose-700 flex items-center justify-between cursor-pointer font-medium border-t border-slate-100"
-                  title="安全退出程序"
-                >
-                  <span class="flex items-center gap-2.5">
-                    <Power class="w-4.5 h-4.5 text-rose-600" />
-                    <span>退出程序</span>
-                  </span>
-                  <span class="text-xs text-rose-400 font-mono">Alt+F4</span>
                 </button>
               </div>
             </div>

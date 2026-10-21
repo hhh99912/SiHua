@@ -247,6 +247,7 @@ export interface ScadaYcItem {
   status?: number;
   status_name?: string;
   unit?: string;
+  if_yt?: number;
   [key: string]: any;
 }
 

@@ -131,8 +131,8 @@ export const PRESET_SCADA_FACILITIES: ScadaFacilityNode[] = [
               { id: 62000001, name: 'yc01', alias: 'F01.V10.S01.DL01.YC001', type: 0, type_name: '普通遥测', val: 2432747, status: 0, status_name: '正常' },
               { id: 62000002, name: 'yc02', alias: 'F01.V10.S01.DL01.YC002', type: 0, type_name: '普通遥测', val: 24000, status: 0, status_name: '正常' },
               { id: 62000003, name: 'yc03', alias: 'F01.V10.S01.DL01.YC003', type: 0, type_name: '普通遥测', val: 120000, status: 0, status_name: '正常' },
-              { id: 62000004, name: 'yc04', alias: 'F01.V10.S01.DL01.YC004', type: 0, type_name: '普通遥测', val: 120000, status: 0, status_name: '正常' },
-              { id: 62000005, name: 'yc05', alias: 'F01.V10.S01.DL01.YC005', type: 0, type_name: '普通遥测', val: 6.6, status: 0, status_name: '正常' },
+              { id: 62000004, name: 'yc04', alias: 'F01.V10.S01.DL01.YC004', type: 0, type_name: '普通遥测', val: 120000, status: 0, status_name: '正常', if_yt: 0 },
+              { id: 62000005, name: 'yc05', alias: 'F01.V10.S01.DL01.YC005', type: 0, type_name: '普通遥测', val: 0, status: 1, status_name: '无效', if_yt: 1 },
               { id: 62000006, name: 'yc06', alias: 'F01.V10.S01.DL01.YC006', type: 0, type_name: '普通遥测', val: 0, status: 1, status_name: '无效' },
               { id: 62000007, name: 'yc07', alias: 'F01.V10.S01.DL01.YC007', type: 0, type_name: '普通遥测', val: 0, status: 1, status_name: '无效' },
               { id: 62000008, name: 'yc08', alias: 'F01.V10.S01.DL01.YC008', type: 0, type_name: '普通遥测', val: 0, status: 1, status_name: '无效' },
@@ -190,7 +190,7 @@ export const PRESET_SCADA_FACILITIES: ScadaFacilityNode[] = [
             state: 1,
             status: 0,
             yc_list: [
-              { id: 62000070, name: 'yt_feedback_yc', alias: 'F01.V10.S01.DL02.YC_FB', type: 0, type_name: '调节反馈遥测', val: 9.0, status: 0, status_name: '正常' }
+              { id: 62000070, name: 'yt_feedback_yc', alias: 'F01.V10.S01.DL02.YC_FB', type: 0, type_name: '调节反馈遥测', val: 9.0, status: 0, status_name: '正常', if_yt: 1 }
             ],
             yx_list: [
               { id: 61000001, name: 'yx01', alias: 'F01.V10.S01.DL02.POS_OPN', type: 1, type_name: '开关位置', val: 1, value: 1, status: 0, status_name: '正常', q: 0 }
@@ -377,7 +377,8 @@ export function sanitizeFacilities(rawList: any[]): ScadaFacilityNode[] {
               value: Number(yc.val ?? yc.value ?? 0),
               status: Number(yc.status ?? 0),
               status_name: String(yc.status_name || YC_STATUS_DICT[Number(yc.status ?? 0)] || '正常'),
-              unit: String(yc.unit || '')
+              unit: String(yc.unit || ''),
+              if_yt: yc.if_yt !== undefined ? Number(yc.if_yt) : (yc.id === 62000005 || yc.id === 62000070 ? 1 : 0)
             }));
 
             const rawYxs = Array.isArray(dev.yx_points) ? dev.yx_points : (Array.isArray(dev.yx_list) ? dev.yx_list : []);
@@ -1481,3 +1482,99 @@ export function convertFacilitiesToDatasets(facilities: ScadaFacilityNode[] = sc
     }
   ];
 }
+
+// ---------------------------------------------------------------------------
+// 行业标准电力 SCADA 测点工程中文名称字典表 (南瑞/国电南自/许继工程规范)
+// ---------------------------------------------------------------------------
+export const SCADA_STANDARD_POINT_NAMES: Record<string, string> = {
+  // 遥测 (YC)
+  'yc01': 'A相母线电压 Ua',
+  'yc02': 'B相母线电压 Ub',
+  'yc03': 'C相母线电压 Uc',
+  'yc04': 'AB相间线电压 Uab',
+  'yc05': 'BC相间线电压 Ubc',
+  'yc06': 'CA相间线电压 Uca',
+  'yc07': 'A相进线电流 Ia',
+  'yc08': 'B相进线电流 Ib',
+  'yc09': 'C相进线电流 Ic',
+  'yc10': '零序电流 I0',
+  'yc11': '总有功功率 P',
+  'yc12': '总无功功率 Q',
+  'yc13': '视在功率 S',
+  'yc14': '功率因数 cosΦ',
+  'yc15': '电网频率 f',
+  'yc16': '变压器油温',
+  'yc17': '变压器绕组温',
+  'yc18': '环境温度',
+  'yc19': '母线有功总加',
+  'yc20': '母线无功总加',
+  'yc21': '正向有功需量',
+  'yc22': '反向有功需量',
+  'yc23': '谐波畸变率 THD',
+  'yc24': '回路负荷率',
+  // 遥信 (YX)
+  'yx01': '断路器合闸位置',
+  'yx02': '断路器分闸位置',
+  'yx03': '隔离开关合位',
+  'yx04': '隔离开关分位',
+  'yx05': '接地刀闸分位',
+  'yx06': '接地刀闸合位',
+  'yx07': '弹簧未储能告警',
+  'yx08': '控制回路断线',
+  'yx09': '事故总信号(变位)',
+  'yx10': '预告总信号',
+  'yx11': '自动重合闸动作',
+  'yx12': '过流I段速断动作',
+  'yx13': '过流II段限时动作',
+  'yx14': '零序过流保护动作',
+  'yx15': '低周减载动作',
+  'yx16': '保护装置自检告警',
+  'yx17': '通信通信中断告警',
+  // 电度 (DD)
+  'dd01': '正向有功总电量',
+  'dd02': '正向无功总电量',
+  'dd03': '反向有功总电量',
+  'dd04': '反向无功总电量'
+};
+
+/**
+ * 解析并展示标准的测点工程名称 (确保测点名称清晰可读，不展示枯燥的物理ID)
+ */
+export function getScadaPointDisplayName(pt: any): string {
+  if (!pt) return '未命名测点';
+  const rawName = String(pt.name || '').trim();
+  const lowerName = rawName.toLowerCase();
+
+  // 1. 标准字典直查
+  if (SCADA_STANDARD_POINT_NAMES[lowerName]) {
+    return SCADA_STANDARD_POINT_NAMES[lowerName];
+  }
+
+  // 2. 规范化前缀数字 (如 yc1 -> yc01)
+  const m = lowerName.match(/^(yc|yx|dd|yk|yt)[-_]?0*(\d+)$/i);
+  if (m) {
+    const normKey = `${m[1].toLowerCase()}${String(m[2]).padStart(2, '0')}`;
+    if (SCADA_STANDARD_POINT_NAMES[normKey]) {
+      return SCADA_STANDARD_POINT_NAMES[normKey];
+    }
+  }
+
+  // 3. 自定义中文名称或长名称直接使用
+  if (rawName && !/^yc\d+$/i.test(rawName) && !/^yx\d+$/i.test(rawName) && !/^dd\d+$/i.test(rawName)) {
+    return rawName;
+  }
+
+  // 4. 别名与描述备选
+  if (pt.desc || pt.description) {
+    return String(pt.desc || pt.description);
+  }
+  if (pt.alias && !pt.alias.includes('.') && pt.alias.length > 2) {
+    return pt.alias;
+  }
+  if (pt.type_name) {
+    return `${pt.type_name}`;
+  }
+
+  return rawName || '测点';
+}
+
