@@ -6,6 +6,7 @@ import {
   rawDdValues,
   rawYcQuality,
   rawYxQuality,
+  rawDdQuality,
   scadaLiveTick,
   cachedRealtimeYc,
   cachedRealtimeYx,
@@ -634,6 +635,35 @@ export function getComponentLiveValue(
  * Alias for getComponentLiveValue
  */
 export const resolveComponentDynamicData = getComponentLiveValue;
+
+/**
+ * 获取组件对应遥测/电度测点的质量状态 (0: 正常, 1: 质量差/无效)
+ */
+export function getComponentPointQuality(component: ScreenComponent): number {
+  const mapping: any = component.data?.mapping || {};
+  const valKey = component.data?.bindings?.value ||
+                 mapping.valueKey ||
+                 mapping.pointId ||
+                 mapping.yc_id ||
+                 mapping.dd_id ||
+                 component.customProps?.pointId;
+  if (!valKey) return 0;
+
+  const parsed = parseScadaPointKey(valKey);
+  if (parsed.pointId > 0) {
+    if (rawYcQuality.has(parsed.pointId)) {
+      return rawYcQuality.get(parsed.pointId)!;
+    }
+    if (rawDdQuality.has(parsed.pointId)) {
+      return rawDdQuality.get(parsed.pointId)!;
+    }
+    const ycItem = cachedRealtimeYc.get(parsed.pointId);
+    if (ycItem && ycItem.status !== undefined) return ycItem.status;
+    const ddItem = cachedRealtimeDd.get(parsed.pointId);
+    if (ddItem && ddItem.status !== undefined) return ddItem.status;
+  }
+  return 0;
+}
 
 /**
  * Ultra-Fast Direct Numeric Extractor for Numeric Components

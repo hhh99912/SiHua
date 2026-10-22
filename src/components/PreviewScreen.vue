@@ -47,7 +47,8 @@ import {
   Terminal,
   Database,
   SlidersHorizontal,
-  TrendingUp
+  TrendingUp,
+  CheckCheck
 } from 'lucide-vue-next';
 import { ScreenConfig, ScreenComponent, DatasetItem, ScreenItem, ScadaDeviceItem } from '../types';
 import { PRESET_SCADA_DEVICES } from '../data/presetDatasets';
@@ -62,7 +63,13 @@ import {
   findScadaPointDef,
   getFastLiveYc,
   getFastLiveYx,
-  scadaLiveTick
+  scadaLiveTick,
+  flashingYxPoints,
+  flashingVersion,
+  clearScreenFlash,
+  clearAllFlash,
+  isPointFlashing,
+  isYxFlashingStatus
 } from '../utils/scadaClient';
 import WidgetRenderer from './widgets/WidgetRenderer.vue';
 import RealtimeAlarmModal from './RealtimeAlarmModal.vue';
@@ -180,15 +187,256 @@ const handleHomeScreen = () => {
 
 // 缩放操作与缩放系数 (1:1等比无拉伸)
 const userZoomFactor = ref(1);
+const panOffset = ref({ x: 0, y: 0 });
+const isPanning = ref(false);
+const isSpacePressed = ref(false);
+const isCtrlPressed = ref(false);
+const hasDraggedDuringCtrl = ref(false);
+const panStart = ref({ x: 0, y: 0, startOffsetX: 0, startOffsetY: 0 });
+
 const handleZoomIn = () => {
-  userZoomFactor.value = Math.min(3, +(userZoomFactor.value * 1.15).toFixed(2));
+  userZoomFactor.value = Math.min(5, +(userZoomFactor.value * 1.15).toFixed(2));
 };
 const handleZoomOut = () => {
-  userZoomFactor.value = Math.max(0.3, +(userZoomFactor.value / 1.15).toFixed(2));
+  userZoomFactor.value = Math.max(0.2, +(userZoomFactor.value / 1.15).toFixed(2));
 };
 const handleResetZoom = () => {
   userZoomFactor.value = 1;
+  panOffset.value = { x: 0, y: 0 };
   scaleMode.value = 'fit';
+};
+
+// Ctrl + 滚轮缩放画布
+const handleViewportWheel = (e: WheelEvent) => {
+  if (e.ctrlKey) {
+    e.preventDefault();
+    const zoomStep = 1.1;
+    if (e.deltaY < 0) {
+      userZoomFactor.value = Math.min(5, +(userZoomFactor.value * zoomStep).toFixed(2));
+    } else {
+      userZoomFactor.value = Math.max(0.2, +(userZoomFactor.value / zoomStep).toFixed(2));
+    }
+  }
+};
+
+// 画布平移交互 (按住Ctrl+单机拖拽、按住空格拖拽、中键拖拽、或在空白区域拖拽)
+const handleViewportMouseDown = (e: MouseEvent) => {
+  const isMiddleClick = e.button === 1;
+  const isCtrlLeft = e.button === 0 && e.ctrlKey;
+  const isSpaceLeft = e.button === 0 && isSpacePressed.value;
+  const isBgLeft = e.button === 0 && (e.target === mainViewportRef.value || (e.target as HTMLElement)?.classList?.contains('canvas-bg-target'));
+
+  if (isMiddleClick || isCtrlLeft || isSpaceLeft || isBgLeft) {
+    e.preventDefault();
+    isPanning.value = true;
+    hasDraggedDuringCtrl.value = false;
+    panStart.value = {
+      x: e.clientX,
+      y: e.clientY,
+      startOffsetX: panOffset.value.x,
+      startOffsetY: panOffset.value.y
+    };
+  }
+};
+
+// 图元鼠标按下：如果按下了 Ctrl 键并点击左键，直接开启移动画布平移
+const handleCompMouseDown = (e: MouseEvent) => {
+  if (e.ctrlKey && e.button === 0) {
+    e.preventDefault();
+    e.stopPropagation();
+    isPanning.value = true;
+    hasDraggedDuringCtrl.value = false;
+    panStart.value = {
+      x: e.clientX,
+      y: e.clientY,
+      startOffsetX: panOffset.value.x,
+      startOffsetY: panOffset.value.y
+    };
+  }
+};
+
+const handleViewportMouseMove = (e: MouseEvent) => {
+  if (isPanning.value) {
+    const dx = e.clientX - panStart.value.x;
+    const dy = e.clientY - panStart.value.y;
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+      hasDraggedDuringCtrl.value = true;
+    }
+    panOffset.value = {
+      x: panStart.value.startOffsetX + dx,
+      y: panStart.value.startOffsetY + dy
+    };
+  }
+};
+
+const handleViewportMouseUp = () => {
+  isPanning.value = false;
+  setTimeout(() => {
+    hasDraggedDuringCtrl.value = false;
+  }, 60);
+};
+
+const handleViewportMouseLeave = () => {
+  isPanning.value = false;
+  setTimeout(() => {
+    hasDraggedDuringCtrl.value = false;
+  }, 60);
+};
+
+// 组件单击：若处于 Ctrl 拖拽移动状态，阻止触发展示/跳转动作；移除原本的选中逻辑
+const handleCompClick = (e: MouseEvent, comp: ScreenComponent) => {
+  if (e.ctrlKey || hasDraggedDuringCtrl.value) {
+    e.stopPropagation();
+    e.preventDefault();
+    return;
+  }
+  handlePreviewCompClick(comp);
+};
+
+// 测点与遥信变位闪烁提取 (严格支持单图元、复合图元、电气图元与返校点所有关联遥信)
+const getComponentAllYxIds = (comp: ScreenComponent): number[] => {
+  if (!comp) return [];
+  const ids = new Set<number>();
+  const mapping = comp.data?.mapping || {};
+  const customProps = comp.customProps || {};
+  const bindings = comp.data?.bindings || {};
+  const action = comp.data?.action;
+
+  const tryAdd = (val: any) => {
+    if (val === undefined || val === null || val === '') return;
+    const num = typeof val === 'number' ? val : Number(String(val).replace(/[^0-9]/g, ''));
+    if (!isNaN(num) && num > 0) {
+      // 61xxxxxx 为国标/行业 SCADA 标准遥信编号区间
+      if (num >= 61000000 && num <= 61999999) {
+        ids.add(num);
+        return;
+      }
+      const def = findScadaPointDef(num);
+      if (def.category === 'yx') {
+        ids.add(num);
+        return;
+      }
+      if (def.category === 'yk' && def.point?.targetVerificationPointId) {
+        ids.add(Number(def.point.targetVerificationPointId));
+        return;
+      }
+      // 其它显式遥信类别标记
+      if (
+        mapping.pointCategory === 'teleSignal' ||
+        mapping.pointCategory === 'yx' ||
+        customProps.pointCategory === 'teleSignal' ||
+        customProps.category === 'yx'
+      ) {
+        ids.add(num);
+      }
+    }
+  };
+
+  // 1. 明确的 yx_id / yxId / yxPointId
+  tryAdd(mapping.yx_id);
+  tryAdd(mapping.yxId);
+  tryAdd(mapping.yxPointId);
+  tryAdd(customProps.yx_id);
+  tryAdd(customProps.yxId);
+  tryAdd(customProps.pointId);
+
+  // 2. 核心 mapping.pointId
+  tryAdd(mapping.pointId);
+
+  // 3. 关联返校校验点 targetVerificationPointId / targetYxPointId / action
+  tryAdd(mapping.targetVerificationPointId);
+  tryAdd(mapping.targetYxPointId);
+  tryAdd(action?.targetVerificationPointId);
+  tryAdd(action?.targetPointId);
+  tryAdd(action?.pointId);
+  tryAdd(action?.yx_id);
+
+  // 4. 字符串绑定 stateKey / bindings.state / statusKey / valueKey (支持 YX_xxx 与 61xxxxxx)
+  for (const candidate of [mapping.stateKey, bindings.state, mapping.statusKey, mapping.valueKey, bindings.value]) {
+    if (!candidate) continue;
+    const str = String(candidate);
+    const m = str.match(/(?:^|_)YX_(\d+)/i);
+    if (m && m[1]) {
+      ids.add(Number(m[1]));
+    } else {
+      const numMatch = str.match(/(61\d{6})/);
+      if (numMatch && numMatch[1]) {
+        ids.add(Number(numMatch[1]));
+      }
+    }
+  }
+
+  // 5. 电气开关类图元设备关联返校点
+  if (['elec-breaker', 'elec-disconnector', 'elec-grounding', 'elec-handcart'].includes(comp.type) || comp.type.startsWith('elec-')) {
+    const bound = isComponentBoundToControlOrRegulation(comp);
+    if (bound.targetVerificationPointId) {
+      ids.add(bound.targetVerificationPointId);
+    }
+  }
+
+  // 6. 复合图元子部件 (递归提取子部件关联遥信)
+  if (Array.isArray(comp.children) && comp.children.length > 0) {
+    for (const child of comp.children) {
+      const childIds = getComponentAllYxIds(child as ScreenComponent);
+      childIds.forEach(id => ids.add(id));
+    }
+  }
+
+  return Array.from(ids);
+};
+
+const getComponentYxPointId = (comp: ScreenComponent): number | null => {
+  const all = getComponentAllYxIds(comp);
+  return all.length > 0 ? all[0] : null;
+};
+
+/**
+ * 判断图元当前是否闪烁：严格依据遥信信息中的 status (status 7~12 闪烁，0 正常)
+ * 具备响应式 flashingVersion 追踪，确保清闪与变位时 100% 触发 Vue 视图重绘
+ */
+const isCompFlashing = (comp: ScreenComponent): boolean => {
+  // 关键：强制读取 flashingVersion 建立 Vue 响应式依赖追踪
+  const _ = flashingVersion.value;
+  const yxIds = getComponentAllYxIds(comp);
+  for (let i = 0; i < yxIds.length; i++) {
+    if (isPointFlashing(yxIds[i])) return true;
+  }
+  // 兼顾图元本身附带的直接状态值
+  if (isYxFlashingStatus(comp.status)) return true;
+  if (isYxFlashingStatus(comp.customProps?.status)) return true;
+  if (isYxFlashingStatus(comp.data?.status)) return true;
+  return false;
+};
+
+// 收集本画面展示的所有遥信 ID (当前画面打开时按需汇聚)
+const currentScreenYxIds = computed(() => {
+  const set = new Set<number>();
+  for (const comp of props.components || []) {
+    const ids = getComponentAllYxIds(comp);
+    ids.forEach(id => set.add(id));
+  }
+  return Array.from(set);
+});
+
+const currentScreenFlashingCount = computed(() => {
+  return currentScreenYxIds.value.filter(id => isPointFlashing(id)).length;
+});
+
+const totalFlashingCount = computed(() => {
+  return flashingYxPoints.value.size;
+});
+
+// 模式一：【画面清闪】（前端当前画面的遥信点清闪）下发 { "yx_ids": [...] }
+const handleClearScreenFlash = async () => {
+  const ids = currentScreenYxIds.value;
+  await clearScreenFlash(ids);
+  closeContextMenu();
+};
+
+// 模式二：【全部清闪】（全站全局一键清闪）下发 { "all": true }
+const handleClearAllFlash = async () => {
+  await clearAllFlash();
+  closeContextMenu();
 };
 
 const handlePrintScreen = () => {
@@ -497,9 +745,27 @@ const toggleBrowserFullscreen = () => {
 };
 
 const handleKeyDown = (e: KeyboardEvent) => {
-  if (e.key === 'Escape') {
-    handleExitPreview();
+  if (e.code === 'Space' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+    isSpacePressed.value = true;
   }
+  if (e.key === 'Control') {
+    isCtrlPressed.value = true;
+  }
+};
+
+const handleKeyUp = (e: KeyboardEvent) => {
+  if (e.code === 'Space') {
+    isSpacePressed.value = false;
+  }
+  if (e.key === 'Control') {
+    isCtrlPressed.value = false;
+  }
+};
+
+const handleWindowBlur = () => {
+  isSpacePressed.value = false;
+  isCtrlPressed.value = false;
+  isPanning.value = false;
 };
 
 // Exit Preview Handler (退出监控直接跳转编辑界面)
@@ -772,18 +1038,32 @@ const handlePreviewContextMenu = (e: MouseEvent, comp?: ScreenComponent) => {
     const bound = isComponentBoundToControlOrRegulation(comp);
     const act = comp.data?.action;
     const mapping = comp.data?.mapping || {};
-    const isBreakerOrSwitch = ['elec-breaker', 'elec-disconnector', 'elec-grounding', 'elec-handcart', 'ctrl-indicator'].includes(comp.type);
-    const isTransform = ['elec-transformer', 'elec-transformer-3w', 'elec-transformer-tap'].includes(comp.type);
 
-    hasControl = isBreakerOrSwitch || comp.type === 'ctrl-button' || act?.type === 'tele-control' || mapping.pointCategory === 'teleControl' || (bound.isBound && bound.type === 'yk');
+    // 严谨过滤：只有关联遥控的组件，右击菜单才能出现遥控
+    hasControl = Boolean(
+      (bound.isBound && bound.type === 'yk') ||
+      mapping.pointCategory === 'teleControl' ||
+      mapping.pointCategory === 'yk' ||
+      mapping.yk_id ||
+      mapping.ykPointId ||
+      (act?.type === 'tele-control' && (act.yk_id || act.pointId))
+    );
 
-    hasRegulation = isTransform || act?.type === 'tele-regulation' || mapping.pointCategory === 'teleRegulation' || (bound.isBound && bound.type === 'yt');
+    // 严谨过滤：只有关联遥调的组件，右击菜单才能出现遥调
+    hasRegulation = Boolean(
+      (bound.isBound && bound.type === 'yt') ||
+      mapping.pointCategory === 'teleRegulation' ||
+      mapping.pointCategory === 'yt' ||
+      mapping.yt_id ||
+      mapping.ytPointId ||
+      (act?.type === 'tele-regulation' && (act.yt_id || act.pointId))
+    );
 
     isTelemetry = isTelemetryComponent(comp, info);
   }
 
   const menuWidth = 288;
-  const menuHeight = (hasControl || hasRegulation ? 200 : 110) + (isTelemetry ? 45 : 0);
+  const menuHeight = (hasControl ? 45 : 0) + (hasRegulation ? 45 : 0) + (isTelemetry ? 45 : 0) + 195;
   const x = Math.min(window.innerWidth - menuWidth - 10, Math.max(10, e.clientX));
   const y = Math.min(window.innerHeight - menuHeight - 10, Math.max(10, e.clientY));
 
@@ -842,11 +1122,12 @@ const handleContainerClick = (e: MouseEvent) => {
 
 let scadaClockTimer: any = null;
 
-// Watch activeScreenId changes - auto reset zoom to fit new screen
+// Watch activeScreenId changes - auto reset zoom and pan to fit new screen
 watch(
   () => props.activeScreenId,
   () => {
     userZoomFactor.value = 1;
+    panOffset.value = { x: 0, y: 0 };
     scaleMode.value = 'fit';
     hoverTooltip.value = null;
     contextMenu.value.visible = false;
@@ -859,6 +1140,8 @@ watch(
 onMounted(() => {
   window.addEventListener('resize', handleResize);
   window.addEventListener('keydown', handleKeyDown);
+  window.addEventListener('keyup', handleKeyUp);
+  window.addEventListener('blur', handleWindowBlur);
   updateClock();
   updateScadaClock();
   clockTimer = setInterval(() => {
@@ -906,6 +1189,8 @@ onBeforeUnmount(() => {
   isUnmounted = true;
   window.removeEventListener('resize', handleResize);
   window.removeEventListener('keydown', handleKeyDown);
+  window.removeEventListener('keyup', handleKeyUp);
+  window.removeEventListener('blur', handleWindowBlur);
   if (clockTimer) clearInterval(clockTimer);
   if (gcTimer) clearInterval(gcTimer);
   if (scadaClockTimer) clearInterval(scadaClockTimer);
@@ -1011,7 +1296,6 @@ onBeforeUnmount(() => {
                   class="w-full px-3.5 py-2 text-left hover:bg-rose-50 text-rose-600 flex items-center justify-between cursor-pointer"
                 >
                   <span>退出监控运行</span>
-                  <span class="text-xs text-rose-400 font-mono">ESC</span>
                 </button>
               </div>
             </div>
@@ -1232,10 +1516,10 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <!-- Right: 音量、电站名称与全屏/退出控制 (移除顶栏时钟，全部单图标无卡片) -->
-      <div class="flex items-center gap-1 shrink-0">
+      <!-- Right: 电站名称、音量与全屏/退出控制 (不放置清闪按钮) -->
+      <div class="flex items-center gap-2 shrink-0">
         <!-- 电站/大屏名称标牌 (无卡片包裹，纯净文本) -->
-        <div class="text-slate-800 font-medium text-[14px] tracking-wide truncate max-w-[200px] pr-3 border-r border-[#cfc5b0]">
+        <div class="text-slate-800 font-medium text-[14px] tracking-wide truncate max-w-[200px] pl-1 pr-3 border-r border-[#cfc5b0]">
           {{ screen.name || '速利达光伏发电站' }}
         </div>
 
@@ -1261,7 +1545,7 @@ onBeforeUnmount(() => {
         <button
           @click="handleExitPreview"
           class="p-1.5 rounded hover:bg-rose-50 text-slate-600 hover:text-rose-600 transition-colors cursor-pointer"
-          title="退出监控运行 (ESC)"
+          title="退出监控运行"
         >
           <LogOut class="w-4.5 h-4.5 text-rose-500" />
         </button>
@@ -1316,20 +1600,30 @@ onBeforeUnmount(() => {
       </aside>
 
       <!-- 2.2 中央电气主接线工作画布 (Canvas Viewport) -->
-      <!-- 留白部分直接继续用背景色填充，绝不拉伸失真，裁剪放大到适屏尺寸，左右居中，上对齐 -->
+      <!-- 留白部分直接继续用背景色填充，绝不拉伸失真，裁剪放大到适屏尺寸，左右居中，上对齐，支持快捷键缩放与平移 -->
       <main
         ref="mainViewportRef"
-        class="flex-1 relative overflow-auto select-none flex flex-col items-center justify-start p-2 transition-colors"
+        class="flex-1 relative overflow-hidden select-none flex flex-col items-center justify-start p-2 transition-colors canvas-bg-target"
+        :class="{
+          'cursor-grab': (isSpacePressed || isCtrlPressed) && !isPanning,
+          'cursor-grabbing': isPanning
+        }"
         :style="{
           backgroundColor: screen.backgroundColor || '#080f1e'
         }"
+        @wheel="handleViewportWheel"
+        @mousedown="handleViewportMouseDown"
+        @mousemove="handleViewportMouseMove"
+        @mouseup="handleViewportMouseUp"
+        @mouseleave="handleViewportMouseLeave"
       >
-        <!-- 外层定寸包裹容器：严格等于裁剪放大后的尺寸，保证水平居中与上对齐 -->
+        <!-- 外层定寸包裹容器：严格等于裁剪放大后的尺寸，保证水平居中与上对齐，支持平移 panOffset -->
         <div
-          class="relative shrink-0 transition-all duration-100 ease-out"
+          class="relative shrink-0 transition-transform duration-75 ease-out"
           :style="{
             width: `${Math.round(contentBoundingBox.width * fitScale)}px`,
-            height: `${Math.round(contentBoundingBox.height * fitScale)}px`
+            height: `${Math.round(contentBoundingBox.height * fitScale)}px`,
+            transform: `translate(${panOffset.x}px, ${panOffset.y}px)`
           }"
         >
           <!-- 内部定点缩放层：等比例严格放大，彻底消除拉伸失真 -->
@@ -1349,10 +1643,13 @@ onBeforeUnmount(() => {
             <div
               v-for="comp in components"
               :key="comp.id"
-              class="absolute"
+              class="absolute scada-comp-item transition-all duration-100"
               :class="{
                 'opacity-0 pointer-events-none': comp.visible === false,
-                'cursor-pointer': comp.data?.action && comp.data.action.type !== 'none'
+                'cursor-pointer': !isCtrlPressed && comp.data?.action && comp.data.action.type !== 'none',
+                'cursor-grab': isCtrlPressed && !isPanning,
+                'cursor-grabbing': isPanning,
+                'scada-yx-flashing': isCompFlashing(comp)
               }"
               :style="{
                 left: `${(comp.x || 0) - contentBoundingBox.minX}px`,
@@ -1363,7 +1660,8 @@ onBeforeUnmount(() => {
                 zIndex: comp.zIndex || 1,
                 contain: comp.type.startsWith('draw-') || comp.category === 'basic' || comp.category === 'drawing' ? 'none' : 'layout style'
               }"
-              @click="handlePreviewCompClick(comp)"
+              @mousedown="handleCompMouseDown($event)"
+              @click="handleCompClick($event, comp)"
               @mouseenter="handleCompMouseEnter($event, comp)"
               @mousemove="handleCompMouseMove($event, comp)"
               @mouseleave="handleCompMouseLeave"
@@ -1379,38 +1677,39 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <!-- 悬浮测点浮标 (格式: 间隔-设备-测点名称，极简紧凑工业风，按用户要求删掉实时值) -->
+        <!-- 悬浮测点浮标 (极简工业提示：无卡片包裹、无蓝色边框、字号放大清晰直观) -->
         <div
           v-if="hoverTooltip && hoverTooltip.visible"
-          class="fixed z-50 pointer-events-none px-2.5 py-1 rounded-md bg-[#091528]/95 backdrop-blur-md border border-[#00f2ff]/60 shadow-[0_6px_20px_rgba(0,0,0,0.85)] flex items-center gap-1.5 text-xs font-sans whitespace-nowrap"
+          class="fixed z-50 pointer-events-none px-2 py-0.5 rounded bg-black/80 flex items-center gap-2 text-sm font-sans whitespace-nowrap select-none drop-shadow-md"
           :style="{
             left: `${Math.round(hoverTooltip.x)}px`,
             top: `${Math.round(hoverTooltip.y)}px`
           }"
         >
           <span
-            class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded uppercase shrink-0"
+            v-if="hoverTooltip.pointType"
+            class="text-[13px] font-mono font-bold shrink-0"
             :class="{
-              'bg-cyan-950 text-cyan-300 border border-cyan-500/50': hoverTooltip.pointType === 'YC',
-              'bg-emerald-950 text-emerald-300 border border-emerald-500/50': hoverTooltip.pointType === 'YX',
-              'bg-amber-950 text-amber-300 border border-amber-500/50': hoverTooltip.pointType === 'YT',
-              'bg-purple-950 text-purple-300 border border-purple-500/50': hoverTooltip.pointType === 'YK',
-              'bg-blue-950 text-blue-300 border border-blue-500/50': hoverTooltip.pointType === 'DD'
+              'text-cyan-300': hoverTooltip.pointType === 'YC',
+              'text-emerald-300': hoverTooltip.pointType === 'YX',
+              'text-amber-300': hoverTooltip.pointType === 'YT',
+              'text-purple-300': hoverTooltip.pointType === 'YK',
+              'text-sky-300': hoverTooltip.pointType === 'DD'
             }"
           >
-            {{ hoverTooltip.pointType }}
+            [{{ hoverTooltip.pointType }}]
           </span>
-          <span class="text-slate-100 font-mono text-[11.5px] font-medium tracking-wide">
+          <span class="text-slate-100 font-sans text-sm font-medium tracking-wide">
             {{ hoverTooltip.hierarchyText }}
           </span>
         </div>
 
-        <!-- 右键操作菜单 (大小、布局风格严格与编辑界面 CanvasEditor 保持一致，每一项不加背景卡片) -->
+        <!-- 右键操作菜单 (去蓝色边框，不显示组件名称) -->
         <div
           v-if="contextMenu.visible"
           @click.stop
           @contextmenu.stop.prevent
-          class="fixed z-50 bg-[#091528] border-2 border-[#00f2ff]/80 rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.95)] p-2 w-72 max-h-[calc(100vh-20px)] overflow-y-auto custom-scrollbar text-sm font-sans divide-y divide-[#00f2ff]/30"
+          class="fixed z-50 bg-[#0b1322] border border-slate-700/80 rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.95)] p-2 w-72 max-h-[calc(100vh-20px)] overflow-y-auto custom-scrollbar text-sm font-sans divide-y divide-slate-700/60"
           :style="{
             left: `${Math.round(contextMenu.x)}px`,
             top: `${Math.round(contextMenu.y)}px`,
@@ -1420,52 +1719,58 @@ onBeforeUnmount(() => {
             transform: 'translateZ(0)'
           }"
         >
-          <!-- 头部信息 -->
-          <div class="px-3 py-1.5 text-sm font-bold text-[#00f2ff] flex items-center justify-between pb-2 tracking-wide border-b border-[#00f2ff]/30">
-            <span class="truncate">{{ contextMenu.targetComponent ? contextMenu.targetComponent.name : '监控界面操作' }}</span>
-            <span v-if="contextMenu.pointType" class="text-xs text-[#38bdf8] font-mono font-bold">{{ contextMenu.pointType }}</span>
-            <span v-else class="text-xs text-slate-400 font-mono">SCADA</span>
-          </div>
 
-          <!-- 遥测/遥控/遥调功能区 (每一项不加背景卡片，与编辑界面操作菜单项一致) -->
+          <!-- 遥测/遥控/遥调功能区 (只有确实关联的测点才显示对应项) -->
           <div v-if="contextMenu.isTelemetry || contextMenu.hasControl || contextMenu.hasRegulation" class="py-1.5 space-y-1">
             <!-- 遥测组件实时曲线 -->
             <button
               v-if="contextMenu.isTelemetry"
               @click="openRealtimeCurve(contextMenu.targetComponent)"
-              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-[#00f2ff]/20 rounded-lg text-[#00f2ff] hover:text-[#38bdf8] cursor-pointer flex items-center justify-between group transition-colors"
+              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-[#00f2ff]/20 rounded-lg text-[#00f2ff] hover:text-[#38bdf8] cursor-pointer flex items-center gap-2.5 group transition-colors"
             >
-              <div class="flex items-center gap-2.5">
-                <TrendingUp class="w-4 h-4 text-[#00f2ff] stroke-[2]" />
-                <span class="font-bold text-[#00f2ff] group-hover:text-[#38bdf8] tracking-wide text-sm">实时曲线</span>
-              </div>
-              <span class="text-xs text-[#38bdf8] font-mono font-bold">10分钟</span>
+              <TrendingUp class="w-4 h-4 text-[#00f2ff] stroke-[2]" />
+              <span class="font-bold text-[#00f2ff] group-hover:text-[#38bdf8] tracking-wide text-sm">实时曲线</span>
             </button>
 
-            <!-- 执行遥控 (YK) -->
+            <!-- 执行遥控 (YK) - 严格仅在组件关联了遥控时出现 -->
             <button
               v-if="contextMenu.hasControl"
               @click="executeContextMenuControl('control')"
-              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-[#fbbf24]/20 rounded-lg text-[#fbbf24] hover:text-[#fde047] cursor-pointer flex items-center justify-between group transition-colors"
+              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-[#fbbf24]/20 rounded-lg text-[#fbbf24] hover:text-[#fde047] cursor-pointer flex items-center gap-2.5 group transition-colors"
             >
-              <div class="flex items-center gap-2.5">
-                <Radio class="w-4 h-4 text-[#fbbf24] stroke-[2]" />
-                <span class="font-bold text-[#fbbf24] tracking-wide text-sm">执行工业遥控 (YK)</span>
-              </div>
-              <span class="text-xs text-[#fbbf24] font-mono font-bold">合分</span>
+              <Radio class="w-4 h-4 text-[#fbbf24] stroke-[2]" />
+              <span class="font-bold text-[#fbbf24] tracking-wide text-sm">执行工业遥控 (YK)</span>
             </button>
 
-            <!-- 执行遥调 (YT) -->
+            <!-- 执行遥调 (YT) - 严格仅在组件关联了遥调时出现 -->
             <button
               v-if="contextMenu.hasRegulation"
               @click="executeContextMenuControl('regulation')"
-              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-[#38bdf8]/20 rounded-lg text-[#38bdf8] hover:text-[#7dd3fc] cursor-pointer flex items-center justify-between group transition-colors"
+              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-[#38bdf8]/20 rounded-lg text-[#38bdf8] hover:text-[#7dd3fc] cursor-pointer flex items-center gap-2.5 group transition-colors"
             >
-              <div class="flex items-center gap-2.5">
-                <SlidersHorizontal class="w-4 h-4 text-[#38bdf8] stroke-[2]" />
-                <span class="font-bold text-[#38bdf8] tracking-wide text-sm">执行工业遥调 (YT)</span>
-              </div>
-              <span class="text-xs text-[#38bdf8] font-mono font-bold">档位</span>
+              <SlidersHorizontal class="w-4 h-4 text-[#38bdf8] stroke-[2]" />
+              <span class="font-bold text-[#38bdf8] tracking-wide text-sm">执行工业遥调 (YT)</span>
+            </button>
+          </div>
+
+          <!-- 变位清闪功能区 (画面清闪 / 全部清闪) -->
+          <div class="py-1.5 space-y-1">
+            <!-- 画面清闪 -->
+            <button
+              @click="handleClearScreenFlash"
+              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-amber-500/20 rounded-lg text-amber-300 hover:text-amber-100 cursor-pointer flex items-center gap-2.5 group transition-colors"
+            >
+              <Sparkles class="w-4 h-4 text-amber-400 stroke-[2]" />
+              <span class="font-bold text-amber-300 group-hover:text-amber-100 tracking-wide text-sm">画面清闪</span>
+            </button>
+
+            <!-- 全部清闪 -->
+            <button
+              @click="handleClearAllFlash"
+              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-orange-500/20 rounded-lg text-orange-300 hover:text-orange-100 cursor-pointer flex items-center gap-2.5 group transition-colors"
+            >
+              <RefreshCw class="w-4 h-4 text-orange-400 stroke-[2]" />
+              <span class="font-bold text-orange-300 group-hover:text-orange-100 tracking-wide text-sm">全部清闪</span>
             </button>
           </div>
 
@@ -1473,13 +1778,10 @@ onBeforeUnmount(() => {
           <div class="pt-1.5">
             <button
               @click="handleExitPreview(); closeContextMenu();"
-              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-rose-500/20 rounded-lg text-rose-300 hover:text-rose-100 cursor-pointer flex items-center justify-between group transition-colors"
+              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-rose-500/20 rounded-lg text-rose-300 hover:text-rose-100 cursor-pointer flex items-center gap-2.5 group transition-colors"
             >
-              <div class="flex items-center gap-2.5">
-                <Edit3 class="w-4 h-4 text-rose-400 stroke-[2]" />
-                <span class="font-bold text-rose-300 group-hover:text-rose-100 tracking-wide text-sm">退出监控 / 跳转编辑界面</span>
-              </div>
-              <span class="text-xs text-rose-400 font-mono font-bold">ESC</span>
+              <Edit3 class="w-4 h-4 text-rose-400 stroke-[2]" />
+              <span class="font-bold text-rose-300 group-hover:text-rose-100 tracking-wide text-sm">退出监控 / 跳转编辑界面</span>
             </button>
           </div>
         </div>

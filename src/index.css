@@ -193,3 +193,20 @@ textarea:disabled,
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none'%3E%3Cpath d='M4 12l4-4M4 12l4 4M4 12h16M20 12l-4-4M20 12l4-4' stroke='%23000000' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M4 12l4-4M4 12l4 4M4 12h16M20 12l-4-4M20 12l4-4' stroke='%2300f2ff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 12 12, e-resize, pointer !important;
 }
 
+/* ========================================================================= */
+/* SCADA 遥信变位 1s 周期闪烁动画 (固定1s周期，简单闪烁，无荧光特效)               */
+/* ========================================================================= */
+@keyframes scadaYxBlink {
+  0%, 49.9% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0.15;
+  }
+}
+
+.scada-yx-flashing {
+  animation: scadaYxBlink 1s infinite steps(1, start) !important;
+  will-change: opacity;
+}
+

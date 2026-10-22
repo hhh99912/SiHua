@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { ScreenComponent, DatasetItem } from '../../types';
-import { getComponentLiveNumericValue, formatTruncatedNumber } from '../../utils/scadaResolver';
+import { getComponentLiveNumericValue, formatTruncatedNumber, getComponentPointQuality } from '../../utils/scadaResolver';
 
 interface Props {
   component: ScreenComponent;
@@ -72,7 +72,19 @@ const formattedValue = computed(() => {
   return formatTruncatedNumber(num, staticStyle.value.decimals, staticStyle.value.trimZeros);
 });
 
-// 3. Telemetry Font Size (抓手拉伸实时更新与自适应顶满抓手框，无边框纯净显示)
+// 3. 测点质量状态检查 (quality status=1 表示差/无效，按要求字体一律显示灰色 #94a3b8)
+const pointQuality = computed(() => {
+  return getComponentPointQuality(props.component);
+});
+
+const effectiveTextColor = computed(() => {
+  if (props.previewMode && pointQuality.value === 1) {
+    return '#94a3b8';
+  }
+  return staticStyle.value.textColor;
+});
+
+// 4. Telemetry Font Size (抓手拉伸实时更新与自适应顶满抓手框，无边框纯净显示)
 const dynamicFontSize = computed(() => {
   const fs = props.component.style?.fontSize;
   if (typeof fs === 'number' && fs > 0) {
@@ -104,7 +116,7 @@ const dynamicFontSize = computed(() => {
     <span
       class="font-mono font-bold leading-none tracking-tight p-0 m-0 block whitespace-nowrap overflow-hidden select-none"
       :style="{
-        color: staticStyle.textColor,
+        color: effectiveTextColor,
         fontSize: dynamicFontSize,
         fontWeight: staticStyle.fontWeight,
         textAlign: staticStyle.textAlign as any,

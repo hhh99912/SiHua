@@ -48,13 +48,24 @@ const isVectorShape = computed(() => {
   const t = compType.value;
   return t.startsWith('draw-') || compCategory.value === 'basic' || compCategory.value === 'drawing';
 });
+
+const shouldOverflowVisible = computed(() => {
+  const t = compType.value;
+  const cat = compCategory.value;
+  // All vectors, lines, composite symbols, electrical components, buttons and indicators should not clip strokes
+  if (isLineType.value || isVectorShape.value || isComposite.value) return true;
+  if (cat === 'electrical' || t.startsWith('elec-')) return true;
+  if (cat === 'buttons' || t === 'ctrl-button' || t === 'ctrl-indicator') return true;
+  if (cat === 'gb-standard' || cat === 'status' || cat === 'decoration') return true;
+  return false;
+});
 </script>
 
 <template>
   <div 
     v-if="component" 
     class="w-full h-full relative pointer-events-none"
-    :class="{ 'overflow-visible': isLineType || isVectorShape, 'overflow-hidden': !isLineType && !isVectorShape }"
+    :class="{ 'overflow-visible': shouldOverflowVisible, 'overflow-hidden': !shouldOverflowVisible }"
   >
     <!-- 1. Float Metric Fast Route (Most Common SCADA Component - 400+ points fast-path) -->
     <FloatMetric 

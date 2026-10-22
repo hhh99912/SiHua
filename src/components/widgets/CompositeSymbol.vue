@@ -114,29 +114,63 @@ const baseBounds = computed(() => {
   };
 });
 
-// 自由刚性缩放比例：将图元内部作为一个不可拆分的整体进行几何变换，同时完全支持用户自由非等比拉伸宽高
-const scaleX = computed(() => {
-  const compW = Math.max(1, props.component.width);
-  const baseW = Math.max(1, baseBounds.value.width);
-  return compW / baseW;
-});
-
-const scaleY = computed(() => {
-  const compH = Math.max(1, props.component.height);
-  const baseH = Math.max(1, baseBounds.value.height);
-  return compH / baseH;
-});
-
-// Memoize child objects with forwarded dataset/telemetry configuration to avoid inline object allocation churn
+// 几何比例自适应计算：将子零件坐标精准投影到当前组件尺寸，彻底摒弃 CSS transform scale
+// 从根源消除拉伸变宽时竖线变粗、拉伸变窄时横线变粗的 2D 笔触非等比畸变！
 const resolvedChildren = computed(() => {
   const compData = props.component.data;
+  const compW = Math.max(2, props.component.width);
+  const compH = Math.max(2, props.component.height);
+  const baseW = Math.max(1, baseBounds.value.width);
+  const baseH = Math.max(1, baseBounds.value.height);
+  const rx = compW / baseW;
+  const ry = compH / baseH;
+
   return children.value.map(child => {
     const hasChildData = child.data?.datasetId;
     const effectiveData = hasChildData ? child.data : (compData?.datasetId ? compData : child.data);
+
+    // 1. Proportional position and dimension mapping
+    const rawX = child.x ?? 0;
+    const rawY = child.y ?? 0;
+    const rawW = child.width ?? 10;
+    const rawH = child.height ?? 10;
+
+    let scaledX = Math.round(rawX * rx);
+    let scaledY = Math.round(rawY * ry);
+    let scaledW = Math.max(1, Math.round(rawW * rx));
+    let scaledH = Math.max(1, Math.round(rawH * ry));
+
+    // For circular elements (e.g. contact points in disconnectors), preserve 1:1 circle shape centered at mapped coordinate
+    const isCircle = child.type === 'draw-circle';
+    if (isCircle && rawW === rawH) {
+      const circleDia = Math.max(2, Math.round(rawW * Math.min(rx, ry)));
+      const centerX = Math.round((rawX + rawW / 2) * rx);
+      const centerY = Math.round((rawY + rawH / 2) * ry);
+      scaledX = centerX - Math.round(circleDia / 2);
+      scaledY = centerY - Math.round(circleDia / 2);
+      scaledW = circleDia;
+      scaledH = circleDia;
+    }
+
+    // 2. Stroke width remains clean, uniform, and undistorted in physical pixels
+    let strokeW = child.style?.strokeWidth !== undefined ? Number(child.style.strokeWidth) : 2;
+    // On extreme micro scales (<= 4px), ensure stroke doesn't exceed half the width/height
+    if (scaledW <= 4 || scaledH <= 4) {
+      strokeW = 1;
+    }
+
     return {
       child,
       renderComp: {
         ...child,
+        x: scaledX,
+        y: scaledY,
+        width: scaledW,
+        height: scaledH,
+        style: {
+          ...(child.style || {}),
+          strokeWidth: strokeW
+        },
         data: effectiveData
       }
     };
@@ -145,48 +179,42 @@ const resolvedChildren = computed(() => {
 </script>
 
 <template>
-  <div class="w-full h-full relative overflow-visible select-none flex items-center justify-center">
-    <!-- Composite Container Canvas: 统一刚性画板 (作为整体缩放，内部零件相对位置绝对锁定，绝不分离散架) -->
-    <div 
-      class="relative"
+  <div 
+    class="w-full h-full relative overflow-visible select-none pointer-events-none"
+    :style="{
+      backgroundColor: component.style?.fill || 'transparent',
+      borderRadius: (component.style?.borderRadius || 0) + 'px'
+    }"
+  >
+    <!-- Geometric Proportional Canvas: 采用原生布局坐标投影，零 CSS 缩放，全向线宽物理恒定一致 -->
+    <div
+      v-for="item in resolvedChildren"
+      :key="item.child.id"
+      class="absolute pointer-events-auto"
       :style="{
-        width: `${baseBounds.width}px`,
-        height: `${baseBounds.height}px`,
-        transform: `scale(${scaleX}, ${scaleY})`,
-        transformOrigin: 'center center',
-        backgroundColor: component.style?.fill || 'transparent',
-        borderRadius: (component.style?.borderRadius || 0) + 'px'
+        left: `${item.renderComp.x}px`,
+        top: `${item.renderComp.y}px`,
+        width: `${item.renderComp.width}px`,
+        height: `${item.renderComp.height}px`,
+        transform: item.child.rotation ? `rotate(${item.child.rotation}deg)` : 'none',
+        zIndex: item.child.zIndex || 1
       }"
     >
-      <div
-        v-for="item in resolvedChildren"
-        :key="item.child.id"
-        class="absolute"
-        :style="{
-          left: `${item.child.x}px`,
-          top: `${item.child.y}px`,
-          width: `${item.child.width}px`,
-          height: `${item.child.height}px`,
-          transform: item.child.rotation ? `rotate(${item.child.rotation}deg)` : 'none',
-          zIndex: item.child.zIndex || 1
-        }"
-      >
-        <WidgetRenderer
-          :component="item.renderComp"
-          :datasets="datasets"
-          :preview-mode="previewMode"
-          @jump:screen="emit('jump:screen', $event)"
-        />
-      </div>
+      <WidgetRenderer
+        :component="item.renderComp"
+        :datasets="datasets"
+        :preview-mode="previewMode"
+        @jump:screen="emit('jump:screen', $event)"
+      />
+    </div>
 
-      <!-- Fallback when no children are inside -->
-      <div 
-        v-if="children.length === 0" 
-        class="w-full h-full border border-dashed border-cyan-500/40 rounded flex flex-col items-center justify-center p-2 text-center text-xs font-mono text-cyan-400 bg-cyan-950/20"
-      >
-        <span>{{ component.name }}</span>
-        <span class="text-[10px] text-slate-500 mt-0.5">复合图元 (暂无子图元)</span>
-      </div>
+    <!-- Fallback when no children are inside -->
+    <div 
+      v-if="children.length === 0" 
+      class="w-full h-full border border-dashed border-cyan-500/40 rounded flex flex-col items-center justify-center p-2 text-center text-xs font-mono text-cyan-400 bg-cyan-950/20"
+    >
+      <span>{{ component.name }}</span>
+      <span class="text-[10px] text-slate-500 mt-0.5">复合图元 (暂无子图元)</span>
     </div>
   </div>
 </template>

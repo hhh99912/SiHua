@@ -54,7 +54,23 @@ const effectiveBorderRadius = computed(() => {
   return '6px';
 });
 
-// 4. 动态计算字号 (自适应顶满组件抓手框)
+// 4. 自适应动态内边距 (根据尺寸弹性伸缩，杜绝拉窄时左右内边距将边框挤出容器导致右边框消失)
+const dynamicPaddingX = computed(() => {
+  const w = props.component.width || 120;
+  if (w < 28) return '1px';
+  if (w < 48) return '3px';
+  if (w < 72) return '6px';
+  return '12px';
+});
+
+const dynamicPaddingY = computed(() => {
+  const h = props.component.height || 40;
+  if (h < 24) return '1px';
+  if (h < 36) return '3px';
+  return '6px';
+});
+
+// 5. 动态计算字号 (自适应顶满组件抓手框)
 const dynamicFontSize = computed(() => {
   if (style.value.fontSize && typeof style.value.fontSize === 'number' && style.value.fontSize > 0) {
     return `${style.value.fontSize}px`;
@@ -67,9 +83,10 @@ const dynamicFontSize = computed(() => {
     visualLen += text.charCodeAt(i) > 255 ? 1.0 : 0.55;
   }
   visualLen = Math.max(1, visualLen);
-  const byHeight = Math.floor(h * 0.80);
-  const byWidth = Math.floor((w - 8) / visualLen);
-  const size = Math.max(10, Math.min(byHeight, byWidth));
+  const byHeight = Math.floor(h * 0.72);
+  const byWidth = Math.floor((w - 4) / visualLen);
+  const minSize = w < 32 ? 6 : 8;
+  const size = Math.max(minSize, Math.min(byHeight, byWidth));
   return `${size}px`;
 });
 
@@ -110,35 +127,7 @@ const triggerAction = () => {
     }
   }
 
-  const bound = isComponentBoundToControlOrRegulation(props.component);
-  if (bound.isBound) {
-    const devId = String(bound.device?.dev_id || bound.device?.id || action.value?.deviceId || props.component.data?.mapping?.deviceId || '7000001');
-    const ptId = bound.pointId || action.value?.pointId || null;
-    const targetVId = bound.targetVerificationPointId || action.value?.targetVerificationPointId || null;
-    const type = bound.type || 'yk';
-    window.dispatchEvent(new CustomEvent('scada:open:control', {
-      detail: {
-        deviceId: devId,
-        pointId: ptId,
-        targetVerificationPointId: targetVId,
-        type
-      }
-    }));
-  } else {
-    // Default fallback
-    const deviceId = props.component.data?.mapping?.deviceId || action.value?.deviceId || '7000001';
-    const pointId = props.component.data?.mapping?.pointId || action.value?.pointId || null;
-    const targetVId = props.component.data?.mapping?.targetVerificationPointId || action.value?.targetVerificationPointId || null;
-    const type = props.component.data?.mapping?.pointCategory === 'teleRegulation' || action.value?.type === 'tele-regulation' ? 'yt' : 'yk';
-    window.dispatchEvent(new CustomEvent('scada:open:control', {
-      detail: {
-        deviceId,
-        pointId,
-        targetVerificationPointId: targetVId,
-        type
-      }
-    }));
-  }
+  // 单击不要触发遥控遥调，工业控制统一由右键上下文菜单核实后执行
 };
 
 const handlePointerDown = () => {
@@ -244,7 +233,7 @@ const themeStyleMap = computed(() => {
 <template>
   <button
     type="button"
-    class="w-full h-full relative select-none flex items-center justify-center gap-2 px-3 py-1.5 transition-colors duration-150 overflow-hidden outline-none focus:outline-none"
+    class="w-full h-full relative select-none flex items-center justify-center transition-colors duration-150 outline-none focus:outline-none box-border min-w-0 min-h-0"
     :class="[
       previewMode ? 'cursor-pointer active:brightness-90 hover:brightness-105' : 'cursor-default pointer-events-none',
       variant === 'outline'
@@ -260,15 +249,23 @@ const themeStyleMap = computed(() => {
       borderColor: effectiveBorderColor || undefined,
       borderWidth: effectiveBorderWidth || undefined,
       borderRadius: effectiveBorderRadius,
-      fontSize: dynamicFontSize
+      fontSize: dynamicFontSize,
+      paddingLeft: dynamicPaddingX,
+      paddingRight: dynamicPaddingX,
+      paddingTop: dynamicPaddingY,
+      paddingBottom: dynamicPaddingY,
+      boxSizing: 'border-box'
     }"
     @pointerdown="handlePointerDown"
     @pointerup="handlePointerUp"
     @pointerleave="isPressed = false; isHovered = false"
     @pointerenter="handlePointerEnter"
   >
-    <!-- Button Text Label (纯文本顶满抓手框，无自带箭头) -->
-    <span class="truncate tracking-wide select-none leading-none font-medium">
+    <!-- Button Text Label (极小尺寸自动安全隐藏，防止撑破边框) -->
+    <span 
+      v-if="(component.width || 120) >= 16 && (component.height || 40) >= 12"
+      class="truncate tracking-wide select-none leading-none font-medium max-w-full min-w-0 pointer-events-none"
+    >
       {{ buttonText }}
     </span>
 

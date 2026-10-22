@@ -252,6 +252,62 @@ export const rawYxValues = new Map<number, number>();
 export const rawDdValues = new Map<number, number>();
 export const rawYcQuality = new Map<number, number>();
 export const rawYxQuality = new Map<number, number>();
+export const rawDdQuality = new Map<number, number>();
+
+// ---------------------------------------------------------------------------
+// 遥信状态 (行业标准定义) 与变位闪烁判定
+// ---------------------------------------------------------------------------
+export const STATE_YX = {
+  NORMAL: 0,          // 正常
+  INVALID: 1,         // 无效
+  BAD_DATA: 2,        // 双位不一致(合)
+  BAD_DATA_OFF: 3,    // 双位不一致(分)
+  LOCK_ON: 4,         // 遥信封锁(合)
+  LOCK_OFF: 5,        // 遥信封锁(分)
+  SET: 6,             // 遥信人工置数
+  BW_ON: 7,           // 遥信变位(合)
+  BW_OFF: 8,          // 遥信变位(分)
+  SGBW_ON: 9,         // 遥信事故变位(合)
+  SGBW_OFF: 10,       // 遥信事故变位(分)
+  SOE_ON: 11,         // 遥信SOE动作
+  SOE_OFF: 12,        // 遥信SOE复归
+  DISTURB: 13,        // 遥信扰动
+  CHECK_REPARE: 14,   // 遥信检修
+  PASSBY: 15          // 遥信被旁路
+} as const;
+
+/**
+ * 判断遥信测点是否处于变位闪烁状态：
+ * 严格依据行业标准与用户要求：只要变位，不管是什么变位，都要闪烁
+ * 对应状态码：
+ * 7:  STATE_YX_BW_ON       遥信变位(合)
+ * 8:  STATE_YX_BW_OFF      遥信变位(分)
+ * 9:  STATE_YX_SGBW_ON     遥信事故变位(合)
+ * 10: STATE_YX_SGBW_OFF    遥信事故变位(分)
+ * 11: STATE_YX_SOE_ON      遥信SOE动作
+ * 12: STATE_YX_SOE_OFF     遥信SOE复归
+ * 非变位状态（0 正常, 1 无效, 2~6, 13~15）绝不闪烁。
+ */
+export function isYxFlashingStatus(status: any, statusName?: string): boolean {
+  if (status !== undefined && status !== null && status !== '') {
+    const num = Number(status);
+    if (!isNaN(num)) {
+      if (num >= 7 && num <= 12) return true;
+      if ((num >= 0 && num <= 6) || (num >= 13 && num <= 15)) return false;
+    }
+  }
+  if (typeof statusName === 'string' && statusName) {
+    if (statusName.includes('变位') || statusName.includes('SOE')) return true;
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// 遥信变位闪烁状态集 (固定 1s 闪烁周期，支持画面清闪与全部清闪)
+// ---------------------------------------------------------------------------
+export const flashingYxPoints = ref<Set<number>>(new Set());
+// 响应式版本号，每次闪烁点发生任何改变（包括新增、移除、清闪、后端推送），自增触发 Vue 视图重绘
+export const flashingVersion = ref<number>(0);
 
 // ---------------------------------------------------------------------------
 // 400+ 测点精准局部响应式更新系统 (针对凝思 Linux 低性能硬件极致优化)
@@ -319,6 +375,7 @@ function seedRawCache(facilities: ScadaFacilityNode[]) {
         });
         (dev.dd_list || dev.dd_points || []).forEach(dd => {
           rawDdValues.set(dd.id, dd.val ?? dd.value ?? 0);
+          rawDdQuality.set(dd.id, dd.status ?? 0);
           cachedRealtimeDd.set(dd.id, { id: dd.id, val: dd.val ?? dd.value ?? 0, status: dd.status ?? 0 });
         });
       });
@@ -339,6 +396,16 @@ export function getFastLiveYx(pointId: number): number | undefined {
 
 export function getFastLiveDd(pointId: number): number | undefined {
   return rawDdValues.get(pointId);
+}
+
+/**
+ * 快速获取测点质量状态 (0: 正常, 1: 质量差/无效)
+ */
+export function getScadaPointQuality(pointId: number): number {
+  if (rawYcQuality.has(pointId)) return rawYcQuality.get(pointId)!;
+  if (rawDdQuality.has(pointId)) return rawDdQuality.get(pointId)!;
+  if (rawYxQuality.has(pointId)) return rawYxQuality.get(pointId)!;
+  return 0;
 }
 
 /**
@@ -681,27 +748,57 @@ export async function fetchScadaRealtime(
         }
       }
 
-      // Update YX Cache with strict diff detection
+      // Update YX Cache with strict diff detection and displacement (变位) tracking
+      let yxFlashingUpdated = false;
+      const nextFlashing = new Set<number>(flashingYxPoints.value);
+
       for (let i = 0; i < yx.length; i++) {
         const item = yx[i];
-        const val = item.val ?? 0;
-        const oldVal = rawYxValues.get(item.id);
-        const oldQuality = rawYxQuality.get(item.id);
-        if (oldVal !== val || oldQuality !== item.status) {
-          rawYxValues.set(item.id, val);
-          if (item.status !== undefined) rawYxQuality.set(item.id, item.status);
-          cachedRealtimeYx.set(item.id, item);
-          notifyPointChanged(item.id, val);
+        const pointId = Number(item.id);
+        if (isNaN(pointId) || pointId <= 0) continue;
+
+        const val = item.val !== undefined ? Number(item.val) : (item.value !== undefined ? Number(item.value) : 0);
+        const status = item.status !== undefined ? Number(item.status) : 0;
+        const statusName = String(item.status_name || '');
+        const oldVal = rawYxValues.get(pointId);
+        const oldQuality = rawYxQuality.get(pointId);
+
+        // 严格依据遥信信息中的 status 判断是否处于变位闪烁 (status 7~12 为变位闪烁，其余非变位不闪)
+        const shouldFlash = isYxFlashingStatus(status, statusName);
+        if (shouldFlash) {
+          if (!nextFlashing.has(pointId)) {
+            nextFlashing.add(pointId);
+            yxFlashingUpdated = true;
+          }
+        } else {
+          if (nextFlashing.has(pointId)) {
+            nextFlashing.delete(pointId);
+            yxFlashingUpdated = true;
+          }
+        }
+
+        if (oldVal !== val || oldQuality !== status) {
+          rawYxValues.set(pointId, val);
+          rawYxQuality.set(pointId, status);
+          cachedRealtimeYx.set(pointId, { ...item, id: pointId, val, value: val, status, status_name: statusName });
+          notifyPointChanged(pointId, val);
         }
       }
 
-      // Update DD Cache with strict diff detection
+      if (yxFlashingUpdated) {
+        flashingYxPoints.value = nextFlashing;
+        flashingVersion.value++;
+      }
+
+      // Update DD Cache with strict diff detection and quality tracking
       for (let i = 0; i < dd.length; i++) {
         const item = dd[i];
         const val = item.val ?? 0;
         const oldVal = rawDdValues.get(item.id);
-        if (oldVal !== val) {
+        const oldQuality = rawDdQuality.get(item.id);
+        if (oldVal !== val || oldQuality !== item.status) {
           rawDdValues.set(item.id, val);
+          if (item.status !== undefined) rawDdQuality.set(item.id, item.status);
           cachedRealtimeDd.set(item.id, item);
           notifyPointChanged(item.id, val);
         }
@@ -1140,6 +1237,20 @@ export function getAssociatedPointIdsFromComponents(
       return;
     }
 
+    // 1.1 标准工业区间数字段分类 (国标 SCADA: 61xxxxxx=遥信, 62xxxxxx=遥测, 35xxxxxx=电度)
+    if (numId >= 61000000 && numId <= 61999999) {
+      yxSet.add(numId);
+      return;
+    }
+    if (numId >= 62000000 && numId <= 62999999) {
+      ycSet.add(numId);
+      return;
+    }
+    if (numId >= 35000000 && numId <= 35999999) {
+      ddSet.add(numId);
+      return;
+    }
+
     // 2. Fallback using hint/category
     const hint = (categoryHint || '').toLowerCase();
     if (hint === 'dd' || hint === 'energy') {
@@ -1380,7 +1491,200 @@ export function isComponentBoundToControlOrRegulation(comp: ScreenComponent | nu
     };
   }
 
+  // 4. Device and verification point association
+  const yxPointId = Number(mapping.yx_id || (mapping.pointCategory === 'teleSignal' || mapping.pointCategory === 'yx' ? mapping.pointId : null));
+  const ycPointId = Number(mapping.yc_id || (mapping.pointCategory === 'telemetry' || mapping.pointCategory === 'yc' ? mapping.pointId : null));
+  const deviceId = mapping.deviceId || action?.deviceId || comp.customProps?.deviceId;
+
+  if (yxPointId || ycPointId || deviceId) {
+    const facs = scadaFacilities.value || [];
+    for (let f = 0; f < facs.length; f++) {
+      const fac = facs[f];
+      for (let b = 0; b < (fac.bays || []).length; b++) {
+        const bay = fac.bays[b];
+        const devs = bay.devices || bay.cb_devices || [];
+        for (let d = 0; d < devs.length; d++) {
+          const dev = devs[d];
+          const isTargetDev = deviceId && String(dev.dev_id || dev.id) === String(deviceId);
+
+          // YK search
+          const ykList = dev.yk_list || dev.yk_points || [];
+          if (ykList.length > 0) {
+            if (yxPointId) {
+              const matchedYk = ykList.find((yk: any) => Number(yk.targetVerificationPointId) === yxPointId);
+              if (matchedYk) {
+                return {
+                  isBound: true,
+                  type: 'yk',
+                  pointId: matchedYk.id,
+                  targetVerificationPointId: yxPointId,
+                  device: dev,
+                  facility: fac,
+                  bay
+                };
+              }
+            }
+            if (isTargetDev && ['elec-breaker', 'elec-disconnector', 'elec-handcart'].includes(comp.type)) {
+              const yk = ykList[0];
+              return {
+                isBound: true,
+                type: 'yk',
+                pointId: yk.id,
+                targetVerificationPointId: yk.targetVerificationPointId || yxPointId || undefined,
+                device: dev,
+                facility: fac,
+                bay
+              };
+            }
+          }
+
+          // YT search
+          const ytList = dev.yt_list || dev.yt_points || [];
+          if (ytList.length > 0) {
+            if (ycPointId) {
+              const matchedYt = ytList.find((yt: any) => Number(yt.targetVerificationPointId) === ycPointId);
+              if (matchedYt) {
+                return {
+                  isBound: true,
+                  type: 'yt',
+                  pointId: matchedYt.id,
+                  targetVerificationPointId: ycPointId,
+                  device: dev,
+                  facility: fac,
+                  bay
+                };
+              }
+            }
+            if (isTargetDev && ['elec-transformer', 'elec-transformer-3w', 'elec-transformer-tap'].includes(comp.type)) {
+              const yt = ytList[0];
+              return {
+                isBound: true,
+                type: 'yt',
+                pointId: yt.id,
+                targetVerificationPointId: yt.targetVerificationPointId || ycPointId || undefined,
+                device: dev,
+                facility: fac,
+                bay
+              };
+            }
+          }
+        }
+      }
+    }
+  }
+
   return { isBound: false };
+}
+
+/**
+ * 下发标准变位清闪请求: POST /api/scada/control/unflash
+ * 模式一：【画面清闪】 { "yx_ids": [52000001, 52000002] }
+ * 模式二：【全部清闪】 { "all": true }
+ */
+export async function sendScadaUnflash(payload: { yx_ids?: number[]; all?: boolean }): Promise<{
+  code: number;
+  msg: string;
+  cleared_count: number;
+}> {
+  const baseUrl = getScadaApiBaseUrl();
+  const url = baseUrl ? `${baseUrl}/api/scada/control/unflash` : '/api/scada/control/unflash';
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    console.warn('[SCADA] 清闪请求异常:', err);
+    return {
+      code: 500,
+      msg: err?.message || '清闪请求异常',
+      cleared_count: 0
+    };
+  }
+}
+
+/**
+ * 模式一：【画面清闪】（前端当前接线图画面打开时，收集本画面展示的所有遥信 ID，点击画面上的清闪按钮下发）
+ */
+export async function clearScreenFlash(pointIds: number[]): Promise<number> {
+  if (!pointIds || pointIds.length === 0) return 0;
+
+  // 1. 本地状态即时刷回 0，界面立即停止闪烁 (一次性清闪，后续变位推送 status 7~12 继续恢复闪烁)
+  const next = new Set<number>(flashingYxPoints.value);
+  for (let i = 0; i < pointIds.length; i++) {
+    const id = Number(pointIds[i]);
+    next.delete(id);
+    rawYxQuality.set(id, 0);
+    const cached = cachedRealtimeYx.get(id);
+    if (cached) {
+      cached.status = 0;
+      cached.status_name = '正常';
+    }
+  }
+  flashingYxPoints.value = next;
+  flashingVersion.value++;
+
+  // 2. 下发接口到共享内存/后端
+  const res = await sendScadaUnflash({ yx_ids: pointIds });
+  return res?.cleared_count ?? 0;
+}
+
+/**
+ * 模式二：【全部清闪】（全站全局一键清闪，下发 { "all": true }）
+ */
+export async function clearAllFlash(): Promise<number> {
+  // 1. 本地所有闪烁点状态刷回 0 (一次性清闪)
+  flashingYxPoints.value.forEach((id) => {
+    rawYxQuality.set(id, 0);
+    const cached = cachedRealtimeYx.get(id);
+    if (cached) {
+      cached.status = 0;
+      cached.status_name = '正常';
+    }
+  });
+  flashingYxPoints.value = new Set<number>();
+  flashingVersion.value++;
+
+  // 2. 下发全局一键清闪接口
+  const res = await sendScadaUnflash({ all: true });
+  return res?.cleared_count ?? 0;
+}
+
+/**
+ * 判断指定遥信测点当前是否处于变位闪烁中
+ * 严格依据响应式 flashingYxPoints 与遥信 status (status 7~12 为变位闪烁，其余非变位不闪)
+ */
+export function isPointFlashing(pointId: number): boolean {
+  const _ = flashingVersion.value; // 建立 Vue 响应式依赖追踪，确保任何闪烁状态变动立即重绘
+  const numId = Number(pointId);
+  if (isNaN(numId) || numId <= 0) return false;
+
+  // 1. 响应式 Set 判断 (优先最准，包含所有当前被判定为变位闪烁的测点)
+  if (flashingYxPoints.value.has(numId)) {
+    return true;
+  }
+
+  // 2. 检查缓存状态保底 (首帧或未轮询前)
+  const quality = rawYxQuality.get(numId);
+  if (quality !== undefined && isYxFlashingStatus(quality)) {
+    return true;
+  }
+  const cached = cachedRealtimeYx.get(numId);
+  if (cached && isYxFlashingStatus(cached.status, cached.status_name)) {
+    return true;
+  }
+  return false;
 }
 
 /**

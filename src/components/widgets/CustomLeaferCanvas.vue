@@ -287,7 +287,7 @@ const cylPaths = computed(() => {
         borderStyle: strokeWidth > 0 && stroke && stroke !== 'transparent' ? (style.lineStyle || 'solid') : 'none',
         borderColor: stroke || 'transparent',
         borderWidth: `${strokeWidth}px`,
-        borderRadius: '0px',
+        borderRadius: style.borderRadius !== undefined ? `${style.borderRadius}px` : '0px',
         boxSizing: 'border-box'
       }"
     />

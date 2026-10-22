@@ -898,9 +898,10 @@ const processMouseMove = (e: MouseEvent) => {
           vLen += text.charCodeAt(i) > 255 ? 1.0 : 0.55;
         }
         vLen = Math.max(1, vLen);
-        const fitH = Math.floor(newH * 0.80);
-        const fitW = Math.floor((newW - 8) / vLen);
-        updatedStyle.fontSize = Math.max(10, Math.min(fitH, fitW, 300));
+        const fitH = Math.floor(newH * 0.75);
+        const fitW = Math.floor((newW - 4) / vLen);
+        const minBtnSize = newW < 32 ? 6 : 8;
+        updatedStyle.fontSize = Math.max(minBtnSize, Math.min(fitH, fitW, 300));
       } else {
         // 文本框：自适应高宽（支持多行），文字刚好顶满组件抓手框
         const text = String(comp.style?.text || comp.data?.staticData?.text || comp.name || '文本');
@@ -3173,10 +3174,10 @@ defineExpose({
       </div>
     </div>
 
-    <!-- Right-Click Context Menu (Solid, Ultra-High-Contrast, Rich Multi-Colored Luminous Menu) -->
+    <!-- Right-Click Context Menu (去蓝色边框，不显示组件名称) -->
     <div
       v-if="contextMenu.visible"
-      class="fixed bg-[#091528] border-2 border-[#00f2ff]/80 rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.95)] p-2 z-50 w-72 max-h-[calc(100vh-20px)] overflow-y-auto custom-scrollbar text-sm font-sans divide-y divide-[#00f2ff]/30"
+      class="fixed bg-[#0b1322] border border-slate-700/80 rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.95)] p-2 z-50 w-72 max-h-[calc(100vh-20px)] overflow-y-auto custom-scrollbar text-sm font-sans divide-y divide-slate-700/60"
       :style="{
         left: `${Math.round(contextMenu.x)}px`,
         top: `${Math.round(contextMenu.y)}px`,
@@ -3189,10 +3190,12 @@ defineExpose({
       @contextmenu.stop.prevent
     >
       <template v-if="effectiveContextMenuIds.length > 0">
-        <!-- Multi-Selection or Single Selection Header -->
-        <div class="px-3 py-1.5 text-sm font-bold text-[#00f2ff] flex items-center justify-between pb-2 tracking-wide border-b border-[#00f2ff]/30">
-          <span class="truncate">{{ effectiveContextMenuIds.length === 1 ? effectivePrimaryComponent?.name : `已选中 ${effectiveContextMenuIds.length} 个元件` }}</span>
-          <span v-if="effectiveContextMenuIds.length === 1" class="text-xs text-[#38bdf8] font-mono font-bold">{{ effectivePrimaryComponent?.rotation || 0 }}°</span>
+        <!-- 多选时仅提示数量，绝不显示具体组件名称 -->
+        <div
+          v-if="effectiveContextMenuIds.length > 1"
+          class="px-3 py-1.5 text-xs font-medium text-slate-400 flex items-center justify-between tracking-wide"
+        >
+          <span>已选中 {{ effectiveContextMenuIds.length }} 个元件</span>
         </div>
 
         <div class="py-1.5 space-y-1">
@@ -3200,20 +3203,17 @@ defineExpose({
           <button
             v-if="batchScadaType"
             @click="emit('open:batch-association', { components: effectiveContextMenuComponents, category: batchScadaType }); closeContextMenu();"
-            class="w-full text-left px-3 py-2 bg-[#fbbf24]/20 hover:bg-[#fbbf24]/35 border border-[#fbbf24]/70 rounded-lg text-[#fbbf24] hover:text-[#fde047] cursor-pointer flex items-center justify-between group transition-colors shadow-sm mb-1.5"
+            class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-[#fbbf24]/20 rounded-lg text-[#fbbf24] hover:text-[#fde047] cursor-pointer flex items-center justify-between group transition-colors"
           >
             <div class="flex items-center gap-2.5">
-              <Zap v-if="batchScadaType === 'yc'" class="w-4 h-4 text-[#fbbf24] stroke-[2.5]" />
-              <Radio v-else class="w-4 h-4 text-[#c084fc] stroke-[2.5]" />
-              <span class="font-bold text-[#fbbf24] tracking-wide text-sm">
+              <Zap v-if="batchScadaType === 'yc'" class="w-4 h-4 text-[#fbbf24] stroke-[2]" />
+              <Radio v-else class="w-4 h-4 text-[#c084fc] stroke-[2]" />
+              <span class="font-bold text-[#fbbf24] group-hover:text-[#fde047] tracking-wide text-sm">
                 {{ batchScadaType === 'yc' ? '批量关联遥测测点 (YC)' : '批量关联遥信测点 (YX)' }}
               </span>
             </div>
-            <span
-              class="text-xs font-mono px-2 py-0.5 rounded font-bold"
-              :class="batchScadaType === 'yc' ? 'bg-[#451a03] text-[#fbbf24] border border-[#f59e0b]' : 'bg-[#3b0764] text-[#c084fc] border border-[#a855f7]'"
-            >
-              {{ effectiveContextMenuComponents.length }} 个组件
+            <span class="text-xs font-mono font-bold text-[#fbbf24]/90">
+              {{ effectiveContextMenuComponents.length }} 个元件
             </span>
           </button>
 
@@ -3314,11 +3314,11 @@ defineExpose({
               });
               closeContextMenu();
             }"
-            class="w-full text-left px-3 py-1.5 bg-[#fbbf24]/15 hover:bg-[#fbbf24]/25 border border-[#fbbf24]/40 rounded-lg text-[#fbbf24] hover:text-[#fde047] cursor-pointer flex items-center justify-between group transition-colors"
+            class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-[#fbbf24]/20 rounded-lg text-[#fbbf24] hover:text-[#fde047] cursor-pointer flex items-center justify-between group transition-colors"
           >
             <div class="flex items-center gap-2.5">
               <Radio class="w-4 h-4 text-[#fbbf24] stroke-[2]" />
-              <span class="font-bold text-[#fbbf24] tracking-wide text-sm">执行遥控遥调 (YK/YT)</span>
+              <span class="font-bold text-[#fbbf24] group-hover:text-[#fde047] tracking-wide text-sm">执行遥控遥调 (YK/YT)</span>
             </div>
             <span class="text-xs text-[#fbbf24] font-mono font-bold">SCADA控制</span>
           </button>
@@ -3417,22 +3417,22 @@ defineExpose({
               <span>尺寸统一 (等大小)</span>
             </div>
             <div class="grid grid-cols-3 gap-1.5 px-1 py-1">
-              <button @click="emit('align', 'equal-width'); closeContextMenu();" class="py-1.5 px-2 rounded-lg bg-[#00f2ff]/10 hover:bg-[#00f2ff]/25 border border-[#00f2ff]/40 text-[#00f2ff] hover:text-[#38bdf8] text-center text-xs font-bold cursor-pointer transition-colors" title="所有选中元件统一为相同宽度 (以主选为主)">等宽</button>
-              <button @click="emit('align', 'equal-height'); closeContextMenu();" class="py-1.5 px-2 rounded-lg bg-[#00f2ff]/10 hover:bg-[#00f2ff]/25 border border-[#00f2ff]/40 text-[#00f2ff] hover:text-[#38bdf8] text-center text-xs font-bold cursor-pointer transition-colors" title="所有选中元件统一为相同高度 (以主选为主)">等高</button>
-              <button @click="emit('align', 'equal-size'); closeContextMenu();" class="py-1.5 px-2 rounded-lg bg-[#38bdf8]/15 hover:bg-[#38bdf8]/30 border border-[#38bdf8]/60 text-[#38bdf8] hover:text-[#00f2ff] text-center text-xs font-bold cursor-pointer transition-colors" title="所有选中元件统一为相同宽高 (完全等大小)">等大小</button>
+              <button @click="emit('align', 'equal-width'); closeContextMenu();" class="py-1.5 px-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/60 border border-slate-700/60 text-slate-300 hover:text-white text-center text-xs font-semibold cursor-pointer transition-colors" title="所有选中元件统一为相同宽度 (以主选为主)">等宽</button>
+              <button @click="emit('align', 'equal-height'); closeContextMenu();" class="py-1.5 px-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/60 border border-slate-700/60 text-slate-300 hover:text-white text-center text-xs font-semibold cursor-pointer transition-colors" title="所有选中元件统一为相同高度 (以主选为主)">等高</button>
+              <button @click="emit('align', 'equal-size'); closeContextMenu();" class="py-1.5 px-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/60 border border-slate-700/60 text-slate-300 hover:text-white text-center text-xs font-semibold cursor-pointer transition-colors" title="所有选中元件统一为相同宽高 (完全等大小)">等大小</button>
             </div>
 
-            <div class="px-2.5 py-0.5 text-xs text-[#38bdf8] font-bold mt-1 tracking-wider">对齐与等间距分布</div>
+            <div class="px-2.5 py-0.5 text-xs text-slate-400 font-bold mt-1 tracking-wider">对齐与等间距分布</div>
             <div class="grid grid-cols-4 gap-1 px-1 py-1">
-              <button @click="emit('align', 'left'); closeContextMenu();" class="py-1 px-1.5 rounded-lg bg-[#00f2ff]/10 hover:bg-[#00f2ff]/25 border border-[#00f2ff]/30 text-[#00f2ff] text-center text-xs font-bold cursor-pointer transition-colors" title="左对齐">左对齐</button>
-              <button @click="emit('align', 'center'); closeContextMenu();" class="py-1 px-1.5 rounded-lg bg-[#00f2ff]/10 hover:bg-[#00f2ff]/25 border border-[#00f2ff]/30 text-[#00f2ff] text-center text-xs font-bold cursor-pointer transition-colors" title="水平居中">居中</button>
-              <button @click="emit('align', 'right'); closeContextMenu();" class="py-1 px-1.5 rounded-lg bg-[#00f2ff]/10 hover:bg-[#00f2ff]/25 border border-[#00f2ff]/30 text-[#00f2ff] text-center text-xs font-bold cursor-pointer transition-colors" title="右对齐">右对齐</button>
-              <button @click="emit('align', 'distribute-h'); closeContextMenu();" class="py-1 px-1.5 rounded-lg bg-[#00f2ff]/10 hover:bg-[#00f2ff]/25 border border-[#00f2ff]/30 text-[#00f2ff] text-center text-xs font-bold cursor-pointer transition-colors" title="水平等间距分布">水平均布</button>
+              <button @click="emit('align', 'left'); closeContextMenu();" class="py-1 px-1.5 rounded-lg bg-slate-800/50 hover:bg-slate-700/60 border border-slate-700/60 text-slate-300 hover:text-white text-center text-xs font-semibold cursor-pointer transition-colors" title="左对齐">左对齐</button>
+              <button @click="emit('align', 'center'); closeContextMenu();" class="py-1 px-1.5 rounded-lg bg-slate-800/50 hover:bg-slate-700/60 border border-slate-700/60 text-slate-300 hover:text-white text-center text-xs font-semibold cursor-pointer transition-colors" title="水平居中">居中</button>
+              <button @click="emit('align', 'right'); closeContextMenu();" class="py-1 px-1.5 rounded-lg bg-slate-800/50 hover:bg-slate-700/60 border border-slate-700/60 text-slate-300 hover:text-white text-center text-xs font-semibold cursor-pointer transition-colors" title="右对齐">右对齐</button>
+              <button @click="emit('align', 'distribute-h'); closeContextMenu();" class="py-1 px-1.5 rounded-lg bg-slate-800/50 hover:bg-slate-700/60 border border-slate-700/60 text-slate-300 hover:text-white text-center text-xs font-semibold cursor-pointer transition-colors" title="水平等间距分布">水平均布</button>
 
-              <button @click="emit('align', 'top'); closeContextMenu();" class="py-1 px-1.5 rounded-lg bg-[#00f2ff]/10 hover:bg-[#00f2ff]/25 border border-[#00f2ff]/30 text-[#00f2ff] text-center text-xs font-bold cursor-pointer transition-colors" title="顶对齐">顶对齐</button>
-              <button @click="emit('align', 'middle'); closeContextMenu();" class="py-1 px-1.5 rounded-lg bg-[#00f2ff]/10 hover:bg-[#00f2ff]/25 border border-[#00f2ff]/30 text-[#00f2ff] text-center text-xs font-bold cursor-pointer transition-colors" title="垂直居中">垂直居中</button>
-              <button @click="emit('align', 'bottom'); closeContextMenu();" class="py-1 px-1.5 rounded-lg bg-[#00f2ff]/10 hover:bg-[#00f2ff]/25 border border-[#00f2ff]/30 text-[#00f2ff] text-center text-xs font-bold cursor-pointer transition-colors" title="底对齐">底对齐</button>
-              <button @click="emit('align', 'distribute-v'); closeContextMenu();" class="py-1 px-1.5 rounded-lg bg-[#00f2ff]/10 hover:bg-[#00f2ff]/25 border border-[#00f2ff]/30 text-[#00f2ff] text-center text-xs font-bold cursor-pointer transition-colors" title="垂直等间距分布">垂直均布</button>
+              <button @click="emit('align', 'top'); closeContextMenu();" class="py-1 px-1.5 rounded-lg bg-slate-800/50 hover:bg-slate-700/60 border border-slate-700/60 text-slate-300 hover:text-white text-center text-xs font-semibold cursor-pointer transition-colors" title="顶对齐">顶对齐</button>
+              <button @click="emit('align', 'middle'); closeContextMenu();" class="py-1 px-1.5 rounded-lg bg-slate-800/50 hover:bg-slate-700/60 border border-slate-700/60 text-slate-300 hover:text-white text-center text-xs font-semibold cursor-pointer transition-colors" title="垂直居中">垂直居中</button>
+              <button @click="emit('align', 'bottom'); closeContextMenu();" class="py-1 px-1.5 rounded-lg bg-slate-800/50 hover:bg-slate-700/60 border border-slate-700/60 text-slate-300 hover:text-white text-center text-xs font-semibold cursor-pointer transition-colors" title="底对齐">底对齐</button>
+              <button @click="emit('align', 'distribute-v'); closeContextMenu();" class="py-1 px-1.5 rounded-lg bg-slate-800/50 hover:bg-slate-700/60 border border-slate-700/60 text-slate-300 hover:text-white text-center text-xs font-semibold cursor-pointer transition-colors" title="垂直等间距分布">垂直均布</button>
             </div>
           </div>
         </template>
@@ -3440,26 +3440,26 @@ defineExpose({
         <div class="py-1.5">
           <button
             @click="emit('delete', effectiveContextMenuIds); closeContextMenu();"
-            class="w-full text-left px-3 py-2 bg-[#f43f5e]/15 hover:bg-[#f43f5e]/30 border border-[#f43f5e]/50 text-[#f43f5e] hover:text-[#fb7185] rounded-lg cursor-pointer flex items-center justify-between font-bold transition-colors"
+            class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-rose-500/20 text-rose-300 hover:text-rose-100 rounded-lg cursor-pointer flex items-center justify-between font-bold group transition-colors"
           >
             <div class="flex items-center gap-2.5">
-              <Trash2 class="w-4 h-4 text-[#f43f5e] stroke-[2]" />
-              <span class="text-[#f43f5e] font-bold tracking-wide text-sm">删除选中元件</span>
+              <Trash2 class="w-4 h-4 text-rose-400 stroke-[2]" />
+              <span class="text-rose-300 group-hover:text-rose-100 font-bold tracking-wide text-sm">删除选中元件</span>
             </div>
-            <span class="text-xs text-[#f43f5e] font-mono font-bold">Del</span>
+            <span class="text-xs text-rose-400/80 font-mono font-bold">Del</span>
           </button>
         </div>
       </template>
       <template v-else>
         <!-- Canvas Blank Area Context Menu -->
-        <div class="px-3 py-1.5 text-sm font-bold text-[#00f2ff] pb-2 tracking-wide border-b border-[#00f2ff]/30">
+        <div class="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">
           画布全局操作
         </div>
         <div class="py-1.5 space-y-1">
           <button
             v-if="canPaste"
             @click="emit('paste', { x: contextMenu.canvasX, y: contextMenu.canvasY }); closeContextMenu();"
-            class="w-full text-left px-3 py-1.5 bg-[#34d399]/15 hover:bg-[#34d399]/30 border border-[#34d399]/40 rounded-lg text-[#34d399] hover:text-[#6ee7b7] cursor-pointer flex items-center justify-between group font-bold transition-colors"
+            class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-[#34d399]/20 rounded-lg text-[#34d399] hover:text-[#6ee7b7] cursor-pointer flex items-center justify-between group font-bold transition-colors"
           >
             <div class="flex items-center gap-2.5">
               <Clipboard class="w-4 h-4 text-[#34d399] stroke-[2]" />
@@ -3471,26 +3471,26 @@ defineExpose({
           <button
             v-if="components.length > 0"
             @click="emit('select', components.map(c => c.id)); closeContextMenu();"
-            class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-[#00f2ff]/20 rounded-lg text-[#00f2ff] hover:text-[#38bdf8] cursor-pointer flex items-center justify-between group font-bold transition-colors"
+            class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-slate-800/60 rounded-lg text-slate-200 hover:text-white cursor-pointer flex items-center justify-between group font-bold transition-colors"
           >
             <div class="flex items-center gap-2.5">
-              <CheckSquare class="w-4 h-4 text-[#00f2ff] stroke-[2]" />
-              <span class="text-[#00f2ff] font-bold tracking-wide text-sm">全选画布图元</span>
+              <CheckSquare class="w-4 h-4 text-sky-400 stroke-[2]" />
+              <span class="text-slate-200 hover:text-white font-bold tracking-wide text-sm">全选画布图元</span>
             </div>
-            <span class="text-xs text-[#38bdf8] font-mono font-bold">Ctrl+A</span>
+            <span class="text-xs text-slate-400 font-mono font-bold">Ctrl+A</span>
           </button>
 
           <button
             @click="handleAlignToOrigin(); closeContextMenu();"
-            class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-[#38bdf8]/20 rounded-lg text-[#38bdf8] hover:text-[#00f2ff] cursor-pointer flex items-center justify-between group font-bold transition-colors"
+            class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-slate-800/60 rounded-lg text-slate-200 hover:text-white cursor-pointer flex items-center justify-between group font-bold transition-colors"
           >
             <div class="flex items-center gap-2.5">
-              <Crosshair class="w-4 h-4 text-[#38bdf8] stroke-[2]" />
-              <span class="text-[#38bdf8] font-bold tracking-wide text-sm">一键定位原点 (0, 0)</span>
+              <Crosshair class="w-4 h-4 text-sky-400 stroke-[2]" />
+              <span class="text-slate-200 hover:text-white font-bold tracking-wide text-sm">一键定位原点 (0, 0)</span>
             </div>
           </button>
 
-          <div class="px-3 py-2 text-xs text-[#38bdf8] font-bold leading-relaxed border-t border-[#00f2ff]/30 mt-1">
+          <div class="px-3 py-2 text-xs text-slate-400 font-medium leading-relaxed">
             按住 Ctrl 或 空格 键拖拽平移无限画布，按住 Ctrl + 滚轮缩放
           </div>
         </div>

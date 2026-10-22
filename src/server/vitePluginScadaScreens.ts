@@ -30,7 +30,8 @@ import {
   handleGetScadaConfig,
   handleGetScadaRealtime,
   handlePostScadaYk,
-  handlePostScadaYt
+  handlePostScadaYt,
+  handlePostScadaUnflash
 } from './scadaMockBackend';
 
 /**
@@ -134,6 +135,13 @@ function registerEndpoints(middlewares: any) {
         if (method === 'POST' && pathname === '/api/scada/control/yt') {
           const body = await parseJsonBody(req);
           const result = handlePostScadaYt(body);
+          return sendJson(res, result.code || 200, result);
+        }
+
+        // 5. POST /api/scada/control/unflash - 变位清闪 (画面清闪 / 全部清闪)
+        if (method === 'POST' && pathname === '/api/scada/control/unflash') {
+          const body = await parseJsonBody(req);
+          const result = handlePostScadaUnflash(body);
           return sendJson(res, result.code || 200, result);
         }
 

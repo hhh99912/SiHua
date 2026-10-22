@@ -5,7 +5,38 @@
  * 2. POST /api/scada/realtime
  * 3. POST /api/scada/control/yk
  * 4. POST /api/scada/control/yt
+ * 5. POST /api/scada/control/unflash
  */
+
+/*** 遥信状态 (行业标准定义) ***/
+export const STATE_YX = {
+  NORMAL: 0,          // 正常
+  INVALID: 1,         // 无效
+  BAD_DATA: 2,        // 双位不一致(合)
+  BAD_DATA_OFF: 3,    // 双位不一致(分)
+  LOCK_ON: 4,         // 遥信封锁(合)
+  LOCK_OFF: 5,        // 遥信封锁(分)
+  SET: 6,             // 遥信人工置数
+  BW_ON: 7,           // 遥信变位(合)
+  BW_OFF: 8,          // 遥信变位(分)
+  SGBW_ON: 9,         // 遥信事故变位(合)
+  SGBW_OFF: 10,       // 遥信事故变位(分)
+  SOE_ON: 11,         // 遥信SOE动作
+  SOE_OFF: 12,        // 遥信SOE复归
+  DISTURB: 13,        // 遥信扰动
+  CHECK_REPARE: 14,   // 遥信检修
+  PASSBY: 15          // 遥信被旁路
+} as const;
+
+/**
+ * 判断遥信状态是否处于变位闪烁中 (依据遥信 status：7 变位合, 8 变位分, 9 事故变位合, 10 事故变位分, 11 SOE动作, 12 SOE复归)
+ */
+export function isYxFlashingStatus(status: any): boolean {
+  if (status === undefined || status === null || status === '') return false;
+  const num = Number(status);
+  if (isNaN(num)) return false;
+  return num >= 7 && num <= 12;
+}
 
 export interface ScadaRawConfig {
   version: string;
@@ -375,3 +406,82 @@ export function handlePostScadaYt(payload: { yt_id: number; action: string; oper
     msg: "YT command sent successfully"
   };
 }
+
+/**
+ * Handle POST /api/scada/control/unflash
+ * 模式一：【画面清闪】 { "yx_ids": [52000001, 52000002] }
+ * 模式二：【全部清闪】 { "all": true }
+ * 统一响应：{ "code": 200, "msg": "Successfully cleared in shared memory", "cleared_count": n }
+ */
+export function handlePostScadaUnflash(payload: { yx_ids?: number[]; all?: boolean }): {
+  code: number;
+  msg: string;
+  cleared_count: number;
+} {
+  let clearedCount = 0;
+  const isAll = Boolean(payload?.all);
+  const yxIds = Array.isArray(payload?.yx_ids) ? payload.yx_ids.map(Number) : [];
+
+  if (isAll) {
+    // 全站全局清闪：扫描所有遥信测点，将处于闪烁状态 (status 7~12) 的测点刷回 0
+    liveYxMap.forEach((point) => {
+      if (isYxFlashingStatus(point.status)) {
+        clearedCount++;
+        point.status = 0;
+      }
+    });
+
+    DEFAULT_SCADA_TREE_DATA.facilities.forEach((fac: any) => {
+      (fac.bays || []).forEach((bay: any) => {
+        (bay.cb_devices || []).forEach((dev: any) => {
+          (dev.yx_points || []).forEach((yx: any) => {
+            if (isYxFlashingStatus(yx.status)) {
+              yx.status = 0;
+              yx.status_name = '正常';
+            }
+          });
+          if (isYxFlashingStatus(dev.status)) {
+            dev.status = 0;
+          }
+        });
+      });
+    });
+  } else if (yxIds.length > 0) {
+    // 画面清闪：按传入测点 ID 列表清闪
+    const targetIdSet = new Set(yxIds);
+    targetIdSet.forEach((id) => {
+      const point = liveYxMap.get(id);
+      if (point && isYxFlashingStatus(point.status)) {
+        clearedCount++;
+        point.status = 0;
+      }
+    });
+
+    DEFAULT_SCADA_TREE_DATA.facilities.forEach((fac: any) => {
+      (fac.bays || []).forEach((bay: any) => {
+        (bay.cb_devices || []).forEach((dev: any) => {
+          (dev.yx_points || []).forEach((yx: any) => {
+            if (targetIdSet.has(yx.id) && isYxFlashingStatus(yx.status)) {
+              yx.status = 0;
+              yx.status_name = '正常';
+            }
+          });
+          const hasTargetPoint = dev.yx_points?.some((x: any) => targetIdSet.has(x.id));
+          if (hasTargetPoint && isYxFlashingStatus(dev.status)) {
+            const stillFlashing = dev.yx_points?.some((x: any) => isYxFlashingStatus(x.status));
+            if (!stillFlashing) {
+              dev.status = 0;
+            }
+          }
+        });
+      });
+    });
+  }
+
+  return {
+    code: 200,
+    msg: "Successfully cleared in shared memory",
+    cleared_count: clearedCount
+  };
+}
+

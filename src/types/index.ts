@@ -377,7 +377,13 @@ export interface ScadaRealtimeYxItem {
   id: number;
   q?: number;
   status?: number;
+  status_name?: string;
   val?: number;
+  value?: number;
+  name?: string;
+  alias?: string;
+  type?: number;
+  type_name?: string;
 }
 
 export interface ScadaRealtimeDdItem {

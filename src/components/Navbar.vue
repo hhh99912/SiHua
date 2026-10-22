@@ -329,14 +329,6 @@ const standardPalette = [
           </span>
         </div>
 
-        <!-- 当前窗口与画面指示标签 (无卡片包裹，纯净文本) -->
-        <div class="hidden lg:flex items-center gap-1.5 text-[13px] text-slate-700 select-none tracking-wide">
-          <PenTool class="w-4 h-4 text-sky-600" />
-          <span>图形编辑</span>
-          <span class="text-slate-300">·</span>
-          <span class="text-slate-800 font-mono font-medium truncate max-w-[140px]">{{ screen.name || '主接线图' }}</span>
-        </div>
-
         <!-- 经典顶级下拉菜单列表 (删除英文后缀) -->
         <nav class="flex items-center gap-1 text-[15px] text-slate-800 font-medium relative tracking-wide">
           <!-- 1. 文件 -->
