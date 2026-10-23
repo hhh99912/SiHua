@@ -58,7 +58,6 @@ import {
   Scaling,
   MoveHorizontal,
   MoveVertical,
-  Palette,
   FilePlus,
   FolderSync,
   LogOut,
@@ -76,7 +75,10 @@ import {
   Minus,
   Copy,
   X,
-  Power
+  Power,
+  LineChart,
+  History,
+  FileSpreadsheet
 } from 'lucide-vue-next';
 import { ScreenConfig, ScreenComponent } from '../types';
 import { detectPlatform, windowToggleFullscreen } from '../utils/platform';
@@ -574,13 +576,6 @@ const standardPalette = [
                   <span>图形编辑界面</span>
                 </button>
                 <button
-                  @click="emit('open:window', 'symbol-editor'); closeMenus();"
-                  class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
-                >
-                  <Box class="w-4.5 h-4.5 text-indigo-600" />
-                  <span>图元编辑界面 (微元工坊)</span>
-                </button>
-                <button
                   @click="emit('open:window', 'monitor-screen'); closeMenus();"
                   class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer text-sky-700 font-medium"
                 >
@@ -593,6 +588,27 @@ const standardPalette = [
                 >
                   <Bell class="w-4.5 h-4.5 text-rose-600" />
                   <span>全站实时告警 / SOE</span>
+                </button>
+                <button
+                  @click="emit('open:window', 'history-curve'); closeMenus();"
+                  class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
+                >
+                  <LineChart class="w-4.5 h-4.5 text-indigo-600" />
+                  <span>历史曲线分析</span>
+                </button>
+                <button
+                  @click="emit('open:window', 'history-alarm'); closeMenus();"
+                  class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
+                >
+                  <History class="w-4.5 h-4.5 text-orange-500" />
+                  <span>历史告警记录</span>
+                </button>
+                <button
+                  @click="emit('open:window', 'report-window'); closeMenus();"
+                  class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
+                >
+                  <FileSpreadsheet class="w-4.5 h-4.5 text-emerald-600" />
+                  <span>综合运行报表</span>
                 </button>
               </div>
 
@@ -618,35 +634,8 @@ const standardPalette = [
         </nav>
       </div>
 
-      <!-- Right: 自定义画布背景色、当前大屏名称与运行控制 -->
+      <!-- Right: 当前大屏名称与运行控制 -->
       <div class="flex items-center gap-2.5 shrink-0">
-        <!-- 核心：自定义编辑画布背景色快速工具 -->
-        <div class="flex items-center gap-1 bg-[#ded5bf] px-2 py-1 rounded-md border border-[#cfc5b0] shadow-2xs">
-          <Palette class="w-3.5 h-3.5 text-slate-600" />
-          <span class="text-[11px] text-slate-700 font-medium">画布底色:</span>
-          
-          <!-- 实时拾色器 -->
-          <input
-            type="color"
-            :value="screen.backgroundColor || '#080f1e'"
-            @input="handleSetBgColor(($event.target as HTMLInputElement).value)"
-            class="w-5 h-5 rounded cursor-pointer border border-[#cfc5b0] p-0 bg-transparent"
-            title="自定义画布背景颜色"
-          />
-
-          <!-- 快速推荐预设色块 -->
-          <div class="flex items-center gap-1 ml-0.5">
-            <button
-              v-for="bg in bgPresets"
-              :key="bg.value"
-              @click="handleSetBgColor(bg.value)"
-              class="w-3.5 h-3.5 rounded border border-black/30 hover:scale-125 transition-transform cursor-pointer"
-              :style="{ backgroundColor: bg.value }"
-              :title="bg.name + ' - ' + bg.desc"
-            />
-          </div>
-        </div>
-
         <!-- 保存当前画面 -->
         <button
           @click="emit('save:screen')"
@@ -695,7 +684,7 @@ const standardPalette = [
     </div>
 
     <!-- ========================================================================= -->
-    <!-- Row 2: 通用功能快捷工具栏 (撤销/重做、网格/标尺/正交/居中、排列对齐、组合/锁定、缩放全屏) -->
+    <!-- Row 2: 通用功能快捷工具栏 (撤销/重做、网格/标尺/正交/居中、排列对齐、组合/锁定、画布底色、缩放全屏) -->
     <!-- ========================================================================= -->
     <div class="flex items-center justify-between bg-[#dfd6bf] border border-[#cfc5b0] px-2 py-1 rounded-md text-[13px] select-none overflow-x-auto gap-2 tracking-wide">
       <!-- Left: 通用功能快捷工具条 -->
@@ -943,6 +932,34 @@ const standardPalette = [
           >
             <Unlock class="w-4 h-4 stroke-[2]" />
           </button>
+        </div>
+
+        <div class="h-4 w-[1px] bg-[#cfc5b0] mx-0.5" />
+
+        <!-- 画布底色快速工具卡片 (放置在解锁选中图元功能键后面，卡片大小与文字大小保持统一) -->
+        <div class="flex items-center bg-[#f2eee3] px-2 py-0.5 rounded-md border border-[#cfc5b0] shadow-2xs gap-1.5 h-[29px] shrink-0">
+          <span class="text-[12px] text-slate-800 font-medium whitespace-nowrap">画布底色:</span>
+          
+          <!-- 实时拾色器 -->
+          <input
+            type="color"
+            :value="screen.backgroundColor || '#080f1e'"
+            @input="handleSetBgColor(($event.target as HTMLInputElement).value)"
+            class="w-4.5 h-4.5 rounded cursor-pointer border border-[#cfc5b0] p-0 bg-transparent shrink-0"
+            title="自定义画布背景颜色"
+          />
+
+          <!-- 快速推荐预设色块 -->
+          <div class="flex items-center gap-1 ml-0.5">
+            <button
+              v-for="bg in bgPresets"
+              :key="bg.value"
+              @click="handleSetBgColor(bg.value)"
+              class="w-3.5 h-3.5 rounded border border-black/30 hover:scale-125 transition-transform cursor-pointer shrink-0"
+              :style="{ backgroundColor: bg.value }"
+              :title="bg.name + ' - ' + bg.desc"
+            />
+          </div>
         </div>
       </div>
 

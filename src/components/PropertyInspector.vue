@@ -22,6 +22,8 @@ import {
 } from 'lucide-vue-next';
 import { ScreenComponent, ScreenConfig, DatasetItem, ScreenItem, ScadaChartPoint } from '../types';
 import { scadaFacilities, findScadaPointDef, getScadaPointDisplayName } from '../utils/scadaClient';
+import { GB_STANDARD_SYMBOLS } from '../data/gbStandardSymbols';
+import { getCustomSymbols } from '../utils/customSymbolStorage';
 import ChartPointAssociationModal from './ChartPointAssociationModal.vue';
 
 interface Props {
@@ -250,15 +252,341 @@ const isBasicGeometry = computed(() => {
   return t.startsWith('draw-') && !t.includes('text') && !t.includes('line');
 });
 
-// 仿真状态测试切换
-const setBreakerSimulationState = (stateVal: number) => {
+export interface AvailableStateItem {
+  id: string | number;
+  name: string;
+  matchValue?: string | number;
+  stateValue?: string | number;
+  children?: ScreenComponent[];
+  type?: 'open' | 'close' | 'fault' | 'test' | 'default';
+}
+
+// 识别是否支持状态测试的图元 (国标图元 / 遥信与状态图元 / 自定义组合图元)
+const isComponentStateCapable = (comp: ScreenComponent | null): boolean => {
+  if (!comp) return false;
+  // 1. 已显式定义 states 列表
+  if (comp.states && comp.states.length > 0) return true;
+  // 2. 自定义组合图元
+  if (comp.type === 'composite-symbol' || comp.category === 'custom' || comp.category === 'custom-cell' || comp.customProps?.isCustomSymbol) {
+    return true;
+  }
+  // 3. 国标图元 (GB Standard)
+  if (comp.category === 'gb-standard' || comp.customProps?.isGbStandard || GB_STANDARD_SYMBOLS.some(s => s.name === comp.name)) {
+    return true;
+  }
+  // 4. 遥信与状态图元 (开关、断路器、隔离开关、手车、接地刀闸、信号灯/指示灯、状态矩阵等)
+  const t = (comp.type || '').toLowerCase();
+  const cat = (comp.category || '').toLowerCase();
+  const name = comp.name || '';
+  if (
+    t.includes('breaker') ||
+    t.includes('switch') ||
+    t.includes('disconnector') ||
+    t.includes('ground') ||
+    t.includes('handcart') ||
+    t.includes('indicator') ||
+    t.includes('matrix') ||
+    t === 'cb' ||
+    t === 'iso' ||
+    t === 'es' ||
+    cat === 'status' ||
+    cat === 'electrical' ||
+    name.includes('断路器') ||
+    name.includes('隔离开关') ||
+    name.includes('接地') ||
+    name.includes('手车') ||
+    name.includes('指示灯') ||
+    name.includes('信号灯') ||
+    comp.data?.mapping?.stateKey ||
+    comp.data?.mapping?.statusKey ||
+    comp.data?.mapping?.yx
+  ) {
+    return true;
+  }
+  return false;
+};
+
+// 提取当前图元的所有可用已定义状态列表
+const availableStates = computed<AvailableStateItem[]>(() => {
+  if (!draftComponent.value || !isComponentStateCapable(draftComponent.value)) return [];
+
+  const comp = draftComponent.value;
+
+  // 1. 当前组件已挂载的 states
+  if (comp.states && comp.states.length > 0) {
+    return comp.states.map(s => ({
+      id: s.id,
+      name: s.name,
+      matchValue: s.matchValue ?? s.id,
+      stateValue: s.stateValue ?? s.matchValue ?? s.id,
+      children: s.children
+    }));
+  }
+
+  // 2. 在国标图元库 GB_STANDARD_SYMBOLS 中寻找同名已定义图元的 states
+  const gbDef = GB_STANDARD_SYMBOLS.find(s => s.name === comp.name);
+  if (gbDef?.states && gbDef.states.length > 0) {
+    return gbDef.states.map(s => ({
+      id: s.id,
+      name: s.name,
+      matchValue: s.matchValue ?? s.id,
+      stateValue: s.stateValue ?? s.matchValue ?? s.id,
+      children: s.children
+    }));
+  }
+
+  // 3. 在自定义图元库中寻找同名已定义图元的 states
+  try {
+    const customSymbols = getCustomSymbols();
+    const customDef = customSymbols.find(s => s.name === comp.name || s.name === comp.customProps?.cellName);
+    if (customDef?.states && customDef.states.length > 0) {
+      return customDef.states.map(s => ({
+        id: s.id,
+        name: s.name,
+        matchValue: s.matchValue ?? s.id,
+        stateValue: s.stateValue ?? s.matchValue ?? s.id,
+        children: s.children
+      }));
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // 4. 电力断路器 (elec-breaker 等)
+  const t = (comp.type || '').toLowerCase();
+  const name = comp.name || '';
+  if (t === 'elec-breaker' || t.includes('breaker') || name.includes('断路器')) {
+    return [
+      { id: 0, matchValue: 0, name: '分闸 / 隔离 (0)', type: 'open' },
+      { id: 1, matchValue: 1, name: '合闸 / 运行 (1)', type: 'close' },
+      { id: 2, matchValue: 2, name: '故障 / 告警 (2)', type: 'fault' }
+    ];
+  }
+
+  // 5. 电力隔离开关 / 负荷开关
+  if (t === 'elec-disconnector' || t.includes('disconnector') || name.includes('隔离开关') || name.includes('负荷开关')) {
+    return [
+      { id: 0, matchValue: 0, name: '分闸 / 开断 (0)', type: 'open' },
+      { id: 1, matchValue: 1, name: '合闸 / 导通 (1)', type: 'close' },
+      { id: 2, matchValue: 2, name: '故障 / 告警 (2)', type: 'fault' }
+    ];
+  }
+
+  // 6. 接地刀闸
+  if (t === 'elec-grounding' || t.includes('ground') || name.includes('接地')) {
+    return [
+      { id: 0, matchValue: 0, name: '分闸 / 释放 (0)', type: 'open' },
+      { id: 1, matchValue: 1, name: '接地合闸 (1)', type: 'close' }
+    ];
+  }
+
+  // 7. 手车断路器
+  if (t === 'elec-handcart' || t.includes('handcart') || name.includes('手车')) {
+    return [
+      { id: 1, matchValue: 1, name: '工作位置 (1)', type: 'close' },
+      { id: 0, matchValue: 0, name: '试验位置 (0)', type: 'open' },
+      { id: 2, matchValue: 2, name: '检修抽出 (2)', type: 'fault' }
+    ];
+  }
+
+  // 8. 信号指示灯 / 状态点
+  if (t === 'ctrl-indicator' || comp.category === 'status' || t.includes('indicator') || name.includes('指示灯') || name.includes('信号灯')) {
+    return [
+      { id: 0, matchValue: 0, name: '分闸 / 熄灭 (0)', type: 'open' },
+      { id: 1, matchValue: 1, name: '合闸 / 点亮 (1)', type: 'close' },
+      { id: 2, matchValue: 2, name: '故障 / 告警 (2)', type: 'fault' }
+    ];
+  }
+
+  // 9. 通用国标图元
+  if (comp.category === 'gb-standard' || comp.customProps?.isGbStandard) {
+    return [
+      { id: 0, matchValue: 0, name: '分闸 / 隔离 (0)', type: 'open' },
+      { id: 1, matchValue: 1, name: '合闸 / 运行 (1)', type: 'close' },
+      { id: 2, matchValue: 2, name: '故障 / 告警 (2)', type: 'fault' }
+    ];
+  }
+
+  // 10. 绑定遥信测点图元
+  if (comp.data?.mapping?.stateKey || comp.data?.mapping?.statusKey || comp.data?.mapping?.yx) {
+    return [
+      { id: 0, matchValue: 0, name: '分闸 / 0 态', type: 'open' },
+      { id: 1, matchValue: 1, name: '合闸 / 1 态', type: 'close' },
+      { id: 2, matchValue: 2, name: '告警 / 2 态', type: 'fault' }
+    ];
+  }
+
+  return [];
+});
+
+// 检查当前状态是否被选中激活
+const isStateActive = (st: AvailableStateItem) => {
+  if (!draftComponent.value) return false;
+  const targetVal = String(st.matchValue ?? st.stateValue ?? st.id);
+
+  if (draftComponent.value.activeState !== undefined && draftComponent.value.activeState !== null) {
+    if (String(draftComponent.value.activeState) === targetVal || String(draftComponent.value.activeState) === String(st.id)) {
+      return true;
+    }
+  }
+
+  const sd = draftComponent.value.data?.staticData;
+  if (sd !== undefined && sd !== null) {
+    const sVal = typeof sd === 'object' ? (sd.state ?? sd.value) : sd;
+    if (sVal !== undefined && (String(sVal) === targetVal || String(sVal) === String(st.id))) {
+      return true;
+    }
+  }
+
+  const cpVal = draftComponent.value.customProps?.state ?? draftComponent.value.customProps?.position;
+  if (cpVal !== undefined && (String(cpVal) === targetVal || String(cpVal) === String(st.id))) {
+    return true;
+  }
+
+  const indVal = draftComponent.value.style?.indicatorState;
+  if (indVal !== undefined && (String(indVal) === targetVal || String(indVal) === String(st.id))) {
+    return true;
+  }
+
+  return false;
+};
+
+// 当前激活状态的名称标签
+const currentActiveStateLabel = computed(() => {
+  if (!availableStates.value.length) return '';
+  const active = availableStates.value.find(st => isStateActive(st));
+  return active ? active.name : '';
+});
+
+// 点击即时切换图元至指定状态，并立即触发主画布更新
+const applyComponentState = (st: AvailableStateItem) => {
   if (!draftComponent.value) return;
+
+  const rawVal = st.matchValue !== undefined ? st.matchValue : (st.stateValue !== undefined ? st.stateValue : st.id);
+  const numVal = !isNaN(Number(rawVal)) ? Number(rawVal) : rawVal;
+
+  draftComponent.value.activeState = numVal;
   if (!draftComponent.value.customProps) draftComponent.value.customProps = {};
-  draftComponent.value.customProps.state = stateVal;
-  draftComponent.value.activeState = stateVal;
+  draftComponent.value.customProps.state = numVal;
+  draftComponent.value.customProps.position = numVal;
+
   if (!draftComponent.value.data) draftComponent.value.data = { mapping: {} };
   draftComponent.value.data.useStatic = true;
-  draftComponent.value.data.staticData = { state: stateVal, value: stateVal };
+  if (!draftComponent.value.data.staticData || typeof draftComponent.value.data.staticData !== 'object') {
+    draftComponent.value.data.staticData = {};
+  }
+  draftComponent.value.data.staticData.state = numVal;
+  draftComponent.value.data.staticData.value = numVal;
+
+  if (!draftComponent.value.style) draftComponent.value.style = {};
+  if (typeof numVal === 'number') {
+    draftComponent.value.style.indicatorState = numVal;
+  }
+
+  // 若该状态自带几何子图元定义，则直接装载
+  if (st.children && Array.isArray(st.children) && st.children.length > 0) {
+    draftComponent.value.children = JSON.parse(JSON.stringify(st.children));
+  }
+
+  // 若组件本身没有 states 字段，补充挂载匹配的 states
+  if (!draftComponent.value.states || draftComponent.value.states.length === 0) {
+    const gbDef = GB_STANDARD_SYMBOLS.find(s => s.name === draftComponent.value?.name);
+    if (gbDef?.states && gbDef.states.length > 0) {
+      draftComponent.value.states = JSON.parse(JSON.stringify(gbDef.states));
+    } else {
+      try {
+        const customSymbols = getCustomSymbols();
+        const customDef = customSymbols.find(s => s.name === draftComponent.value?.name || s.name === draftComponent.value?.customProps?.cellName);
+        if (customDef?.states && customDef.states.length > 0) {
+          draftComponent.value.states = JSON.parse(JSON.stringify(customDef.states));
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+  }
+
+  // 针对通用组合图元（未单独提供子图元几何分支时），根据状态切换标准红绿告警主描边颜色
+  if (draftComponent.value.type === 'composite-symbol' && (!st.children || st.children.length === 0)) {
+    const targetColor = numVal === 1 ? '#ef4444' : (numVal === 0 ? '#10b981' : '#f59e0b');
+    if (draftComponent.value.style) {
+      draftComponent.value.style.stroke = targetColor;
+    }
+    if (Array.isArray(draftComponent.value.children)) {
+      draftComponent.value.children.forEach((c: any) => {
+        if (c.style?.stroke && c.style.stroke !== 'transparent') {
+          const old = (c.style.stroke || '').toLowerCase();
+          if (old.includes('ef4444') || old.includes('10b981') || old.includes('f59e0b') || old.includes('00f2ff') || old.includes('ff3344') || old.includes('00e676')) {
+            c.style.stroke = targetColor;
+          }
+        }
+      });
+    }
+  }
+
+  // 关键：立即提交至主编辑界面画布，实现点击即时切换
+  const compToSubmit = cloneComponent(draftComponent.value);
+  if (compToSubmit) {
+    emit('update:component', compToSubmit);
+    originalComponentJson.value = JSON.stringify(compToSubmit);
+  }
+};
+
+const getStateDotClass = (st: AvailableStateItem) => {
+  const active = isStateActive(st);
+  const val = String(st.matchValue ?? st.stateValue ?? st.id);
+  const name = st.name || '';
+  const isClose = val === '1' || name.includes('合') || name.includes('工作') || name.includes('点亮');
+  const isOpen = val === '0' || name.includes('分') || name.includes('试验') || name.includes('熄灭') || name.includes('正常') || name.includes('释放');
+  const isFault = val === '2' || name.includes('故障') || name.includes('告警') || name.includes('抽出') || name.includes('异常');
+
+  if (active) {
+    return 'bg-white shadow-[0_0_8px_#ffffff]';
+  }
+
+  if (isClose) return 'bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.6)]';
+  if (isOpen) return 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)]';
+  if (isFault) return 'bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.6)]';
+  return 'bg-sky-400 shadow-[0_0_6px_rgba(56,189,248,0.6)]';
+};
+
+const getStateButtonClass = (st: AvailableStateItem) => {
+  const active = isStateActive(st);
+  const val = String(st.matchValue ?? st.stateValue ?? st.id);
+  const name = st.name || '';
+  const isClose = val === '1' || name.includes('合') || name.includes('工作') || name.includes('点亮');
+  const isOpen = val === '0' || name.includes('分') || name.includes('试验') || name.includes('熄灭') || name.includes('正常') || name.includes('释放');
+  const isFault = val === '2' || name.includes('故障') || name.includes('告警') || name.includes('抽出') || name.includes('异常');
+
+  if (active) {
+    if (isClose) return 'bg-rose-600 text-white border-rose-400 shadow-[0_0_12px_rgba(244,63,94,0.4)]';
+    if (isOpen) return 'bg-emerald-600 text-white border-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.4)]';
+    if (isFault) return 'bg-amber-600 text-white border-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.4)]';
+    return 'bg-sky-600 text-white border-sky-400 shadow-[0_0_12px_rgba(56,189,248,0.4)]';
+  }
+
+  if (isClose) return 'bg-[#080d1a] text-rose-300 border-rose-950/70 hover:border-rose-500/60 hover:bg-rose-950/20';
+  if (isOpen) return 'bg-[#080d1a] text-emerald-300 border-emerald-950/70 hover:border-emerald-500/60 hover:bg-emerald-950/20';
+  if (isFault) return 'bg-[#080d1a] text-amber-300 border-amber-950/70 hover:border-amber-500/60 hover:bg-amber-950/20';
+  return 'bg-[#080d1a] text-slate-300 border-[#2b3a55] hover:border-sky-500/60 hover:bg-[#131f38]';
+};
+
+const getStateTagClass = (st: AvailableStateItem) => {
+  const active = isStateActive(st);
+  if (active) {
+    return 'bg-white/20 text-white border border-white/30';
+  }
+  return 'bg-[#050914] text-slate-400 border border-[#1e293b]';
+};
+
+// 仿真状态测试兼容方法
+const setBreakerSimulationState = (stateVal: number) => {
+  const match = availableStates.value.find(s => Number(s.matchValue ?? s.id) === stateVal);
+  if (match) {
+    applyComponentState(match);
+  } else {
+    applyComponentState({ id: stateVal, matchValue: stateVal, name: `状态 ${stateVal}` });
+  }
 };
 
 // 遥测字体颜色双向绑定计算属性 (严格修改字体颜色，绝不修改背景底色 style.fill)
@@ -462,6 +790,29 @@ const textLabelContent = computed({
               <option :value="180">180°</option>
               <option :value="270">270°</option>
             </select>
+          </div>
+        </div>
+
+        <!-- 状态测试 (国标图元 / 遥信与状态图元 / 自定义组合图元已定义状态即时测试) -->
+        <div 
+          v-if="availableStates.length > 0" 
+          class="p-3 bg-[#101b31] border border-cyan-500/40 rounded-xl space-y-2.5 shadow-[0_0_15px_rgba(6,182,212,0.12)]"
+        >
+          <div class="pb-1.5 border-b border-[#1e293b]">
+            <span class="text-cyan-300 font-extrabold text-xs">状态测试</span>
+          </div>
+
+          <div class="grid gap-1.5" :class="availableStates.length > 3 ? 'grid-cols-4' : 'grid-cols-3'">
+            <button
+              v-for="st in availableStates"
+              :key="st.id"
+              type="button"
+              @click="applyComponentState(st)"
+              class="py-1.5 px-2 rounded-lg font-mono font-extrabold transition-all cursor-pointer border text-center text-xs select-none"
+              :class="getStateButtonClass(st)"
+            >
+              {{ st.matchValue ?? st.id }}
+            </button>
           </div>
         </div>
 

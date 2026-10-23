@@ -48,7 +48,10 @@ import {
   Database,
   SlidersHorizontal,
   TrendingUp,
-  CheckCheck
+  CheckCheck,
+  LineChart,
+  History,
+  FileSpreadsheet
 } from 'lucide-vue-next';
 import { ScreenConfig, ScreenComponent, DatasetItem, ScreenItem, ScadaDeviceItem } from '../types';
 import { PRESET_SCADA_DEVICES } from '../data/presetDatasets';
@@ -102,6 +105,7 @@ const emit = defineEmits<{
   (e: 'reload:current-screen'): void;
   (e: 'logout'): void;
   (e: 'open:alarm'): void;
+  (e: 'open:window', id: string): void;
   (e: 'open:control', devId: string, pointId: any, type: 'control' | 'regulation', targetPointId?: any): void;
 }>();
 
@@ -781,7 +785,11 @@ const handlePreviewCompClick = (comp: ScreenComponent) => {
     emit('switch:screen', act.targetScreenId);
     return;
   } else if (act?.type === 'link' && act.url) {
-    window.open(act.url, '_blank');
+    try {
+      window.open(act.url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      console.warn('[PreviewScreen] window.open blocked by sandbox environment:', err);
+    }
     return;
   }
 };
@@ -1846,7 +1854,37 @@ onBeforeUnmount(() => {
             </span>
           </button>
 
-          <!-- 3. 画面切换快捷菜单 -->
+          <!-- 3. 历史曲线 -->
+          <button
+            @click="emit('open:window', 'history-curve')"
+            class="px-3 py-1.5 rounded-md text-[13px] font-bold text-slate-800 hover:text-sky-700 hover:bg-[#e4dcce] border border-[#cfc5b0] transition-colors flex items-center gap-2 cursor-pointer"
+            title="查看历史时序趋势曲线"
+          >
+            <LineChart class="w-4 h-4 text-indigo-600" />
+            <span>历史曲线</span>
+          </button>
+
+          <!-- 4. 历史告警 -->
+          <button
+            @click="emit('open:window', 'history-alarm')"
+            class="px-3 py-1.5 rounded-md text-[13px] font-bold text-slate-800 hover:text-sky-700 hover:bg-[#e4dcce] border border-[#cfc5b0] transition-colors flex items-center gap-2 cursor-pointer"
+            title="查看历史告警与 SOE 事件归档"
+          >
+            <History class="w-4 h-4 text-orange-500" />
+            <span>历史告警</span>
+          </button>
+
+          <!-- 5. 报表 -->
+          <button
+            @click="emit('open:window', 'report-window')"
+            class="px-3 py-1.5 rounded-md text-[13px] font-bold text-slate-800 hover:text-sky-700 hover:bg-[#e4dcce] border border-[#cfc5b0] transition-colors flex items-center gap-2 cursor-pointer"
+            title="查看电量与运行综合报表"
+          >
+            <FileSpreadsheet class="w-4 h-4 text-emerald-600" />
+            <span>报表</span>
+          </button>
+
+          <!-- 6. 画面切换快捷菜单 -->
           <div class="relative">
             <button
               @click="showScreenMenu = !showScreenMenu"

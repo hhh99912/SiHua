@@ -1449,9 +1449,28 @@ const finishPlaceDrawing = () => {
     }
   }
 
+  const isCompositeOrCustom = 
+    def.type === 'composite-symbol' || 
+    def.category === 'gb-standard' || 
+    def.category === 'electrical' ||
+    def.category === 'status' ||
+    def.category === 'charts' ||
+    def.category === 'industrial' ||
+    def.customProps?.isCustomSymbol ||
+    def.customProps?.isGbStandard ||
+    Boolean(def.states?.length) ||
+    Boolean(def.children?.length);
+
   let finalStyle = { ...(def.defaultStyle || def.style || {}) };
-  // 全局画笔预设继承 (专业 SCADA 预设模式精髓)
-  if (props.drawingPreset) {
+
+  if (isCompositeOrCustom) {
+    // 复合图元、自定义图元与电力设备其外轮廓底色必须严格保持透明，杜绝被全局画笔底色污染
+    if (def.type === 'composite-symbol' || def.customProps?.isCustomSymbol || def.category === 'gb-standard' || def.category === 'electrical') {
+      finalStyle.fill = 'transparent';
+      finalStyle.bgColor = 'transparent';
+    }
+  } else if (props.drawingPreset) {
+    // 全局画笔预设继承 (仅适用于用户绘制单体基础几何图形：矩形、圆形等)
     if (props.drawingPreset.stroke) {
       finalStyle.stroke = props.drawingPreset.stroke;
       finalStyle.borderColor = props.drawingPreset.stroke;

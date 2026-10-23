@@ -1,545 +1,358 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
-import { 
-  X, 
-  TrendingUp, 
-  Calendar, 
-  RefreshCw, 
-  Download, 
-  Activity, 
-  Zap, 
-  Gauge, 
-  Clock, 
-  Layers, 
-  CheckCircle2,
+import { ref, computed } from 'vue';
+import {
+  LineChart,
+  Search,
+  RefreshCw,
+  Download,
+  Calendar,
+  Layers,
+  Clock,
+  Filter,
+  Check,
+  X,
+  Maximize2,
   ChevronDown,
-  Sparkles
+  RotateCcw
 } from 'lucide-vue-next';
-import { PRESET_SCADA_DEVICES } from '../data/presetDatasets';
-import { ScadaDeviceItem, ScadaTelemetryPoint } from '../types';
-import { scadaFacilities } from '../utils/scadaClient';
 
 interface Props {
-  initialDeviceId?: string;
-  initialPointId?: number;
+  visible?: boolean;
+  isEmbedded?: boolean;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  visible: true,
+  isEmbedded: true
+});
+
 const emit = defineEmits<{
   (e: 'close'): void;
 }>();
 
-const devices = ref<ScadaDeviceItem[]>(PRESET_SCADA_DEVICES);
-const selectedDeviceId = ref<string>(props.initialDeviceId || devices.value[0].deviceId);
-const selectedDevice = computed(() => {
-  return devices.value.find(d => d.deviceId === selectedDeviceId.value) || devices.value[0];
-});
+// 快捷时间范围
+const timePresets = [
+  { id: '1h', label: '近1小时' },
+  { id: '6h', label: '近6小时' },
+  { id: '12h', label: '近12小时' },
+  { id: 'today', label: '今天' },
+  { id: '3d', label: '近3天' },
+  { id: '7d', label: '近7天' }
+];
 
-// Primary Telemetry Point Selection
-const selectedPointId = ref<number>(props.initialPointId || selectedDevice.value.telemetries?.[0]?.pointId || 1);
-const selectedPoint = computed(() => {
-  return selectedDevice.value.telemetries?.find(p => p.pointId === selectedPointId.value) || selectedDevice.value.telemetries?.[0] || {
-    pointId: 1,
-    name: 'A相母线电压 Ua',
-    value: 10.48,
-    unit: 'kV',
-    min: 9.0,
-    max: 11.5
-  };
-});
+const selectedPreset = ref('today');
+const startDate = ref('2026-10-23 00:00:00');
+const endDate = ref('2026-10-23 23:59:59');
+const sampleRate = ref('1m'); // 1s, 5s, 1m, 5m, 15m
 
-// 多测点通道对比 (GE-SCADA 特性：三相对比 / 有功无功对比)
-const compareMode = ref<'single' | 'three_phase' | 'pq'>('single');
-
-// When device changes, fallback point
-watch(selectedDeviceId, () => {
-  if (selectedDevice.value?.telemetries?.length) {
-    if (!selectedDevice.value.telemetries.some(p => p.pointId === selectedPointId.value)) {
-      selectedPointId.value = selectedDevice.value.telemetries[0].pointId;
-    }
-  }
-});
-
-// Time Range
-const timeRange = ref<'15m' | '1h' | '6h' | '24h' | '7d'>('1h');
-
-// Historical points
-export interface HistoryDataPoint {
-  time: string;
-  timestamp: number;
-  valA: number;
-  valB: number;
-  valC: number;
-  quality: string | number;
+// 常用曲线通道
+interface ChannelItem {
+  id: string;
+  name: string;
+  color: string;
+  unit: string;
+  enabled: boolean;
+  curVal: number;
+  maxVal: number;
+  minVal: number;
+  avgVal: number;
 }
 
-const historyData = ref<HistoryDataPoint[]>([]);
-const isGenerating = ref(false);
-const dataSourceText = ref<string>('GE-SCADA 时序历史数据库');
+const channels = ref<ChannelItem[]>([
+  { id: 'YC-01', name: '35kV I段母线线电压 Uab', color: '#0284c7', unit: 'kV', enabled: true, curVal: 36.4, maxVal: 37.1, minVal: 35.8, avgVal: 36.3 },
+  { id: 'YC-02', name: '35kV I段母线总有功功率 P', color: '#16a34a', unit: 'MW', enabled: true, curVal: 142.1, maxVal: 156.4, minVal: 0.0, avgVal: 88.5 },
+  { id: 'YC-03', name: '35kV I段母线总无功功率 Q', color: '#ea580c', unit: 'Mvar', enabled: false, curVal: 12.8, maxVal: 18.2, minVal: 4.1, avgVal: 10.2 },
+  { id: 'YC-04', name: '#1主变高压侧A相电流 Ia', color: '#8b5cf6', unit: 'A', enabled: true, curVal: 248.5, maxVal: 285.0, minVal: 0.0, avgVal: 165.2 },
+  { id: 'YC-05', name: '速利达站环境辐照强度 GHI', color: '#eab308', unit: 'W/m²', enabled: false, curVal: 785.0, maxVal: 980.0, minVal: 0.0, avgVal: 412.0 }
+]);
 
-const generateHistoryData = async () => {
-  isGenerating.value = true;
-  try {
-    const baseVal = selectedPoint.value?.value || 10.0;
-    const count = timeRange.value === '15m' ? 30 : (timeRange.value === '1h' ? 40 : (timeRange.value === '6h' ? 50 : 60));
-    const now = Date.now();
-    const stepMs = timeRange.value === '15m' ? 30000 : (timeRange.value === '1h' ? 90000 : (timeRange.value === '6h' ? 432000 : 1440000));
-    const list: HistoryDataPoint[] = [];
+const isQuerying = ref(false);
+const hasQueried = ref(true);
 
-    for (let i = count; i >= 0; i--) {
-      const ts = now - i * stepMs;
-      const d = new Date(ts);
-      const timeStr = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
-      
-      const noiseA = (Math.sin(i * 0.35) * 0.05 + (Math.random() - 0.5) * 0.015) * baseVal;
-      const noiseB = (Math.sin(i * 0.35 + 2.09) * 0.05 + (Math.random() - 0.5) * 0.015) * baseVal;
-      const noiseC = (Math.sin(i * 0.35 + 4.18) * 0.05 + (Math.random() - 0.5) * 0.015) * baseVal;
-      
-      const valA = Math.round((baseVal + noiseA) * 100) / 100;
-      const valB = Math.round((baseVal * 0.995 + noiseB) * 100) / 100;
-      const valC = Math.round((baseVal * 1.005 + noiseC) * 100) / 100;
-
-      list.push({
-        time: timeStr,
-        timestamp: ts,
-        valA,
-        valB,
-        valC,
-        quality: 1
-      });
-    }
-    historyData.value = list;
-    dataSourceText.value = 'GE-SCADA 变电站高频时序采集库';
-  } catch (err) {
-    console.error('获取历史数据异常:', err);
-  } finally {
-    isGenerating.value = false;
-  }
+const handleQuery = () => {
+  isQuerying.value = true;
+  setTimeout(() => {
+    isQuerying.value = false;
+    hasQueried.value = true;
+  }, 400);
 };
 
-watch([selectedDeviceId, selectedPointId, timeRange, compareMode], () => {
-  generateHistoryData();
-}, { immediate: true });
-
-// Statistics
-const stats = computed(() => {
-  if (!historyData.value.length) return { max: 0, min: 0, avg: 0, maxTime: '--', minTime: '--', diff: 0, qualifiedRate: '100%' };
-  const values = historyData.value.map(d => d.valA);
-  const max = Math.max(...values);
-  const min = Math.min(...values);
-  const maxIdx = values.indexOf(max);
-  const minIdx = values.indexOf(min);
-  const sum = values.reduce((a, b) => a + b, 0);
-  const avg = Math.round((sum / values.length) * 100) / 100;
-  const diff = Math.round((max - min) * 100) / 100;
-  return { 
-    max, 
-    min, 
-    avg, 
-    maxTime: historyData.value[maxIdx]?.time || '--',
-    minTime: historyData.value[minIdx]?.time || '--',
-    diff,
-    qualifiedRate: '99.85%'
-  };
-});
-
-// Chart View Geometry (SVG generation)
-const chartWidth = 980;
-const chartHeight = 330;
-const padding = { top: 35, right: 35, bottom: 45, left: 65 };
-
-const innerWidth = computed(() => chartWidth - padding.left - padding.right);
-const innerHeight = computed(() => chartHeight - padding.top - padding.bottom);
-
-const yDomain = computed(() => {
-  if (!historyData.value.length) return { min: 0, max: 100 };
-  const allVals = historyData.value.flatMap(d => [d.valA, d.valB, d.valC]);
-  const min = Math.min(...allVals);
-  const max = Math.max(...allVals);
-  const pad = (max - min) * 0.18 || max * 0.1 || 5;
-  return {
-    min: Math.floor((min - pad) * 10) / 10,
-    max: Math.ceil((max + pad) * 10) / 10
-  };
-});
-
-// SVG Points calculation
-const svgSeries = computed(() => {
-  if (!historyData.value.length) return { a: [], b: [], c: [] };
-  const { min: yMin, max: yMax } = yDomain.value;
-  const ySpan = yMax - yMin || 1;
-  const len = historyData.value.length;
-
-  const a: any[] = [];
-  const b: any[] = [];
-  const c: any[] = [];
-
-  historyData.value.forEach((d, idx) => {
-    const x = padding.left + (idx / (len - 1)) * innerWidth.value;
-    const yA = padding.top + (1 - (d.valA - yMin) / ySpan) * innerHeight.value;
-    const yB = padding.top + (1 - (d.valB - yMin) / ySpan) * innerHeight.value;
-    const yC = padding.top + (1 - (d.valC - yMin) / ySpan) * innerHeight.value;
-
-    a.push({ x, y: yA, val: d.valA, time: d.time });
-    b.push({ x, y: yB, val: d.valB, time: d.time });
-    c.push({ x, y: yC, val: d.valC, time: d.time });
+const handleReset = () => {
+  channels.value.forEach((ch, idx) => {
+    ch.enabled = idx < 2;
   });
-
-  return { a, b, c };
-});
-
-const polylinePathA = computed(() => {
-  if (!svgSeries.value.a.length) return '';
-  return svgSeries.value.a.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
-});
-
-const polylinePathB = computed(() => {
-  if (!svgSeries.value.b.length) return '';
-  return svgSeries.value.b.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
-});
-
-const polylinePathC = computed(() => {
-  if (!svgSeries.value.c.length) return '';
-  return svgSeries.value.c.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
-});
-
-// Hover tooltip on chart
-const hoverPoint = ref<{ x: number; valA: number; valB: number; valC: number; time: string } | null>(null);
-
-const handleMouseMoveChart = (e: MouseEvent) => {
-  const target = e.currentTarget as HTMLElement;
-  const rect = target.getBoundingClientRect();
-  const clientX = e.clientX - rect.left;
-  let closestIdx = 0;
-  let minDist = 9999;
-  svgSeries.value.a.forEach((p, idx) => {
-    const dist = Math.abs(p.x - clientX);
-    if (dist < minDist) {
-      minDist = dist;
-      closestIdx = idx;
-    }
-  });
-  if (svgSeries.value.a[closestIdx]) {
-    hoverPoint.value = {
-      x: svgSeries.value.a[closestIdx].x,
-      valA: svgSeries.value.a[closestIdx].val,
-      valB: svgSeries.value.b[closestIdx].val,
-      valC: svgSeries.value.c[closestIdx].val,
-      time: svgSeries.value.a[closestIdx].time
-    };
-  }
 };
 
-const handleMouseLeaveChart = () => {
-  hoverPoint.value = null;
+const toggleChannel = (ch: ChannelItem) => {
+  ch.enabled = !ch.enabled;
 };
 
-// Export CSV
-const exportCsv = () => {
-  const headers = ['采样时间', '时标戳', '装置编号', '测点', 'A相/主测点', 'B相对比值', 'C相对比值', '单位', '品质'];
-  const rows = historyData.value.map(d => [
-    d.time,
-    d.timestamp,
-    selectedDevice.value.deviceId,
-    selectedPoint.value.name,
-    d.valA,
-    d.valB,
-    d.valC,
-    selectedPoint.value.unit || '',
-    '1(有效)'
-  ]);
-
-  const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement('a');
-  link.setAttribute('href', encodedUri);
-  link.setAttribute('download', `GE_SCADA_${selectedDevice.value.deviceId}_${selectedPoint.value.name}_${timeRange.value}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
+// 底部标签分类 (对齐全站告警风格)
+const viewTabs = ['实时多轴曲线', '采样数据明细', '极值与合格率分析', '通道关联配置'];
+const activeTab = ref('实时多轴曲线');
 </script>
 
 <template>
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200" @click.self="emit('close')">
-    <div class="bg-[#0b1220] border-2 border-[#1c3055] rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.95)] w-[1240px] max-w-[96vw] max-h-[92vh] flex flex-col overflow-hidden text-slate-100 font-sans">
-      <!-- GE-SCADA 风格顶栏 -->
-      <div class="bg-[#0e172a] border-b-2 border-[#1e3358] px-5 py-3 flex items-center justify-between shrink-0 select-none">
-        <div class="flex items-center gap-3">
-          <div class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center text-emerald-400">
-            <TrendingUp class="w-5 h-5 stroke-[2]" />
-          </div>
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="text-base font-bold text-white tracking-wide">GE-SCADA · 变电站多测点历史负荷曲线分析</span>
-              <span class="text-xs px-2 py-0.5 rounded bg-[#162544] text-sky-300 font-mono border border-sky-600/40 font-bold">
-                CURVE ANALYZER
-              </span>
-            </div>
-            <div class="text-[11px] text-slate-400 font-mono mt-0.5">
-              母线电压 / 线路负荷电流 / 有功无功潮流时序历史分析与极值统计
-            </div>
-          </div>
+  <div 
+    v-if="visible"
+    :class="[
+      isEmbedded 
+        ? 'w-full h-full bg-white text-slate-800 flex flex-col font-sans select-none overflow-hidden text-sm'
+        : 'fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex flex-col select-none p-1 md:p-2'
+    ]"
+  >
+    <div 
+      class="w-full h-full bg-white text-slate-800 flex flex-col font-sans select-none overflow-hidden text-sm"
+      :class="{ 'rounded-lg shadow-2xl border border-slate-300': !isEmbedded }"
+    >
+      <!-- 非嵌入模式下的顶部标题栏 -->
+      <div 
+        v-if="!isEmbedded"
+        class="h-11 bg-slate-100 border-b border-slate-300 px-4 flex items-center justify-between shrink-0 select-none"
+      >
+        <div class="flex items-center gap-2.5 font-bold text-slate-800 text-base">
+          <LineChart class="w-5 h-5 text-indigo-600" />
+          <span>历史曲线中心 (遥测时序多轴趋势分析)</span>
         </div>
-
-        <div class="flex items-center gap-3">
-          <button
-            @click="exportCsv"
-            class="px-3 py-1.5 rounded-lg bg-[#142340] hover:bg-[#1a2f58] border border-sky-500/40 text-sky-300 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
-          >
-            <Download class="w-3.5 h-3.5" />
-            <span>导出报表 (CSV)</span>
-          </button>
-
-          <button
-            @click="emit('close')"
-            class="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
-          >
-            <X class="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-
-      <!-- 控制与测点选择工具栏 -->
-      <div class="bg-[#09101d] border-b border-[#182947] px-5 py-2.5 flex flex-wrap items-center justify-between gap-4 shrink-0 text-xs">
-        <div class="flex items-center gap-3">
-          <!-- 装置选择 -->
-          <div class="flex items-center gap-2">
-            <span class="text-slate-400 font-bold">间隔装置:</span>
-            <select
-              v-model="selectedDeviceId"
-              class="bg-[#050a14] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 font-mono"
-            >
-              <option v-for="d in devices" :key="d.deviceId" :value="d.deviceId">
-                {{ d.name }} ({{ d.deviceId }})
-              </option>
-            </select>
-          </div>
-
-          <!-- 测点选择 -->
-          <div class="flex items-center gap-2">
-            <span class="text-slate-400 font-bold">遥测项目:</span>
-            <select
-              v-model="selectedPointId"
-              class="bg-[#050a14] border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-sky-300 font-bold focus:outline-none focus:border-sky-500 font-mono"
-            >
-              <option v-for="p in selectedDevice.telemetries" :key="p.pointId" :value="p.pointId">
-                {{ p.name }} [{{ p.unit || '' }}]
-              </option>
-            </select>
-          </div>
-
-          <!-- 通道模式 -->
-          <div class="flex items-center gap-1 bg-[#050a14] p-1 rounded-lg border border-slate-800">
-            <button
-              @click="compareMode = 'single'"
-              class="px-2.5 py-1 rounded text-xs transition-colors cursor-pointer"
-              :class="compareMode === 'single' ? 'bg-[#1e345e] text-white font-bold' : 'text-slate-400 hover:text-slate-200'"
-            >
-              单通道
-            </button>
-            <button
-              @click="compareMode = 'three_phase'"
-              class="px-2.5 py-1 rounded text-xs transition-colors cursor-pointer"
-              :class="compareMode === 'three_phase' ? 'bg-[#1e345e] text-white font-bold' : 'text-slate-400 hover:text-slate-200'"
-            >
-              三相三线对比 (A/B/C)
-            </button>
-          </div>
-        </div>
-
-        <!-- 时间跨度快捷键 -->
-        <div class="flex items-center gap-2">
-          <span class="text-slate-400 font-bold">时间范围:</span>
-          <div class="flex items-center gap-1 bg-[#050a14] p-1 rounded-lg border border-slate-800">
-            <button
-              v-for="r in (['15m', '1h', '6h', '24h', '7d'] as const)"
-              :key="r"
-              @click="timeRange = r"
-              class="px-2.5 py-1 rounded text-xs transition-colors cursor-pointer font-mono"
-              :class="timeRange === r ? 'bg-sky-600 text-white font-bold' : 'text-slate-400 hover:text-slate-200'"
-            >
-              {{ r === '15m' ? '15分钟' : r === '1h' ? '1小时' : r === '6h' ? '6小时' : r === '24h' ? '今日24h' : '7天周线' }}
-            </button>
-          </div>
-
-          <button
-            @click="generateHistoryData"
-            class="p-1.5 rounded-lg bg-[#142340] border border-slate-700 hover:border-sky-500 text-sky-400 hover:text-white transition-colors cursor-pointer"
-            title="刷新数据"
-          >
-            <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isGenerating }" />
-          </button>
-        </div>
-      </div>
-
-      <!-- GE-SCADA 极值统计面板 -->
-      <div class="bg-[#070e1c] border-b border-[#182947] p-4 grid grid-cols-5 gap-3 shrink-0">
-        <div class="bg-[#0d1629] border border-[#1b2f52] rounded-xl p-3">
-          <div class="text-[11px] text-slate-400">当前实时值 (PV)</div>
-          <div class="text-lg font-black text-sky-300 font-mono mt-0.5">
-            {{ selectedPoint.value }} <span class="text-xs font-normal text-slate-400">{{ selectedPoint.unit }}</span>
-          </div>
-          <div class="text-[10px] text-emerald-400 font-mono mt-1">品质码: 0 (正常采集)</div>
-        </div>
-
-        <div class="bg-[#0d1629] border border-[#1b2f52] rounded-xl p-3">
-          <div class="text-[11px] text-slate-400">历史极大值 (Max)</div>
-          <div class="text-lg font-black text-rose-400 font-mono mt-0.5">
-            {{ stats.max }} <span class="text-xs font-normal text-slate-400">{{ selectedPoint.unit }}</span>
-          </div>
-          <div class="text-[10px] text-slate-400 font-mono mt-1">时标: {{ stats.maxTime }}</div>
-        </div>
-
-        <div class="bg-[#0d1629] border border-[#1b2f52] rounded-xl p-3">
-          <div class="text-[11px] text-slate-400">历史极小值 (Min)</div>
-          <div class="text-lg font-black text-amber-300 font-mono mt-0.5">
-            {{ stats.min }} <span class="text-xs font-normal text-slate-400">{{ selectedPoint.unit }}</span>
-          </div>
-          <div class="text-[10px] text-slate-400 font-mono mt-1">时标: {{ stats.minTime }}</div>
-        </div>
-
-        <div class="bg-[#0d1629] border border-[#1b2f52] rounded-xl p-3">
-          <div class="text-[11px] text-slate-400">区间平均值 (Avg)</div>
-          <div class="text-lg font-black text-white font-mono mt-0.5">
-            {{ stats.avg }} <span class="text-xs font-normal text-slate-400">{{ selectedPoint.unit }}</span>
-          </div>
-          <div class="text-[10px] text-slate-400 font-mono mt-1">峰谷波动差: {{ stats.diff }}</div>
-        </div>
-
-        <div class="bg-[#0d1629] border border-[#1b2f52] rounded-xl p-3">
-          <div class="text-[11px] text-slate-400">电压/频率合格率</div>
-          <div class="text-lg font-black text-emerald-400 font-mono mt-0.5">
-            {{ stats.qualifiedRate }}
-          </div>
-          <div class="text-[10px] text-slate-400 font-mono mt-1">符合电能质量国标</div>
-        </div>
-      </div>
-
-      <!-- 图表主体 (高保真 SVG 工业曲线) -->
-      <div class="flex-1 bg-[#060b17] p-5 flex flex-col justify-center relative select-none">
-        <!-- 曲线图例说明 -->
-        <div class="absolute top-4 right-8 flex items-center gap-4 text-xs font-mono z-10 bg-[#0c1527]/90 px-3 py-1.5 rounded-lg border border-slate-800">
-          <div class="flex items-center gap-1.5">
-            <span class="w-3 h-1 bg-[#eab308] rounded-full inline-block" />
-            <span class="text-amber-300 font-bold">A相 / 主测点</span>
-          </div>
-          <div v-if="compareMode === 'three_phase'" class="flex items-center gap-1.5">
-            <span class="w-3 h-1 bg-[#10b981] rounded-full inline-block" />
-            <span class="text-emerald-400 font-bold">B相曲线</span>
-          </div>
-          <div v-if="compareMode === 'three_phase'" class="flex items-center gap-1.5">
-            <span class="w-3 h-1 bg-[#ef4444] rounded-full inline-block" />
-            <span class="text-rose-400 font-bold">C相曲线</span>
-          </div>
-        </div>
-
-        <!-- 曲线画布 -->
-        <div class="w-full flex justify-center">
-          <svg
-            :viewBox="`0 0 ${chartWidth} ${chartHeight}`"
-            class="w-full h-[360px] overflow-visible"
-            @mousemove="handleMouseMoveChart"
-            @mouseleave="handleMouseLeaveChart"
-          >
-            <!-- 背景网格横线 -->
-            <g class="stroke-[#13223f] stroke-[1] stroke-dasharray-[3,3]">
-              <line :x1="padding.left" :y1="padding.top" :x2="padding.left + innerWidth" :y2="padding.top" />
-              <line :x1="padding.left" :y1="padding.top + innerHeight * 0.25" :x2="padding.left + innerWidth" :y2="padding.top + innerHeight * 0.25" />
-              <line :x1="padding.left" :y1="padding.top + innerHeight * 0.5" :x2="padding.left + innerWidth" :y2="padding.top + innerHeight * 0.5" />
-              <line :x1="padding.left" :y1="padding.top + innerHeight * 0.75" :x2="padding.left + innerWidth" :y2="padding.top + innerHeight * 0.75" />
-              <line :x1="padding.left" :y1="padding.top + innerHeight" :x2="padding.left + innerWidth" :y2="padding.top + innerHeight" />
-            </g>
-
-            <!-- Y 轴数值标签 -->
-            <g class="fill-slate-400 font-mono text-[11px] text-anchor-end">
-              <text :x="padding.left - 10" :y="padding.top + 4" text-anchor="end">{{ yDomain.max }}</text>
-              <text :x="padding.left - 10" :y="padding.top + innerHeight * 0.5 + 4" text-anchor="end">{{ ((yDomain.max + yDomain.min) / 2).toFixed(1) }}</text>
-              <text :x="padding.left - 10" :y="padding.top + innerHeight + 4" text-anchor="end">{{ yDomain.min }}</text>
-            </g>
-
-            <!-- X 轴刻度标签 -->
-            <g v-if="historyData.length > 0" class="fill-slate-400 font-mono text-[11px]">
-              <text :x="padding.left" :y="padding.top + innerHeight + 22" text-anchor="start">{{ historyData[0].time }}</text>
-              <text :x="padding.left + innerWidth * 0.5" :y="padding.top + innerHeight + 22" text-anchor="middle">{{ historyData[Math.floor(historyData.length / 2)].time }}</text>
-              <text :x="padding.left + innerWidth" :y="padding.top + innerHeight + 22" text-anchor="end">{{ historyData[historyData.length - 1].time }}</text>
-            </g>
-
-            <!-- C相曲线 (红色) -->
-            <path
-              v-if="compareMode === 'three_phase'"
-              :d="polylinePathC"
-              fill="none"
-              stroke="#ef4444"
-              stroke-width="2"
-              class="transition-all duration-150"
-            />
-
-            <!-- B相曲线 (绿色) -->
-            <path
-              v-if="compareMode === 'three_phase'"
-              :d="polylinePathB"
-              fill="none"
-              stroke="#10b981"
-              stroke-width="2"
-              class="transition-all duration-150"
-            />
-
-            <!-- A相/主测点曲线 (黄色) -->
-            <path
-              :d="polylinePathA"
-              fill="none"
-              stroke="#eab308"
-              stroke-width="2.5"
-              class="transition-all duration-150"
-            />
-
-            <!-- 悬浮标尺指示线 -->
-            <g v-if="hoverPoint">
-              <line
-                :x1="hoverPoint.x"
-                :y1="padding.top"
-                :x2="hoverPoint.x"
-                :y2="padding.top + innerHeight"
-                stroke="#38bdf8"
-                stroke-width="1.5"
-                stroke-dasharray="4,4"
-              />
-            </g>
-          </svg>
-        </div>
-
-        <!-- 悬浮指示窗 -->
-        <div
-          v-if="hoverPoint"
-          class="absolute bottom-6 left-1/2 -translate-x-1/2 bg-[#0c1628] border border-sky-400 px-4 py-2 rounded-xl shadow-2xl flex items-center gap-6 font-mono text-xs z-20"
+        <button
+          @click="emit('close')"
+          class="p-1.5 rounded hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+          title="关闭窗口"
         >
-          <div class="text-slate-300">
-            采样时间: <span class="text-white font-bold">{{ hoverPoint.time }}</span>
+          <X class="w-5 h-5" />
+        </button>
+      </div>
+
+      <!-- ===================================================================== -->
+      <!-- 1. 顶部操作工具栏 (仿全站告警 RealtimeAlarmModal 样式)                   -->
+      <!-- ===================================================================== -->
+      <div class="h-11 bg-slate-50 border-b border-slate-300 px-3 flex items-center justify-between shrink-0 select-none overflow-x-auto gap-3">
+        <!-- 左侧：快捷范围与时间设置 -->
+        <div class="flex items-center gap-1.5 shrink-0">
+          <!-- 快捷预设 -->
+          <div class="flex items-center bg-white border border-slate-300 rounded p-0.5">
+            <button
+              v-for="p in timePresets"
+              :key="p.id"
+              @click="selectedPreset = p.id"
+              class="px-2 py-0.5 rounded text-xs font-medium transition-colors cursor-pointer"
+              :class="selectedPreset === p.id ? 'bg-sky-600 text-white font-bold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'"
+            >
+              {{ p.label }}
+            </button>
           </div>
-          <div class="text-amber-300 font-bold">
-            A相/主值: {{ hoverPoint.valA }} {{ selectedPoint.unit }}
+
+          <div class="h-5 w-[1px] bg-slate-300 mx-1" />
+
+          <!-- 起止时间输入 -->
+          <div class="flex items-center gap-1 text-xs text-slate-700 bg-white border border-slate-300 rounded px-2 py-1">
+            <Calendar class="w-3.5 h-3.5 text-slate-400" />
+            <input 
+              v-model="startDate" 
+              class="w-34 font-mono focus:outline-none text-slate-800" 
+              placeholder="开始时间"
+            />
+            <span class="text-slate-400">至</span>
+            <input 
+              v-model="endDate" 
+              class="w-34 font-mono focus:outline-none text-slate-800" 
+              placeholder="结束时间"
+            />
           </div>
-          <div v-if="compareMode === 'three_phase'" class="text-emerald-400 font-bold">
-            B相: {{ hoverPoint.valB }} {{ selectedPoint.unit }}
+
+          <!-- 采样周期 -->
+          <select 
+            v-model="sampleRate" 
+            class="px-2 py-1 bg-white border border-slate-300 rounded text-xs text-slate-700 focus:outline-none cursor-pointer"
+          >
+            <option value="1s">1秒 (高精)</option>
+            <option value="5s">5秒</option>
+            <option value="1m">1分钟</option>
+            <option value="5m">5分钟</option>
+            <option value="15m">15分钟</option>
+          </select>
+        </div>
+
+        <!-- 右侧：执行查询、刷新、重置、导出 -->
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button
+            @click="handleQuery"
+            class="px-3 py-1.5 rounded bg-sky-600 hover:bg-sky-700 active:bg-sky-800 text-white text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            :disabled="isQuerying"
+            title="执行查询历史数据"
+          >
+            <Search class="w-4 h-4" :class="{ 'animate-spin': isQuerying }" />
+            <span>{{ isQuerying ? '查询中...' : '查询曲线' }}</span>
+          </button>
+
+          <button
+            @click="handleQuery"
+            class="px-3 py-1.5 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            title="刷新当前曲线"
+          >
+            <RefreshCw class="w-4 h-4 text-slate-500" />
+            <span>刷新</span>
+          </button>
+
+          <button
+            @click="handleReset"
+            class="px-2.5 py-1.5 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1"
+            title="重置通道选择"
+          >
+            <RotateCcw class="w-3.5 h-3.5 text-slate-500" />
+            <span>重置</span>
+          </button>
+
+          <button
+            class="px-3 py-1.5 rounded bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            title="导出曲线采样点至 CSV / EXCEL"
+          >
+            <Download class="w-4 h-4 text-slate-500" />
+            <span>导出</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ===================================================================== -->
+      <!-- 2. 主体内容区 (左侧通道列表 + 右侧多轴曲线画布)                           -->
+      <!-- ===================================================================== -->
+      <div class="flex-1 flex overflow-hidden min-h-0 bg-slate-100/50">
+        <!-- 左侧：曲线通道选择列表 -->
+        <div class="w-68 bg-white border-r border-slate-300 flex flex-col shrink-0">
+          <div class="h-9 px-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs font-bold text-slate-700">
+            <span class="flex items-center gap-1.5">
+              <Layers class="w-3.5 h-3.5 text-sky-600" />
+              <span>显示通道 ({{ channels.filter(c => c.enabled).length }}/{{ channels.length }})</span>
+            </span>
           </div>
-          <div v-if="compareMode === 'three_phase'" class="text-rose-400 font-bold">
-            C相: {{ hoverPoint.valC }} {{ selectedPoint.unit }}
+
+          <div class="flex-1 overflow-y-auto p-2 space-y-1.5">
+            <div
+              v-for="ch in channels"
+              :key="ch.id"
+              @click="toggleChannel(ch)"
+              class="p-2.5 rounded border transition-all cursor-pointer flex flex-col gap-1 text-xs"
+              :class="ch.enabled ? 'bg-sky-50/60 border-sky-300 shadow-2xs' : 'bg-slate-50 border-slate-200 opacity-60 hover:opacity-100'"
+            >
+              <div class="flex items-center justify-between">
+                <span class="flex items-center gap-2 font-bold text-slate-800 truncate">
+                  <span class="w-3 h-3 rounded-sm shrink-0" :style="{ backgroundColor: ch.color }"></span>
+                  <span class="truncate">{{ ch.name }}</span>
+                </span>
+                <span 
+                  class="w-4 h-4 rounded border flex items-center justify-center shrink-0"
+                  :class="ch.enabled ? 'bg-sky-600 border-sky-600 text-white' : 'border-slate-300 bg-white'"
+                >
+                  <Check v-if="ch.enabled" class="w-3 h-3 stroke-[3]" />
+                </span>
+              </div>
+
+              <div class="flex items-center justify-between text-[11px] text-slate-500 font-mono mt-0.5">
+                <span>实时: <strong class="text-slate-900">{{ ch.curVal }}</strong> {{ ch.unit }}</span>
+                <span>均值: {{ ch.avgVal }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右侧：曲线趋势图主视图 (SCADA 工业坐标轴与趋势模拟) -->
+        <div class="flex-1 flex flex-col overflow-hidden bg-slate-950 p-3">
+          <!-- 坐标系顶部图例 -->
+          <div class="h-7 flex items-center justify-between px-2 text-xs text-slate-400 font-mono select-none">
+            <div class="flex items-center gap-4">
+              <div 
+                v-for="ch in channels.filter(c => c.enabled)" 
+                :key="ch.id" 
+                class="flex items-center gap-1.5"
+              >
+                <div class="w-2.5 h-2.5 rounded-full" :style="{ backgroundColor: ch.color }"></div>
+                <span class="text-slate-300">{{ ch.name }}:</span>
+                <span class="font-bold text-white">{{ ch.curVal }} {{ ch.unit }}</span>
+              </div>
+            </div>
+            <span class="text-slate-500">网格采样步长: 1m | 坐标系: 标准工业多轴</span>
+          </div>
+
+          <!-- 模拟图表画布容器 -->
+          <div class="flex-1 relative border border-slate-800 bg-[#070d19] rounded overflow-hidden flex flex-col justify-between p-4">
+            <!-- 纵向水平网格刻度线 -->
+            <div class="absolute inset-0 flex flex-col justify-between pointer-events-none p-4 opacity-25">
+              <div v-for="i in 6" :key="i" class="w-full border-b border-dashed border-sky-400/30"></div>
+            </div>
+            <div class="absolute inset-0 flex justify-between pointer-events-none p-4 opacity-20">
+              <div v-for="i in 12" :key="i" class="h-full border-r border-dashed border-sky-400/30"></div>
+            </div>
+
+            <!-- SVG 动态趋势曲线渲染 -->
+            <svg class="w-full h-full relative z-10" preserveAspectRatio="none" viewBox="0 0 1000 400">
+              <!-- 通道 1 曲线 (Uab 电压 - 稳态平缓) -->
+              <path
+                d="M 0,160 Q 150,155 300,165 T 600,158 T 900,162 L 1000,160"
+                fill="none"
+                stroke="#0284c7"
+                stroke-width="2.5"
+                stroke-linecap="round"
+              />
+              <!-- 通道 2 曲线 (有功功率 P - 典型光伏日照驼峰) -->
+              <path
+                d="M 0,380 Q 200,380 350,220 T 550,60 T 750,240 T 900,375 L 1000,380"
+                fill="none"
+                stroke="#16a34a"
+                stroke-width="3"
+                stroke-linecap="round"
+              />
+              <!-- 光伏功率半透明填充渐变 -->
+              <path
+                d="M 0,380 Q 200,380 350,220 T 550,60 T 750,240 T 900,375 L 1000,380 L 1000,395 L 0,395 Z"
+                fill="rgba(22, 163, 74, 0.12)"
+              />
+              <!-- 通道 4 曲线 (电流 Ia - 随功率波动) -->
+              <path
+                d="M 0,370 Q 220,360 360,240 T 560,95 T 760,260 T 920,368 L 1000,370"
+                fill="none"
+                stroke="#8b5cf6"
+                stroke-width="2"
+                stroke-dasharray="4 2"
+                stroke-linecap="round"
+              />
+            </svg>
+
+            <!-- 底部横轴时间刻度 -->
+            <div class="relative z-10 flex justify-between text-[11px] font-mono text-slate-400 border-t border-slate-700/60 pt-1">
+              <span>00:00</span>
+              <span>03:00</span>
+              <span>06:00</span>
+              <span>09:00</span>
+              <span>12:00</span>
+              <span>15:00</span>
+              <span>18:00</span>
+              <span>21:00</span>
+              <span>24:00</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- 底部状态说明 -->
-      <div class="bg-[#0b1322] border-t-2 border-[#1a2d4f] px-5 py-2.5 flex items-center justify-between text-xs text-slate-400 shrink-0">
-        <div class="flex items-center gap-3">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse" />
-          <span>数据源: {{ dataSourceText }}</span>
-          <span>·</span>
-          <span>采样率: 100ms 瞬时值 / 1s 冻结值</span>
+      <!-- ===================================================================== -->
+      <!-- 3. 底部各分类标签 (仿照 RealtimeAlarmModal 样式)                         -->
+      <!-- ===================================================================== -->
+      <div class="h-9 bg-slate-100 border-t border-slate-300 px-2 flex items-center justify-between shrink-0 select-none text-xs">
+        <div class="flex items-center gap-1 overflow-x-auto">
+          <button
+            v-for="tab in viewTabs"
+            :key="tab"
+            @click="activeTab = tab"
+            class="px-3 py-1 rounded font-bold transition-colors cursor-pointer text-xs"
+            :class="activeTab === tab ? 'bg-sky-700 text-white shadow-2xs' : 'text-slate-700 hover:bg-slate-200'"
+          >
+            {{ tab }}
+          </button>
         </div>
 
-        <div class="font-mono text-slate-400">
-          GE-SCADA Curve Analysis Engine
+        <div class="flex items-center gap-4 text-slate-600 font-mono text-xs pr-2">
+          <span>采样点总数: <strong class="text-slate-800">1,440</strong></span>
+          <span>查询耗时: <strong class="text-emerald-600">32ms</strong></span>
+          <span>状态: <strong class="text-emerald-700">实时归档就绪</strong></span>
         </div>
       </div>
     </div>

@@ -75,6 +75,10 @@ export function normalizeSymbolZeroMargin(symbol: CustomSymbolDef): CustomSymbol
   cloned.type = 'composite-symbol';
   cloned.category = 'electrical';
   cloned.iconName = 'Zap';
+  cloned.defaultStyle = {
+    ...(cloned.defaultStyle || {}),
+    fill: 'transparent'
+  };
 
   return cloned;
 }
@@ -207,6 +211,40 @@ export function addCustomSymbol(symbol: CustomSymbolDef): CustomSymbolDef[] {
 
 export function updateCustomSymbol(symbol: CustomSymbolDef): CustomSymbolDef[] {
   return addCustomSymbol(symbol);
+}
+
+/**
+ * 重命名并保存图元（先删除磁盘上的旧名称文件，再写入新名称文件）
+ */
+export async function saveCustomSymbolWithRename(
+  symbol: CustomSymbolDef,
+  oldName?: string
+): Promise<CustomSymbolDef[]> {
+  const normalized = normalizeSymbolZeroMargin(symbol);
+  if (oldName && oldName.trim() && oldName.trim() !== normalized.name.trim()) {
+    try {
+      await deleteCellFromDisk(oldName.trim());
+    } catch (e) {
+      console.warn(`[CellStorage] 删除旧文件 ${oldName} 异常:`, e);
+    }
+    // 从内存和本地缓存中清除旧条目
+    const curList = getCustomSymbols().filter(s => s.name !== oldName.trim());
+    inMemorySymbols = curList;
+    saveLocalCache(curList);
+  }
+
+  const list = [...getCustomSymbols()];
+  const existingIdx = list.findIndex(s => s.id === normalized.id || s.name === normalized.name || (oldName && s.name === oldName.trim()));
+
+  if (existingIdx !== -1) {
+    list[existingIdx] = { ...normalized, updatedAt: new Date().toISOString() };
+  } else {
+    list.unshift({ ...normalized, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+  }
+
+  saveCustomSymbols(list);
+  await saveCellToDisk(normalized).catch(() => {});
+  return list;
 }
 
 /**

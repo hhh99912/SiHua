@@ -176,3 +176,17 @@ export const windowToggleFullscreen = async (): Promise<boolean> => {
     }
   }
 };
+
+/**
+ * Safe confirm helper that avoids throwing errors in sandboxed iframe environments
+ */
+export const safeConfirm = (msg: string): boolean => {
+  if (typeof window === 'undefined') return true;
+  try {
+    return window.confirm(msg);
+  } catch (err) {
+    console.warn('[safeConfirm] Modal confirm blocked or ignored in iframe sandbox:', err);
+    return true;
+  }
+};
+

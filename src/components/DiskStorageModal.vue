@@ -27,7 +27,7 @@ import {
   openDiskStorageDir,
   DiskStorageConfig
 } from '../utils/screenFileService';
-import { isElectron } from '../utils/platform';
+import { isElectron, safeConfirm } from '../utils/platform';
 
 interface Props {
   visible: boolean;
@@ -277,7 +277,7 @@ const handleOpenStorageDirectory = async () => {
 };
 
 const handleResetPresets = async () => {
-  if (!confirm('确定要在 graph 目录下重置写入系统标准保底工程文件吗？')) return;
+  if (!safeConfirm('确定要在 graph 目录下重置写入系统标准保底工程文件吗？')) return;
   try {
     const res = await resetPresetScreensOnDisk();
     if (res.success && res.screens.length > 0) {

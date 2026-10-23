@@ -32,12 +32,15 @@ import ScadaBatchPointModal from './components/ScadaBatchPointModal.vue';
 import DesktopPlatformModal from './components/DesktopPlatformModal.vue';
 import PreviewScreen from './components/PreviewScreen.vue';
 import RealtimeAlarmModal from './components/RealtimeAlarmModal.vue';
+import HistoryCurveModal from './components/HistoryCurveModal.vue';
+import HistoryAlarmModal from './components/HistoryAlarmModal.vue';
+import ReportManagerModal from './components/ReportManagerModal.vue';
 import MdiWindow from './components/MdiWindow.vue';
 import PrsBottomBar, { BottomWindowItem } from './components/PrsBottomBar.vue';
 import LoginModal from './components/LoginModal.vue';
 import DiskStorageModal from './components/DiskStorageModal.vue';
 import SystemHealthModal from './components/SystemHealthModal.vue';
-import { windowClose } from './utils/platform';
+import { windowClose, safeConfirm } from './utils/platform';
 import { 
   loadScreensFromDisk, 
   saveScreenToDisk, 
@@ -58,6 +61,9 @@ import {
   PenTool,
   TrendingUp,
   Bell,
+  LineChart,
+  History,
+  FileSpreadsheet,
   Network,
   Lightbulb,
   Sliders,
@@ -217,6 +223,51 @@ const mdiWindows = ref<MdiWindowItem[]>([
     width: 1100,
     height: 640,
     headerTheme: 'white'
+  },
+  {
+    id: 'history-curve',
+    title: '历史曲线',
+    subtitle: '',
+    icon: LineChart,
+    isOpen: false,
+    isMinimized: false,
+    isMaximized: true,
+    zIndex: 36,
+    x: 100,
+    y: 50,
+    width: 1120,
+    height: 660,
+    headerTheme: 'white'
+  },
+  {
+    id: 'history-alarm',
+    title: '历史告警',
+    subtitle: '',
+    icon: History,
+    isOpen: false,
+    isMinimized: false,
+    isMaximized: true,
+    zIndex: 37,
+    x: 120,
+    y: 60,
+    width: 1120,
+    height: 660,
+    headerTheme: 'white'
+  },
+  {
+    id: 'report-window',
+    title: '报表',
+    subtitle: '',
+    icon: FileSpreadsheet,
+    isOpen: false,
+    isMinimized: false,
+    isMaximized: true,
+    zIndex: 38,
+    x: 140,
+    y: 70,
+    width: 1120,
+    height: 660,
+    headerTheme: 'white'
   }
 ]);
 
@@ -229,7 +280,7 @@ const openWindow = (id: string) => {
   if (win) {
     win.isOpen = true;
     win.isMinimized = false;
-    if (id === 'alarm-window') {
+    if (id === 'alarm-window' || id === 'history-curve' || id === 'history-alarm' || id === 'report-window') {
       win.isMaximized = true;
     }
     focusWindow(id);
@@ -625,7 +676,7 @@ const handleRenameScreen = async (payload: { screenId: string; newName: string }
     if (!trimmed) return;
     const isTaken = screens.value.some(s => s.id !== payload.screenId && s.name.trim().toLowerCase() === trimmed.toLowerCase());
     if (isTaken) {
-      alert(`画面「${trimmed}」已存在，画面名称为唯一识别标识，不可重复！`);
+      showDiskNotification(`画面「${trimmed}」已存在，画面名称为唯一识别标识，不可重复！`);
       return;
     }
     target.name = trimmed;
@@ -644,11 +695,11 @@ const handleRenameScreen = async (payload: { screenId: string; newName: string }
 // Delete screen and its JSON file
 const handleDeleteScreen = async (screenId: string) => {
   if (screens.value.length <= 1) {
-    alert('至少需要保留一个画面。');
+    showDiskNotification('至少需要保留一个画面。');
     return;
   }
   const toDelete = screens.value.find(s => s.id === screenId);
-  if (!confirm(`确定要删除画面「${toDelete?.name || ''}」及其磁盘 JSON 文件吗？`)) return;
+  if (!safeConfirm(`确定要删除画面「${toDelete?.name || ''}」及其磁盘 JSON 文件吗？`)) return;
 
   if (toDelete) {
     await deleteScreenFromDisk(toDelete.name);
@@ -922,7 +973,14 @@ const handleAddComponentAt = (def: any, x: number, y: number) => {
     states: def.states ? JSON.parse(JSON.stringify(def.states)) : undefined,
     activeState: def.activeState || (def.states?.[0]?.id ?? '1'),
     children: def.children ? JSON.parse(JSON.stringify(def.children)) : (def.states?.[0]?.children ? JSON.parse(JSON.stringify(def.states[0].children)) : undefined),
-    style: JSON.parse(JSON.stringify(def.style || def.defaultStyle || {})),
+    style: (() => {
+      const st = JSON.parse(JSON.stringify(def.style || def.defaultStyle || {}));
+      if (def.type === 'composite-symbol' || def.category === 'gb-standard' || def.category === 'electrical' || def.customProps?.isCustomSymbol || (def.children && def.children.length > 0) || (def.states && def.states.length > 0)) {
+        st.fill = 'transparent';
+        st.bgColor = 'transparent';
+      }
+      return st;
+    })(),
     animation: def.animation ? JSON.parse(JSON.stringify(def.animation)) : (def.defaultAnimation ? JSON.parse(JSON.stringify(def.defaultAnimation)) : undefined),
     data: JSON.parse(JSON.stringify(def.data || def.defaultData || { mapping: {} })),
     customProps: def.customProps ? JSON.parse(JSON.stringify(def.customProps)) : (def.defaultCustomProps ? JSON.parse(JSON.stringify(def.defaultCustomProps)) : undefined)
@@ -968,7 +1026,12 @@ const handleAddCustomSymbolToCanvas = (sym: CustomSymbolDef) => {
     states: sym.states ? JSON.parse(JSON.stringify(sym.states)) : undefined,
     activeState: sym.activeState || (sym.states?.[0]?.id ?? '1'),
     children: sym.children ? JSON.parse(JSON.stringify(sym.children)) : undefined,
-    style: JSON.parse(JSON.stringify(sym.defaultStyle || {})),
+    style: (() => {
+      const st = JSON.parse(JSON.stringify(sym.defaultStyle || {}));
+      st.fill = 'transparent';
+      st.bgColor = 'transparent';
+      return st;
+    })(),
     data: JSON.parse(JSON.stringify(sym.defaultData || { mapping: {} })),
     customProps: sym.defaultCustomProps ? JSON.parse(JSON.stringify(sym.defaultCustomProps)) : undefined
   };
@@ -1195,7 +1258,7 @@ const handleDeleteBatch = (ids: string[]) => {
 };
 
 const handleClearCanvas = () => {
-  if (window.confirm('确定要清空当前画面中的所有组件吗？')) {
+  if (safeConfirm('确定要清空当前画面中的所有组件吗？')) {
     components.value = [];
     selectedIds.value = [];
     recordHistory();
@@ -2358,6 +2421,7 @@ onBeforeUnmount(() => {
             @reload:current-screen="handleReloadCurrentMonitorScreen"
             @logout="handleLogout"
             @open:alarm="openWindow('alarm-window')"
+            @open:window="openWindow"
           />
           <!-- 极速冷启动闪烁屏蔽帘：在确认真实主索引大屏解析完成前提供平滑暗黑背景，彻底杜绝一次系统图一闪而过 -->
           <div 
@@ -2408,6 +2472,114 @@ onBeforeUnmount(() => {
           :visible="true"
           :isEmbedded="true"
           @close="closeWindow('alarm-window')"
+        />
+      </MdiWindow>
+
+      <!-- ======================================================== -->
+      <!-- D. 独立窗口: 历史曲线 (可任意拖动/独立打开关闭/白色主题)    -->
+      <!-- ======================================================== -->
+      <MdiWindow
+        :id="'history-curve'"
+        :title="'历史曲线'"
+        :subtitle="''"
+        :icon="LineChart"
+        :isOpen="getWindow('history-curve').isOpen"
+        :isMinimized="getWindow('history-curve').isMinimized"
+        :isMaximized="getWindow('history-curve').isMaximized"
+        :zIndex="getWindow('history-curve').zIndex"
+        :x="getWindow('history-curve').x"
+        :y="getWindow('history-curve').y"
+        :width="getWindow('history-curve').width"
+        :height="getWindow('history-curve').height"
+        :headerTheme="'white'"
+        @focus="focusWindow('history-curve')"
+        @close="closeWindow('history-curve')"
+        @minimize="minimizeWindow('history-curve')"
+        @maximize="maximizeWindow('history-curve')"
+        @restore="restoreWindow('history-curve')"
+        @update:x="val => updateWindowCoord('history-curve', 'x', val)"
+        @update:y="val => updateWindowCoord('history-curve', 'y', val)"
+        @update:width="val => updateWindowCoord('history-curve', 'width', val)"
+        @update:height="val => updateWindowCoord('history-curve', 'height', val)"
+        @update:isMaximized="val => updateWindowProp('history-curve', 'isMaximized', val)"
+        @update:isMinimized="val => updateWindowProp('history-curve', 'isMinimized', val)"
+      >
+        <HistoryCurveModal
+          :visible="true"
+          :isEmbedded="true"
+          @close="closeWindow('history-curve')"
+        />
+      </MdiWindow>
+
+      <!-- ======================================================== -->
+      <!-- E. 独立窗口: 历史告警 (可任意拖动/独立打开关闭/白色主题)    -->
+      <!-- ======================================================== -->
+      <MdiWindow
+        :id="'history-alarm'"
+        :title="'历史告警'"
+        :subtitle="''"
+        :icon="History"
+        :isOpen="getWindow('history-alarm').isOpen"
+        :isMinimized="getWindow('history-alarm').isMinimized"
+        :isMaximized="getWindow('history-alarm').isMaximized"
+        :zIndex="getWindow('history-alarm').zIndex"
+        :x="getWindow('history-alarm').x"
+        :y="getWindow('history-alarm').y"
+        :width="getWindow('history-alarm').width"
+        :height="getWindow('history-alarm').height"
+        :headerTheme="'white'"
+        @focus="focusWindow('history-alarm')"
+        @close="closeWindow('history-alarm')"
+        @minimize="minimizeWindow('history-alarm')"
+        @maximize="maximizeWindow('history-alarm')"
+        @restore="restoreWindow('history-alarm')"
+        @update:x="val => updateWindowCoord('history-alarm', 'x', val)"
+        @update:y="val => updateWindowCoord('history-alarm', 'y', val)"
+        @update:width="val => updateWindowCoord('history-alarm', 'width', val)"
+        @update:height="val => updateWindowCoord('history-alarm', 'height', val)"
+        @update:isMaximized="val => updateWindowProp('history-alarm', 'isMaximized', val)"
+        @update:isMinimized="val => updateWindowProp('history-alarm', 'isMinimized', val)"
+      >
+        <HistoryAlarmModal
+          :visible="true"
+          :isEmbedded="true"
+          @close="closeWindow('history-alarm')"
+        />
+      </MdiWindow>
+
+      <!-- ======================================================== -->
+      <!-- F. 独立窗口: 报表 (可任意拖动/独立打开关闭/白色主题)        -->
+      <!-- ======================================================== -->
+      <MdiWindow
+        :id="'report-window'"
+        :title="'报表'"
+        :subtitle="''"
+        :icon="FileSpreadsheet"
+        :isOpen="getWindow('report-window').isOpen"
+        :isMinimized="getWindow('report-window').isMinimized"
+        :isMaximized="getWindow('report-window').isMaximized"
+        :zIndex="getWindow('report-window').zIndex"
+        :x="getWindow('report-window').x"
+        :y="getWindow('report-window').y"
+        :width="getWindow('report-window').width"
+        :height="getWindow('report-window').height"
+        :headerTheme="'white'"
+        @focus="focusWindow('report-window')"
+        @close="closeWindow('report-window')"
+        @minimize="minimizeWindow('report-window')"
+        @maximize="maximizeWindow('report-window')"
+        @restore="restoreWindow('report-window')"
+        @update:x="val => updateWindowCoord('report-window', 'x', val)"
+        @update:y="val => updateWindowCoord('report-window', 'y', val)"
+        @update:width="val => updateWindowCoord('report-window', 'width', val)"
+        @update:height="val => updateWindowCoord('report-window', 'height', val)"
+        @update:isMaximized="val => updateWindowProp('report-window', 'isMaximized', val)"
+        @update:isMinimized="val => updateWindowProp('report-window', 'isMinimized', val)"
+      >
+        <ReportManagerModal
+          :visible="true"
+          :isEmbedded="true"
+          @close="closeWindow('report-window')"
         />
       </MdiWindow>
     </div>

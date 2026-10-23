@@ -126,6 +126,56 @@ const handleSelectScreen = (screenId: string) => {
   isDropdownOpen.value = false;
 };
 
+// 新建画面弹窗拖拽状态 (仿照 DataAssociationModal.vue 风格)
+const addModalPos = ref<{ x: number; y: number }>({ x: 0, y: 0 });
+const isDraggingAddModal = ref(false);
+let addModalDragStart = { mouseX: 0, mouseY: 0, posX: 0, posY: 0 };
+
+const initAddModalPosition = () => {
+  const modalW = 560;
+  const modalH = 440;
+  addModalPos.value = {
+    x: Math.max(16, Math.round((window.innerWidth - modalW) / 2)),
+    y: Math.max(20, Math.round((window.innerHeight - modalH) / 2))
+  };
+};
+
+const onAddModalHeaderMouseDown = (e: MouseEvent) => {
+  if ((e.target as HTMLElement).closest('button, input, select, a')) return;
+  isDraggingAddModal.value = true;
+  addModalDragStart = {
+    mouseX: e.clientX,
+    mouseY: e.clientY,
+    posX: addModalPos.value.x,
+    posY: addModalPos.value.y
+  };
+
+  const onMouseMove = (ev: MouseEvent) => {
+    if (!isDraggingAddModal.value) return;
+    const dx = ev.clientX - addModalDragStart.mouseX;
+    const dy = ev.clientY - addModalDragStart.mouseY;
+    const modalW = 560;
+    const modalH = 440;
+
+    const maxX = Math.max(0, window.innerWidth - modalW - 8);
+    const maxY = Math.max(0, window.innerHeight - modalH - 8);
+
+    addModalPos.value = {
+      x: Math.min(maxX, Math.max(8, addModalDragStart.posX + dx)),
+      y: Math.min(maxY, Math.max(8, addModalDragStart.posY + dy))
+    };
+  };
+
+  const onMouseUp = () => {
+    isDraggingAddModal.value = false;
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+  };
+
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp);
+};
+
 // 打开新建大屏模态框
 const handleOpenAddModal = () => {
   errorMessage.value = '';
@@ -134,6 +184,7 @@ const handleOpenAddModal = () => {
   // 严格默认无模板创建
   selectedTemplateValue.value = '__blank_minimal__';
   onTemplateSelectChange();
+  initAddModalPosition();
   showAddModal.value = true;
 };
 
@@ -465,113 +516,126 @@ const handleConfirmSaveTemplate = async () => {
       <span class="text-slate-600 font-mono">尺寸: <strong class="text-slate-900 font-bold">{{ currentScreen?.screen.width || 1980 }}×{{ currentScreen?.screen.height || 1100 }}</strong></span>
     </div>
 
-    <!-- ==================== 1. 新建画面弹窗 (样式完全与数据集弹框一致，清晰大方，无多余小字与冗余解释) ==================== -->
-    <div 
-      v-if="showAddModal" 
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 font-sans select-none"
-      style="transform: translateZ(0); will-change: transform;"
-    >
+    <!-- ==================== 1. 新建画面弹窗 (仿照数据关联配置中心风格重构：纯黑底色、可拖动、去除所有蓝色边框特效) ==================== -->
+    <Teleport to="body">
       <div 
-        class="bg-[#0e172a] border-2 border-sky-400 rounded-2xl w-full max-w-xl flex flex-col shadow-2xl overflow-hidden text-white"
-        style="contain: paint layout;"
+        v-if="showAddModal" 
+        class="fixed inset-0 z-[9999] pointer-events-none select-none font-sans"
       >
-        <!-- Header -->
-        <div class="px-6 py-4 border-b-2 border-slate-700 bg-[#080d1a] flex items-center justify-between shrink-0">
-          <div class="flex items-center gap-3">
-            <div class="w-3 h-3 rounded-full bg-sky-400"></div>
-            <h2 class="text-lg font-bold tracking-wide text-white">新建画面</h2>
-          </div>
-          <button
-            @click="showAddModal = false"
-            class="p-1 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+        <div 
+          class="pointer-events-auto absolute bg-black text-white rounded-lg border border-neutral-700 shadow-2xl flex flex-col overflow-hidden w-[540px]"
+          :style="{
+            left: `${addModalPos.x}px`,
+            top: `${addModalPos.y}px`
+          }"
+        >
+          <!-- Header (可拖拽，纯黑色系工业风格，对齐数据关联配置中心) -->
+          <header 
+            @mousedown="onAddModalHeaderMouseDown"
+            class="h-11 px-3.5 bg-[#111111] border-b border-[#2a2a2a] flex items-center justify-between shrink-0 cursor-move select-none"
+            title="按住鼠标左键可拖动"
           >
-            <X class="w-6 h-6" />
-          </button>
-        </div>
-
-        <!-- Body -->
-        <div class="p-6 space-y-5 bg-[#0a1120]">
-          <!-- 错误提示 -->
-          <div 
-            v-if="errorMessage" 
-            class="p-3.5 bg-rose-950 border border-rose-400 text-rose-200 text-sm font-bold rounded-xl flex items-center gap-2"
-          >
-            <AlertCircle class="w-5 h-5 shrink-0 text-rose-400" />
-            <span>{{ errorMessage }}</span>
-          </div>
-
-          <!-- 模板选择 -->
-          <div>
-            <label class="block text-sm font-bold text-sky-300 mb-2">选择模板</label>
-            <select
-              v-model="selectedTemplateValue"
-              @change="onTemplateSelectChange"
-              class="w-full px-4 py-2.5 bg-[#111c34] border border-sky-400 rounded-xl text-base text-white focus:outline-none focus:border-sky-300 font-bold shadow-inner cursor-pointer"
+            <div class="flex items-center gap-2.5 min-w-0 pr-3">
+              <div class="w-2.5 h-2.5 rounded-full bg-white shrink-0"></div>
+              <span class="text-sm sm:text-base font-bold text-white tracking-normal truncate drop-shadow-xs">
+                新建画面
+              </span>
+            </div>
+            <!-- 关闭按钮 -->
+            <button
+              @click="showAddModal = false"
+              class="w-7 h-7 rounded flex items-center justify-center text-white hover:bg-neutral-800 border border-transparent hover:border-neutral-600 transition-colors cursor-pointer"
+              title="关闭窗口"
             >
-              <option value="__blank_minimal__">无模板创建</option>
-              <optgroup v-if="availableModels.length > 0" label="model/ 模板文件">
-                <option 
-                  v-for="tpl in availableModels" 
-                  :key="tpl.id" 
-                  :value="tpl.id"
-                >
-                  {{ tpl.name }} ({{ tpl.components?.length || 0 }} 个组件)
-                </option>
-              </optgroup>
-            </select>
-          </div>
+              <X class="w-4 h-4" />
+            </button>
+          </header>
 
-          <!-- 画面名称 -->
-          <div>
-            <label class="block text-sm font-bold text-sky-300 mb-2">画面名称</label>
-            <input 
-              v-model="newScreenName"
-              @input="errorMessage = ''"
-              @keydown.enter="handleConfirmAdd"
-              placeholder="请输入画面名称"
-              class="w-full px-4 py-2.5 bg-[#111c34] border border-sky-400 rounded-xl text-base text-white placeholder-slate-400 focus:outline-none focus:border-sky-300 font-bold shadow-inner"
-              autofocus
-            />
-          </div>
+          <!-- Body (纯黑/深灰工业底色，去除所有蓝色边框特效) -->
+          <div class="p-5 space-y-4 bg-[#0a0a0a]">
+            <!-- 错误提示 -->
+            <div 
+              v-if="errorMessage" 
+              class="p-3 bg-rose-950/80 border border-rose-600 text-rose-200 text-sm font-semibold rounded flex items-center gap-2"
+            >
+              <AlertCircle class="w-4.5 h-4.5 shrink-0 text-rose-400" />
+              <span>{{ errorMessage }}</span>
+            </div>
 
-          <!-- 尺寸设置 -->
-          <div class="grid grid-cols-2 gap-4">
+            <!-- 选择模板 -->
             <div>
-              <label class="block text-sm font-bold text-sky-300 mb-2">宽度 (px)</label>
+              <label class="block text-sm font-medium text-neutral-300 mb-1.5">选择模板</label>
+              <select
+                v-model="selectedTemplateValue"
+                @change="onTemplateSelectChange"
+                class="w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded text-sm text-white focus:outline-none focus:border-neutral-500 font-medium cursor-pointer"
+              >
+                <option value="__blank_minimal__">无模板创建 (空白工程)</option>
+                <optgroup v-if="availableModels.length > 0" label="model/ 模板文件">
+                  <option 
+                    v-for="tpl in availableModels" 
+                    :key="tpl.id" 
+                    :value="tpl.id"
+                  >
+                    {{ tpl.name }} ({{ tpl.components?.length || 0 }} 个组件)
+                  </option>
+                </optgroup>
+              </select>
+            </div>
+
+            <!-- 画面名称 -->
+            <div>
+              <label class="block text-sm font-medium text-neutral-300 mb-1.5">画面名称</label>
               <input 
-                type="number" 
-                v-model.number="newScreenWidth" 
-                class="w-full px-4 py-2.5 bg-[#111c34] border border-sky-400 rounded-xl text-base text-white font-mono font-bold shadow-inner focus:outline-none focus:border-sky-300"
+                v-model="newScreenName"
+                @input="errorMessage = ''"
+                @keydown.enter="handleConfirmAdd"
+                placeholder="请输入画面名称"
+                class="w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-500 font-medium"
+                autofocus
               />
             </div>
-            <div>
-              <label class="block text-sm font-bold text-sky-300 mb-2">高度 (px)</label>
-              <input 
-                type="number" 
-                v-model.number="newScreenHeight" 
-                class="w-full px-4 py-2.5 bg-[#111c34] border border-sky-400 rounded-xl text-base text-white font-mono font-bold shadow-inner focus:outline-none focus:border-sky-300"
-              />
+
+            <!-- 尺寸设置 -->
+            <div class="grid grid-cols-2 gap-3.5">
+              <div>
+                <label class="block text-sm font-medium text-neutral-300 mb-1.5">宽度 (px)</label>
+                <input 
+                  type="number" 
+                  v-model.number="newScreenWidth" 
+                  class="w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded text-sm text-white font-mono font-medium focus:outline-none focus:border-neutral-500"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-neutral-300 mb-1.5">高度 (px)</label>
+                <input 
+                  type="number" 
+                  v-model.number="newScreenHeight" 
+                  class="w-full px-3 py-2 bg-neutral-900 border border-neutral-700 rounded text-sm text-white font-mono font-medium focus:outline-none focus:border-neutral-500"
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Footer -->
-        <div class="px-6 py-4 border-t-2 border-slate-700 bg-[#080d1a] flex items-center justify-end gap-3 shrink-0">
-          <button 
-            @click="showAddModal = false"
-            class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold transition-colors cursor-pointer border border-slate-600 text-sm"
-          >
-            取消
-          </button>
-          <button 
-            @click="handleConfirmAdd"
-            class="px-6 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold transition-colors shadow-lg cursor-pointer border border-sky-400 text-sm"
-          >
-            确认创建
-          </button>
+          <!-- Footer (深灰边框、黑底、高对比清晰操作按钮) -->
+          <footer class="px-4 py-3 bg-[#111111] border-t border-[#2a2a2a] flex items-center justify-end gap-2.5 shrink-0">
+            <button 
+              @click="showAddModal = false"
+              class="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded font-medium transition-colors cursor-pointer border border-neutral-600 text-sm"
+            >
+              取消
+            </button>
+            <button 
+              @click="handleConfirmAdd"
+              class="px-5 py-2 bg-neutral-100 hover:bg-white text-neutral-900 rounded font-semibold transition-colors cursor-pointer border border-neutral-300 text-sm flex items-center gap-1.5 shadow-xs"
+            >
+              <Check class="w-4 h-4" />
+              <span>确认创建</span>
+            </button>
+          </footer>
         </div>
       </div>
-    </div>
+    </Teleport>
 
     <!-- ==================== 2. 存为模板弹窗 ==================== -->
     <div 

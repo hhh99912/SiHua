@@ -182,7 +182,7 @@ const resolvedChildren = computed(() => {
   <div 
     class="w-full h-full relative overflow-visible select-none pointer-events-none"
     :style="{
-      backgroundColor: component.style?.fill || 'transparent',
+      backgroundColor: (component.customProps?.hasBackground && component.style?.fill) ? component.style.fill : 'transparent',
       borderRadius: (component.style?.borderRadius || 0) + 'px'
     }"
   >

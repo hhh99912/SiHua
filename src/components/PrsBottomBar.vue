@@ -14,7 +14,10 @@ import {
   Layers,
   Minimize2,
   Power,
-  Activity
+  Activity,
+  LineChart,
+  History,
+  FileSpreadsheet
 } from 'lucide-vue-next';
 import { currentUser } from '../utils/auth';
 
@@ -116,11 +119,14 @@ onBeforeUnmount(() => {
   window.removeEventListener('click', handleGlobalClick);
 });
 
-// 向上竖向系统菜单项 (按用户要求：监控运行/图形编辑/全站告警/系统健康 全部放到竖向的菜单里)
+// 向上竖向系统菜单项 (按用户要求：监控运行/图形编辑/全站告警/历史曲线/历史告警/报表/系统健康)
 const verticalMenuItems = [
   { id: 'monitor-screen', title: '监控运行', icon: Zap, color: 'text-amber-500' },
   { id: 'graphic-editor', title: '图形编辑', icon: PenTool, color: 'text-sky-600' },
   { id: 'alarm-window', title: '全站告警', icon: Bell, color: 'text-rose-500', isAlarm: true },
+  { id: 'history-curve', title: '历史曲线', icon: LineChart, color: 'text-indigo-600' },
+  { id: 'history-alarm', title: '历史告警', icon: History, color: 'text-orange-500' },
+  { id: 'report-window', title: '报表', icon: FileSpreadsheet, color: 'text-emerald-600' },
   { id: 'health-monitor', title: '系统健康与黑匣子', icon: Activity, color: 'text-cyan-600' }
 ];
 </script>

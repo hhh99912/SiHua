@@ -73,6 +73,30 @@ export const GB_STANDARD_SYMBOLS: ComponentDefinition[] = [
     defaultHeight: 84,
     defaultStyle: { fill: 'transparent', stroke: '#ef4444', strokeWidth: 2 },
     defaultCustomProps: { isGbStandard: true, standard: 'GB/T 43259.556-2024' },
+    states: [
+      {
+        id: '1',
+        name: '合闸 / 运行',
+        matchValue: '1',
+        children: [
+          { id: 'sf6-top-1', name: '上引线', type: 'draw-line', category: 'basic', x: 20, y: 0, width: 4, height: 18, rotation: 0, zIndex: 1, style: { stroke: '#ef4444', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 18, xRatio: 0.5, yRatio: 1 }] } },
+          { id: 'sf6-gas-1', name: 'SF6气室外壳', type: 'draw-polygon', category: 'basic', x: 0, y: 18, width: 44, height: 48, rotation: 0, zIndex: 2, style: { fill: 'rgba(239, 68, 68, 0.2)', stroke: '#ef4444', strokeWidth: 2.5 } },
+          { id: 'sf6-contact-1', name: '灭弧动触头', type: 'draw-line', category: 'basic', x: 20, y: 18, width: 4, height: 48, rotation: 0, zIndex: 3, style: { stroke: '#ef4444', strokeWidth: 4 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 48, xRatio: 0.5, yRatio: 1 }] } },
+          { id: 'sf6-bot-1', name: '下引线', type: 'draw-line', category: 'basic', x: 20, y: 66, width: 4, height: 18, rotation: 0, zIndex: 1, style: { stroke: '#ef4444', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 18, xRatio: 0.5, yRatio: 1 }] } }
+        ]
+      },
+      {
+        id: '0',
+        name: '分闸 / 隔离',
+        matchValue: '0',
+        children: [
+          { id: 'sf6-top-0', name: '上引线', type: 'draw-line', category: 'basic', x: 20, y: 0, width: 4, height: 18, rotation: 0, zIndex: 1, style: { stroke: '#10b981', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 18, xRatio: 0.5, yRatio: 1 }] } },
+          { id: 'sf6-gas-0', name: 'SF6气室外壳', type: 'draw-polygon', category: 'basic', x: 0, y: 18, width: 44, height: 48, rotation: 0, zIndex: 2, style: { fill: 'rgba(16, 185, 129, 0.15)', stroke: '#10b981', strokeWidth: 2 } },
+          { id: 'sf6-contact-0', name: '灭弧动触头', type: 'draw-line', category: 'basic', x: 10, y: 24, width: 24, height: 36, rotation: 0, zIndex: 3, style: { stroke: '#10b981', strokeWidth: 3.5 }, customProps: { points: [{ x: 2, y: 32, xRatio: 0.1, yRatio: 0.9 }, { x: 22, y: 4, xRatio: 0.9, yRatio: 0.1 }] } },
+          { id: 'sf6-bot-0', name: '下引线', type: 'draw-line', category: 'basic', x: 20, y: 66, width: 4, height: 18, rotation: 0, zIndex: 1, style: { stroke: '#10b981', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 18, xRatio: 0.5, yRatio: 1 }] } }
+        ]
+      }
+    ],
     children: [
       { id: 'sf6-top', name: '上引线', type: 'draw-line', category: 'basic', x: 20, y: 0, width: 4, height: 18, rotation: 0, zIndex: 1, style: { stroke: '#ef4444', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 18, xRatio: 0.5, yRatio: 1 }] } },
       { id: 'sf6-gas', name: 'SF6气室外壳', type: 'draw-polygon', category: 'basic', x: 0, y: 18, width: 44, height: 48, rotation: 0, zIndex: 2, style: { fill: 'rgba(239, 68, 68, 0.2)', stroke: '#ef4444', strokeWidth: 2.5 } },
@@ -92,6 +116,42 @@ export const GB_STANDARD_SYMBOLS: ComponentDefinition[] = [
     defaultHeight: 96,
     defaultStyle: { fill: 'transparent', stroke: '#ef4444', strokeWidth: 2 },
     defaultCustomProps: { isGbStandard: true, standard: 'GB/T 4728.7-2022' },
+    states: [
+      {
+        id: '1',
+        name: '工作位置 / 合闸',
+        matchValue: '1',
+        children: [
+          { id: 'hc-rail-1', name: '手车活动框', type: 'draw-rect', category: 'basic', x: 0, y: 12, width: 54, height: 72, rotation: 0, zIndex: 1, style: { fill: 'rgba(15, 23, 42, 0.65)', stroke: '#38bdf8', strokeWidth: 1.5, strokeDasharray: '4 3', borderRadius: 4 } },
+          { id: 'hc-plug-t-1', name: '上动触头插座', type: 'draw-line', category: 'basic', x: 25, y: 0, width: 4, height: 16, rotation: 0, zIndex: 2, style: { stroke: '#ef4444', strokeWidth: 3.5 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 16, xRatio: 0.5, yRatio: 1 }] } },
+          { id: 'hc-body-1', name: '断路器灭弧本体', type: 'draw-rect', category: 'basic', x: 11, y: 32, width: 32, height: 32, rotation: 0, zIndex: 3, style: { fill: 'rgba(239, 68, 68, 0.3)', stroke: '#ef4444', strokeWidth: 2.5, borderRadius: 2 } },
+          { id: 'hc-contact-1', name: '导电直通杆', type: 'draw-line', category: 'basic', x: 25, y: 16, width: 4, height: 64, rotation: 0, zIndex: 4, style: { stroke: '#ef4444', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 64, xRatio: 0.5, yRatio: 1 }] } },
+          { id: 'hc-plug-b-1', name: '下动触头插座', type: 'draw-line', category: 'basic', x: 25, y: 80, width: 4, height: 16, rotation: 0, zIndex: 2, style: { stroke: '#ef4444', strokeWidth: 3.5 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 16, xRatio: 0.5, yRatio: 1 }] } }
+        ]
+      },
+      {
+        id: '0',
+        name: '试验位置 / 分闸',
+        matchValue: '0',
+        children: [
+          { id: 'hc-rail-0', name: '手车活动框', type: 'draw-rect', category: 'basic', x: 0, y: 12, width: 54, height: 72, rotation: 0, zIndex: 1, style: { fill: 'rgba(15, 23, 42, 0.65)', stroke: '#38bdf8', strokeWidth: 1.5, strokeDasharray: '4 3', borderRadius: 4 } },
+          { id: 'hc-plug-t-0', name: '上动触头插座', type: 'draw-line', category: 'basic', x: 25, y: 0, width: 4, height: 12, rotation: 0, zIndex: 2, style: { stroke: '#10b981', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 12, xRatio: 0.5, yRatio: 1 }] } },
+          { id: 'hc-body-0', name: '断路器灭弧本体', type: 'draw-rect', category: 'basic', x: 11, y: 32, width: 32, height: 32, rotation: 0, zIndex: 3, style: { fill: 'rgba(16, 185, 129, 0.15)', stroke: '#10b981', strokeWidth: 2, borderRadius: 2 } },
+          { id: 'hc-contact-0', name: '隔离分闸触头', type: 'draw-line', category: 'basic', x: 15, y: 36, width: 24, height: 24, rotation: 0, zIndex: 4, style: { stroke: '#10b981', strokeWidth: 3 }, customProps: { points: [{ x: 4, y: 20, xRatio: 0.2, yRatio: 0.8 }, { x: 20, y: 4, xRatio: 0.8, yRatio: 0.2 }] } },
+          { id: 'hc-plug-b-0', name: '下动触头插座', type: 'draw-line', category: 'basic', x: 25, y: 84, width: 4, height: 12, rotation: 0, zIndex: 2, style: { stroke: '#10b981', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 12, xRatio: 0.5, yRatio: 1 }] } }
+        ]
+      },
+      {
+        id: '2',
+        name: '检修抽出',
+        matchValue: '2',
+        children: [
+          { id: 'hc-rail-2', name: '手车活动框', type: 'draw-rect', category: 'basic', x: 0, y: 12, width: 54, height: 72, rotation: 0, zIndex: 1, style: { fill: 'rgba(15, 23, 42, 0.4)', stroke: '#f59e0b', strokeWidth: 1.5, strokeDasharray: '4 3', borderRadius: 4 } },
+          { id: 'hc-body-2', name: '手车抽出本体', type: 'draw-rect', category: 'basic', x: 11, y: 46, width: 32, height: 32, rotation: 0, zIndex: 3, style: { fill: 'rgba(245, 158, 11, 0.2)', stroke: '#f59e0b', strokeWidth: 2, borderRadius: 2 } },
+          { id: 'hc-contact-2', name: '抽出标记', type: 'draw-line', category: 'basic', x: 25, y: 52, width: 4, height: 20, rotation: 0, zIndex: 4, style: { stroke: '#f59e0b', strokeWidth: 2.5 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 20, xRatio: 0.5, yRatio: 1 }] } }
+        ]
+      }
+    ],
     children: [
       { id: 'hc-rail', name: '手车活动框', type: 'draw-rect', category: 'basic', x: 0, y: 12, width: 54, height: 72, rotation: 0, zIndex: 1, style: { fill: 'rgba(15, 23, 42, 0.65)', stroke: '#38bdf8', strokeWidth: 1.5, strokeDasharray: '4 3', borderRadius: 4 } },
       { id: 'hc-plug-t', name: '上动触头插座', type: 'draw-line', category: 'basic', x: 25, y: 0, width: 4, height: 16, rotation: 0, zIndex: 2, style: { stroke: '#ef4444', strokeWidth: 3.5 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 16, xRatio: 0.5, yRatio: 1 }] } },
@@ -112,6 +172,32 @@ export const GB_STANDARD_SYMBOLS: ComponentDefinition[] = [
     defaultHeight: 70,
     defaultStyle: { fill: 'transparent', stroke: '#ef4444', strokeWidth: 2 },
     defaultCustomProps: { isGbStandard: true, standard: 'GB/T 4728.7-2022' },
+    states: [
+      {
+        id: '1',
+        name: '合闸 / 导通',
+        matchValue: '1',
+        children: [
+          { id: 'qs-top-1', name: '上引线', type: 'draw-line', category: 'basic', x: 12, y: 0, width: 4, height: 18, rotation: 0, zIndex: 1, style: { stroke: '#ef4444', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 18, xRatio: 0.5, yRatio: 1 }] } },
+          { id: 'qs-c1-1', name: '上静触点', type: 'draw-circle', category: 'basic', x: 8, y: 18, width: 12, height: 12, rotation: 0, zIndex: 2, style: { fill: '#ef4444', stroke: '#ef4444', strokeWidth: 1 } },
+          { id: 'qs-blade-1', name: '动触刀', type: 'draw-line', category: 'basic', x: 12, y: 28, width: 4, height: 18, rotation: 0, zIndex: 3, style: { stroke: '#ef4444', strokeWidth: 4 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 18, xRatio: 0.5, yRatio: 1 }] } },
+          { id: 'qs-c2-1', name: '下轴承座', type: 'draw-circle', category: 'basic', x: 8, y: 44, width: 12, height: 12, rotation: 0, zIndex: 2, style: { fill: '#ef4444', stroke: '#ef4444', strokeWidth: 1 } },
+          { id: 'qs-bot-1', name: '下引线', type: 'draw-line', category: 'basic', x: 12, y: 54, width: 4, height: 16, rotation: 0, zIndex: 1, style: { stroke: '#ef4444', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 16, xRatio: 0.5, yRatio: 1 }] } }
+        ]
+      },
+      {
+        id: '0',
+        name: '分闸 / 隔离',
+        matchValue: '0',
+        children: [
+          { id: 'qs-top-0', name: '上引线', type: 'draw-line', category: 'basic', x: 12, y: 0, width: 4, height: 18, rotation: 0, zIndex: 1, style: { stroke: '#10b981', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 18, xRatio: 0.5, yRatio: 1 }] } },
+          { id: 'qs-c1-0', name: '上静触点', type: 'draw-circle', category: 'basic', x: 8, y: 18, width: 12, height: 12, rotation: 0, zIndex: 2, style: { fill: '#10b981', stroke: '#10b981', strokeWidth: 1 } },
+          { id: 'qs-blade-0', name: '斜断开触刀', type: 'draw-line', category: 'basic', x: 8, y: 26, width: 18, height: 20, rotation: 0, zIndex: 3, style: { stroke: '#10b981', strokeWidth: 3.5 }, customProps: { points: [{ x: 4, y: 18, xRatio: 0.2, yRatio: 0.9 }, { x: 16, y: 2, xRatio: 0.9, yRatio: 0.1 }] } },
+          { id: 'qs-c2-0', name: '下轴承座', type: 'draw-circle', category: 'basic', x: 8, y: 44, width: 12, height: 12, rotation: 0, zIndex: 2, style: { fill: '#10b981', stroke: '#10b981', strokeWidth: 1 } },
+          { id: 'qs-bot-0', name: '下引线', type: 'draw-line', category: 'basic', x: 12, y: 54, width: 4, height: 16, rotation: 0, zIndex: 1, style: { stroke: '#10b981', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 16, xRatio: 0.5, yRatio: 1 }] } }
+        ]
+      }
+    ],
     children: [
       { id: 'qs-top', name: '上引线', type: 'draw-line', category: 'basic', x: 12, y: 0, width: 4, height: 18, rotation: 0, zIndex: 1, style: { stroke: '#ef4444', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 18, xRatio: 0.5, yRatio: 1 }] } },
       { id: 'qs-c1', name: '上静触点', type: 'draw-circle', category: 'basic', x: 8, y: 18, width: 12, height: 12, rotation: 0, zIndex: 2, style: { fill: '#ef4444', stroke: '#ef4444', strokeWidth: 1 } },
@@ -132,6 +218,34 @@ export const GB_STANDARD_SYMBOLS: ComponentDefinition[] = [
     defaultHeight: 70,
     defaultStyle: { fill: 'transparent', stroke: '#10b981', strokeWidth: 2 },
     defaultCustomProps: { isGbStandard: true, standard: 'GB/T 4728.7-2022' },
+    states: [
+      {
+        id: '0',
+        name: '分闸 / 释放',
+        matchValue: '0',
+        children: [
+          { id: 'qe-top-0', name: '主线接入引线', type: 'draw-line', category: 'basic', x: 16, y: 0, width: 4, height: 20, rotation: 0, zIndex: 1, style: { stroke: '#10b981', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 20, xRatio: 0.5, yRatio: 1 }] } },
+          { id: 'qe-c-0', name: '上触头圆', type: 'draw-circle', category: 'basic', x: 12, y: 20, width: 12, height: 12, rotation: 0, zIndex: 2, style: { fill: '#10b981', stroke: '#10b981', strokeWidth: 1 } },
+          { id: 'qe-blade-0', name: '接地倾斜动刀', type: 'draw-line', category: 'basic', x: 4, y: 26, width: 22, height: 22, rotation: 0, zIndex: 3, style: { stroke: '#10b981', strokeWidth: 3.5 }, customProps: { points: [{ x: 20, y: 4, xRatio: 0.9, yRatio: 0.2 }, { x: 4, y: 20, xRatio: 0.2, yRatio: 0.9 }] } },
+          { id: 'qe-g1-0', name: '第一接地横杠', type: 'draw-line', category: 'basic', x: 0, y: 50, width: 36, height: 4, rotation: 0, zIndex: 2, style: { stroke: '#10b981', strokeWidth: 3 }, customProps: { points: [{ x: 0, y: 2, xRatio: 0, yRatio: 0.5 }, { x: 36, y: 2, xRatio: 1, yRatio: 0.5 }] } },
+          { id: 'qe-g2-0', name: '第二接地横杠', type: 'draw-line', category: 'basic', x: 6, y: 58, width: 24, height: 4, rotation: 0, zIndex: 2, style: { stroke: '#10b981', strokeWidth: 2.5 }, customProps: { points: [{ x: 0, y: 2, xRatio: 0, yRatio: 0.5 }, { x: 24, y: 2, xRatio: 1, yRatio: 0.5 }] } },
+          { id: 'qe-g3-0', name: '第三接地横杠', type: 'draw-line', category: 'basic', x: 12, y: 66, width: 12, height: 4, rotation: 0, zIndex: 2, style: { stroke: '#10b981', strokeWidth: 2 }, customProps: { points: [{ x: 0, y: 2, xRatio: 0, yRatio: 0.5 }, { x: 12, y: 2, xRatio: 1, yRatio: 0.5 }] } }
+        ]
+      },
+      {
+        id: '1',
+        name: '接地合闸',
+        matchValue: '1',
+        children: [
+          { id: 'qe-top-1', name: '主线接入引线', type: 'draw-line', category: 'basic', x: 16, y: 0, width: 4, height: 20, rotation: 0, zIndex: 1, style: { stroke: '#ef4444', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 20, xRatio: 0.5, yRatio: 1 }] } },
+          { id: 'qe-c-1', name: '上触头圆', type: 'draw-circle', category: 'basic', x: 12, y: 20, width: 12, height: 12, rotation: 0, zIndex: 2, style: { fill: '#ef4444', stroke: '#ef4444', strokeWidth: 1 } },
+          { id: 'qe-blade-1', name: '接地闭合垂直动刀', type: 'draw-line', category: 'basic', x: 16, y: 26, width: 4, height: 24, rotation: 0, zIndex: 3, style: { stroke: '#ef4444', strokeWidth: 4 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 24, xRatio: 0.5, yRatio: 1 }] } },
+          { id: 'qe-g1-1', name: '第一接地横杠', type: 'draw-line', category: 'basic', x: 0, y: 50, width: 36, height: 4, rotation: 0, zIndex: 2, style: { stroke: '#ef4444', strokeWidth: 3.5 }, customProps: { points: [{ x: 0, y: 2, xRatio: 0, yRatio: 0.5 }, { x: 36, y: 2, xRatio: 1, yRatio: 0.5 }] } },
+          { id: 'qe-g2-1', name: '第二接地横杠', type: 'draw-line', category: 'basic', x: 6, y: 58, width: 24, height: 4, rotation: 0, zIndex: 2, style: { stroke: '#ef4444', strokeWidth: 3 }, customProps: { points: [{ x: 0, y: 2, xRatio: 0, yRatio: 0.5 }, { x: 24, y: 2, xRatio: 1, yRatio: 0.5 }] } },
+          { id: 'qe-g3-1', name: '第三接地横杠', type: 'draw-line', category: 'basic', x: 12, y: 66, width: 12, height: 4, rotation: 0, zIndex: 2, style: { stroke: '#ef4444', strokeWidth: 2.5 }, customProps: { points: [{ x: 0, y: 2, xRatio: 0, yRatio: 0.5 }, { x: 12, y: 2, xRatio: 1, yRatio: 0.5 }] } }
+        ]
+      }
+    ],
     children: [
       { id: 'qe-top', name: '主线接入引线', type: 'draw-line', category: 'basic', x: 16, y: 0, width: 4, height: 20, rotation: 0, zIndex: 1, style: { stroke: '#10b981', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 20, xRatio: 0.5, yRatio: 1 }] } },
       { id: 'qe-c', name: '上触头圆', type: 'draw-circle', category: 'basic', x: 12, y: 20, width: 12, height: 12, rotation: 0, zIndex: 2, style: { fill: '#10b981', stroke: '#10b981', strokeWidth: 1 } },
@@ -153,6 +267,32 @@ export const GB_STANDARD_SYMBOLS: ComponentDefinition[] = [
     defaultHeight: 74,
     defaultStyle: { fill: 'transparent', stroke: '#ef4444', strokeWidth: 2 },
     defaultCustomProps: { isGbStandard: true, standard: 'GB/T 4728.7-2022' },
+    states: [
+      {
+        id: '1',
+        name: '合闸 / 运行',
+        matchValue: '1',
+        children: [
+          { id: 'ql-top-1', name: '上引线', type: 'draw-line', category: 'basic', x: 14, y: 0, width: 4, height: 18, rotation: 0, zIndex: 1, style: { stroke: '#ef4444', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 18, xRatio: 0.5, yRatio: 1 }] } },
+          { id: 'ql-arc-1', name: '负荷灭弧三角标', type: 'draw-triangle-down', category: 'basic', x: 8, y: 18, width: 16, height: 14, rotation: 0, zIndex: 2, style: { fill: 'rgba(239, 68, 68, 0.3)', stroke: '#ef4444', strokeWidth: 2 } },
+          { id: 'ql-contact-1', name: '主触刀', type: 'draw-line', category: 'basic', x: 14, y: 32, width: 4, height: 22, rotation: 0, zIndex: 3, style: { stroke: '#ef4444', strokeWidth: 3.5 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 22, xRatio: 0.5, yRatio: 1 }] } },
+          { id: 'ql-c-1', name: '触头转轴', type: 'draw-circle', category: 'basic', x: 10, y: 52, width: 12, height: 12, rotation: 0, zIndex: 2, style: { fill: '#ef4444', stroke: '#ef4444', strokeWidth: 1 } },
+          { id: 'ql-bot-1', name: '下引线', type: 'draw-line', category: 'basic', x: 14, y: 62, width: 4, height: 12, rotation: 0, zIndex: 1, style: { stroke: '#ef4444', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 12, xRatio: 0.5, yRatio: 1 }] } }
+        ]
+      },
+      {
+        id: '0',
+        name: '分闸 / 隔离',
+        matchValue: '0',
+        children: [
+          { id: 'ql-top-0', name: '上引线', type: 'draw-line', category: 'basic', x: 14, y: 0, width: 4, height: 18, rotation: 0, zIndex: 1, style: { stroke: '#10b981', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 18, xRatio: 0.5, yRatio: 1 }] } },
+          { id: 'ql-arc-0', name: '负荷灭弧三角标', type: 'draw-triangle-down', category: 'basic', x: 8, y: 18, width: 16, height: 14, rotation: 0, zIndex: 2, style: { fill: 'rgba(16, 185, 129, 0.2)', stroke: '#10b981', strokeWidth: 2 } },
+          { id: 'ql-contact-0', name: '分闸开断触刀', type: 'draw-line', category: 'basic', x: 8, y: 32, width: 18, height: 22, rotation: 0, zIndex: 3, style: { stroke: '#10b981', strokeWidth: 3.5 }, customProps: { points: [{ x: 4, y: 20, xRatio: 0.2, yRatio: 0.9 }, { x: 16, y: 2, xRatio: 0.9, yRatio: 0.1 }] } },
+          { id: 'ql-c-0', name: '触头转轴', type: 'draw-circle', category: 'basic', x: 10, y: 52, width: 12, height: 12, rotation: 0, zIndex: 2, style: { fill: '#10b981', stroke: '#10b981', strokeWidth: 1 } },
+          { id: 'ql-bot-0', name: '下引线', type: 'draw-line', category: 'basic', x: 14, y: 62, width: 4, height: 12, rotation: 0, zIndex: 1, style: { stroke: '#10b981', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 12, xRatio: 0.5, yRatio: 1 }] } }
+        ]
+      }
+    ],
     children: [
       { id: 'ql-top', name: '上引线', type: 'draw-line', category: 'basic', x: 14, y: 0, width: 4, height: 18, rotation: 0, zIndex: 1, style: { stroke: '#ef4444', strokeWidth: 3 }, customProps: { points: [{ x: 2, y: 0, xRatio: 0.5, yRatio: 0 }, { x: 2, y: 18, xRatio: 0.5, yRatio: 1 }] } },
       { id: 'ql-arc', name: '负荷灭弧三角标', type: 'draw-triangle-down', category: 'basic', x: 8, y: 18, width: 16, height: 14, rotation: 0, zIndex: 2, style: { fill: 'rgba(239, 68, 68, 0.3)', stroke: '#ef4444', strokeWidth: 2 } },
