@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue';
 import { ScreenItem, ScreenComponent } from '../types';
 import { 
   Plus, Copy, Trash2, Edit3, Monitor, Layers, 
-  ChevronDown, Check, AlertCircle, Layout,
+  ChevronDown, ChevronUp, Check, AlertCircle, Layout,
   HardDrive, Save, Folder, Star, Sparkles, Zap,
   FolderDown, CheckCircle2, X
 } from 'lucide-vue-next';
@@ -40,7 +40,19 @@ const emit = defineEmits<{
   (e: 'open:disk-storage'): void;
   (e: 'save:current-disk'): void;
   (e: 'set:index-screen', screenId: string): void;
+  (e: 'reorder:screens', screens: ScreenItem[]): void;
 }>();
+
+// 画面上下顺序调整
+const handleMoveScreen = (fromIdx: number, toIdx: number) => {
+  if (!props.screens || fromIdx < 0 || toIdx < 0 || fromIdx >= props.screens.length || toIdx >= props.screens.length) {
+    return;
+  }
+  const cloned = [...props.screens];
+  const [target] = cloned.splice(fromIdx, 1);
+  cloned.splice(toIdx, 0, target);
+  emit('reorder:screens', cloned);
+};
 
 const isDropdownOpen = ref(false);
 const showAddModal = ref(false);
@@ -376,16 +388,16 @@ const handleConfirmSaveTemplate = async () => {
           </div>
 
           <div class="max-h-64 overflow-y-auto p-1.5 space-y-1">
-            <button
-              v-for="item in screens"
+            <div
+              v-for="(item, index) in screens"
               :key="item.id"
               @click="handleSelectScreen(item.id)"
-              class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-[13px] text-left cursor-pointer transition-colors"
+              class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-[13px] text-left cursor-pointer transition-colors group"
               :class="item.id === activeScreenId 
                 ? 'bg-sky-100 text-sky-900 font-bold border border-sky-300' 
                 : 'text-slate-700 hover:bg-[#eae3d2] border border-transparent'"
             >
-              <div class="flex items-center gap-2.5 truncate">
+              <div class="flex items-center gap-2 truncate min-w-0 mr-1.5">
                 <Monitor class="w-4 h-4 shrink-0 stroke-[2]" :class="item.id === activeScreenId ? 'text-sky-700' : 'text-slate-500'" />
                 <span class="truncate">{{ item.name }}</span>
                 <span 
@@ -396,13 +408,32 @@ const handleConfirmSaveTemplate = async () => {
                   ★主索引
                 </span>
               </div>
-              <div class="flex items-center gap-2 shrink-0">
+              <div class="flex items-center gap-1.5 shrink-0">
+                <!-- 顺序控制：上移 / 下移按钮 (悬浮时呈现，点击即持久化) -->
+                <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    v-if="index > 0"
+                    @click.stop="handleMoveScreen(index, index - 1)"
+                    class="p-0.5 rounded hover:bg-[#d5ccba] text-slate-500 hover:text-sky-700 transition-colors cursor-pointer"
+                    title="上移此画面"
+                  >
+                    <ChevronUp class="w-3.5 h-3.5 stroke-[2.5]" />
+                  </button>
+                  <button
+                    v-if="index < screens.length - 1"
+                    @click.stop="handleMoveScreen(index, index + 1)"
+                    class="p-0.5 rounded hover:bg-[#d5ccba] text-slate-500 hover:text-sky-700 transition-colors cursor-pointer"
+                    title="下移此画面"
+                  >
+                    <ChevronDown class="w-3.5 h-3.5 stroke-[2.5]" />
+                  </button>
+                </div>
                 <span class="text-[11px] text-slate-500 font-mono font-medium">
                   {{ item.components?.length || 0 }} 项
                 </span>
                 <Check v-if="item.id === activeScreenId" class="w-4 h-4 text-sky-700 stroke-[2.5]" />
               </div>
-            </button>
+            </div>
           </div>
 
           <!-- Bottom Action in Dropdown -->

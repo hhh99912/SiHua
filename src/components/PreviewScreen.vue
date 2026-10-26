@@ -13,6 +13,7 @@ import {
   Layout,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   Zap,
   ShieldCheck,
   UserCheck,
@@ -107,7 +108,19 @@ const emit = defineEmits<{
   (e: 'open:alarm'): void;
   (e: 'open:window', id: string): void;
   (e: 'open:control', devId: string, pointId: any, type: 'control' | 'regulation', targetPointId?: any): void;
+  (e: 'reorder:screens', screens: ScreenItem[]): void;
 }>();
+
+// 画面上下顺序调整
+const handleMoveScreen = (fromIdx: number, toIdx: number) => {
+  if (!props.screens || fromIdx < 0 || toIdx < 0 || fromIdx >= props.screens.length || toIdx >= props.screens.length) {
+    return;
+  }
+  const cloned = [...props.screens];
+  const [target] = cloned.splice(fromIdx, 1);
+  cloned.splice(toIdx, 0, target);
+  emit('reorder:screens', cloned);
+};
 
 // 工业遥控/遥调模态框状态与参数
 const showTeleControlModal = ref(false);
@@ -1584,25 +1597,47 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <!-- 画面列表 (极简纯净单行，无卡片，无悬浮气泡解释，字号一致) -->
+        <!-- 画面列表 (极简纯净单行，支持上下顺序微调，无卡片，字号一致) -->
         <div class="flex-1 overflow-y-auto py-1 text-[14px]" style="scrollbar-gutter: stable;">
           <div
-            v-for="s in screens"
+            v-for="(s, index) in screens"
             :key="s.id"
             @click="emit('switch:screen', s.id)"
-            class="px-3.5 py-2 cursor-pointer transition-colors flex items-center justify-between text-[14px] border-b border-[#ded5bf]"
+            class="px-3 py-2 cursor-pointer transition-colors flex items-center justify-between text-[14px] border-b border-[#ded5bf] group"
             :class="s.id === activeScreenId 
               ? 'bg-[#e4dcce] text-sky-800 font-medium border-l-3 border-sky-600' 
               : 'text-slate-800 hover:bg-[#e4dcce] font-normal border-l-3 border-transparent'"
           >
-            <div class="flex items-center gap-2.5 truncate">
-              <Zap class="w-4.5 h-4.5 shrink-0" :class="s.id === activeScreenId ? 'text-sky-600' : 'text-slate-500'" />
+            <div class="truncate min-w-0 mr-1.5">
               <span class="truncate text-[14px]">{{ s.name }}</span>
             </div>
-            <span
-              v-if="s.id === activeScreenId"
-              class="w-2 h-2 rounded-full bg-sky-600 shrink-0"
-            />
+
+            <div class="flex items-center gap-1 shrink-0">
+              <!-- 顺序控制：上移 / 下移按钮 (悬浮时呈现，简洁轻量，点击即自动持久化到 cfg/base.json) -->
+              <div class="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  v-if="index > 0"
+                  @click.stop="handleMoveScreen(index, index - 1)"
+                  class="p-0.5 rounded hover:bg-[#d5ccba] text-slate-500 hover:text-sky-700 transition-colors cursor-pointer"
+                  title="上移此画面"
+                >
+                  <ChevronUp class="w-3.5 h-3.5 stroke-[2.5]" />
+                </button>
+                <button
+                  v-if="index < screens.length - 1"
+                  @click.stop="handleMoveScreen(index, index + 1)"
+                  class="p-0.5 rounded hover:bg-[#d5ccba] text-slate-500 hover:text-sky-700 transition-colors cursor-pointer"
+                  title="下移此画面"
+                >
+                  <ChevronDown class="w-3.5 h-3.5 stroke-[2.5]" />
+                </button>
+              </div>
+
+              <span
+                v-if="s.id === activeScreenId"
+                class="w-2 h-2 rounded-full bg-sky-600 shrink-0 ml-0.5"
+              />
+            </div>
           </div>
         </div>
       </aside>

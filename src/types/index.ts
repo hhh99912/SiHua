@@ -733,3 +733,34 @@ export interface ScadaChartPoint {
   devName?: string;
 }
 
+export interface ScadaRealtimeWarnItem {
+  seq_id: number;
+  time: string;
+  timestamp: number;
+  content: string;
+  full_text?: string;
+  level: number;
+  level_name?: string;
+  level_color?: string;
+  type?: number;
+  type_name?: string;
+  is_examine?: boolean;
+  is_revert?: boolean;
+  tabs?: string[];
+  fac_id?: number;
+  fac_name?: string;
+  bay_id?: number;
+  bay_name?: string;
+  dev_id?: number;
+  dev_name?: string;
+  key_id?: number;
+  key_name?: string;
+  val?: number;
+  val_desc?: string;
+  status?: number;
+  status_desc?: string;
+  confirm: number;
+  confirm_desc?: string;
+  selected?: boolean;
+}
+

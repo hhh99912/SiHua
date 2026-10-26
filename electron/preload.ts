@@ -58,6 +58,10 @@ const apiBridge = {
     getConfigFile: () => ipcRenderer.invoke('scada:get-config-file'),
     saveConfigFile: (payload: any) => ipcRenderer.invoke('scada:save-config-file', safePojo(payload))
   },
+  cfg: {
+    getBaseConfig: () => ipcRenderer.invoke('cfg:get-base'),
+    saveBaseConfig: (payload: any) => ipcRenderer.invoke('cfg:save-base', safePojo(payload))
+  },
   uds: {
     getDevices: (options?: any) => ipcRenderer.invoke('uds:get-devices', safePojo(options)),
     getRealtimeData: (options?: any) => ipcRenderer.invoke('uds:get-realtime', safePojo(options)),

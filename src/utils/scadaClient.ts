@@ -1908,11 +1908,15 @@ export interface ScadaRealtimeWarnItem {
   time: string;
   timestamp: number;
   content: string;
+  full_text?: string;
   level: number;
   level_name?: string;
   level_color?: string;
-  type: number;
+  type?: number;
   type_name?: string;
+  is_examine?: boolean;
+  is_revert?: boolean;
+  tabs?: string[];
   fac_id?: number;
   fac_name?: string;
   bay_id?: number;
@@ -1956,28 +1960,46 @@ export interface ScadaWarnReport {
   related_events: string[];
 }
 
-// 全局告警配置字典缓存
+// 全局告警配置字典缓存 (严格对齐 SCADA 规范：提示 #67C23A, 告警 #E6A23C, 事故 #FF0000)
 export const globalWarnLevels = ref<ScadaWarnLevelItem[]>([
-  { level: 3, name: "事故跳闸", open_color: "#00FF00", close_color: "#FF0000" },
-  { level: 2, name: "告警越限", open_color: "#00FF00", close_color: "#FF9900" },
-  { level: 1, name: "提示预告", open_color: "#00FF00", close_color: "#00FF00" },
+  { level: 3, name: "事故信息", open_color: "#67C23A", close_color: "#FF0000" },
+  { level: 2, name: "告警信息", open_color: "#67C23A", close_color: "#E6A23C" },
+  { level: 1, name: "提示信息", open_color: "#67C23A", close_color: "#67C23A" },
   { level: 4, name: "操作记录", open_color: "#00FFFF", close_color: "#00FFFF" }
 ]);
 
 export const globalWarnTypes = ref<ScadaWarnTypeItem[]>([
   { type_id: 1, name: "遥信变位" },
   { type_id: 2, name: "遥测越限" },
-  { type_id: 8, name: "人工遥控" },
-  { type_id: 9, name: "人工遥调" },
+  { type_id: 3, name: "厂站工况" },
+  { type_id: 4, name: "结点工况" },
+  { type_id: 8, name: "遥控" },
+  { type_id: 9, name: "人工操作" },
   { type_id: 10, name: "事件SOE" },
   { type_id: 28, name: "保护动作" }
 ]);
 
-// 全局未确认告警数量 (响应式供给底栏、顶栏与图元)
-export const globalUnconfirmedAlarmCount = ref<number>(4);
+// 全局未确认告警数量 (响应式供给底栏、顶栏与图元，严格从实际现场接口获取，默认0)
+export const globalUnconfirmedAlarmCount = ref<number>(0);
 
 // 全局实时告警列表 (最新活跃队列)
 export const globalRealtimeWarns = ref<ScadaRealtimeWarnItem[]>([]);
+
+/**
+ * 实时同步告警数据并更新未确认告警数量 (从现场实际接口获取，绝不虚构)
+ */
+export async function syncRealtimeAlarms(): Promise<void> {
+  try {
+    const res = await fetchScadaWarnRealtime({ limit: 100, after_seq: 0 });
+    if (res.success && Array.isArray(res.data)) {
+      globalRealtimeWarns.value = res.data;
+      const unack = res.data.filter(a => a.confirm === 0).length;
+      globalUnconfirmedAlarmCount.value = unack;
+    }
+  } catch {
+    // 忽略网络通信偶发异常
+  }
+}
 
 /**
  * 1. 获取告警元数据与配置字典: GET /api/scada/warn/config
@@ -2006,6 +2028,8 @@ export async function fetchScadaWarnConfig(): Promise<{ success: boolean; data?:
 
 /**
  * 2. 获取实时告警列表 (支持增量轮询): GET /api/scada/warn/realtime
+ * - after_seq 为 0 时不带游标：默认倒序获取系统最新产生的 limit 条告警，按时间正序返回
+ * - after_seq 大于 0 时：带游标增量拉取比该序号更新的记录
  */
 export async function fetchScadaWarnRealtime(params?: { limit?: number; after_seq?: number }): Promise<{
   success: boolean;
@@ -2016,9 +2040,10 @@ export async function fetchScadaWarnRealtime(params?: { limit?: number; after_se
   const baseUrl = getScadaApiBaseUrl().replace(/\/+$/, '');
   const limit = params?.limit ?? 100;
   const afterSeq = params?.after_seq ?? 0;
+  const queryStr = afterSeq > 0 ? `after_seq=${afterSeq}&limit=${limit}` : `limit=${limit}`;
   const url = baseUrl
-    ? `${baseUrl}/api/scada/warn/realtime?limit=${limit}&after_seq=${afterSeq}`
-    : `/api/scada/warn/realtime?limit=${limit}&after_seq=${afterSeq}`;
+    ? `${baseUrl}/api/scada/warn/realtime?${queryStr}`
+    : `/api/scada/warn/realtime?${queryStr}`;
 
   try {
     const res = await fetch(url, {
@@ -2038,6 +2063,8 @@ export async function fetchScadaWarnRealtime(params?: { limit?: number; after_se
 
 /**
  * 3. 单条/批量告警确认 (对位复归): POST /api/scada/warn/ack
+ * - 单条确认：Body: { "seq_id": 1052 }
+ * - 批量确认：Body: { "seq_ids": [1051, 1052] }
  */
 export async function ackScadaWarn(params: {
   seq_id?: number;
@@ -2048,11 +2075,14 @@ export async function ackScadaWarn(params: {
   const url = baseUrl ? `${baseUrl}/api/scada/warn/ack` : '/api/scada/warn/ack';
 
   try {
-    const payload: any = { operator: params.operator || 'web_user' };
+    const payload: any = {};
     if (params.seq_ids && params.seq_ids.length > 0) {
       payload.seq_ids = params.seq_ids;
     } else if (params.seq_id !== undefined) {
       payload.seq_id = params.seq_id;
+    }
+    if (params.operator) {
+      payload.operator = params.operator;
     }
 
     const res = await fetch(url, {
@@ -2072,7 +2102,7 @@ export async function ackScadaWarn(params: {
 }
 
 /**
- * 4. 告警全量一键确认: POST /api/scada/warn/ack_all
+ * 4. 告警全量一键确认 (一键对位复归): POST /api/scada/warn/ack_all
  */
 export async function ackAllScadaWarn(params?: { operator?: string }): Promise<{
   success: boolean;
@@ -2083,10 +2113,11 @@ export async function ackAllScadaWarn(params?: { operator?: string }): Promise<{
   const url = baseUrl ? `${baseUrl}/api/scada/warn/ack_all` : '/api/scada/warn/ack_all';
 
   try {
+    const payload = params?.operator ? { operator: params.operator } : {};
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ operator: params?.operator || 'web_user' })
+      body: JSON.stringify(payload)
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();

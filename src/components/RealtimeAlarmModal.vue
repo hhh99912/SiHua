@@ -12,7 +12,6 @@ import {
   ChevronRight,
   Square,
   CheckSquare,
-  Bell,
   RefreshCw,
   Copy,
   Check,
@@ -30,7 +29,6 @@ import {
   fetchScadaWarnRealtime,
   ackScadaWarn,
   ackAllScadaWarn,
-  clearScadaWarnCache,
   globalUnconfirmedAlarmCount,
   ScadaRealtimeWarnItem
 } from '../utils/scadaClient';
@@ -83,7 +81,7 @@ const isAcking = ref<boolean>(false);
 const showOptionsMenu = ref<boolean>(false);
 const soundAlertEnabled = ref<boolean>(false); // 报警声音蜂鸣器
 const pinToTopLocked = ref<boolean>(true); // 自动置顶锁定 (默认开启，关掉后允许操作员自由往下拉)
-const maxCapacity = ref<number>(500); // 单屏缓存上限：100 / 300 / 500
+const maxCapacity = ref<number>(2000); // 单屏缓存上限：默认 2000 条 (防止浏览器内存溢出)
 
 // 列可见性控制
 const columnVisibility = ref({
@@ -514,14 +512,11 @@ const toggleSelectAll = () => {
   }
 };
 
-// 单条告警确认
+// 单条告警确认 (对位复归)
 const acknowledgeItem = async (item: ScadaRealtimeWarnItem) => {
   if (item.confirm === 1) return;
   try {
-    const res = await ackScadaWarn({
-      seq_id: item.seq_id,
-      operator: '调度员_张三'
-    });
+    const res = await ackScadaWarn({ seq_id: item.seq_id });
     if (res.success) {
       const updated = alarms.value.map(a => {
         if (a.seq_id === item.seq_id) {
@@ -547,10 +542,7 @@ const handleAcknowledgeSelected = async () => {
   const ids = Array.from(selectedAlarmIds.value);
   isAcking.value = true;
   try {
-    const res = await ackScadaWarn({
-      seq_ids: ids,
-      operator: '调度员_张三'
-    });
+    const res = await ackScadaWarn({ seq_ids: ids });
     if (res.success) {
       const selSet = selectedAlarmIds.value;
       const updated = alarms.value.map(a => {
@@ -574,11 +566,11 @@ const handleAcknowledgeSelected = async () => {
   }
 };
 
-// 确认全部
+// 确认全部 (一键对位复归)
 const handleAcknowledgeAll = async () => {
   isAcking.value = true;
   try {
-    const res = await ackAllScadaWarn({ operator: '调度员_张三' });
+    const res = await ackAllScadaWarn();
     if (res.success) {
       const updated = alarms.value.map(a => Object.freeze({
         ...a,
@@ -596,23 +588,27 @@ const handleAcknowledgeAll = async () => {
   }
 };
 
-// 实时告警清屏
-const handleClearAll = async () => {
-  try {
-    await clearScadaWarnCache();
-    alarms.value = Object.freeze([]);
-    knownSeqIds.clear();
-    selectedAlarmIds.value.clear();
-    lastSeqId.value = 0;
-    updateGlobalUnconfirmedCount();
-  } catch (err) {
-    console.warn('清屏失败:', err);
-  }
+// 业务动作：清屏 (清除当前页面告警视觉显示)
+// 规范：仅清空当前前端 DOM/列表的视觉显示；不要调用后端的任何清空接口；切记：不要重置 lastSeqId！
+const handleClearAll = () => {
+  alarms.value = Object.freeze([]) as ScadaRealtimeWarnItem[];
+  knownSeqIds.clear();
+  selectedAlarmIds.value.clear();
+  // 关键：绝对不重置 lastSeqId！记录时间线断点，下一秒只要产生新告警 (seq_id > lastSeqId) 立刻在干净屏幕呈现
+  updateGlobalUnconfirmedCount();
+  console.log('[SCADA] 当前告警页面视觉显示已清空，断点游标保持 lastSeqId =', lastSeqId.value);
 };
 
-// 暂停 / 继续轮询
+// 业务动作：自由暂停与恢复告警流 (0漏报机制)
 const togglePause = () => {
   isPaused.value = !isPaused.value;
+  if (!isPaused.value) {
+    // 点击“恢复刷新”：立即触发一次轮询，借助未变的 lastSeqId 把暂停期间积累的所有告警瞬间追平，实现无缝追赶
+    pollRealtimeAlarms();
+    console.log('[SCADA] 告警流已恢复，已自动发起增量轮询补齐暂停期间数据');
+  } else {
+    console.log('[SCADA] 告警流已暂停，画面已冻结，保持断点游标 lastSeqId =', lastSeqId.value);
+  }
 };
 
 // 右键菜单处理
@@ -689,31 +685,30 @@ let isPollingActive = false;
 let gcCheckCounter = 0;
 
 const pollRealtimeAlarms = async () => {
+  // 处于暂停状态时不发起增量请求，画面完全定格
   if (isPaused.value || isPollingActive) return;
   isPollingActive = true;
 
   try {
+    // 2. 定时增量轮询：带着上次记录的断点游标 lastSeqId 拉取差量新记录
     const res = await fetchScadaWarnRealtime({
-      limit: 100,
+      limit: 200,
       after_seq: lastSeqId.value
     });
 
     if (res.success && res.data && res.data.length > 0) {
       const newItems = res.data.map(normalizeAlarmItem);
-      let maxSeq = lastSeqId.value;
-      const filteredNew: ScadaRealtimeWarnItem[] = [];
+      // 更新断点游标为最新一条的 seq_id
+      lastSeqId.value = Math.max(lastSeqId.value, newItems[newItems.length - 1].seq_id);
 
+      const filteredNew: ScadaRealtimeWarnItem[] = [];
       for (let i = 0; i < newItems.length; i++) {
         const item = newItems[i];
-        if (item.seq_id > maxSeq) {
-          maxSeq = item.seq_id;
-        }
         if (!knownSeqIds.has(item.seq_id)) {
           knownSeqIds.add(item.seq_id);
           filteredNew.push(item);
         }
       }
-      lastSeqId.value = maxSeq;
 
       if (filteredNew.length > 0) {
         // 如果开启声音报警且有新告警产生，触发蜂鸣提示音
@@ -721,10 +716,11 @@ const pollRealtimeAlarms = async () => {
           playBeepSound();
         }
 
-        // 新增告警置顶，严格限制总容量在 maxCapacity
+        // 呈现：新告警置顶呈现，严格限制总容量在 maxCapacity (如 2000 条防止浏览器内存溢出)
+        const reversedNew = [...filteredNew].reverse();
         const currentList = alarms.value;
-        const nextList = filteredNew.concat(currentList);
-        const cap = maxCapacity.value || 500;
+        const nextList = reversedNew.concat(currentList);
+        const cap = maxCapacity.value || 2000;
         if (nextList.length > cap) {
           nextList.length = cap;
           // 同步清理 Set，保证不积存无用 ID
@@ -784,17 +780,22 @@ onMounted(async () => {
   try {
     await fetchScadaWarnConfig();
 
-    const res = await fetchScadaWarnRealtime({ limit: 100, after_seq: 0 });
+    // 1. 初始化拉取首屏数据 (取系统当前最新产生的 50 条告警铺满表格)
+    const res = await fetchScadaWarnRealtime({ limit: 50, after_seq: 0 });
     if (res.success && res.data && res.data.length > 0) {
       const mapped = res.data.map(normalizeAlarmItem);
-      const cap = maxCapacity.value || 500;
-      const sliced = mapped.slice(0, cap);
+      // 记录最新一条记录的 seq_id 为 lastSeqId 游标
+      lastSeqId.value = res.data[res.data.length - 1].seq_id;
+
+      // 最新告警排在首行置顶
+      const reversed = [...mapped].reverse();
+      const cap = maxCapacity.value || 2000;
+      const sliced = reversed.slice(0, cap);
       knownSeqIds.clear();
       for (const item of sliced) {
         knownSeqIds.add(item.seq_id);
       }
       alarms.value = Object.freeze(sliced) as ScadaRealtimeWarnItem[];
-      lastSeqId.value = Math.max(...res.data.map(x => x.seq_id));
       updateGlobalUnconfirmedCount();
 
       nextTick(() => {
@@ -856,7 +857,7 @@ watch(() => props.visible, (val) => {
         class="h-11 bg-slate-200 border-b border-slate-400 px-4 flex items-center justify-between shrink-0 select-none text-[15px] font-bold"
       >
         <div class="flex items-center gap-2.5 font-bold text-slate-900 text-[15px]">
-          <Bell 
+          <ShieldAlert 
             class="w-5 h-5 text-rose-600" 
             :class="unackCount > 0 ? (isBlinkPhase ? 'opacity-100' : 'opacity-30') : ''" 
           />
@@ -932,13 +933,13 @@ watch(() => props.visible, (val) => {
                 <div class="text-slate-900 mb-1.5">单屏告警容量上限 (性能调优):</div>
                 <div class="flex items-center gap-4 text-xs font-bold text-slate-800">
                   <label class="flex items-center gap-1 cursor-pointer">
-                    <input type="radio" :value="100" v-model="maxCapacity" name="cap" /> 100条
+                    <input type="radio" :value="500" v-model="maxCapacity" name="cap" /> 500条
                   </label>
                   <label class="flex items-center gap-1 cursor-pointer">
-                    <input type="radio" :value="300" v-model="maxCapacity" name="cap" /> 300条
+                    <input type="radio" :value="1000" v-model="maxCapacity" name="cap" /> 1000条
                   </label>
                   <label class="flex items-center gap-1 cursor-pointer">
-                    <input type="radio" :value="500" v-model="maxCapacity" name="cap" /> 500条 (默认)
+                    <input type="radio" :value="2000" v-model="maxCapacity" name="cap" /> 2000条 (默认推荐)
                   </label>
                 </div>
               </div>

@@ -2,7 +2,7 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import {
   ShieldCheck,
-  Bell,
+  ShieldAlert,
   Clock,
   LogOut,
   Zap,
@@ -40,7 +40,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  unconfirmedAlarmCount: 4,
+  unconfirmedAlarmCount: 0,
   safetyDays: 1428
 });
 
@@ -123,7 +123,7 @@ onBeforeUnmount(() => {
 const verticalMenuItems = [
   { id: 'monitor-screen', title: '监控运行', icon: Zap, color: 'text-amber-500' },
   { id: 'graphic-editor', title: '图形编辑', icon: PenTool, color: 'text-sky-600' },
-  { id: 'alarm-window', title: '全站告警', icon: Bell, color: 'text-rose-500', isAlarm: true },
+  { id: 'alarm-window', title: '全站告警', icon: ShieldAlert, color: 'text-rose-500', isAlarm: true },
   { id: 'history-curve', title: '历史曲线', icon: LineChart, color: 'text-indigo-600' },
   { id: 'history-alarm', title: '历史告警', icon: History, color: 'text-orange-500' },
   { id: 'report-window', title: '报表', icon: FileSpreadsheet, color: 'text-emerald-600' },
@@ -186,18 +186,20 @@ const verticalMenuItems = [
                 class="w-full px-3.5 py-2.5 text-left hover:bg-[#e4dcce] flex items-center justify-between transition-colors cursor-pointer text-[15px] font-medium text-slate-800 hover:text-sky-700"
               >
                 <div class="flex items-center gap-3">
+                  <span v-if="item.isAlarm" class="w-5 h-5 flex items-center justify-center shrink-0">
+                    <span
+                      class="w-3.5 h-3.5 rounded-full inline-block"
+                      :class="unconfirmedAlarmCount > 0 ? 'scada-alarm-dot-blinking' : 'bg-emerald-500'"
+                    />
+                  </span>
                   <component
+                    v-else
                     :is="item.icon"
                     class="w-5 h-5 shrink-0 stroke-[2]"
-                    :class="[item.color, item.isAlarm && unconfirmedAlarmCount > 0 ? 'scada-bell-blinking-icon' : '']"
+                    :class="item.color"
                   />
                   <span>{{ item.title }}</span>
                 </div>
-                <!-- 告警未确认微点指示 (醒目高频扩散闪烁) -->
-                <span
-                  v-if="item.isAlarm && unconfirmedAlarmCount > 0"
-                  class="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping shadow-xs"
-                />
               </button>
             </div>
 
@@ -247,22 +249,13 @@ const verticalMenuItems = [
         </transition>
       </div>
 
-      <!-- 全站告警：底栏中只保留单个图标按钮 (有未确认告警时铃铛1Hz交替闪烁摇摆，全确认后停止闪烁，无数字角标) -->
+      <!-- 全站告警状态指示：纯实心圆，外围无卡片包裹，高度与周围卡片(h-9)一致；没有告警时为绿色实心圆，有未确认告警时红/绿1秒交替闪烁 -->
       <button
         @click="handleOpenAlarm"
-        class="h-9 w-9 rounded-lg border flex items-center justify-center relative cursor-pointer shadow-2xs transition-all shrink-0"
-        :class="unconfirmedAlarmCount > 0 
-          ? 'scada-bell-blinking-btn' 
-          : 'bg-[#f2eee3] hover:bg-slate-200/60 border-[#cfc5b0] text-slate-600'"
-        :title="unconfirmedAlarmCount > 0 
-          ? `全站告警 (有 ${unconfirmedAlarmCount} 条未确认告警，点击打开对位消闪)` 
-          : '全站告警 (所有告警均已确认对位)'"
-      >
-        <Bell
-          class="w-4.5 h-4.5 shrink-0 stroke-[2] transition-colors"
-          :class="unconfirmedAlarmCount > 0 ? 'scada-bell-blinking-icon' : 'text-slate-500'"
-        />
-      </button>
+        class="h-9 w-9 rounded-full cursor-pointer transition-transform hover:scale-105 active:scale-95 shrink-0 border-0 p-0 focus:outline-none shadow-xs"
+        :class="unconfirmedAlarmCount > 0 ? 'scada-alarm-dot-blinking' : 'bg-emerald-500'"
+        title="告警"
+      />
 
       <!-- 窗口任务栏：正在打开的独立组态窗口标签 (字号与图标同顶栏一样放大，不加深) -->
       <div class="flex items-center gap-1.5 overflow-x-auto min-w-0 scrollbar-none border-l border-[#cfc5b0] pl-2.5">
@@ -365,59 +358,17 @@ const verticalMenuItems = [
 </template>
 
 <style scoped>
-/* 电力工控 SCADA 标准 1Hz 未确认告警按钮闪烁 (等宽方波周期亮灭交替) */
-@keyframes scada-alarm-flash {
+/* 告警实心圆指示灯：红/绿 1s 一次交替闪烁 (方波等宽交替) */
+@keyframes scada-alarm-rg-blink {
   0%, 49.9% {
-    background-color: #fee2e2;
-    border-color: #ef4444;
-    box-shadow: 0 0 10px rgba(239, 68, 68, 0.5), inset 0 0 4px rgba(239, 68, 68, 0.25);
+    background-color: #ef4444; /* 红色 */
   }
   50%, 100% {
-    background-color: #dc2626;
-    border-color: #991b1b;
-    box-shadow: 0 0 18px rgba(220, 38, 38, 0.85), inset 0 0 5px rgba(255, 255, 255, 0.5);
+    background-color: #10b981; /* 绿色 */
   }
 }
 
-/* 铃铛图标摇摆摆铃动作与反色明暗闪烁 */
-@keyframes scada-bell-swing {
-  0%, 100% {
-    transform: rotate(0deg) scale(1);
-  }
-  12% {
-    transform: rotate(-16deg) scale(1.18);
-  }
-  24% {
-    transform: rotate(16deg) scale(1.18);
-  }
-  36% {
-    transform: rotate(-12deg) scale(1.14);
-  }
-  48% {
-    transform: rotate(12deg) scale(1.14);
-  }
-  60% {
-    transform: rotate(0deg) scale(1.05);
-  }
-}
-
-@keyframes scada-bell-color-flash {
-  0%, 49.9% {
-    color: #dc2626;
-    filter: drop-shadow(0 0 3px rgba(220, 38, 38, 0.7));
-  }
-  50%, 100% {
-    color: #ffffff;
-    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.95));
-  }
-}
-
-.scada-bell-blinking-btn {
-  animation: scada-alarm-flash 1s steps(1, end) infinite;
-}
-
-.scada-bell-blinking-icon {
-  animation: scada-bell-swing 1s ease-in-out infinite, scada-bell-color-flash 1s steps(1, end) infinite;
-  transform-origin: top center;
+.scada-alarm-dot-blinking {
+  animation: scada-alarm-rg-blink 1s steps(1, end) infinite;
 }
 </style>

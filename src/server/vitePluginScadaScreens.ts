@@ -27,6 +27,11 @@ import {
   ensureDataDirectory
 } from './scadaDataStorage';
 import {
+  ensureCfgDirectory,
+  getBaseConfig,
+  saveBaseConfig
+} from './scadaCfgStorage';
+import {
   handleGetScadaConfig,
   handleGetScadaRealtime,
   handlePostScadaYk,
@@ -72,8 +77,8 @@ function sendJson(res: any, statusCode: number, data: any) {
 
 /**
  * SCADA 大屏 JSON 磁盘文件存储 Vite 插件
- * 目录固定在运行根目录同级 graph/ 文件夹下
- * 在开发和预览服务器提供 /api/screens/*、/api/models/* 与 /api/cells/* 系列接口
+ * 目录固定在运行根目录同级 graph/ 文件夹下，配置在 cfg/ 文件夹下
+ * 在开发和预览服务器提供 /api/screens/*、/api/models/*、/api/cells/* 与 /api/cfg/* 系列接口
  */
 export function scadaScreensPlugin(): Plugin {
   return {
@@ -83,6 +88,7 @@ export function scadaScreensPlugin(): Plugin {
       ensureModelDirectory();
       ensureCellDirectory();
       ensureDataDirectory();
+      ensureCfgDirectory();
       registerEndpoints(server.middlewares);
     },
     configurePreviewServer(server) {
@@ -90,6 +96,7 @@ export function scadaScreensPlugin(): Plugin {
       ensureModelDirectory();
       ensureCellDirectory();
       ensureDataDirectory();
+      ensureCfgDirectory();
       registerEndpoints(server.middlewares);
     }
   };
@@ -99,14 +106,15 @@ function registerEndpoints(middlewares: any) {
   middlewares.use(async (req: any, res: any, next: any) => {
     const url = req.url || '';
 
-    // 拦截 /api/screens、/api/templates (/api/models)、/api/cells、/api/data 与 /api/scada 前缀的请求
+    // 拦截 /api/screens、/api/templates (/api/models)、/api/cells、/api/data、/api/cfg 与 /api/scada 前缀的请求
     const isScreensApi = url.startsWith('/api/screens');
     const isTemplatesApi = url.startsWith('/api/templates') || url.startsWith('/api/models');
     const isCellsApi = url.startsWith('/api/cells');
     const isDataApi = url.startsWith('/api/data') || url.startsWith('/api/datasets');
     const isScadaApi = url.startsWith('/api/scada');
+    const isCfgApi = url.startsWith('/api/cfg') || url.startsWith('/api/config');
 
-    if (!isScreensApi && !isTemplatesApi && !isCellsApi && !isDataApi && !isScadaApi) {
+    if (!isScreensApi && !isTemplatesApi && !isCellsApi && !isDataApi && !isScadaApi && !isCfgApi) {
       return next();
     }
 
@@ -203,6 +211,24 @@ function registerEndpoints(middlewares: any) {
         }
 
         return sendJson(res, 404, { code: 404, msg: `未找到 SCADA 接口: ${method} ${pathname}` });
+      }
+
+      // ==================== 基础与环境配置 API 路由 (存储在 cfg/ 目录) ====================
+      if (isCfgApi) {
+        // 1. GET /api/cfg/base 或 /api/config/base - 读取 cfg/base.json
+        if (method === 'GET' && (pathname === '/api/cfg/base' || pathname === '/api/cfg/base.json' || pathname === '/api/config/base')) {
+          const result = getBaseConfig();
+          return sendJson(res, 200, { success: true, data: result });
+        }
+
+        // 2. POST /api/cfg/base 或 /api/config/base - 保存至 cfg/base.json
+        if (method === 'POST' && (pathname === '/api/cfg/base' || pathname === '/api/config/base')) {
+          const body = await parseJsonBody(req);
+          const result = saveBaseConfig(body);
+          return sendJson(res, 200, result);
+        }
+
+        return sendJson(res, 404, { success: false, error: `未找到配置接口: ${method} ${pathname}` });
       }
 
       // ==================== 数据集与点表 API 路由 (存储在 data/ 目录) ====================

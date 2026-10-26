@@ -601,6 +601,64 @@ function setupIpcHandlers() {
     }
   });
 
+  // ---------------- SCADA Base Config Disk Storage IPC (cfg/base.json 与 graph 同级) ----------------
+  const getCfgDir = () => {
+    const execDir = app.isPackaged ? path.dirname(process.execPath) : process.cwd();
+    const dir = path.resolve(execDir, 'cfg');
+    if (!fs.existsSync(dir)) {
+      try { fs.mkdirSync(dir, { recursive: true }); } catch {}
+    }
+    return dir;
+  };
+
+  const getBaseConfigFile = () => {
+    const cfgDir = getCfgDir();
+    const baseFile = path.join(cfgDir, 'base.json');
+    if (!fs.existsSync(baseFile)) {
+      try {
+        fs.writeFileSync(baseFile, JSON.stringify({
+          SAFE_DATA_START: "2025-05-06",
+          description: "GE-SCADA 现场基础运行配置文件 (支持工程师现场配置安全运行起始日期与站所基础参数)",
+          station_name: "智能变电站"
+        }, null, 2), 'utf-8');
+      } catch (err) {
+        console.warn('[Electron] 初始化 cfg/base.json 失败:', err);
+      }
+    }
+    return baseFile;
+  };
+
+  // 凝思与桌面运行启动时，自动在磁盘 graph 同级目录下确保 cfg 目录与 base.json
+  getBaseConfigFile();
+
+  ipcMain.handle('cfg:get-base', () => {
+    try {
+      const baseFile = getBaseConfigFile();
+      if (fs.existsSync(baseFile)) {
+        const raw = fs.readFileSync(baseFile, 'utf-8');
+        return { success: true, data: JSON.parse(raw) };
+      }
+    } catch (err: any) {
+      return { success: false, error: err?.message || '读取 base.json 失败' };
+    }
+    return { success: true, data: { SAFE_DATA_START: "2025-05-06" } };
+  });
+
+  ipcMain.handle('cfg:save-base', (_event: any, payload: any) => {
+    try {
+      const baseFile = getBaseConfigFile();
+      let current: any = { SAFE_DATA_START: "2025-05-06" };
+      if (fs.existsSync(baseFile)) {
+        try { current = JSON.parse(fs.readFileSync(baseFile, 'utf-8')); } catch {}
+      }
+      const merged = { ...current, ...payload };
+      fs.writeFileSync(baseFile, JSON.stringify(merged, null, 2), 'utf-8');
+      return { success: true, data: merged };
+    } catch (err: any) {
+      return { success: false, error: err?.message || '写入 base.json 失败' };
+    }
+  });
+
   // ---------------- SCADA Template JSON Files Disk Storage IPC (model/ 目录) ----------------
   const getModelsDir = () => {
     const execDir = app.isPackaged ? path.dirname(process.execPath) : process.cwd();

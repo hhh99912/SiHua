@@ -491,16 +491,18 @@ export function handlePostScadaUnflash(payload: { yx_ids?: number[]; all?: boole
 
 export const SCADA_WARN_CONFIG = {
   levels: [
-    { level: 3, name: "事故跳闸", open_color: "#00FF00", close_color: "#FF0000" },
-    { level: 2, name: "告警越限", open_color: "#00FF00", close_color: "#FF9900" },
-    { level: 1, name: "提示预告", open_color: "#00FF00", close_color: "#00FF00" },
+    { level: 3, name: "事故信息", open_color: "#67C23A", close_color: "#FF0000" },
+    { level: 2, name: "告警信息", open_color: "#67C23A", close_color: "#E6A23C" },
+    { level: 1, name: "提示信息", open_color: "#67C23A", close_color: "#67C23A" },
     { level: 4, name: "操作记录", open_color: "#00FFFF", close_color: "#00FFFF" }
   ],
   types: [
     { type_id: 1, name: "遥信变位" },
     { type_id: 2, name: "遥测越限" },
-    { type_id: 8, name: "人工遥控" },
-    { type_id: 9, name: "人工遥调" },
+    { type_id: 3, name: "厂站工况" },
+    { type_id: 4, name: "结点工况" },
+    { type_id: 8, name: "遥控" },
+    { type_id: 9, name: "人工操作" },
     { type_id: 10, name: "事件SOE" },
     { type_id: 28, name: "保护动作" }
   ]
@@ -511,11 +513,15 @@ export interface MockRealtimeWarn {
   time: string;
   timestamp: number;
   content: string;
+  full_text?: string;
   level: number;
   level_name: string;
   level_color: string;
   type: number;
   type_name: string;
+  is_examine?: boolean;
+  is_revert?: boolean;
+  tabs?: string[];
   fac_id: number;
   fac_name: string;
   bay_id: number;
@@ -532,118 +538,110 @@ export interface MockRealtimeWarn {
   confirm_desc: string;
 }
 
-// 服务端内存环形缓存告警列表 (全量中文自动翻译，无需前端查表)
+export function computeMockAlarmTabs(item: {
+  level?: number;
+  level_name?: string;
+  type?: number;
+  type_name?: string;
+  is_examine?: boolean;
+  is_revert?: boolean;
+}): string[] {
+  const tabs = ["时序信息"];
+  if (item.level_name === "提示信息" || item.level === 1) tabs.push("提示信息");
+  if (item.level_name === "告警信息" || item.level === 2) tabs.push("告警信息");
+  if (item.level_name === "事故信息" || item.level === 3) tabs.push("事故信息");
+
+  if (item.type_name === "遥信变位" || item.type === 1) tabs.push("遥信变位");
+  if (item.type_name === "遥测越限" || item.type === 2) tabs.push("遥测越限");
+  if (item.type_name === "厂站工况" || item.type === 3) tabs.push("厂站工况");
+  if (item.type_name === "结点工况" || item.type === 4) tabs.push("结点工况");
+  if (item.type_name === "遥控" || item.type === 8) tabs.push("遥控");
+  if (item.type_name === "人工操作" || item.type === 9) tabs.push("人工操作");
+
+  if (item.is_examine === true) {
+    tabs.push("检修信息");
+  }
+  if (item.is_revert === false && item.is_examine === false) {
+    tabs.push("未复归信息");
+  }
+
+  return tabs;
+}
+
+// 服务端内存环形缓存告警列表 (严格按后台重构规范：单调递增 seq_id，标准色彩与已翻译语义)
 let realtimeWarnList: MockRealtimeWarn[] = [
   {
-    seq_id: 1001,
-    time: "2026-10-23 21:50:00.000",
-    timestamp: Math.floor(Date.now() / 1000) - 300,
-    content: "220kV 东郊变 2211断路器 事故跳闸(分)",
-    level: 3,
-    level_name: "事故跳闸",
-    level_color: "#FF0000",
-    type: 1,
-    type_name: "遥信变位",
-    fac_id: 4000003,
-    fac_name: "东郊变电站",
-    bay_id: 430000001,
-    bay_name: "220kV第一线间隔",
-    dev_id: 7000001,
-    dev_name: "2211断路器",
-    key_id: 61000067,
-    key_name: "2211开关位置信号",
-    val: 0,
-    val_desc: "分闸/断开",
-    status: 10,
-    status_desc: "事故跳闸(分)",
-    confirm: 0,
-    confirm_desc: "未确认"
-  },
-  {
-    seq_id: 1002,
-    time: "2026-10-23 21:50:01.000",
-    timestamp: Math.floor(Date.now() / 1000) - 299,
-    content: "东郊变电站 1号主变压器 过流保护II段动作",
-    level: 3,
-    level_name: "事故跳闸",
-    level_color: "#FF0000",
-    type: 28,
-    type_name: "保护动作",
-    fac_id: 4000003,
-    fac_name: "东郊变电站",
-    bay_id: 430000001,
-    bay_name: "1号主变间隔",
-    dev_id: 7000002,
-    dev_name: "1号主变保护测控屏",
-    key_id: 52000005,
-    key_name: "过流保护动作出口",
+    seq_id: 1045,
+    timestamp: Math.floor(Date.now() / 1000) - 180,
+    time: new Date(Date.now() - 180000).toISOString().replace('T', ' ').slice(0, 23),
+    content: "东郊变电站 1号主控机 厂站工况 双机热备主备切换",
+    full_text: "提示信息  " + new Date(Date.now() - 180000).toISOString().replace('T', ' ').slice(0, 23) + "  东郊变电站 1号主控机 厂站工况 双机热备主备切换",
+    level: 1,
+    level_name: "提示信息",
+    level_color: "#67C23A",
+    type: 3,
+    type_name: "厂站工况",
+    is_examine: false,
+    is_revert: true,
+    tabs: ["时序信息", "提示信息", "厂站工况"],
+    fac_id: 400010,
+    fac_name: "东郊变",
+    bay_id: 430001001,
+    bay_name: "站控层网络",
+    dev_id: 51000099,
+    dev_name: "监控主机A",
+    key_id: 52000090,
+    key_name: "双机热备状态",
     val: 1,
-    val_desc: "合闸/动作",
-    status: 9,
-    status_desc: "保护动作(合)",
-    confirm: 0,
-    confirm_desc: "未确认"
+    val_desc: "主机正常",
+    status: 0,
+    status_desc: "正常",
+    confirm: 1,
+    confirm_desc: "已确认"
   },
   {
-    seq_id: 1003,
-    time: "2026-10-23 21:50:02.120",
-    timestamp: Math.floor(Date.now() / 1000) - 298,
-    content: "东郊变电站 1号主变高压侧 A相母线电流 越限值: 1250.50 A (上限: 1200.00 A)",
-    level: 2,
-    level_name: "告警越限",
-    level_color: "#FF9900",
-    type: 2,
-    type_name: "遥测越限",
+    seq_id: 1046,
+    timestamp: Math.floor(Date.now() / 1000) - 150,
+    time: new Date(Date.now() - 150000).toISOString().replace('T', ' ').slice(0, 23),
+    content: "35kV配电室 远动通信网关 结点工况 GPS/北斗对时时钟锁定",
+    full_text: "提示信息  " + new Date(Date.now() - 150000).toISOString().replace('T', ' ').slice(0, 23) + "  35kV配电室 远动通信网关 结点工况 GPS/北斗对时时钟锁定",
+    level: 1,
+    level_name: "提示信息",
+    level_color: "#67C23A",
+    type: 4,
+    type_name: "结点工况",
+    is_examine: false,
+    is_revert: true,
+    tabs: ["时序信息", "提示信息", "结点工况"],
     fac_id: 4000003,
-    fac_name: "东郊变电站",
+    fac_name: "速利达光伏",
     bay_id: 430000001,
-    bay_name: "1号主变间隔",
-    dev_id: 7000002,
-    dev_name: "1号主变保护测控屏",
-    key_id: 51000003,
-    key_name: "高压侧A相电流Ia",
-    val: 1250.5,
-    val_desc: "越上限 (1250.5A)",
-    status: 8,
-    status_desc: "遥测越上限",
-    confirm: 0,
-    confirm_desc: "未确认"
-  },
-  {
-    seq_id: 1004,
-    time: "2026-10-23 21:50:00.040",
-    timestamp: Math.floor(Date.now() / 1000) - 297,
-    content: "东郊变电站 220kV第一线间隔 距离保护I段动作事件 (时标精度 1ms)",
-    level: 3,
-    level_name: "事故跳闸",
-    level_color: "#FF0000",
-    type: 10,
-    type_name: "事件SOE",
-    fac_id: 4000003,
-    fac_name: "东郊变电站",
-    bay_id: 430000001,
-    bay_name: "220kV第一线间隔",
-    dev_id: 7000001,
-    dev_name: "2211断路器",
-    key_id: 61000067,
-    key_name: "距离保护I段SOE",
+    bay_name: "35kV配电室",
+    dev_id: 7000009,
+    dev_name: "通信网关",
+    key_id: 61000090,
+    key_name: "北斗对时状态",
     val: 1,
-    val_desc: "SOE动作就位",
-    status: 11,
-    status_desc: "遥信SOE动作",
-    confirm: 0,
-    confirm_desc: "未确认"
+    val_desc: "同步锁定",
+    status: 0,
+    status_desc: "正常",
+    confirm: 1,
+    confirm_desc: "已确认"
   },
   {
-    seq_id: 1005,
-    time: "2026-10-23 21:45:12.000",
-    timestamp: Math.floor(Date.now() / 1000) - 600,
-    content: "苏州晟高 苏州晟高一体柜 6#开关 调度人工遥控合闸 (执行成功)",
-    level: 4,
-    level_name: "操作记录",
-    level_color: "#00FFFF",
+    seq_id: 1047,
+    timestamp: Math.floor(Date.now() / 1000) - 130,
+    time: new Date(Date.now() - 130000).toISOString().replace('T', ' ').slice(0, 23),
+    content: "苏州晟高 6#开关 调度遥控合闸 执行成功",
+    full_text: "提示信息  " + new Date(Date.now() - 130000).toISOString().replace('T', ' ').slice(0, 23) + "  苏州晟高 6#开关 调度遥控合闸 执行成功",
+    level: 1,
+    level_name: "提示信息",
+    level_color: "#67C23A",
     type: 8,
-    type_name: "人工遥控",
+    type_name: "遥控",
+    is_examine: false,
+    is_revert: true,
+    tabs: ["时序信息", "提示信息", "遥控"],
     fac_id: 4000003,
     fac_name: "苏州晟高",
     bay_id: 430000001,
@@ -653,11 +651,156 @@ let realtimeWarnList: MockRealtimeWarn[] = [
     key_id: 54000003,
     key_name: "6遥控666",
     val: 1,
-    val_desc: "合闸指令执行",
+    val_desc: "遥控执行合闸",
     status: 0,
-    status_desc: "正常",
+    status_desc: "执行成功",
     confirm: 1,
     confirm_desc: "已确认"
+  },
+  {
+    seq_id: 1048,
+    timestamp: Math.floor(Date.now() / 1000) - 120,
+    time: new Date(Date.now() - 120000).toISOString().replace('T', ' ').slice(0, 23),
+    content: "220kV 东郊变 1号主变高侧A相电流 遥测越限 (当前: 1250.5A, 上限: 1200.0A)",
+    full_text: "告警信息  " + new Date(Date.now() - 120000).toISOString().replace('T', ' ').slice(0, 23) + "  220kV 东郊变 1号主变高侧A相电流 遥测越限 (当前: 1250.5A, 上限: 1200.0A)",
+    level: 2,
+    level_name: "告警信息",
+    level_color: "#E6A23C",
+    type: 2,
+    type_name: "遥测越限",
+    is_examine: false,
+    is_revert: false,
+    tabs: ["时序信息", "告警信息", "遥测越限", "未复归信息"],
+    fac_id: 400010,
+    fac_name: "东郊变",
+    bay_id: 430001001,
+    bay_name: "1号主变间隔",
+    dev_id: 51000001,
+    dev_name: "1号主变",
+    key_id: 51000003,
+    key_name: "高侧A相电流",
+    val: 1250.5,
+    val_desc: "越上限",
+    status: 8,
+    status_desc: "越上限",
+    confirm: 0,
+    confirm_desc: "未确认"
+  },
+  {
+    seq_id: 1049,
+    timestamp: Math.floor(Date.now() / 1000) - 90,
+    time: new Date(Date.now() - 90000).toISOString().replace('T', ' ').slice(0, 23),
+    content: "35kV 高压光伏站 311开关 变位(合) -> 变位(分)",
+    full_text: "提示信息  " + new Date(Date.now() - 90000).toISOString().replace('T', ' ').slice(0, 23) + "  35kV 高压光伏站 311开关 变位(合) -> 变位(分)",
+    level: 1,
+    level_name: "提示信息",
+    level_color: "#67C23A",
+    type: 1,
+    type_name: "遥信变位",
+    is_examine: false,
+    is_revert: true,
+    tabs: ["时序信息", "提示信息", "遥信变位"],
+    fac_id: 4000003,
+    fac_name: "苏州晟高",
+    bay_id: 430000001,
+    bay_name: "苏州晟高一体柜",
+    dev_id: 7000001,
+    dev_name: "311断路器",
+    key_id: 61000006,
+    key_name: "311开关位置",
+    val: 0,
+    val_desc: "分闸/断开",
+    status: 8,
+    status_desc: "变位(分)",
+    confirm: 0,
+    confirm_desc: "未确认"
+  },
+  {
+    seq_id: 1050,
+    timestamp: Math.floor(Date.now() / 1000) - 60,
+    time: new Date(Date.now() - 60000).toISOString().replace('T', ' ').slice(0, 23),
+    content: "220kV 东郊变 2211开关 事故跳闸",
+    full_text: "事故信息  " + new Date(Date.now() - 60000).toISOString().replace('T', ' ').slice(0, 23) + "  220kV 东郊变 2211开关 事故跳闸",
+    level: 3,
+    level_name: "事故信息",
+    level_color: "#FF0000",
+    type: 1,
+    type_name: "遥信变位",
+    is_examine: false,
+    is_revert: false,
+    tabs: ["时序信息", "事故信息", "遥信变位", "未复归信息"],
+    fac_id: 400010,
+    fac_name: "东郊变",
+    bay_id: 430001080,
+    bay_name: "220kV出线间隔",
+    dev_id: 51000001,
+    dev_name: "2211断路器",
+    key_id: 52000001,
+    key_name: "2211开关位置",
+    val: 0,
+    val_desc: "分闸/断开",
+    status: 10,
+    status_desc: "事故跳闸(分)",
+    confirm: 0,
+    confirm_desc: "未确认"
+  },
+  {
+    seq_id: 1051,
+    timestamp: Math.floor(Date.now() / 1000) - 30,
+    time: new Date(Date.now() - 30000).toISOString().replace('T', ' ').slice(0, 23),
+    content: "220kV 东郊变 1号主变保护装置 人工操作 检修挂牌投入",
+    full_text: "提示信息  " + new Date(Date.now() - 30000).toISOString().replace('T', ' ').slice(0, 23) + "  220kV 东郊变 1号主变保护装置 人工操作 检修挂牌投入",
+    level: 1,
+    level_name: "提示信息",
+    level_color: "#67C23A",
+    type: 9,
+    type_name: "人工操作",
+    is_examine: true,
+    is_revert: false,
+    tabs: ["时序信息", "提示信息", "人工操作", "检修信息"],
+    fac_id: 400010,
+    fac_name: "东郊变",
+    bay_id: 430001001,
+    bay_name: "1号主变间隔",
+    dev_id: 51000002,
+    dev_name: "主变保护测控",
+    key_id: 52000008,
+    key_name: "检修压板",
+    val: 1,
+    val_desc: "投入",
+    status: 0,
+    status_desc: "检修态",
+    confirm: 0,
+    confirm_desc: "未确认"
+  },
+  {
+    seq_id: 1052,
+    timestamp: Math.floor(Date.now() / 1000) - 10,
+    time: new Date(Date.now() - 10000).toISOString().replace('T', ' ').slice(0, 23),
+    content: "速利达光伏电站 35kV 101断路器 零序过流I段动作 事故跳闸",
+    full_text: "事故信息  " + new Date(Date.now() - 10000).toISOString().replace('T', ' ').slice(0, 23) + "  速利达光伏电站 35kV 101断路器 零序过流I段动作 事故跳闸",
+    level: 3,
+    level_name: "事故信息",
+    level_color: "#FF0000",
+    type: 1,
+    type_name: "遥信变位",
+    is_examine: false,
+    is_revert: false,
+    tabs: ["时序信息", "事故信息", "遥信变位", "未复归信息"],
+    fac_id: 4000003,
+    fac_name: "速利达光伏",
+    bay_id: 430000001,
+    bay_name: "35kV配电室",
+    dev_id: 7000001,
+    dev_name: "101断路器",
+    key_id: 61000006,
+    key_name: "101开关位置",
+    val: 0,
+    val_desc: "分闸/断开",
+    status: 10,
+    status_desc: "事故跳闸(分)",
+    confirm: 0,
+    confirm_desc: "未确认"
   }
 ];
 
@@ -778,172 +921,24 @@ export function handleGetScadaWarnConfig() {
   };
 }
 
-let lastGenTime = Date.now();
-let dynamicSeq = 1010;
-
-const DYNAMIC_ALARM_TEMPLATES = [
-  {
-    fac_id: 10001,
-    fac_name: "速利达光伏电站",
-    bay_id: 20003,
-    bay_name: "SVG间隔",
-    dev_id: 30006,
-    dev_name: "SVG无功补偿装置",
-    key_id: 52000012,
-    key_name: "SVG晶闸管超温报警",
-    level: 2,
-    level_name: "告警越限",
-    level_color: "#FF9900",
-    type: 2,
-    type_name: "遥测越限",
-    val: 88.5,
-    val_desc: "温度越上限 (88.5℃)",
-    content: "速利达光伏电站 SVG间隔 SVG无功补偿装置 晶闸管阀组超温告警 (88.5℃)"
-  },
-  {
-    fac_id: 10001,
-    fac_name: "速利达光伏电站",
-    bay_id: 20004,
-    bay_name: "防孤岛保护间隔",
-    dev_id: 30009,
-    dev_name: "微机防孤岛保护测控装置",
-    key_id: 52000015,
-    key_name: "频率突变保护动作",
-    level: 3,
-    level_name: "事故跳闸",
-    level_color: "#FF0000",
-    type: 28,
-    type_name: "保护动作",
-    val: 1,
-    val_desc: "保护动作(合)",
-    content: "速利达光伏电站 防孤岛保护间隔 防孤岛保护装置 动作跳闸"
-  },
-  {
-    fac_id: 10001,
-    fac_name: "速利达光伏电站",
-    bay_id: 20006,
-    bay_name: "并网柜间隔",
-    dev_id: 30013,
-    dev_name: "35kV主断路器101",
-    key_id: 61000088,
-    key_name: "101开关分合状态",
-    level: 1,
-    level_name: "提示预告",
-    level_color: "#00FF00",
-    type: 1,
-    type_name: "遥信变位",
-    val: 1,
-    val_desc: "合闸/闭合",
-    content: "速利达光伏电站 并网柜间隔 35kV主断路器101 遥信变位 (合闸)"
-  },
-  {
-    fac_id: 10002,
-    fac_name: "东郊变电站",
-    bay_id: 20011,
-    bay_name: "220kV第一线间隔",
-    dev_id: 30021,
-    dev_name: "2211断路器",
-    key_id: 61000067,
-    key_name: "2211开关气压低告警",
-    level: 2,
-    level_name: "告警越限",
-    level_color: "#FF9900",
-    type: 1,
-    type_name: "遥信变位",
-    val: 0,
-    val_desc: "气压低闭锁",
-    content: "东郊变电站 220kV第一线间隔 2211断路器 SF6气压降低一级告警"
-  },
-  {
-    fac_id: 10002,
-    fac_name: "东郊变电站",
-    bay_id: 20012,
-    bay_name: "1号主变间隔",
-    dev_id: 30025,
-    dev_name: "1号主变保护测控屏",
-    key_id: 52000022,
-    key_name: "高压侧B相电流",
-    level: 2,
-    level_name: "告警越限",
-    level_color: "#FF9900",
-    type: 2,
-    type_name: "遥测越限",
-    val: 1215.3,
-    val_desc: "越上限 (1215.3A)",
-    content: "东郊变电站 1号主变间隔 高压侧B相电流 越限值: 1215.3 A"
-  },
-  {
-    fac_id: 10003,
-    fac_name: "苏州晟高",
-    bay_id: 20021,
-    bay_name: "苏州晟高一体柜",
-    dev_id: 30031,
-    dev_name: "6#断路器",
-    key_id: 54000003,
-    key_name: "储能并网遥控合闸",
-    level: 4,
-    level_name: "操作记录",
-    level_color: "#00FFFF",
-    type: 8,
-    type_name: "人工遥控",
-    val: 1,
-    val_desc: "合闸成功",
-    content: "苏州晟高 苏州晟高一体柜 6#断路器 远方遥控合闸就位"
-  }
-];
-
-let templateIndex = 0;
+let dynamicSeq = 1053;
 
 /**
- * 2. GET /api/scada/warn/realtime
+ * 2. GET /api/scada/warn/realtime (后端改动：不带游标时默认倒序获取系统最新N条告警，按时间正序排好返回；带游标时增量拉取)
  */
 export function handleGetScadaWarnRealtime(query: { limit?: any; after_seq?: any }) {
-  const now = Date.now();
-  // 每 2~3 秒动态生成 1 条新告警，丰富现场数据
-  if (now - lastGenTime > 2500) {
-    lastGenTime = now;
-    dynamicSeq++;
-    const tpl = DYNAMIC_ALARM_TEMPLATES[templateIndex % DYNAMIC_ALARM_TEMPLATES.length];
-    templateIndex++;
-
-    const dateStr = new Date().toISOString().replace('T', ' ').slice(0, 23);
-    const newItem: MockRealtimeWarn = {
-      seq_id: dynamicSeq,
-      time: dateStr,
-      timestamp: Math.floor(now / 1000),
-      content: tpl.content,
-      level: tpl.level,
-      level_name: tpl.level_name,
-      level_color: tpl.level_color,
-      type: tpl.type,
-      type_name: tpl.type_name,
-      fac_id: tpl.fac_id,
-      fac_name: tpl.fac_name,
-      bay_id: tpl.bay_id,
-      bay_name: tpl.bay_name,
-      dev_id: tpl.dev_id,
-      dev_name: tpl.dev_name,
-      key_id: tpl.key_id,
-      key_name: tpl.key_name,
-      val: tpl.val,
-      val_desc: tpl.val_desc,
-      status: tpl.level === 3 ? 10 : (tpl.level === 2 ? 8 : 7),
-      status_desc: tpl.val_desc,
-      confirm: 0,
-      confirm_desc: "未确认"
-    };
-
-    realtimeWarnList.push(newItem);
-    if (realtimeWarnList.length > 500) {
-      realtimeWarnList = realtimeWarnList.slice(-500);
-    }
-  }
-
   const limit = Math.min(Math.max(1, Number(query.limit) || 100), 500);
   const afterSeq = Number(query.after_seq) || 0;
 
-  const filtered = realtimeWarnList.filter(item => item.seq_id > afterSeq);
-  const result = filtered.slice(0, limit);
+  let result: MockRealtimeWarn[] = [];
+  if (afterSeq === 0) {
+    // 不带游标 (或 after_seq === 0)：默认获取系统最新产生的 limit 条告警，按时间正序排好返回
+    result = realtimeWarnList.slice(-limit);
+  } else {
+    // 增量游标：只拉取比该序号更新的记录 (按时间/seq_id正序)
+    const filtered = realtimeWarnList.filter(item => item.seq_id > afterSeq);
+    result = filtered.slice(0, limit);
+  }
 
   return {
     code: 200,

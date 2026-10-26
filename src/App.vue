@@ -50,7 +50,16 @@ import {
   setIndexScreen
 } from './utils/screenFileService';
 import { fetchAllDatasetsFromDisk } from './utils/datasetFileService';
-import { loadLocalScadaConfigFile, invalidateAssociatedPointsCache, globalUnconfirmedAlarmCount } from './utils/scadaClient';
+import { 
+  loadLocalScadaConfigFile, 
+  invalidateAssociatedPointsCache, 
+  globalUnconfirmedAlarmCount, 
+  syncRealtimeAlarms,
+  fetchScadaConfig,
+  convertFacilitiesToDatasets,
+  scadaFacilities
+} from './utils/scadaClient';
+import { fetchBaseConfig, computeSafetyDays, scheduleMidnightTask, saveScreenOrder, applyScreenOrder } from './utils/cfgFileService';
 import { currentUser, canEditCanvas, isLoggedIn, logoutUser } from './utils/auth';
 import { 
   Sparkles, 
@@ -60,7 +69,7 @@ import {
   HardDrive,
   PenTool,
   TrendingUp,
-  Bell,
+  ShieldAlert,
   LineChart,
   History,
   FileSpreadsheet,
@@ -213,7 +222,7 @@ const mdiWindows = ref<MdiWindowItem[]>([
     id: 'alarm-window',
     title: '全站告警',
     subtitle: '',
-    icon: Bell,
+    icon: ShieldAlert,
     isOpen: false,
     isMinimized: false,
     isMaximized: true,
@@ -275,7 +284,27 @@ const getWindow = (id: string): MdiWindowItem => {
   return mdiWindows.value.find(w => w.id === id) || mdiWindows.value[0];
 };
 
-const openWindow = (id: string) => {
+// 从 cfg/base.json 检索并重排画面顺序 (支持热更新与冷启动检索)
+const reloadAndApplyScreenOrder = async () => {
+  try {
+    const cfg = await fetchBaseConfig();
+    if (cfg && Array.isArray(cfg.SCREEN_ORDER) && cfg.SCREEN_ORDER.length > 0) {
+      screens.value = applyScreenOrder(screens.value, cfg.SCREEN_ORDER);
+    }
+  } catch (err) {
+    console.warn('[SCADA] 检索 cfg/base.json 画面顺序失败:', err);
+  }
+};
+
+// 画面上下顺序调整并自动持久化到 cfg/base.json
+const handleReorderScreens = async (newScreens: ScreenItem[]) => {
+  screens.value = newScreens;
+  const names = newScreens.map(s => s.name);
+  await saveScreenOrder(names);
+  showDiskNotification('已保存画面显示顺序至 cfg/base.json');
+};
+
+const openWindow = async (id: string) => {
   const win = mdiWindows.value.find(w => w.id === id);
   if (win) {
     win.isOpen = true;
@@ -284,6 +313,11 @@ const openWindow = (id: string) => {
       win.isMaximized = true;
     }
     focusWindow(id);
+
+    // 每次打开 图形编辑界面(graphic-editor) / 实时监控界面(monitor-screen) 就在此检索画面顺序并应用
+    if (id === 'graphic-editor' || id === 'monitor-screen') {
+      await reloadAndApplyScreenOrder();
+    }
   }
 };
 
@@ -446,8 +480,7 @@ const bottomBarWindows = computed<BottomWindowItem[]>(() => {
     isOpen: w.isOpen,
     isMinimized: w.isMinimized,
     isMaximized: w.isMaximized,
-    isActive: activeWindowId.value === w.id,
-    badge: w.id === 'alarm-window' ? 12 : undefined
+    isActive: activeWindowId.value === w.id
   }));
 });
 const showSymbolModal = ref(false);
@@ -473,6 +506,10 @@ const indexScreenId = ref<string>(bootstrapData.indexId);
 const indexScreenName = ref<string>(bootstrapData.indexName);
 const diskNotification = ref('');
 let diskNotificationTimer: any = null;
+
+// 底栏安全运行天数 (严格从 cfg/base.json 读取 SAFE_DATA_START 并在启动及每日零点计算)
+const safetyDays = ref<number>(computeSafetyDays('2025-05-06'));
+let cleanupMidnightTask: (() => void) | null = null;
 
 const showDiskNotification = (msg: string) => {
   diskNotification.value = msg;
@@ -1898,6 +1935,7 @@ const selectedComponent = computed(() => {
 
 // Dynamic Dataset Simulation Loop & Jump Screen Event Listener
 let simulationTimer: any = null;
+let alarmSyncTimer: any = null;
 
 // Tele-Control Execution (YK 遥控指令执行与遥信联动刷新)
 const handleExecuteControl = (deviceId: string, pointId: number | string, targetValue: number) => {
@@ -1996,6 +2034,15 @@ onMounted(async () => {
           localStorage.setItem('scada_index_screen_name', indexScreenName.value);
         } catch {}
       }
+      // 检索并应用 cfg/base.json 中的 SCREEN_ORDER
+      await reloadAndApplyScreenOrder();
+      try {
+        const baseCfg = await fetchBaseConfig();
+        if (!baseCfg?.SCREEN_ORDER || baseCfg.SCREEN_ORDER.length === 0) {
+          await saveScreenOrder(screens.value.map(s => s.name));
+        }
+      } catch {}
+
       // 匹配已配置的主索引大屏作为初始界面，否则取首个大屏
       let targetScreen = res.screens[0];
       if (indexScreenId.value || indexScreenName.value) {
@@ -2045,11 +2092,26 @@ onMounted(async () => {
     console.warn('[SCADA] 自动加载 data/ 目录数据集失败:', err);
   }
 
-  // 4. 启动时加载本地持久化 scada_config.json 测点配置树 (只加载一次)
+  // 4. 启动时加载本地持久化 scada_config.json 测点配置树，并自动发起请求向后台接口获取最新测点配置同步点表
   try {
     await loadLocalScadaConfigFile();
   } catch (err) {
     console.warn('[SCADA] 启动加载本地 scada_config.json 失败:', err);
+  }
+
+  // 每次程序启动时，自动调用发起一次获取配置请求，自动同步后台点表 (免去工程师手动点击获取配置)
+  try {
+    const cfgRes = await fetchScadaConfig();
+    if (cfgRes.success && cfgRes.data && cfgRes.data.length > 0) {
+      const syncedDatasets = convertFacilitiesToDatasets(scadaFacilities.value);
+      if (syncedDatasets && syncedDatasets.length > 0) {
+        datasets.value = syncedDatasets;
+        syncDatasetFastIndex(syncedDatasets);
+        console.log(`[SCADA] 启动已自动向后台接口同步测点配置点表: 共 ${cfgRes.data.length} 个厂站`);
+      }
+    }
+  } catch (err) {
+    console.warn('[SCADA] 启动自动同步后台点表配置失败 (保持本地已加载点表):', err);
   }
 
   recordHistory();
@@ -2058,6 +2120,28 @@ onMounted(async () => {
   // Only start synthetic simulation timer if explicitly running offline demo mode without SCADA
   // In industrial SCADA mode, realtime polling is strictly handled by fetchScadaRealtime
   simulationTimer = null;
+
+  // 严格从现场实际接口轮询同步告警未确认状态与数据 (绝不虚构)
+  syncRealtimeAlarms().catch(() => {});
+  alarmSyncTimer = setInterval(() => {
+    syncRealtimeAlarms().catch(() => {});
+  }, 2000);
+
+  // 5. 启动时自动检索磁盘 cfg/base.json，并计算安全运行天数 (并在夜里 00:00:00 准时检索磁盘条目重新计算)
+  const updateSafetyDaysFromDisk = async () => {
+    try {
+      const cfg = await fetchBaseConfig();
+      if (cfg?.SAFE_DATA_START) {
+        safetyDays.value = computeSafetyDays(cfg.SAFE_DATA_START);
+      }
+    } catch (err) {
+      console.warn('[SCADA] 读取 cfg/base.json 失败:', err);
+    }
+  };
+  updateSafetyDaysFromDisk();
+  cleanupMidnightTask = scheduleMidnightTask(() => {
+    updateSafetyDaysFromDisk();
+  });
 
   window.addEventListener('resize', fitToScreen);
   window.addEventListener('keydown', handleKeyDown);
@@ -2095,7 +2179,8 @@ const handleLoginSuccess = async () => {
 };
 
 // 进入实时大屏监控：加载当前画面的已保存版本至监控窗口 (修改需保存后才在实时监控中体现)
-const handleOpenPreview = () => {
+const handleOpenPreview = async () => {
+  await reloadAndApplyScreenOrder();
   const target = screens.value.find(s => s.id === activeScreenId.value) || screens.value[0];
   if (target) {
     monitorActiveScreenId.value = target.id;
@@ -2120,6 +2205,8 @@ const handleExitApp = async () => {
 
 onBeforeUnmount(() => {
   if (simulationTimer) clearInterval(simulationTimer);
+  if (alarmSyncTimer) clearInterval(alarmSyncTimer);
+  if (cleanupMidnightTask) cleanupMidnightTask();
   if (diskNotificationTimer) clearTimeout(diskNotificationTimer);
   window.removeEventListener('resize', fitToScreen);
   window.removeEventListener('keydown', handleKeyDown);
@@ -2346,6 +2433,7 @@ onBeforeUnmount(() => {
                 @open:disk-storage="showDiskStorageModal = true"
                 @save:current-disk="handleSaveCurrentScreenToDisk"
                 @set:index-screen="handleSetIndexScreen"
+                @reorder:screens="handleReorderScreens"
               />
             </div>
 
@@ -2422,6 +2510,7 @@ onBeforeUnmount(() => {
             @logout="handleLogout"
             @open:alarm="openWindow('alarm-window')"
             @open:window="openWindow"
+            @reorder:screens="handleReorderScreens"
           />
           <!-- 极速冷启动闪烁屏蔽帘：在确认真实主索引大屏解析完成前提供平滑暗黑背景，彻底杜绝一次系统图一闪而过 -->
           <div 
@@ -2591,7 +2680,7 @@ onBeforeUnmount(() => {
       :windows="bottomBarWindows"
       :activeWindowId="activeWindowId"
       :unconfirmedAlarmCount="globalUnconfirmedAlarmCount"
-      :safetyDays="1428"
+      :safetyDays="safetyDays"
       @open:window="openWindow"
       @toggle:window="toggleWindow"
       @close:window="closeWindow"
