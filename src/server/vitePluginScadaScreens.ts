@@ -31,7 +31,14 @@ import {
   handleGetScadaRealtime,
   handlePostScadaYk,
   handlePostScadaYt,
-  handlePostScadaUnflash
+  handlePostScadaUnflash,
+  handleGetScadaWarnConfig,
+  handleGetScadaWarnRealtime,
+  handlePostScadaWarnAck,
+  handlePostScadaWarnAckAll,
+  handlePostScadaWarnClear,
+  handlePostScadaWarnHistory,
+  handleGetScadaWarnReport
 } from './scadaMockBackend';
 
 /**
@@ -143,6 +150,56 @@ function registerEndpoints(middlewares: any) {
           const body = await parseJsonBody(req);
           const result = handlePostScadaUnflash(body);
           return sendJson(res, result.code || 200, result);
+        }
+
+        // ==================== 告警模块 HTTP API (/api/scada/warn/*) ====================
+        // 6. GET /api/scada/warn/config - 获取告警元数据与配置字典
+        if (method === 'GET' && pathname === '/api/scada/warn/config') {
+          const result = handleGetScadaWarnConfig();
+          return sendJson(res, 200, result);
+        }
+
+        // 7. GET /api/scada/warn/realtime - 获取实时告警列表 (支持增量轮询)
+        if (method === 'GET' && pathname === '/api/scada/warn/realtime') {
+          const limit = parsedUrl.searchParams.get('limit');
+          const after_seq = parsedUrl.searchParams.get('after_seq');
+          const result = handleGetScadaWarnRealtime({ limit, after_seq });
+          return sendJson(res, 200, result);
+        }
+
+        // 8. POST /api/scada/warn/ack - 单条/批量告警确认 (对位复归)
+        if (method === 'POST' && pathname === '/api/scada/warn/ack') {
+          const body = await parseJsonBody(req);
+          const result = handlePostScadaWarnAck(body);
+          return sendJson(res, 200, result);
+        }
+
+        // 9. POST /api/scada/warn/ack_all - 告警全量一键确认
+        if (method === 'POST' && pathname === '/api/scada/warn/ack_all') {
+          const body = await parseJsonBody(req);
+          const result = handlePostScadaWarnAckAll(body);
+          return sendJson(res, 200, result);
+        }
+
+        // 10. POST /api/scada/warn/clear - 实时告警清屏
+        if (method === 'POST' && pathname === '/api/scada/warn/clear') {
+          const result = handlePostScadaWarnClear();
+          return sendJson(res, 200, result);
+        }
+
+        // 11. POST /api/scada/warn/history - 历史告警综合检索
+        if (method === 'POST' && pathname === '/api/scada/warn/history') {
+          const body = await parseJsonBody(req);
+          const result = handlePostScadaWarnHistory(body);
+          return sendJson(res, 200, result);
+        }
+
+        // 12. GET /api/scada/warn/report - 故障智能推理与诊断分析报告
+        if (method === 'GET' && pathname === '/api/scada/warn/report') {
+          const key_id = parsedUrl.searchParams.get('key_id');
+          const timestamp = parsedUrl.searchParams.get('timestamp');
+          const result = handleGetScadaWarnReport({ key_id, timestamp });
+          return sendJson(res, 200, result);
         }
 
         return sendJson(res, 404, { code: 404, msg: `未找到 SCADA 接口: ${method} ${pathname}` });

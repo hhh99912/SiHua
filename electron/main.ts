@@ -136,13 +136,29 @@ app.commandLine.appendSwitch('disable-print-preview');
 app.commandLine.appendSwitch('disable-client-side-phishing-detection');
 app.commandLine.appendSwitch('no-pings');
 
-// V8 与 Chromium 内存配置：彻底消除人工 512MB 封顶！
-// 智能根据系统内存动态分配：至少 1536MB，最大 2048MB（4GB+机器取 2048MB）
+// V8 与 Chromium 内存配置：彻底消除人工 512MB 封顶与内存挤占引起的系统崩溃！
+// 智能根据系统物理内存动态分配：严禁超出物理内存上限触发 Linux OOM-Killer！
+// 若工控机物理内存 <= 2.5GB (2GB工控机)，V8 限制在 800MB；4GB工控机限制在 1400MB；8GB+ 限制在 2048MB
 const totalHostMemMb = Math.floor(os.totalmem() / 1024 / 1024);
-const v8MaxOldSpaceMb = Math.min(2048, Math.max(1536, Math.floor(totalHostMemMb * 0.5)));
-app.commandLine.appendSwitch('js-flags', `--max-old-space-size=${v8MaxOldSpaceMb} --expose-gc`);
+let v8MaxOldSpaceMb = 1400;
+if (totalHostMemMb <= 2500) {
+  v8MaxOldSpaceMb = 800;
+} else if (totalHostMemMb <= 4500) {
+  v8MaxOldSpaceMb = 1400;
+} else {
+  v8MaxOldSpaceMb = 2048;
+}
+
+app.commandLine.appendSwitch('js-flags', `--max-old-space-size=${v8MaxOldSpaceMb} --expose-gc --optimize-for-size --max-semi-space-size=64`);
 app.commandLine.appendSwitch('disk-cache-size', '33554432');
 app.commandLine.appendSwitch('media-cache-size', '8388608');
+
+// Linux 凝思安全操作系统底层内核防重启加固：关闭内核 Panic-on-OOM 与 Softlockup Panic
+if (process.platform === 'linux') {
+  try {
+    exec('sysctl -w vm.panic_on_oom=0 kernel.panic=0 kernel.panic_on_oops=0 kernel.hung_task_panic=0 kernel.softlockup_panic=0 2>/dev/null || true');
+  } catch {}
+}
 
 // 定期在空闲时段触发 V8 垃圾回收以释放无用内存
 if (typeof setInterval !== 'undefined') {
@@ -150,7 +166,7 @@ if (typeof setInterval !== 'undefined') {
     if (typeof global !== 'undefined' && (global as any).gc) {
       try { (global as any).gc(); } catch {}
     }
-  }, 45000);
+  }, 30000);
 }
 
 let mainWindow: BrowserWindow | null = null;

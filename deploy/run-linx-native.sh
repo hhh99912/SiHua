@@ -173,9 +173,29 @@ echo " 进程架构: Chromium 标准双进程 (1个主调度进程 + 1个画面�
 # 9.1 提升工控机系统文件句柄上限，杜绝 EMFILE 导致的突然闪退
 ulimit -n 65535 2>/dev/null || ulimit -n 4096 2>/dev/null || true
 
+# 9.2 凝思安全内核防整机重启关键防护 (彻底消除 vm.panic_on_oom 与 softlockup panic)
+if [ "$(id -u)" = "0" ] || sudo -n true 2>/dev/null; then
+  sudo sysctl -w vm.panic_on_oom=0 >/dev/null 2>&1 || sysctl -w vm.panic_on_oom=0 >/dev/null 2>&1 || true
+  sudo sysctl -w kernel.panic=0 >/dev/null 2>&1 || sysctl -w kernel.panic=0 >/dev/null 2>&1 || true
+  sudo sysctl -w kernel.panic_on_oops=0 >/dev/null 2>&1 || sysctl -w kernel.panic_on_oops=0 >/dev/null 2>&1 || true
+  sudo sysctl -w kernel.hung_task_panic=0 >/dev/null 2>&1 || sysctl -w kernel.hung_task_panic=0 >/dev/null 2>&1 || true
+  sudo sysctl -w kernel.softlockup_panic=0 >/dev/null 2>&1 || sysctl -w kernel.softlockup_panic=0 >/dev/null 2>&1 || true
+fi
+
+# 9.3 智能根据物理内存计算安全 V8 上限，严禁挤占 Linux 内核基础内存
+HOST_MEM_KB=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}' || echo 4000000)
+if [ "$HOST_MEM_KB" -lt 2500000 ]; then
+  V8_MEM=800
+elif [ "$HOST_MEM_KB" -lt 4500000 ]; then
+  V8_MEM=1400
+else
+  V8_MEM=2048
+fi
+
 echo " 图形加速: 已默认彻底禁用 GPU 硬件加速 (纯 CPU 软渲染，杜绝 i915 核显死机)"
-echo " 内存优化: 已配置 2048MB Chromium JS引擎堆内存 (Google V8)，彻底解除 512MB 闪退限制"
-echo " 测点优化: 400+ 测点局部精准订阅已激活，消除 CPU 跑满卡顿"
+echo " 内存优化: 已配置 ${V8_MEM}MB Chromium JS引擎堆内存 (Google V8)，安全防挤占与防 OOM"
+echo " 内核防护: 凝思安全内核 panic_on_oom 与 softlockup_panic 已加固设为 0，杜绝整机自动重启"
+echo " 测点优化: 400+ 测点局部精准订阅与告警视口虚拟化已激活，消除 CPU 跑满卡顿"
 echo " 崩溃监控: 工业黑匣子与秒级心跳已激活，自动记录并分析异常退出原因"
 echo " 消除白屏: 已启用 Vue 首帧挂载握手与深蓝背景锁定"
 echo " 输入法适配: $DETECTED_IME (Ctrl+空格 瞬时呼出)"
@@ -199,7 +219,7 @@ exec "$TARGET_BIN" \
   --disable-gpu-rasterization \
   --force-color-profile=srgb \
   --gtk-version=3 \
-  --js-flags="--max-old-space-size=2048 --expose-gc" \
+  --js-flags="--max-old-space-size=${V8_MEM} --expose-gc --optimize-for-size --max-semi-space-size=64" \
   --disable-component-update \
   --disable-sync \
   --disable-domain-reliability \

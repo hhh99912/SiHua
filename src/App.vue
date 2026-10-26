@@ -50,7 +50,7 @@ import {
   setIndexScreen
 } from './utils/screenFileService';
 import { fetchAllDatasetsFromDisk } from './utils/datasetFileService';
-import { loadLocalScadaConfigFile, invalidateAssociatedPointsCache } from './utils/scadaClient';
+import { loadLocalScadaConfigFile, invalidateAssociatedPointsCache, globalUnconfirmedAlarmCount } from './utils/scadaClient';
 import { currentUser, canEditCanvas, isLoggedIn, logoutUser } from './utils/auth';
 import { 
   Sparkles, 
@@ -2469,7 +2469,7 @@ onBeforeUnmount(() => {
         @update:isMinimized="val => updateWindowProp('alarm-window', 'isMinimized', val)"
       >
         <RealtimeAlarmModal
-          :visible="true"
+          :visible="getWindow('alarm-window').isOpen && !getWindow('alarm-window').isMinimized"
           :isEmbedded="true"
           @close="closeWindow('alarm-window')"
         />
@@ -2590,7 +2590,7 @@ onBeforeUnmount(() => {
     <PrsBottomBar
       :windows="bottomBarWindows"
       :activeWindowId="activeWindowId"
-      :unconfirmedAlarmCount="12"
+      :unconfirmedAlarmCount="globalUnconfirmedAlarmCount"
       :safetyDays="1428"
       @open:window="openWindow"
       @toggle:window="toggleWindow"

@@ -210,3 +210,20 @@ textarea:disabled,
   will-change: opacity;
 }
 
+/* ========================================================================= */
+/* SCADA 未确认告警整行 1s 周期交替闪烁 (工控调度规范)                             */
+/* ========================================================================= */
+@keyframes scadaAlarmRowBlink {
+  0%, 49.9% {
+    background-color: #ffe4e6;
+  }
+  50%, 100% {
+    background-color: #ffffff;
+  }
+}
+
+.scada-alarm-row-blink {
+  animation: scadaAlarmRowBlink 1s infinite steps(1, start) !important;
+}
+
+

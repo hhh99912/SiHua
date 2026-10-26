@@ -1882,3 +1882,327 @@ export function getScadaPointDisplayName(pt: any): string {
   return rawName || '测点';
 }
 
+// ============================================================================
+// SCADA 监控系统 — 告警模块 HTTP API 客户端接口与状态中心
+// ============================================================================
+
+export interface ScadaWarnLevelItem {
+  level: number;
+  name: string;
+  open_color: string;
+  close_color: string;
+}
+
+export interface ScadaWarnTypeItem {
+  type_id: number;
+  name: string;
+}
+
+export interface ScadaWarnConfig {
+  levels: ScadaWarnLevelItem[];
+  types: ScadaWarnTypeItem[];
+}
+
+export interface ScadaRealtimeWarnItem {
+  seq_id: number;
+  time: string;
+  timestamp: number;
+  content: string;
+  level: number;
+  level_name?: string;
+  level_color?: string;
+  type: number;
+  type_name?: string;
+  fac_id?: number;
+  fac_name?: string;
+  bay_id?: number;
+  bay_name?: string;
+  dev_id?: number;
+  dev_name?: string;
+  key_id?: number;
+  key_name?: string;
+  val?: number;
+  val_desc?: string;
+  status?: number;
+  status_desc?: string;
+  confirm: number; // 0: 未确认 (闪烁/高亮), 1: 已确认
+  confirm_desc?: string;
+  selected?: boolean;
+}
+
+export interface ScadaHistoryWarnItem {
+  time: string;
+  timestamp: number;
+  msec?: number;
+  table_no: number;
+  table_name: string;
+  content: string;
+  alias?: string;
+  fac_id?: number;
+  bay_id?: number;
+  dev_id?: number;
+  key_id?: number;
+  status?: number;
+  val?: number;
+  host?: string;
+  operator?: string;
+}
+
+export interface ScadaWarnReport {
+  fac_name: string;
+  bay_name: string;
+  fault_type: string;
+  detail: string;
+  related_events: string[];
+}
+
+// 全局告警配置字典缓存
+export const globalWarnLevels = ref<ScadaWarnLevelItem[]>([
+  { level: 3, name: "事故跳闸", open_color: "#00FF00", close_color: "#FF0000" },
+  { level: 2, name: "告警越限", open_color: "#00FF00", close_color: "#FF9900" },
+  { level: 1, name: "提示预告", open_color: "#00FF00", close_color: "#00FF00" },
+  { level: 4, name: "操作记录", open_color: "#00FFFF", close_color: "#00FFFF" }
+]);
+
+export const globalWarnTypes = ref<ScadaWarnTypeItem[]>([
+  { type_id: 1, name: "遥信变位" },
+  { type_id: 2, name: "遥测越限" },
+  { type_id: 8, name: "人工遥控" },
+  { type_id: 9, name: "人工遥调" },
+  { type_id: 10, name: "事件SOE" },
+  { type_id: 28, name: "保护动作" }
+]);
+
+// 全局未确认告警数量 (响应式供给底栏、顶栏与图元)
+export const globalUnconfirmedAlarmCount = ref<number>(4);
+
+// 全局实时告警列表 (最新活跃队列)
+export const globalRealtimeWarns = ref<ScadaRealtimeWarnItem[]>([]);
+
+/**
+ * 1. 获取告警元数据与配置字典: GET /api/scada/warn/config
+ */
+export async function fetchScadaWarnConfig(): Promise<{ success: boolean; data?: ScadaWarnConfig; error?: string }> {
+  const baseUrl = getScadaApiBaseUrl().replace(/\/+$/, '');
+  const url = baseUrl ? `${baseUrl}/api/scada/warn/config` : '/api/scada/warn/config';
+
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (json && json.code === 200 && json.data) {
+      if (Array.isArray(json.data.levels)) globalWarnLevels.value = json.data.levels;
+      if (Array.isArray(json.data.types)) globalWarnTypes.value = json.data.types;
+      return { success: true, data: json.data };
+    }
+    return { success: false, error: json?.msg || '获取告警字典异常' };
+  } catch (err: any) {
+    return { success: false, error: err?.message || '网络连接异常' };
+  }
+}
+
+/**
+ * 2. 获取实时告警列表 (支持增量轮询): GET /api/scada/warn/realtime
+ */
+export async function fetchScadaWarnRealtime(params?: { limit?: number; after_seq?: number }): Promise<{
+  success: boolean;
+  data?: ScadaRealtimeWarnItem[];
+  total?: number;
+  error?: string;
+}> {
+  const baseUrl = getScadaApiBaseUrl().replace(/\/+$/, '');
+  const limit = params?.limit ?? 100;
+  const afterSeq = params?.after_seq ?? 0;
+  const url = baseUrl
+    ? `${baseUrl}/api/scada/warn/realtime?limit=${limit}&after_seq=${afterSeq}`
+    : `/api/scada/warn/realtime?limit=${limit}&after_seq=${afterSeq}`;
+
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (json && json.code === 200) {
+      return { success: true, data: json.data || [], total: json.total || 0 };
+    }
+    return { success: false, error: json?.msg || '获取实时告警异常' };
+  } catch (err: any) {
+    return { success: false, error: err?.message || '网络连接异常' };
+  }
+}
+
+/**
+ * 3. 单条/批量告警确认 (对位复归): POST /api/scada/warn/ack
+ */
+export async function ackScadaWarn(params: {
+  seq_id?: number;
+  seq_ids?: number[];
+  operator?: string;
+}): Promise<{ success: boolean; cleared_count?: number; error?: string }> {
+  const baseUrl = getScadaApiBaseUrl().replace(/\/+$/, '');
+  const url = baseUrl ? `${baseUrl}/api/scada/warn/ack` : '/api/scada/warn/ack';
+
+  try {
+    const payload: any = { operator: params.operator || 'web_user' };
+    if (params.seq_ids && params.seq_ids.length > 0) {
+      payload.seq_ids = params.seq_ids;
+    } else if (params.seq_id !== undefined) {
+      payload.seq_id = params.seq_id;
+    }
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (json && json.code === 200) {
+      return { success: true, cleared_count: json.cleared_count ?? 0 };
+    }
+    return { success: false, error: json?.msg || '告警确认失败' };
+  } catch (err: any) {
+    return { success: false, error: err?.message || '网络连接异常' };
+  }
+}
+
+/**
+ * 4. 告警全量一键确认: POST /api/scada/warn/ack_all
+ */
+export async function ackAllScadaWarn(params?: { operator?: string }): Promise<{
+  success: boolean;
+  cleared_count?: number;
+  error?: string;
+}> {
+  const baseUrl = getScadaApiBaseUrl().replace(/\/+$/, '');
+  const url = baseUrl ? `${baseUrl}/api/scada/warn/ack_all` : '/api/scada/warn/ack_all';
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ operator: params?.operator || 'web_user' })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (json && json.code === 200) {
+      return { success: true, cleared_count: json.cleared_count ?? 0 };
+    }
+    return { success: false, error: json?.msg || '全量确认失败' };
+  } catch (err: any) {
+    return { success: false, error: err?.message || '网络连接异常' };
+  }
+}
+
+/**
+ * 5. 实时告警清屏: POST /api/scada/warn/clear
+ */
+export async function clearScadaWarnCache(): Promise<{ success: boolean; error?: string }> {
+  const baseUrl = getScadaApiBaseUrl().replace(/\/+$/, '');
+  const url = baseUrl ? `${baseUrl}/api/scada/warn/clear` : '/api/scada/warn/clear';
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({})
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (json && json.code === 200) {
+      return { success: true };
+    }
+    return { success: false, error: json?.msg || '清屏失败' };
+  } catch (err: any) {
+    return { success: false, error: err?.message || '网络连接异常' };
+  }
+}
+
+/**
+ * 6. 历史告警综合检索: POST /api/scada/warn/history
+ */
+export async function queryScadaWarnHistory(params: {
+  start_time?: number;
+  end_time?: number;
+  search_type?: number;
+  select_all_fac?: boolean;
+  fac_ids?: number[];
+  select_all_bay?: boolean;
+  bay_ids?: number[];
+  select_all_dev?: boolean;
+  dev_ids?: number[];
+  select_all_level?: boolean;
+  level_ids?: number[];
+  table_options?: Array<{ table_no: number; status_mask: number }>;
+  keyword?: string;
+  limit?: number;
+}): Promise<{ success: boolean; data?: ScadaHistoryWarnItem[]; total?: number; error?: string }> {
+  const baseUrl = getScadaApiBaseUrl().replace(/\/+$/, '');
+  const url = baseUrl ? `${baseUrl}/api/scada/warn/history` : '/api/scada/warn/history';
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        start_time: params.start_time || 0,
+        end_time: params.end_time || Math.floor(Date.now() / 1000),
+        search_type: params.search_type ?? 0,
+        select_all_fac: params.select_all_fac ?? true,
+        fac_ids: params.fac_ids || [],
+        select_all_bay: params.select_all_bay ?? true,
+        bay_ids: params.bay_ids || [],
+        select_all_dev: params.select_all_dev ?? true,
+        dev_ids: params.dev_ids || [],
+        select_all_level: params.select_all_level ?? true,
+        level_ids: params.level_ids || [],
+        table_options: params.table_options,
+        keyword: params.keyword || '',
+        limit: params.limit || 500
+      })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (json && json.code === 200) {
+      return { success: true, data: json.data || [], total: json.total || 0 };
+    }
+    return { success: false, error: json?.msg || '检索历史告警失败' };
+  } catch (err: any) {
+    return { success: false, error: err?.message || '网络连接异常' };
+  }
+}
+
+/**
+ * 7. 故障智能推理与诊断分析报告: GET /api/scada/warn/report?key_id=...&timestamp=...
+ */
+export async function fetchScadaWarnReport(
+  key_id: number,
+  timestamp: number
+): Promise<{ success: boolean; data?: ScadaWarnReport; error?: string }> {
+  const baseUrl = getScadaApiBaseUrl().replace(/\/+$/, '');
+  const url = baseUrl
+    ? `${baseUrl}/api/scada/warn/report?key_id=${key_id}&timestamp=${timestamp}`
+    : `/api/scada/warn/report?key_id=${key_id}&timestamp=${timestamp}`;
+
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (json && json.code === 200 && json.data) {
+      return { success: true, data: json.data };
+    }
+    return { success: false, error: json?.msg || '获取故障诊断报告失败' };
+  } catch (err: any) {
+    return { success: false, error: err?.message || '网络连接异常' };
+  }
+}
+
+
