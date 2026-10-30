@@ -43,7 +43,8 @@ import {
   handlePostScadaWarnAckAll,
   handlePostScadaWarnClear,
   handlePostScadaWarnHistory,
-  handleGetScadaWarnReport
+  handleGetScadaWarnReport,
+  startMockAlarmGenerator
 } from './scadaMockBackend';
 
 /**
@@ -89,6 +90,7 @@ export function scadaScreensPlugin(): Plugin {
       ensureCellDirectory();
       ensureDataDirectory();
       ensureCfgDirectory();
+      startMockAlarmGenerator();
       registerEndpoints(server.middlewares);
     },
     configurePreviewServer(server) {
@@ -97,6 +99,7 @@ export function scadaScreensPlugin(): Plugin {
       ensureCellDirectory();
       ensureDataDirectory();
       ensureCfgDirectory();
+      startMockAlarmGenerator();
       registerEndpoints(server.middlewares);
     }
   };

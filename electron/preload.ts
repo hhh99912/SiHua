@@ -26,6 +26,22 @@ const apiBridge = {
   close: () => ipcRenderer.invoke('window:close'),
   toggleFullscreen: () => ipcRenderer.invoke('window:toggle-fullscreen'),
   openExternal: (url: string) => ipcRenderer.invoke('app:open-external', url),
+  openModule: (moduleId: string) => ipcRenderer.invoke('scada:open-module', String(moduleId)),
+  closeModule: (moduleId: string) => ipcRenderer.invoke('scada:close-module', String(moduleId)),
+  getOpenModules: () => ipcRenderer.invoke('scada:get-open-modules'),
+  exitApp: () => ipcRenderer.invoke('scada:exit-app'),
+  toggleStartMenu: () => ipcRenderer.invoke('scada:toggle-start-menu'),
+  closeStartMenu: () => ipcRenderer.invoke('scada:close-start-menu'),
+  toggleUserMenu: () => ipcRenderer.invoke('scada:toggle-user-menu'),
+  closeUserMenu: () => ipcRenderer.invoke('scada:close-user-menu'),
+  sendUserAction: (action: string) => ipcRenderer.invoke('scada:user-action', String(action)),
+  onUserAction: (callback: (action: string) => void) => {
+    const handler = (_e: any, action: string) => callback(action);
+    ipcRenderer.on('scada:user-action', handler);
+    return () => {
+      ipcRenderer.removeListener('scada:user-action', handler);
+    };
+  },
   notifyAppReady: () => ipcRenderer.send('app:renderer-ready'),
   screens: {
     loadAll: () => ipcRenderer.invoke('screens:load-all'),

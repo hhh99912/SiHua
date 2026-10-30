@@ -17,6 +17,7 @@ import {
   Zap,
   ShieldCheck,
   UserCheck,
+  User,
   Edit3,
   RefreshCw,
   Eye,
@@ -83,10 +84,10 @@ import ScadaTeleRegulationModal from './ScadaTeleRegulationModal.vue';
 import ScadaRealtimeCurveModal from './ScadaRealtimeCurveModal.vue';
 
 interface Props {
-  screen: ScreenConfig;
-  components: ScreenComponent[];
-  datasets: DatasetItem[];
-  isStreaming: boolean;
+  screen?: ScreenConfig;
+  components?: ScreenComponent[];
+  datasets?: DatasetItem[];
+  isStreaming?: boolean;
   screens?: ScreenItem[];
   activeScreenId?: string;
   indexScreenId?: string;
@@ -96,7 +97,53 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   screens: () => [],
-  isEmbedded: false
+  isEmbedded: false,
+  isStreaming: true,
+  datasets: () => [],
+  components: () => [],
+  screen: () => ({
+    id: 'default-screen',
+    name: '监控运行',
+    width: 1920,
+    height: 1080,
+    backgroundColor: '#080f1e'
+  })
+});
+
+// 安全大屏与图元计算属性：保证即便外部延迟传入，视图也绝不报错白屏
+const currentActiveScreen = computed(() => {
+  if (props.screens && props.screens.length > 0) {
+    const target = props.screens.find(s => s.id === props.activeScreenId);
+    if (target) return target;
+    return props.screens[0];
+  }
+  return null;
+});
+
+const effectiveScreen = computed<ScreenConfig>(() => {
+  if (props.screen && props.screen.name) {
+    return props.screen;
+  }
+  if (currentActiveScreen.value) {
+    return currentActiveScreen.value.screen;
+  }
+  return {
+    id: 'screen-fallback',
+    name: '监控运行',
+    width: 1920,
+    height: 1080,
+    backgroundColor: '#080f1e'
+  };
+});
+
+const effectiveComponents = computed<ScreenComponent[]>(() => {
+  if (props.components && props.components.length > 0) {
+    return props.components;
+  }
+  if (currentActiveScreen.value && currentActiveScreen.value.components) {
+    return currentActiveScreen.value.components;
+  }
+  return [];
 });
 
 const emit = defineEmits<{
@@ -428,7 +475,7 @@ const isCompFlashing = (comp: ScreenComponent): boolean => {
 // 收集本画面展示的所有遥信 ID (当前画面打开时按需汇聚)
 const currentScreenYxIds = computed(() => {
   const set = new Set<number>();
-  for (const comp of props.components || []) {
+  for (const comp of effectiveComponents.value) {
     const ids = getComponentAllYxIds(comp);
     ids.forEach(id => set.add(id));
   }
@@ -655,8 +702,8 @@ const handleReloadCurrentScreen = async () => {
 const handleTriggerScadaRealtime = handleReloadCurrentScreen;
 
 // Fixed Canvas Dimensions
-const canvasWidth = computed(() => props.screen?.width || 1920);
-const canvasHeight = computed(() => props.screen?.height || 1080);
+const canvasWidth = computed(() => effectiveScreen.value?.width || 1920);
+const canvasHeight = computed(() => effectiveScreen.value?.height || 1080);
 
 // Viewport container measurement
 const mainViewportRef = ref<HTMLElement | null>(null);
@@ -667,7 +714,7 @@ let resizeRafId: number | null = null;
 
 // 1. 严格计算可见图元的实际外接矩形 (Bounding Box) 避免留白过大
 const contentBoundingBox = computed(() => {
-  const comps = props.components?.filter(c => c.visible !== false) || [];
+  const comps = effectiveComponents.value.filter(c => c.visible !== false);
   if (comps.length === 0) {
     return {
       minX: 0,
@@ -1541,7 +1588,7 @@ onBeforeUnmount(() => {
       <div class="flex items-center gap-2 shrink-0">
         <!-- 电站/大屏名称标牌 (无卡片包裹，纯净文本) -->
         <div class="text-slate-800 font-medium text-[14px] tracking-wide truncate max-w-[200px] pl-1 pr-3 border-r border-[#cfc5b0]">
-          {{ screen.name || '速利达光伏发电站' }}
+          {{ effectiveScreen.name || '监控运行' }}
         </div>
 
         <!-- 声音告警静音切换 -->
@@ -1652,7 +1699,7 @@ onBeforeUnmount(() => {
           'cursor-grabbing': isPanning
         }"
         :style="{
-          backgroundColor: screen.backgroundColor || '#080f1e'
+          backgroundColor: effectiveScreen.backgroundColor || '#080f1e'
         }"
         @wheel="handleViewportWheel"
         @mousedown="handleViewportMouseDown"
@@ -1676,15 +1723,15 @@ onBeforeUnmount(() => {
               width: `${contentBoundingBox.width}px`,
               height: `${contentBoundingBox.height}px`,
               transform: `scale(${fitScale})`,
-              backgroundColor: screen.backgroundColor || '#080f1e',
-              backgroundImage: screen.backgroundImage ? `url(${screen.backgroundImage})` : undefined,
+              backgroundColor: effectiveScreen.backgroundColor || '#080f1e',
+              backgroundImage: effectiveScreen.backgroundImage ? `url(${effectiveScreen.backgroundImage})` : undefined,
               backgroundSize: 'cover',
               backgroundPosition: 'center'
             }"
           >
             <!-- 逐图元精准渲染 (按 contentBoundingBox.minX, minY 平移对齐) -->
             <div
-              v-for="comp in components"
+              v-for="comp in effectiveComponents"
               :key="comp.id"
               class="absolute scada-comp-item transition-all duration-100"
               :class="{
@@ -1959,42 +2006,48 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <!-- 右侧：简洁状态与时钟 -->
-        <div class="flex items-center gap-2.5 text-[13px]">
+        <!-- 右侧：简洁状态与时钟 (与底栏规范一致) -->
+        <div class="flex items-center gap-3.5 text-[13px]">
           <!-- 消音按钮 -->
           <button
             @click="isMuted = !isMuted"
-            class="p-1.5 rounded-md border border-[#cfc5b0] hover:bg-[#e4dcce] transition-colors cursor-pointer"
-            :class="isMuted ? 'text-slate-400' : 'text-slate-700'"
-            :title="isMuted ? '警报音已消音' : '警报音正常'"
+            class="flex items-center justify-center p-1 hover:bg-black/5 rounded cursor-pointer transition-colors"
+            :class="isMuted ? 'text-sky-600' : 'text-sky-600'"
+            :title="isMuted ? '警报音已消音 (点击开启)' : '警报音正常 (点击消音)'"
           >
-            <component :is="isMuted ? VolumeX : Volume2" class="w-4 h-4" />
+            <component :is="isMuted ? VolumeX : Volume2" class="w-4.5 h-4.5 stroke-[2]" />
           </button>
 
-          <!-- 安全天数 -->
-          <div
-            class="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold text-[12.5px]"
-            title="变电站连续安全运行天数"
-          >
-            <ShieldCheck class="w-4 h-4 text-emerald-600" />
-            <span>安全运行 {{ safetyDays }} 天</span>
-          </div>
+          <!-- 全站告警状态指示：原版纯实心圆，稍微缩小 (w-7 h-7) -->
+          <button
+            @click="showAlarmModal = true"
+            class="w-7 h-7 rounded-full cursor-pointer transition-transform hover:scale-105 active:scale-95 shrink-0 border-0 p-0 focus:outline-none shadow-xs"
+            :class="unconfirmedAlarmCount > 0 ? 'scada-alarm-dot-blinking' : 'bg-emerald-500'"
+            title="实时告警 (点击打开告警窗)"
+          />
 
-          <!-- 账号 -->
+          <!-- 账号 (简化：就一个用户图标+用户名，无卡片底色) -->
           <button
             @click="showLoginModal = true"
-            class="flex items-center gap-1.5 px-2.5 py-1 rounded-md hover:bg-[#e4dcce] border border-[#cfc5b0] text-slate-800 font-mono font-bold transition-colors cursor-pointer"
+            class="flex items-center gap-1.5 text-slate-800 hover:text-sky-700 font-mono transition-colors cursor-pointer text-[13px]"
             :title="`当前账号: ${currentUser.name}`"
           >
-            <UserCheck class="w-4 h-4 text-sky-600" />
+            <User class="w-4 h-4 text-slate-600 shrink-0 stroke-[1.8]" />
             <span>{{ currentUser.name }}</span>
           </button>
 
-          <!-- 秒时钟 -->
-          <div class="flex items-center gap-1.5 font-mono text-[13px] font-bold text-slate-800 bg-[#e5decb] px-2.5 py-1 rounded-md border border-[#cfc5b0]">
-            <Clock class="w-4 h-4 text-sky-600" />
-            <span>{{ currentTimeSecondStr }}</span>
-          </div>
+          <!-- 安全天数 (图标/卡片/背景色全部删掉，只留纯文本) -->
+          <span
+            class="hidden md:inline text-slate-800 text-[13px] whitespace-nowrap"
+            title="变电站连续安全运行天数"
+          >
+            安全运行{{ safetyDays }}天
+          </span>
+
+          <!-- 秒时钟 (卡片/图标删掉，只留下时间) -->
+          <span class="font-mono text-[13px] text-slate-800 tracking-tight whitespace-nowrap" title="系统时间">
+            {{ currentTimeSecondStr }}
+          </span>
         </div>
       </div>
     </footer>

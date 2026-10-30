@@ -1960,6 +1960,71 @@ export interface ScadaWarnReport {
   related_events: string[];
 }
 
+// ---------------------------------------------------------------------------
+// SCADA 底栏 12 个分类标签标准定义与判定映射 (严格对齐 SCADA 规范)
+// ---------------------------------------------------------------------------
+export const SCADA_WARN_TAB_NAMES = [
+  '时序信息',
+  '提示信息',
+  '告警信息',
+  '事故信息',
+  '遥信变位',
+  '遥测越限',
+  '厂站工况',
+  '结点工况',
+  '遥控',
+  '人工操作',
+  '检修信息',
+  '未复归信息'
+] as const;
+
+export type ScadaWarnTabName = typeof SCADA_WARN_TAB_NAMES[number];
+
+export interface ScadaAlarmTabDef {
+  name: ScadaWarnTabName;
+  attr: '全量流水' | '严重级别' | '专业大类' | '运行状态';
+  ruleDesc: string;
+  color?: string; // 提示信息: #67C23A, 告警信息: #E6A23C, 事故信息: #FF0000
+}
+
+export const SCADA_WARN_12_TABS: ScadaAlarmTabDef[] = [
+  { name: '时序信息', attr: '全量流水', ruleDesc: '全量数据 (默认选中此项)' },
+  { name: '提示信息', attr: '严重级别', ruleDesc: 'item.level_name === "提示信息"', color: '#67C23A' },
+  { name: '告警信息', attr: '严重级别', ruleDesc: 'item.level_name === "告警信息"', color: '#E6A23C' },
+  { name: '事故信息', attr: '严重级别', ruleDesc: 'item.level_name === "事故信息"', color: '#FF0000' },
+  { name: '遥信变位', attr: '专业大类', ruleDesc: 'item.type_name === "遥信变位"' },
+  { name: '遥测越限', attr: '专业大类', ruleDesc: 'item.type_name === "遥测越限"' },
+  { name: '厂站工况', attr: '专业大类', ruleDesc: 'item.type_name === "厂站工况"' },
+  { name: '结点工况', attr: '专业大类', ruleDesc: 'item.type_name === "结点工况"' },
+  { name: '遥控', attr: '专业大类', ruleDesc: 'item.type_name === "遥控"' },
+  { name: '人工操作', attr: '专业大类', ruleDesc: 'item.type_name === "人工操作"' },
+  { name: '检修信息', attr: '运行状态', ruleDesc: 'item.is_examine === true', color: '#A855F7' },
+  { name: '未复归信息', attr: '运行状态', ruleDesc: 'item.is_revert === false && item.is_examine === false', color: '#DC2626' }
+];
+
+/**
+ * 依据 SCADA 底栏 12 个分类标签映射规则判定告警条目归属
+ * 优先使用后端计算好的 tabs 数组，若缺失则通过字段规则自动判定
+ */
+export function checkAlarmMatchesTab(item: ScadaRealtimeWarnItem, tabName: string): boolean {
+  if (tabName === '时序信息') return true;
+  if (Array.isArray(item.tabs) && item.tabs.length > 0) {
+    return item.tabs.includes(tabName);
+  }
+  if (tabName === '提示信息') return item.level_name === '提示信息' || item.level === 1;
+  if (tabName === '告警信息') return item.level_name === '告警信息' || item.level === 2;
+  if (tabName === '事故信息') return item.level_name === '事故信息' || item.level === 3;
+  if (tabName === '遥信变位') return item.type_name === '遥信变位' || item.type === 1;
+  if (tabName === '遥测越限') return item.type_name === '遥测越限' || item.type === 2;
+  if (tabName === '厂站工况') return item.type_name === '厂站工况' || item.type === 3;
+  if (tabName === '结点工况') return item.type_name === '结点工况' || item.type === 4;
+  if (tabName === '遥控') return item.type_name === '遥控' || item.type === 8;
+  if (tabName === '人工操作') return item.type_name === '人工操作' || item.type === 9;
+  if (tabName === '检修信息') return item.is_examine === true;
+  if (tabName === '未复归信息') return item.is_revert === false && item.is_examine === false;
+  return false;
+}
+
 // 全局告警配置字典缓存 (严格对齐 SCADA 规范：提示 #67C23A, 告警 #E6A23C, 事故 #FF0000)
 export const globalWarnLevels = ref<ScadaWarnLevelItem[]>([
   { level: 3, name: "事故信息", open_color: "#67C23A", close_color: "#FF0000" },

@@ -76,7 +76,9 @@ import {
   Network,
   Lightbulb,
   Sliders,
-  Tv
+  Tv,
+  Activity,
+  Power
 } from 'lucide-vue-next';
 
 // 1. Initial State: Load Multi-Screen Electrical Project (快速本地缓存引导与主索引初态加载，彻底消除一次系统图一闪而过)
@@ -164,6 +166,33 @@ const controlInitialDeviceId = ref<string | undefined>(undefined);
 const controlInitialPointId = ref<number | string | null>(null);
 const controlInitialTargetVerificationPointId = ref<number | string | null>(null);
 const showPreviewModal = ref(false); // Controlled via monitor-screen MdiWindow
+
+// ---------------- 深瑞 (Shenrui) SCADA 独立子模块窗口与总管底栏进程检测 ----------------
+// 在凝思系统 Electron 模式下，底栏是唯一常驻的总管进程；每个子模块拥有独立原生线程窗口
+const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+const standaloneModuleId = ref<string | null>(urlParams?.get('module') || null);
+const isDaemonBarOnly = computed(() => urlParams?.get('mode') === 'daemon-bar');
+const isStartMenuOnly = computed(() => urlParams?.get('mode') === 'start-menu');
+
+const MODULE_TITLES: Record<string, string> = {
+  'monitor-screen': '监控运行',
+  'graphic-editor': '图形编辑',
+  'alarm-window': '全站告警',
+  'history-alarm': '历史告警',
+  'history-curve': '历史曲线',
+  'report-window': '综合报表',
+  'health-monitor': '系统健康'
+};
+
+onMounted(() => {
+  if (isDaemonBarOnly.value) {
+    document.title = '总管进程';
+  } else if (isStartMenuOnly.value) {
+    document.title = '系统菜单';
+  } else if (standaloneModuleId.value && MODULE_TITLES[standaloneModuleId.value]) {
+    document.title = MODULE_TITLES[standaloneModuleId.value];
+  }
+});
 
 // ---------------- GE-SCADA 多组态 MDI 独立窗口系统状态 ----------------
 export interface MdiWindowItem {
@@ -305,13 +334,22 @@ const handleReorderScreens = async (newScreens: ScreenItem[]) => {
 };
 
 const openWindow = async (id: string) => {
+  // 1. 在 Electron 凝思系统模式下，由主进程开辟独立的操作系统原生窗口 (深瑞架构：各子模块独立线程/进程窗口，在凝思系统应用面板显示原生任务标签)
+  if (typeof window !== 'undefined' && (window as any).electronAPI?.openModule) {
+    try {
+      const res = await (window as any).electronAPI.openModule(id);
+      if (res?.success) return;
+    } catch (e) {
+      console.warn('调用 Electron openModule 失败，降级为内置窗口展示:', e);
+    }
+  }
+
+  // 2. 浏览器网页端模式回退：在工作区内展示模块窗口 (同时保持总管底栏清洁，不在底栏堆积模块标签)
   const win = mdiWindows.value.find(w => w.id === id);
   if (win) {
     win.isOpen = true;
     win.isMinimized = false;
-    if (id === 'alarm-window' || id === 'history-curve' || id === 'history-alarm' || id === 'report-window') {
-      win.isMaximized = true;
-    }
+    win.isMaximized = true; // 所有子模块打开时默认最大化！
     focusWindow(id);
 
     // 每次打开 图形编辑界面(graphic-editor) / 实时监控界面(monitor-screen) 就在此检索画面顺序并应用
@@ -319,6 +357,20 @@ const openWindow = async (id: string) => {
       await reloadAndApplyScreenOrder();
     }
   }
+};
+
+// 专用系统菜单项点击调度 (Electron 环境下打开独立模块原生窗口并自动收起菜单，Web 模式直接打开)
+const handleStartMenuItemClick = async (id: string) => {
+  if (typeof window !== 'undefined' && (window as any).electronAPI?.openModule) {
+    try {
+      await (window as any).electronAPI.openModule(id);
+      await (window as any).electronAPI.closeStartMenu?.();
+      return;
+    } catch (e) {
+      console.warn('打开模块失败:', e);
+    }
+  }
+  openWindow(id);
 };
 
 const closeWindow = (id: string) => {
@@ -2196,11 +2248,20 @@ const handleLogout = () => {
 };
 
 const handleExitApp = async () => {
+  if (typeof window !== 'undefined' && (window as any).electronAPI?.exitApp) {
+    try {
+      await (window as any).electronAPI.exitApp();
+      return;
+    } catch (err) {
+      console.warn('[SCADA] 退出 Electron 进程失败:', err);
+    }
+  }
   try {
     await windowClose();
   } catch (err) {
     console.warn('[SCADA] 退出程序调用失败:', err);
   }
+  isLoggedIn.value = false;
 };
 
 onBeforeUnmount(() => {
@@ -2216,16 +2277,347 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <!-- -1. 专用系统菜单弹出窗口模式 (深瑞架构：由 Electron 向上弹出的独立轻量级无边框窗口，位于左下角，不被44px底栏截断) -->
+  <div v-if="isStartMenuOnly" class="h-screen w-screen bg-[#f2eee3] border border-[#cfc5b0] rounded-xl shadow-2xl text-slate-800 flex flex-col justify-between overflow-hidden select-none p-0 box-border">
+    <!-- 菜单顶栏：简洁标题 -->
+    <div class="px-3.5 py-2.5 bg-[#e5decb] border-b border-[#ded5bf] flex items-center justify-between text-[13.5px] font-bold text-slate-700 shrink-0">
+      <span class="flex items-center gap-2 text-slate-900 font-bold">
+        <span class="w-2.5 h-2.5 rounded-full bg-sky-600"></span>
+        <span>系统菜单</span>
+      </span>
+      <span class="text-[12px] text-[#d81e06] font-bold">KND科能达</span>
+    </div>
+
+    <!-- 菜单项列表 (监控运行 / 图形编辑 / 全站告警 / 历史曲线 / 历史告警 / 报表 / 系统健康) -->
+    <div class="py-1 flex-1 overflow-y-auto divide-y divide-[#ded5bf]/40">
+      <button
+        v-for="item in [
+          { id: 'monitor-screen', title: '监控运行', icon: Zap, color: 'text-amber-500' },
+          { id: 'graphic-editor', title: '图形编辑', icon: PenTool, color: 'text-sky-600' },
+          { id: 'alarm-window', title: '全站告警', icon: ShieldAlert, color: 'text-rose-500', isAlarm: true },
+          { id: 'history-curve', title: '历史曲线', icon: LineChart, color: 'text-indigo-600' },
+          { id: 'history-alarm', title: '历史告警', icon: History, color: 'text-orange-500' },
+          { id: 'report-window', title: '综合报表', icon: FileSpreadsheet, color: 'text-emerald-600' },
+          { id: 'health-monitor', title: '系统健康与黑匣子', icon: Activity, color: 'text-cyan-600' }
+        ]"
+        :key="item.id"
+        @click="handleStartMenuItemClick(item.id)"
+        class="w-full px-3.5 py-2.5 text-left hover:bg-[#e4dcce] flex items-center justify-between transition-colors cursor-pointer text-[15px] font-medium text-slate-800 hover:text-sky-700"
+      >
+        <div class="flex items-center gap-3">
+          <span v-if="item.isAlarm" class="w-5 h-5 flex items-center justify-center shrink-0">
+            <span
+              class="w-3.5 h-3.5 rounded-full inline-block"
+              :class="globalUnconfirmedAlarmCount > 0 ? 'scada-alarm-dot-blinking' : 'bg-emerald-500'"
+            />
+          </span>
+          <component
+            v-else
+            :is="item.icon"
+            class="w-5 h-5 shrink-0 stroke-[2]"
+            :class="item.color"
+          />
+          <span>{{ item.title }}</span>
+        </div>
+      </button>
+    </div>
+
+    <!-- 底部退出 -->
+    <div class="py-1 bg-[#e5decb] border-t border-[#ded5bf] shrink-0">
+      <button
+        @click="handleExitApp"
+        class="w-full px-3.5 py-2.5 text-left hover:bg-rose-50 text-rose-600 hover:text-rose-700 flex items-center justify-between transition-colors cursor-pointer text-[14px] font-medium"
+        title="安全退出系统"
+      >
+        <div class="flex items-center gap-2.5">
+          <Power class="w-4.5 h-4.5 text-rose-500" />
+          <span>退出程序</span>
+        </div>
+        <span class="text-[12px] text-rose-400 font-mono">Alt+F4</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 0. 总管底栏进程模式 (深瑞架构：常驻系统底部，只有一个底栏，纯净无遮挡) -->
+  <div v-else-if="isDaemonBarOnly" class="h-full w-full overflow-hidden bg-[#ebe4d4]">
+    <PrsBottomBar
+      :activeWindowId="activeWindowId"
+      :unconfirmedAlarmCount="globalUnconfirmedAlarmCount"
+      :safetyDays="safetyDays"
+      @open:window="openWindow"
+      @toggle:window="openWindow"
+      @close:window="closeWindow"
+      @logout="handleLogout"
+      @open:login="showLoginModal = true"
+      @open:health="openWindow('health-monitor')"
+      @exit:app="handleExitApp"
+    />
+    <LoginModal
+      v-if="showLoginModal"
+      :notice="loginNotice"
+      @close="showLoginModal = false; loginNotice = '';"
+      @success="showLoginModal = false; loginNotice = '';"
+    />
+  </div>
+
+  <!-- 1. 独立子模块窗口模式 (深瑞架构：由 Electron 打开独立操作系统窗口时直接全屏渲染对应子模块) -->
+  <div v-else-if="standaloneModuleId" class="h-screen w-screen fixed inset-0 overflow-hidden bg-[#edf0f5] text-slate-900 font-sans select-none">
+    <!-- 监控运行 -->
+    <PreviewScreen
+      v-if="standaloneModuleId === 'monitor-screen'"
+      :screens="screens"
+      :activeScreenId="activeScreenId"
+      :isLiveMode="true"
+      @switch:screen="handleSelectScreen"
+      @open:window="openWindow"
+    />
+
+    <!-- 图形编辑工作台 -->
+    <div v-else-if="standaloneModuleId === 'graphic-editor'" class="w-full h-full flex flex-col bg-slate-100 text-slate-800 overflow-hidden font-sans select-none">
+      <Navbar
+        :screen="screen"
+        :zoom="zoom"
+        :isStreaming="isStreaming"
+        :canUndo="canUndo"
+        :canRedo="canRedo"
+        :drawTool="drawTool"
+        :activeShapeType="activeShapeType"
+        :selectedIds="selectedIds"
+        :selectedComponents="selectedComponents"
+        :showGrid="showGrid"
+        :gridSize="gridSize"
+        :snapToGrid="snapToGrid"
+        :orthogonalLock="orthogonalLock"
+        :showRuler="showRuler"
+        :isMaximized="true"
+        :drawingPreset="drawingPreset"
+        @update:drawing-style="handleUpdateDrawingStyle"
+        @update:screen="screen = $event; recordHistory();"
+        @update:zoom="zoom = $event"
+        @update:drawTool="drawTool = $event"
+        @select:shape="handleSelectBasicShape"
+        @update:showGrid="showGrid = $event"
+        @update:gridSize="gridSize = $event"
+        @update:snapToGrid="snapToGrid = $event"
+        @update:orthogonalLock="orthogonalLock = $event"
+        @update:showRuler="showRuler = $event"
+        @toggle:streaming="isStreaming = !isStreaming"
+        @save:screen="handleSaveCurrentScreenToDisk"
+        @open:preview="openWindow('monitor-screen')"
+        @open:datasets="showDatasetsModal = true"
+        @open:control="showControlModal = true; controlInitialDeviceId = undefined;"
+        @open:disk-storage="showDiskStorageModal = true"
+        @open:symbols="showSymbolModal = true"
+        @open:platform="showPlatformModal = true"
+        @open:login="showLoginModal = true"
+        @open:window="openWindow"
+        @exit:app="handleExitApp"
+        @tile:windows="() => {}"
+        @cascade:windows="() => {}"
+        @load:template="handleSwitchScreen"
+        @clear:canvas="handleClearCanvas"
+        @fit:screen="fitToScreen"
+        @undo="handleUndo"
+        @redo="handleRedo"
+        @align="handleAlignComponent"
+        @group="handleGroup"
+        @ungroup="handleUngroup"
+        @lock="handleLockSelected"
+        @unlock="handleUnlockSelected"
+        @save:symbol="() => handleOpenSaveSymbolModal(selectedComponents)"
+        @center:all="fitToScreen"
+        @snap:all="handleSnapAllToGrid"
+      />
+
+      <!-- Main Workspace Studio (Sidebar + Canvas + ScreenManagerBar) -->
+      <div class="flex-1 flex overflow-hidden relative">
+        <!-- Left Sidebar Navigation Tabs -->
+        <div class="w-11 shrink-0 bg-[#f7f5ef] border-r border-[#e1ddd4] flex flex-col items-center py-2.5 gap-2.5 z-30">
+          <button
+            @click="leftSidebarTab = 'palette'"
+            class="w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer"
+            :class="leftSidebarTab === 'palette' 
+              ? 'bg-[#efeae0] text-sky-700 border border-[#ded8cc] font-medium' 
+              : 'text-slate-500 hover:text-slate-900 hover:bg-[#e4ded2]'"
+            title="图元浏览器"
+          >
+            <Box class="w-4.5 h-4.5 stroke-[2]" />
+          </button>
+          <button
+            @click="leftSidebarTab = 'layers'"
+            class="w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer relative"
+            :class="leftSidebarTab === 'layers' 
+              ? 'bg-[#efeae0] text-sky-700 border border-[#ded8cc] font-medium' 
+              : 'text-slate-500 hover:text-slate-900 hover:bg-[#e4ded2]'"
+            title="图层管理"
+          >
+            <Layers class="w-4.5 h-4.5 stroke-[2]" />
+            <span 
+              v-if="components.length > 0" 
+              class="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-sky-600 text-white text-[8px] font-mono font-medium flex items-center justify-center"
+            >
+              {{ components.length }}
+            </span>
+          </button>
+        </div>
+
+        <!-- Left Tab Pane -->
+        <ComponentPalette
+          v-if="leftSidebarTab === 'palette'"
+          @add:component="handleAddComponentFromPalette"
+          @open:symbol-modal="showSymbolModal = true"
+        />
+        <LayerManager
+          v-else
+          :components="components"
+          :selectedIds="selectedIds"
+          @select="selectedIds = $event"
+          @update:component="c => handleUpdateComponent(c, true)"
+          @duplicate="handleDuplicate"
+          @delete="handleDelete"
+          @bring:front="handleBringToFront"
+          @send:back="handleSendToBack"
+          @move:up="handleMoveUp"
+          @move:down="handleMoveDown"
+        />
+
+        <!-- Center Workspace Canvas + Bottom ScreenManagerBar -->
+        <div class="flex-1 min-w-0 flex flex-col overflow-hidden relative bg-black">
+          <CanvasEditor
+            ref="canvasEditorRef"
+            :screen="screen"
+            :components="components"
+            :selectedIds="selectedIds"
+            :zoom="zoom"
+            :datasets="datasets"
+            :drawTool="drawTool"
+            :activeComponentDef="activePlacementDef"
+            :canPaste="clipboard.length > 0"
+            :showGrid="showGrid"
+            :gridSize="gridSize"
+            :snapToGrid="snapToGrid"
+            :orthogonalLock="orthogonalLock"
+            :showRuler="showRuler"
+            :drawingPreset="drawingPreset"
+            @update:zoom="zoom = $event"
+            @update:screen="screen = $event; recordHistory();"
+            @update:drawTool="drawTool = $event"
+            @select="selectedIds = $event"
+            @update:component="c => handleUpdateComponent(c, false)"
+            @update:components="cs => handleUpdateComponents(cs, false)"
+            @add:component:at="handleAddComponentAt"
+            @copy="handleCopy"
+            @cut="handleCut"
+            @paste="handlePaste"
+            @duplicate="handleDuplicate"
+            @delete="handleDelete"
+            @bring:front="handleBringToFront"
+            @send:back="handleSendToBack"
+            @move:up="handleMoveUp"
+            @move:down="handleMoveDown"
+            @align="handleAlignComponent"
+            @group="handleGroup"
+            @ungroup="handleUngroup"
+            @save:symbol="handleOpenSaveSymbolModal"
+            @undo="handleUndo"
+            @redo="handleRedo"
+            @finish:draw="handleFinishDraw"
+            @open:property-inspector="showPropertyInspector = true"
+            @open:data-association="handleOpenDataAssociation"
+            @open:batch-association="handleOpenBatchAssociation"
+            @open:control-modal="handleOpenControlModalFromApp"
+            @commit:history="recordHistory"
+          />
+
+          <ScreenManagerBar
+            :screens="screens"
+            :activeScreenId="activeScreenId"
+            :storageDir="storageDirectory"
+            :diskFileCount="diskFileCount"
+            :isSavingDisk="isSavingDisk"
+            :indexScreenId="indexScreenId"
+            :indexScreenName="indexScreenName"
+            @switch:screen="handleSwitchScreen"
+            @add:screen="handleAddScreen"
+            @duplicate:screen="handleDuplicateScreen"
+            @rename:screen="handleRenameScreen"
+            @delete:screen="handleDeleteScreen"
+            @open:disk-storage="showDiskStorageModal = true"
+            @save:current-disk="handleSaveCurrentScreenToDisk"
+            @set:index-screen="handleSetIndexScreen"
+            @reorder:screens="handleReorderScreens"
+          />
+        </div>
+
+        <!-- Right PropertyInspector -->
+        <PropertyInspector
+          v-if="showPropertyInspector && selectedIds.length > 0"
+          :component="selectedComponent"
+          :selectedComponents="selectedComponents"
+          :screen="screen"
+          :datasets="datasets"
+          :screens="screens"
+          @close="showPropertyInspector = false"
+          @update:component="c => handleUpdateComponent(c, true)"
+          @delete="handleDelete"
+          @duplicate="handleDuplicate"
+          @bring:front="handleBringToFront"
+          @send:back="handleSendToBack"
+          @open:data-association="handleOpenDataAssociation"
+        />
+      </div>
+    </div>
+
+    <!-- 全站实时告警中心 -->
+    <RealtimeAlarmModal
+      v-else-if="standaloneModuleId === 'alarm-window'"
+      :visible="true"
+      :isEmbedded="true"
+      @close="handleExitApp"
+    />
+
+    <!-- 历史告警检索 -->
+    <HistoryAlarmModal
+      v-else-if="standaloneModuleId === 'history-alarm'"
+      :visible="true"
+      :isEmbedded="true"
+      @close="handleExitApp"
+    />
+
+    <!-- 历史曲线分析 -->
+    <HistoryCurveModal
+      v-else-if="standaloneModuleId === 'history-curve'"
+      :visible="true"
+      :isEmbedded="true"
+      @close="handleExitApp"
+    />
+
+    <!-- 综合运行报表 -->
+    <ReportManagerModal
+      v-else-if="standaloneModuleId === 'report-window'"
+      :visible="true"
+      :isEmbedded="true"
+      @close="handleExitApp"
+    />
+
+    <!-- 系统健康与黑匣子 -->
+    <SystemHealthModal
+      v-else-if="standaloneModuleId === 'health-monitor'"
+      :visible="true"
+      @close="handleExitApp"
+    />
+  </div>
+
   <!-- 1. GE-SCADA Industrial Login Interface (Startup view) -->
   <ScadaPvLogin
-    v-if="!isLoggedIn"
+    v-else-if="!isLoggedIn"
     @login:success="handleLoginSuccess"
   />
 
   <!-- 2. SCADA Master Studio Workspace (After login) - GE-SCADA 多组态 MDI 独立窗口系统 (护眼偏暖白底色) -->
   <div v-else class="h-screen w-screen fixed inset-0 overflow-hidden bg-[#e5e7eb] text-slate-900 font-sans select-none">
-    <!-- Desktop Area (from top to calc(100vh - 40px)) 护眼柔和暖白底色，杜绝刺眼纯白与冷黑大背景 -->
-    <div class="fixed top-0 left-0 right-0 bottom-10 overflow-hidden bg-[#edf0f5]">
+    <!-- Desktop Area (from top to calc(100vh - 44px)) 护眼柔和暖白底色，杜绝刺眼纯白与冷黑大背景 -->
+    <div class="fixed top-0 left-0 right-0 bottom-11 overflow-hidden bg-[#edf0f5]">
       <!-- ======================================================== -->
       <!-- A. 组态窗口 1: 图形编辑界面 (Graphic Editor)             -->
       <!-- ======================================================== -->

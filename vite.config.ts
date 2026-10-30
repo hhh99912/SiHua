@@ -16,6 +16,15 @@ export default defineConfig(() => {
       target: 'chrome93', // 确保构建产物完全兼容 Electron 14 (Chromium 93)
       cssTarget: 'chrome93',
       minify: 'esbuild',
+      chunkSizeWarningLimit: 3000,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-vue': ['vue'],
+            'vendor-echarts': ['echarts'],
+          }
+        }
+      }
     },
     server: {
       port: 3000,

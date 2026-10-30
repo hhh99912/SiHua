@@ -268,8 +268,464 @@ function createWindow() {
   });
 }
 
+// ==============================================================================
+// 深瑞 (Shenrui) SCADA 独立子模块窗口架构 (凝思安全操作系统原生进程/线程窗口)
+// 每个子模块 (监控运行/图形编辑/全站告警/历史告警/历史曲线/报表/系统健康) 拥有独立原生窗口，
+// 窗口标签严格显示在凝思系统应用面板 (OS taskbar) 中，总管底栏永驻系统底部作为统一守护守护进程。
+// ==============================================================================
+interface ModuleWindowConfig {
+  title: string;
+  width: number;
+  height: number;
+  minWidth?: number;
+  minHeight?: number;
+  maximized?: boolean;
+}
+
+const MODULE_CONFIGS: Record<string, ModuleWindowConfig> = {
+  'monitor-screen': {
+    title: '监控运行',
+    width: 1920,
+    height: 1080,
+    minWidth: 1280,
+    minHeight: 768,
+    maximized: true
+  },
+  'graphic-editor': {
+    title: '图形编辑',
+    width: 1600,
+    height: 960,
+    minWidth: 1200,
+    minHeight: 720
+  },
+  'alarm-window': {
+    title: '全站告警',
+    width: 1450,
+    height: 850,
+    minWidth: 1100,
+    minHeight: 650
+  },
+  'history-alarm': {
+    title: '历史告警',
+    width: 1400,
+    height: 820,
+    minWidth: 1000,
+    minHeight: 600
+  },
+  'history-curve': {
+    title: '历史曲线',
+    width: 1400,
+    height: 820,
+    minWidth: 1000,
+    minHeight: 600
+  },
+  'report-window': {
+    title: '综合报表',
+    width: 1400,
+    height: 820,
+    minWidth: 1000,
+    minHeight: 600
+  },
+  'health-monitor': {
+    title: '系统健康',
+    width: 1200,
+    height: 750,
+    minWidth: 900,
+    minHeight: 550
+  }
+};
+
+const moduleWindows = new Map<string, BrowserWindow>();
+let daemonBarWindow: BrowserWindow | null = null;
+let startMenuWindow: BrowserWindow | null = null;
+let userMenuWindow: BrowserWindow | null = null;
+
+// 统一的页面 URL 加载器，在开发环境优先直连 Vite 端口，打包后加载 dist/index.html
+function loadAppUrl(win: BrowserWindow, queryParams?: Record<string, string>) {
+  const queryStr = queryParams ? '?' + new URLSearchParams(queryParams).toString() : '';
+  const devUrl = process.env.VITE_DEV_SERVER_URL || (isDev ? 'http://localhost:3000' : '');
+
+  if (devUrl) {
+    win.loadURL(`${devUrl}${queryStr}`);
+  } else {
+    const indexPath = path.join(__dirname, '../dist/index.html');
+    if (fs.existsSync(indexPath)) {
+      win.loadFile(indexPath, { query: queryParams || {} });
+    } else {
+      win.loadURL(`http://localhost:3000${queryStr}`);
+    }
+  }
+}
+
+// 创建并锁定凝思系统桌面底部的“总管底栏进程” (深瑞架构：常驻屏幕底部，只有底栏，不遮挡凝思系统)
+function createDaemonBarWindow(): BrowserWindow {
+  if (daemonBarWindow && !daemonBarWindow.isDestroyed()) {
+    daemonBarWindow.show();
+    daemonBarWindow.focus();
+    return daemonBarWindow;
+  }
+
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+  const barHeight = 44;
+
+  daemonBarWindow = new BrowserWindow({
+    width: screenWidth,
+    height: barHeight,
+    x: 0,
+    y: screenHeight - barHeight,
+    minWidth: 1000,
+    minHeight: barHeight,
+    maxHeight: barHeight,
+    backgroundColor: '#ebe4d4',
+    title: '总管进程',
+    frame: false, // 无边框底栏，纯净贴合桌面底部
+    resizable: false,
+    movable: false,
+    alwaysOnTop: true, // 工业总管底栏永远常驻最前端
+    show: false,
+    skipTaskbar: true, // 核心：从凝思系统栏/任务栏彻底隐藏，系统栏只展示子模块进程！
+    type: process.platform === 'linux' ? 'dock' : 'toolbar',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+      webSecurity: false,
+      backgroundThrottling: false,
+      spellcheck: false
+    }
+  });
+
+  Menu.setApplicationMenu(null);
+  crashMonitor.attachWindow(daemonBarWindow);
+
+  daemonBarWindow.once('ready-to-show', () => {
+    daemonBarWindow?.setSkipTaskbar(true);
+    daemonBarWindow?.show();
+  });
+
+  daemonBarWindow.on('closed', () => {
+    daemonBarWindow = null;
+    exitAllScadaProcesses();
+  });
+
+  loadAppUrl(daemonBarWindow, { mode: 'daemon-bar' });
+  return daemonBarWindow;
+}
+
+// 创建向上弹出的系统菜单独立无边框窗口 (解决底栏高度44px导致DOM菜单被裁剪弹不出来的问题)
+// 矩形直角 + 纯色背景 + 永远置顶，彻底杜绝Linux X11透明圆角四角发黑漏色
+function createStartMenuWindow(): BrowserWindow {
+  if (startMenuWindow && !startMenuWindow.isDestroyed()) {
+    return startMenuWindow;
+  }
+
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { height: screenHeight } = primaryDisplay.bounds;
+  const menuWidth = 240;
+  const menuHeight = 420;
+  const barHeight = 44;
+
+  startMenuWindow = new BrowserWindow({
+    width: menuWidth,
+    height: menuHeight,
+    x: 6,
+    y: screenHeight - barHeight - menuHeight - 4,
+    resizable: false,
+    movable: false,
+    frame: false,
+    alwaysOnTop: true,
+    show: false,
+    skipTaskbar: true,
+    backgroundColor: '#f2eee3',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+      webSecurity: false,
+      backgroundThrottling: false,
+      spellcheck: false
+    }
+  });
+
+  Menu.setApplicationMenu(null);
+  startMenuWindow.setAlwaysOnTop(true, 'pop-up-menu');
+
+  // 失去焦点时自动收起菜单
+  startMenuWindow.on('blur', () => {
+    startMenuWindow?.hide();
+  });
+
+  loadAppUrl(startMenuWindow, { mode: 'start-menu' });
+  return startMenuWindow;
+}
+
+// 创建向上弹出的用户菜单独立无边框窗口 (最上层显示，右对齐用户头像正上方)
+function createUserMenuWindow(): BrowserWindow {
+  if (userMenuWindow && !userMenuWindow.isDestroyed()) {
+    return userMenuWindow;
+  }
+
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+  const menuWidth = 190;
+  const menuHeight = 150;
+  const barHeight = 44;
+
+  userMenuWindow = new BrowserWindow({
+    width: menuWidth,
+    height: menuHeight,
+    x: Math.max(10, screenWidth - menuWidth - 70),
+    y: screenHeight - barHeight - menuHeight - 4,
+    resizable: false,
+    movable: false,
+    frame: false,
+    alwaysOnTop: true,
+    show: false,
+    skipTaskbar: true,
+    backgroundColor: '#f2eee3',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+      webSecurity: false,
+      backgroundThrottling: false,
+      spellcheck: false
+    }
+  });
+
+  Menu.setApplicationMenu(null);
+  userMenuWindow.setAlwaysOnTop(true, 'pop-up-menu');
+
+  // 失去焦点时自动收起用户菜单
+  userMenuWindow.on('blur', () => {
+    userMenuWindow?.hide();
+  });
+
+  loadAppUrl(userMenuWindow, { mode: 'user-menu' });
+  return userMenuWindow;
+}
+
+// 退出总管进程：推掉所有子进程并彻底退出系统
+function exitAllScadaProcesses() {
+  if (startMenuWindow && !startMenuWindow.isDestroyed()) {
+    startMenuWindow.destroy();
+    startMenuWindow = null;
+  }
+  if (userMenuWindow && !userMenuWindow.isDestroyed()) {
+    userMenuWindow.destroy();
+    userMenuWindow = null;
+  }
+  moduleWindows.forEach((win) => {
+    if (!win.isDestroyed()) {
+      win.destroy();
+    }
+  });
+  moduleWindows.clear();
+  if (daemonBarWindow && !daemonBarWindow.isDestroyed()) {
+    daemonBarWindow.destroy();
+    daemonBarWindow = null;
+  }
+  app.quit();
+}
+
+function openModuleWindow(moduleId: string): BrowserWindow {
+  if (startMenuWindow && !startMenuWindow.isDestroyed()) {
+    startMenuWindow.hide();
+  }
+  if (userMenuWindow && !userMenuWindow.isDestroyed()) {
+    userMenuWindow.hide();
+  }
+
+  const existing = moduleWindows.get(moduleId);
+  if (existing && !existing.isDestroyed()) {
+    if (existing.isMinimized()) existing.restore();
+    existing.maximize();
+    existing.show();
+    existing.focus();
+    return existing;
+  }
+
+  const conf = MODULE_CONFIGS[moduleId] || {
+    title: moduleId,
+    width: 1600,
+    height: 960
+  };
+
+  const win = new BrowserWindow({
+    width: conf.width,
+    height: conf.height,
+    minWidth: conf.minWidth || 900,
+    minHeight: conf.minHeight || 600,
+    title: conf.title, // 核心：严格为子模块中文名称，在凝思系统应用面板显示为'监控运行'、'图形编辑'等
+    frame: true, // 凝思系统原生窗口标题栏与操作按键
+    autoHideMenuBar: true,
+    backgroundColor: '#080f1e',
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: false,
+      webSecurity: false,
+      nativeWindowOpen: true,
+      backgroundThrottling: false,
+      spellcheck: false
+    }
+  });
+
+  crashMonitor.attachWindow(win);
+
+  const showWin = () => {
+    if (win && !win.isDestroyed() && !win.isVisible()) {
+      // 用户明确要求：每个子模块打开时默认最大化！
+      win.maximize();
+      win.show();
+      win.focus();
+    }
+  };
+
+  win.once('ready-to-show', () => {
+    setTimeout(showWin, 50);
+  });
+
+  // 保底：即使 ready-to-show 触发受阻，在 1500ms 后强制呼出窗口
+  setTimeout(showWin, 1500);
+
+  win.on('closed', () => {
+    moduleWindows.delete(moduleId);
+    // 即使挨个关闭所有子模块窗口，总管进程底栏也一直存在，绝不自动退出！
+  });
+
+  loadAppUrl(win, { module: moduleId });
+
+  moduleWindows.set(moduleId, win);
+  return win;
+}
+
 // ---------------- IPC Handlers for Windows & Linux ----------------
 function setupIpcHandlers() {
+  // 子模块独立多窗口 IPC 调度 (深瑞架构：不污染底栏，交由凝思桌面管理)
+  ipcMain.handle('scada:open-module', (_event, moduleId: string) => {
+    try {
+      openModuleWindow(moduleId);
+      return { success: true };
+    } catch (err: any) {
+      console.error(`[SCADA] Failed to open module ${moduleId}:`, err);
+      return { success: false, error: err?.message };
+    }
+  });
+
+  ipcMain.handle('scada:close-module', (_event, moduleId: string) => {
+    const win = moduleWindows.get(moduleId);
+    if (win && !win.isDestroyed()) {
+      win.close();
+    }
+    return { success: true };
+  });
+
+  ipcMain.handle('scada:get-open-modules', () => {
+    const openIds: string[] = [];
+    moduleWindows.forEach((win, id) => {
+      if (!win.isDestroyed()) openIds.push(id);
+    });
+    return openIds;
+  });
+
+  // 向上弹出/隐藏系统菜单窗口 (解决底层44px窗口无法向外展示溢出菜单的难题)
+  ipcMain.handle('scada:toggle-start-menu', () => {
+    if (!startMenuWindow || startMenuWindow.isDestroyed()) {
+      createStartMenuWindow();
+    }
+    if (startMenuWindow.isVisible()) {
+      startMenuWindow.hide();
+    } else {
+      const { screen } = require('electron');
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { height: screenHeight } = primaryDisplay.bounds;
+      const menuWidth = 240;
+      const menuHeight = 410;
+      const barHeight = 44;
+      startMenuWindow.setBounds({
+        x: 8,
+        y: screenHeight - barHeight - menuHeight - 6,
+        width: menuWidth,
+        height: menuHeight
+      });
+      startMenuWindow.show();
+      startMenuWindow.focus();
+    }
+    return { success: true };
+  });
+
+  ipcMain.handle('scada:close-start-menu', () => {
+    if (startMenuWindow && !startMenuWindow.isDestroyed()) {
+      startMenuWindow.hide();
+    }
+    return { success: true };
+  });
+
+  // 向上弹出/隐藏用户菜单窗口 (最上层显示，不被44px底栏截断)
+  ipcMain.handle('scada:toggle-user-menu', () => {
+    if (!userMenuWindow || userMenuWindow.isDestroyed()) {
+      createUserMenuWindow();
+    }
+    if (userMenuWindow.isVisible()) {
+      userMenuWindow.hide();
+    } else {
+      const { screen } = require('electron');
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+      const menuWidth = 190;
+      const menuHeight = 150;
+      const barHeight = 44;
+      userMenuWindow.setBounds({
+        x: Math.max(10, screenWidth - menuWidth - 70),
+        y: screenHeight - barHeight - menuHeight - 4,
+        width: menuWidth,
+        height: menuHeight
+      });
+      userMenuWindow.show();
+      userMenuWindow.focus();
+    }
+    return { success: true };
+  });
+
+  ipcMain.handle('scada:close-user-menu', () => {
+    if (userMenuWindow && !userMenuWindow.isDestroyed()) {
+      userMenuWindow.hide();
+    }
+    return { success: true };
+  });
+
+  ipcMain.handle('scada:user-action', (_event, action: string) => {
+    if (userMenuWindow && !userMenuWindow.isDestroyed()) {
+      userMenuWindow.hide();
+    }
+    if (daemonBarWindow && !daemonBarWindow.isDestroyed()) {
+      daemonBarWindow.webContents.send('scada:user-action', action);
+    }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('scada:user-action', action);
+    }
+    moduleWindows.forEach((win) => {
+      if (!win.isDestroyed()) {
+        win.webContents.send('scada:user-action', action);
+      }
+    });
+    return { success: true };
+  });
+
+  ipcMain.handle('scada:exit-app', () => {
+    exitAllScadaProcesses();
+  });
+
   // System Info
   ipcMain.handle('app:get-system-info', () => {
     return {
@@ -1270,20 +1726,29 @@ if (!gotTheLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
+    if (daemonBarWindow && !daemonBarWindow.isDestroyed()) {
+      daemonBarWindow.show();
+      daemonBarWindow.focus();
     }
   });
 
   app.whenReady().then(() => {
-    crashMonitor.init(() => mainWindow);
+    crashMonitor.init(() => daemonBarWindow);
     enableIndustrialStayAwake();
     setupIpcHandlers();
-    createWindow();
+    
+    // 1. 创建常驻系统底部的“总管底栏进程” (深瑞模式：常驻桌面底部，不遮挡凝思桌面，没有多余大窗口)
+    createDaemonBarWindow();
+
+    // 2. 默认拉起“监控运行”子模块独立窗口
+    setTimeout(() => {
+      openModuleWindow('monitor-screen');
+    }, 450);
 
     app.on('activate', () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      if (!daemonBarWindow || daemonBarWindow.isDestroyed()) {
+        createDaemonBarWindow();
+      }
     });
   });
 
@@ -1292,8 +1757,11 @@ if (!gotTheLock) {
   });
 
   app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-      app.quit();
+    // 关键：即使挨个关闭所有子模块窗口，只要总管进程底栏还在，就绝不退出！
+    if (!daemonBarWindow || daemonBarWindow.isDestroyed()) {
+      if (process.platform !== 'darwin') {
+        app.quit();
+      }
     }
   });
 }

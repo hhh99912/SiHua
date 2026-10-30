@@ -30,6 +30,12 @@ export interface ElectronAPI {
   close: () => Promise<void>;
   toggleFullscreen: () => Promise<boolean>;
   openExternal: (url: string) => Promise<void>;
+  openModule?: (moduleId: string) => Promise<{ success: boolean; error?: string }>;
+  closeModule?: (moduleId: string) => Promise<{ success: boolean; error?: string }>;
+  getOpenModules?: () => Promise<string[]>;
+  exitApp?: () => Promise<void>;
+  toggleStartMenu?: () => Promise<{ success: boolean }>;
+  closeStartMenu?: () => Promise<{ success: boolean }>;
   screens?: {
     loadAll: () => Promise<{ success: boolean; screens: any[]; storageDir: string; count: number; files: string[] }>;
     saveAll: (screens: any[]) => Promise<{ success: boolean; count: number; storageDir: string; savedFiles: string[] }>;
