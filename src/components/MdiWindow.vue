@@ -186,7 +186,7 @@ onBeforeUnmount(() => {
       top: '0px',
       left: '0px',
       width: '100vw',
-      height: 'calc(100vh - 40px)',
+      height: 'calc(100vh - 44px)',
       zIndex: zIndex
     } : {
       top: `${y}px`,

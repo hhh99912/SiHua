@@ -584,12 +584,12 @@ const handleSubmit = () => {
   <Teleport to="body">
     <div
       v-if="visible"
-      class="fixed inset-0 z-[9999] pointer-events-none select-none"
+      class="fixed inset-0 z-[999999] pointer-events-none select-none font-sans"
     >
-      <!-- 弹窗容器：纯黑底色、硬质深灰边框、全白高对比字体、支持拖动与拉伸 -->
+      <!-- 弹窗容器：凝思米白工控风格、硬质深边框、纯黑高对比字体、支持拖动与拉伸 -->
       <div
         ref="modalRef"
-        class="pointer-events-auto absolute bg-black text-white rounded-lg border border-neutral-700 shadow-2xl flex flex-col overflow-hidden"
+        class="pointer-events-auto absolute bg-[#f2eee3] text-black rounded-lg border-2 border-[#8c826d] shadow-2xl flex flex-col overflow-hidden"
         :style="isMaximized ? {
           left: '8px',
           top: '8px',
@@ -606,15 +606,15 @@ const handleSubmit = () => {
         <header
           @mousedown="onHeaderMouseDown"
           @dblclick="toggleMaximize"
-          class="h-11 px-3.5 bg-[#111111] border-b border-[#2a2a2a] flex items-center justify-between shrink-0 cursor-move select-none"
+          class="h-11 px-3.5 bg-[#e5decb] border-b border-[#cfc5b0] flex items-center justify-between shrink-0 cursor-move select-none"
           title="按住鼠标左键可拖动，双击可最大化/还原"
         >
           <div class="flex items-center gap-2.5 min-w-0 pr-3">
-            <div class="w-2.5 h-2.5 rounded-full bg-white shrink-0"></div>
-            <span class="text-sm sm:text-base font-bold text-white tracking-normal truncate drop-shadow-xs">
+            <div class="w-2.5 h-2.5 rounded-full bg-sky-700 shrink-0"></div>
+            <span class="text-sm sm:text-base font-bold text-black tracking-normal truncate">
               五遥测点数据关联配置中心
             </span>
-            <span v-if="component" class="text-xs text-white font-mono hidden sm:inline opacity-90">
+            <span v-if="component" class="text-xs text-black font-mono font-bold bg-[#dfd6bf] px-2 py-0.5 rounded border border-[#b8ad96] hidden sm:inline">
               [当前图元: {{ component.name || component.type }}]
             </span>
           </div>
@@ -622,18 +622,18 @@ const handleSubmit = () => {
           <!-- 顶栏控制区 -->
           <div class="flex items-center gap-1.5 shrink-0">
             <button
-              class="px-2.5 py-1 rounded text-xs font-semibold border border-neutral-600 bg-neutral-900 hover:bg-neutral-800 text-rose-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+              class="px-2.5 py-1 rounded text-xs font-bold border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-800 flex items-center gap-1.5 transition-colors cursor-pointer"
               @click="handleUnbind"
               title="解除当前图元的所有测点绑定"
             >
-              <Unlink class="w-3.5 h-3.5" />
+              <Unlink class="w-3.5 h-3.5 text-rose-700" />
               <span>解除绑定</span>
             </button>
 
             <!-- 最大化 / 还原按钮 -->
             <button
               @click="toggleMaximize"
-              class="w-7 h-7 rounded flex items-center justify-center text-white hover:bg-neutral-800 border border-transparent hover:border-neutral-600 transition-colors cursor-pointer"
+              class="w-7 h-7 rounded flex items-center justify-center text-black hover:bg-[#d8cfba] border border-transparent hover:border-[#b8ad96] transition-colors cursor-pointer"
               :title="isMaximized ? '还原窗口' : '最大化窗口'"
             >
               <component :is="isMaximized ? Minimize2 : Maximize2" class="w-3.5 h-3.5" />
@@ -642,7 +642,7 @@ const handleSubmit = () => {
             <!-- 关闭按钮 -->
             <button
               @click="emit('close')"
-              class="w-7 h-7 rounded flex items-center justify-center text-white hover:bg-neutral-800 border border-transparent hover:border-neutral-600 transition-colors cursor-pointer"
+              class="w-7 h-7 rounded flex items-center justify-center text-black hover:bg-rose-100 hover:text-rose-700 border border-transparent hover:border-rose-300 transition-colors cursor-pointer"
               title="关闭窗口"
             >
               <X class="w-4 h-4" />
@@ -650,13 +650,16 @@ const handleSubmit = () => {
           </div>
         </header>
 
-        <!-- 主体区域：左侧三级级联选择，右侧测点展示 (统一纯白字体，无灰色文字) -->
-        <div class="flex-1 flex overflow-hidden min-h-0 bg-black">
+        <!-- 主体区域：左侧三级级联选择，右侧测点展示 (统一纯黑高对比字体) -->
+        <div class="flex-1 flex overflow-hidden min-h-0 bg-[#ebe4d4]">
           <!-- 1. 厂站选择 -->
-          <div class="w-60 border-r border-[#222222] bg-[#0c0d10] flex flex-col shrink-0">
-            <div class="p-3 border-b border-[#222222] bg-[#141414] flex items-center justify-between">
-              <span class="text-xs font-bold text-white">1. 厂站选择</span>
-              <span class="px-1.5 py-0.5 bg-neutral-800 border border-neutral-700 text-white text-[11px] rounded font-mono font-bold">
+          <div class="w-60 border-r border-[#cfc5b0] bg-[#ebe4d4] flex flex-col shrink-0">
+            <div class="p-3 border-b border-[#cfc5b0] bg-[#e5decb] flex items-center justify-between">
+              <span class="text-xs font-bold text-black flex items-center gap-1.5">
+                <Building2 class="w-3.5 h-3.5 text-sky-700" />
+                <span>1. 厂站选择</span>
+              </span>
+              <span class="px-1.5 py-0.5 bg-[#dfd6bf] border border-[#b8ad96] text-black text-[11px] rounded font-mono font-bold">
                 {{ scadaFacilities.length }}
               </span>
             </div>
@@ -665,20 +668,23 @@ const handleSubmit = () => {
                 v-for="fac in scadaFacilities"
                 :key="fac.fac_id || fac.id"
                 class="p-2.5 rounded border transition-colors text-left cursor-pointer"
-                :class="selectedFacId === (fac.fac_id || fac.id) ? 'bg-neutral-800 border-neutral-400 text-white font-bold' : 'bg-[#141414] border-[#242424] text-white hover:bg-[#1a1a1a]'"
+                :class="selectedFacId === (fac.fac_id || fac.id) ? 'bg-sky-700 text-white border-sky-900 font-bold shadow-xs' : 'bg-white border-[#cfc5b0] text-black hover:bg-[#fbf9f4]'"
                 @click="selectedFacId = (fac.fac_id || fac.id); selectedBayId = (fac.bays?.[0]?.bay_id || fac.bays?.[0]?.id || 0)"
               >
-                <div class="truncate text-sm font-bold text-white">{{ fac.fac_name || fac.name }}</div>
-                <div class="text-xs text-white mt-1 truncate opacity-90">{{ fac.alias || '变电站' }}</div>
+                <div class="truncate text-sm font-bold" :class="selectedFacId === (fac.fac_id || fac.id) ? 'text-white' : 'text-black'">{{ fac.fac_name || fac.name }}</div>
+                <div class="text-xs mt-1 truncate" :class="selectedFacId === (fac.fac_id || fac.id) ? 'text-sky-100 font-medium' : 'text-neutral-700 font-medium'">{{ fac.alias || '变电站' }}</div>
               </div>
             </div>
           </div>
 
           <!-- 2. 间隔选择 -->
-          <div class="w-64 border-r border-[#222222] bg-[#0c0d10] flex flex-col shrink-0">
-            <div class="p-3 border-b border-[#222222] bg-[#141414] flex items-center justify-between">
-              <span class="text-xs font-bold text-white">2. 间隔选择</span>
-              <span class="px-1.5 py-0.5 bg-neutral-800 border border-neutral-700 text-white text-[11px] rounded font-mono font-bold">
+          <div class="w-64 border-r border-[#cfc5b0] bg-[#ebe4d4] flex flex-col shrink-0">
+            <div class="p-3 border-b border-[#cfc5b0] bg-[#e5decb] flex items-center justify-between">
+              <span class="text-xs font-bold text-black flex items-center gap-1.5">
+                <Layers class="w-3.5 h-3.5 text-sky-700" />
+                <span>2. 间隔选择</span>
+              </span>
+              <span class="px-1.5 py-0.5 bg-[#dfd6bf] border border-[#b8ad96] text-black text-[11px] rounded font-mono font-bold">
                 {{ currentFacility?.bays?.length || 0 }}
               </span>
             </div>
@@ -687,20 +693,23 @@ const handleSubmit = () => {
                 v-for="bay in (currentFacility?.bays || [])"
                 :key="bay.bay_id || bay.id"
                 class="p-2.5 rounded border transition-colors text-left cursor-pointer"
-                :class="selectedBayId === (bay.bay_id || bay.id) ? 'bg-neutral-800 border-neutral-400 text-white font-bold' : 'bg-[#141414] border-[#242424] text-white hover:bg-[#1a1a1a]'"
+                :class="selectedBayId === (bay.bay_id || bay.id) ? 'bg-sky-700 text-white border-sky-900 font-bold shadow-xs' : 'bg-white border-[#cfc5b0] text-black hover:bg-[#fbf9f4]'"
                 @click="selectedBayId = (bay.bay_id || bay.id); selectedDevId = (bay.devices?.[0]?.dev_id || bay.devices?.[0]?.id || 0)"
               >
-                <div class="truncate text-sm font-bold text-white">{{ bay.bay_name || bay.name }}</div>
-                <div class="text-xs text-white mt-1 truncate opacity-90">{{ bay.alias || '配电间隔' }}</div>
+                <div class="truncate text-sm font-bold" :class="selectedBayId === (bay.bay_id || bay.id) ? 'text-white' : 'text-black'">{{ bay.bay_name || bay.name }}</div>
+                <div class="text-xs mt-1 truncate" :class="selectedBayId === (bay.bay_id || bay.id) ? 'text-sky-100 font-medium' : 'text-neutral-700 font-medium'">{{ bay.alias || '配电间隔' }}</div>
               </div>
             </div>
           </div>
 
           <!-- 3. 装置选择 -->
-          <div class="w-64 border-r border-[#222222] bg-[#0c0d10] flex flex-col shrink-0">
-            <div class="p-3 border-b border-[#222222] bg-[#141414] flex items-center justify-between">
-              <span class="text-xs font-bold text-white">3. 装置选择</span>
-              <span class="px-1.5 py-0.5 bg-neutral-800 border border-neutral-700 text-white text-[11px] rounded font-mono font-bold">
+          <div class="w-64 border-r border-[#cfc5b0] bg-[#ebe4d4] flex flex-col shrink-0">
+            <div class="p-3 border-b border-[#cfc5b0] bg-[#e5decb] flex items-center justify-between">
+              <span class="text-xs font-bold text-black flex items-center gap-1.5">
+                <Cpu class="w-3.5 h-3.5 text-sky-700" />
+                <span>3. 装置选择</span>
+              </span>
+              <span class="px-1.5 py-0.5 bg-[#dfd6bf] border border-[#b8ad96] text-black text-[11px] rounded font-mono font-bold">
                 {{ currentBay?.devices?.length || currentBay?.cb_devices?.length || 0 }}
               </span>
             </div>
@@ -709,108 +718,108 @@ const handleSubmit = () => {
                 v-for="dev in (currentBay?.devices || currentBay?.cb_devices || [])"
                 :key="dev.dev_id || dev.id"
                 class="p-2.5 rounded border transition-colors text-left cursor-pointer"
-                :class="selectedDevId === (dev.dev_id || dev.id) ? 'bg-neutral-800 border-neutral-400 text-white font-bold' : 'bg-[#141414] border-[#242424] text-white hover:bg-[#1a1a1a]'"
+                :class="selectedDevId === (dev.dev_id || dev.id) ? 'bg-sky-700 text-white border-sky-900 font-bold shadow-xs' : 'bg-white border-[#cfc5b0] text-black hover:bg-[#fbf9f4]'"
                 @click="selectedDevId = (dev.dev_id || dev.id)"
               >
-                <div class="truncate text-sm font-bold text-white">{{ dev.dev_name || dev.name }}</div>
-                <div class="flex items-center justify-between text-xs text-white mt-1 opacity-90">
+                <div class="truncate text-sm font-bold" :class="selectedDevId === (dev.dev_id || dev.id) ? 'text-white' : 'text-black'">{{ dev.dev_name || dev.name }}</div>
+                <div class="flex items-center justify-between text-xs mt-1" :class="selectedDevId === (dev.dev_id || dev.id) ? 'text-sky-100' : 'text-neutral-700 font-medium'">
                   <span>{{ dev.cbty_name || '保护测控装置' }}</span>
-                  <span class="text-[11px] font-mono text-white">{{ dev.alias || '' }}</span>
+                  <span class="text-[11px] font-mono">{{ dev.alias || '' }}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- 4. 测点分类与列表展示区 (测点名称突出展示，测点ID完全隐藏，无实时值，无灰色文字) -->
-          <div class="flex-1 flex flex-col bg-black overflow-hidden min-w-0">
-            <!-- 顶部分类标签栏与更窄的测点搜索框 -->
-            <div class="p-3 border-b border-[#222222] bg-[#111111] shrink-0 flex items-center justify-between gap-3">
-              <!-- 分类切换按钮 (统一删除(YC)(YX)等前缀提示，统一纯白字体) -->
+          <!-- 4. 测点分类与列表展示区 (统一米白背景+纯白表格+纯黑字体) -->
+          <div class="flex-1 flex flex-col bg-[#f2eee3] overflow-hidden min-w-0">
+            <!-- 顶部分类标签栏与搜索框 -->
+            <div class="p-3 border-b border-[#cfc5b0] bg-[#e5decb] shrink-0 flex items-center justify-between gap-3">
+              <!-- 分类切换按钮 -->
               <div class="grid grid-cols-5 gap-1.5 flex-1 max-w-lg">
                 <button
                   type="button"
                   class="py-1.5 px-2 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border"
-                  :class="selectedCategory === 'yc' ? 'bg-neutral-800 text-white border-neutral-400 shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+                  :class="selectedCategory === 'yc' ? 'bg-sky-700 text-white border-sky-900 shadow-xs' : 'bg-[#dfd6bf] text-black border-[#b8ad96] hover:bg-[#d4caaf]'"
                   @click="selectedCategory = 'yc'"
                 >
                   <span>遥测</span>
-                  <span class="px-1.5 py-0.2 bg-black/60 rounded font-mono text-[11px] text-white font-bold">{{ categoryStats.yc }}</span>
+                  <span class="px-1.5 py-0.2 rounded font-mono text-[11px] font-bold" :class="selectedCategory === 'yc' ? 'bg-white/20 text-white' : 'bg-black/10 text-black'">{{ categoryStats.yc }}</span>
                 </button>
 
                 <button
                   type="button"
                   class="py-1.5 px-2 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border"
-                  :class="selectedCategory === 'yx' ? 'bg-neutral-800 text-white border-neutral-400 shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+                  :class="selectedCategory === 'yx' ? 'bg-sky-700 text-white border-sky-900 shadow-xs' : 'bg-[#dfd6bf] text-black border-[#b8ad96] hover:bg-[#d4caaf]'"
                   @click="selectedCategory = 'yx'"
                 >
                   <span>遥信</span>
-                  <span class="px-1.5 py-0.2 bg-black/60 rounded font-mono text-[11px] text-white font-bold">{{ categoryStats.yx }}</span>
+                  <span class="px-1.5 py-0.2 rounded font-mono text-[11px] font-bold" :class="selectedCategory === 'yx' ? 'bg-white/20 text-white' : 'bg-black/10 text-black'">{{ categoryStats.yx }}</span>
                 </button>
 
                 <button
                   type="button"
                   class="py-1.5 px-2 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border"
-                  :class="selectedCategory === 'dd' ? 'bg-neutral-800 text-white border-neutral-400 shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+                  :class="selectedCategory === 'dd' ? 'bg-sky-700 text-white border-sky-900 shadow-xs' : 'bg-[#dfd6bf] text-black border-[#b8ad96] hover:bg-[#d4caaf]'"
                   @click="selectedCategory = 'dd'"
                 >
                   <span>电度</span>
-                  <span class="px-1.5 py-0.2 bg-black/60 rounded font-mono text-[11px] text-white font-bold">{{ categoryStats.dd }}</span>
+                  <span class="px-1.5 py-0.2 rounded font-mono text-[11px] font-bold" :class="selectedCategory === 'dd' ? 'bg-white/20 text-white' : 'bg-black/10 text-black'">{{ categoryStats.dd }}</span>
                 </button>
 
                 <button
                   type="button"
                   class="py-1.5 px-2 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border"
-                  :class="selectedCategory === 'yk' ? 'bg-neutral-800 text-white border-neutral-400 shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+                  :class="selectedCategory === 'yk' ? 'bg-sky-700 text-white border-sky-900 shadow-xs' : 'bg-[#dfd6bf] text-black border-[#b8ad96] hover:bg-[#d4caaf]'"
                   @click="selectedCategory = 'yk'"
                 >
                   <span>遥控</span>
-                  <span class="px-1.5 py-0.2 bg-black/60 rounded font-mono text-[11px] text-white font-bold">{{ categoryStats.yk }}</span>
+                  <span class="px-1.5 py-0.2 rounded font-mono text-[11px] font-bold" :class="selectedCategory === 'yk' ? 'bg-white/20 text-white' : 'bg-black/10 text-black'">{{ categoryStats.yk }}</span>
                 </button>
 
                 <button
                   type="button"
                   class="py-1.5 px-2 rounded text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer border"
-                  :class="selectedCategory === 'yt' ? 'bg-neutral-800 text-white border-neutral-400 shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+                  :class="selectedCategory === 'yt' ? 'bg-sky-700 text-white border-sky-900 shadow-xs' : 'bg-[#dfd6bf] text-black border-[#b8ad96] hover:bg-[#d4caaf]'"
                   @click="selectedCategory = 'yt'"
                 >
                   <span>遥调</span>
-                  <span class="px-1.5 py-0.2 bg-black/60 rounded font-mono text-[11px] text-white font-bold">{{ categoryStats.yt }}</span>
+                  <span class="px-1.5 py-0.2 rounded font-mono text-[11px] font-bold" :class="selectedCategory === 'yt' ? 'bg-white/20 text-white' : 'bg-black/10 text-black'">{{ categoryStats.yt }}</span>
                 </button>
               </div>
 
-              <!-- 测点快速搜索框：按要求变窄 (w-40) -->
-              <div class="relative w-40 shrink-0">
-                <Search class="w-3.5 h-3.5 text-white absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <!-- 测点快速搜索框 -->
+              <div class="relative w-44 shrink-0">
+                <Search class="w-3.5 h-3.5 text-neutral-600 absolute left-2.5 top-1/2 -translate-y-1/2" />
                 <input
                   v-model="pointSearchInput"
                   type="text"
                   placeholder="搜索测点..."
-                  class="w-full bg-[#181818] border border-neutral-700 rounded pl-8 pr-2.5 py-1.5 text-xs text-white placeholder-neutral-400 font-medium focus:outline-none focus:border-white"
+                  class="w-full bg-white border border-[#b8ad96] rounded pl-8 pr-2.5 py-1.5 text-xs text-black placeholder:text-neutral-500 font-medium focus:outline-none focus:border-sky-600"
                 />
               </div>
             </div>
 
-            <!-- 测点数据列表 (测点ID已删除，不显示实时值，统一纯白字体，测点名称醒目居首，高性能虚拟滚动) -->
+            <!-- 测点数据列表 -->
             <div
               ref="tableScrollRef"
-              class="flex-1 overflow-y-auto p-2.5 relative"
+              class="flex-1 overflow-y-auto p-2.5 relative bg-[#f2eee3]"
               style="scrollbar-gutter: stable;"
               @scroll.passive="onTableScroll"
             >
-              <table class="w-full text-left text-sm border-collapse" style="table-layout: fixed;">
+              <table class="w-full text-left text-sm border-collapse bg-white border border-[#cfc5b0]" style="table-layout: fixed;">
                 <colgroup>
                   <col style="width: 48%;" />
                   <col style="width: 36%;" />
                   <col style="width: 110px;" />
                 </colgroup>
                 <thead>
-                  <tr class="border-b border-[#2a2a2a] bg-[#141414] text-white sticky top-0 z-10 h-11">
-                    <th class="py-3 px-3 font-bold text-sm text-white">测点名称</th>
-                    <th class="py-3 px-3 font-bold text-xs text-white">工程别名 / 物理标识</th>
-                    <th class="py-3 px-3 font-bold text-xs text-white text-right">选择状态</th>
+                  <tr class="border-b border-[#cfc5b0] bg-[#e5decb] text-black sticky top-0 z-10 h-10">
+                    <th class="py-2.5 px-3 font-bold text-sm text-black">测点名称</th>
+                    <th class="py-2.5 px-3 font-bold text-xs text-black">工程别名 / 物理标识</th>
+                    <th class="py-2.5 px-3 font-bold text-xs text-black text-right">选择状态</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-[#1e1e1e]">
+                <tbody class="divide-y divide-[#ebe4d4]">
                   <!-- 虚拟滚动顶部占位行 -->
                   <tr v-if="virtualTopSpacerHeight > 0" :style="{ height: `${virtualTopSpacerHeight}px` }" aria-hidden="true">
                     <td colspan="3" class="p-0 border-0 m-0"></td>
@@ -820,28 +829,28 @@ const handleSubmit = () => {
                     v-for="pt in visiblePointsList"
                     :key="pt.id"
                     :id="`cascade-point-row-${pt.id}`"
-                    class="cursor-pointer h-12 select-none"
-                    :class="selectedPointId === pt.id ? 'bg-neutral-800 text-white' : 'hover:bg-[#161616] text-white'"
+                    class="cursor-pointer h-12 select-none transition-colors"
+                    :class="selectedPointId === pt.id ? 'bg-sky-50 text-black font-bold border-l-4 border-l-sky-600' : 'hover:bg-[#faf7f0] text-black'"
                     @click="handleSelectPointRow(pt)"
                   >
-                    <!-- 测点名称：醒目大号亮白文字 -->
-                    <td class="py-2.5 px-3 font-sans text-sm font-bold text-white truncate" :title="getScadaPointDisplayName(pt)">
+                    <!-- 测点名称 -->
+                    <td class="py-2.5 px-3 font-sans text-sm font-bold text-black truncate" :title="getScadaPointDisplayName(pt)">
                       <div class="flex items-center gap-2 truncate">
-                        <span class="w-2 h-2 rounded-full shrink-0" :class="selectedPointId === pt.id ? 'bg-white' : 'bg-neutral-600'"></span>
+                        <span class="w-2 h-2 rounded-full shrink-0" :class="selectedPointId === pt.id ? 'bg-sky-600' : 'bg-neutral-400'"></span>
                         <span class="truncate">{{ getScadaPointDisplayName(pt) }}</span>
                       </div>
                     </td>
 
                     <!-- 工程别名 / 物理标识 -->
-                    <td class="py-2.5 px-3 font-mono text-xs text-white font-medium truncate" :title="pt.alias || pt.type_name || ''">
+                    <td class="py-2.5 px-3 font-mono text-xs text-black font-medium truncate" :title="pt.alias || pt.type_name || ''">
                       {{ pt.alias || pt.type_name || '-' }}
                     </td>
 
-                    <!-- 选中状态 (固定尺寸 w-20 居中，固定1px边框无晃动) -->
+                    <!-- 选中状态 -->
                     <td class="py-2.5 px-3 text-right">
                       <div
-                        class="inline-flex items-center justify-center w-20 h-7 rounded text-xs font-semibold shrink-0 select-none border"
-                        :class="selectedPointId === pt.id ? 'bg-white text-black border-white shadow-sm' : 'bg-neutral-800 text-white border-neutral-700 hover:border-neutral-500'"
+                        class="inline-flex items-center justify-center w-20 h-7 rounded text-xs font-bold shrink-0 select-none border transition-colors"
+                        :class="selectedPointId === pt.id ? 'bg-sky-700 text-white border-sky-900 shadow-xs' : 'bg-[#dfd6bf] text-black border-[#b8ad96] hover:bg-[#d4caaf]'"
                       >
                         <Check v-if="selectedPointId === pt.id" class="w-3.5 h-3.5 mr-1 stroke-[3] shrink-0" />
                         <span>{{ selectedPointId === pt.id ? '已选中' : '选择' }}</span>
@@ -855,7 +864,7 @@ const handleSubmit = () => {
                   </tr>
 
                   <tr v-if="totalPointsCount === 0">
-                    <td colspan="3" class="p-12 text-center text-white font-sans text-sm font-medium">
+                    <td colspan="3" class="p-12 text-center text-neutral-800 font-sans text-sm font-bold">
                       当前装置暂无该类型测点或未搜索到匹配项
                     </td>
                   </tr>
@@ -863,20 +872,20 @@ const handleSubmit = () => {
               </table>
             </div>
 
-            <!-- 遥控/遥调闭环返校点配置 (删去(YX)(YC)提示，统一纯白字体，仅显示经过严格规则筛选的返校点) -->
+            <!-- 遥控/遥调闭环返校点配置 -->
             <div
               v-if="selectedCategory === 'yk' || selectedCategory === 'yt'"
-              class="h-12 min-h-12 px-3 bg-[#111111] border-t border-[#2a2a2a] shrink-0 flex items-center justify-between gap-3 text-xs"
+              class="h-12 min-h-12 px-3 bg-[#e5decb] border-t border-[#cfc5b0] shrink-0 flex items-center justify-between gap-3 text-xs"
             >
-              <div class="flex items-center gap-2 shrink-0 text-xs font-bold text-white">
-                <ShieldCheck class="w-4 h-4 text-white" />
+              <div class="flex items-center gap-2 shrink-0 text-xs font-bold text-black">
+                <ShieldCheck class="w-4 h-4 text-sky-700" />
                 <span>{{ selectedCategory === 'yk' ? '遥控闭环返校点:' : '遥调闭环返校点:' }}</span>
               </div>
 
               <div class="flex-1">
                 <select
                   v-model="selectedVerificationPointId"
-                  class="w-full bg-[#181818] border border-neutral-600 rounded px-2.5 py-1 text-xs text-white font-medium focus:outline-none focus:border-white cursor-pointer"
+                  class="w-full bg-white border border-[#b8ad96] rounded px-2.5 py-1 text-xs text-black font-medium focus:outline-none focus:border-sky-600 cursor-pointer"
                 >
                   <option :value="null">-- 不配置专属返校校验点 (执行后直接返回) --</option>
                   <option
@@ -892,20 +901,20 @@ const handleSubmit = () => {
           </div>
         </div>
 
-        <!-- 底部操作栏 (统一纯白字体，删掉(YC)(YX)类前缀) -->
-        <footer class="h-13 px-5 border-t border-[#2a2a2a] bg-[#111111] flex items-center justify-between shrink-0">
+        <!-- 底部操作栏 -->
+        <footer class="h-13 px-5 border-t border-[#cfc5b0] bg-[#e5decb] flex items-center justify-between shrink-0">
           <div class="flex items-center gap-2 text-sm min-w-0 pr-4">
-            <span class="text-white font-bold shrink-0">当前选择:</span>
-            <span v-if="isUnboundPending" class="text-rose-400 font-bold truncate">
+            <span class="text-black font-bold shrink-0">当前选择:</span>
+            <span v-if="isUnboundPending" class="text-rose-700 font-bold truncate">
               [已标记解除测点关联]
             </span>
-            <span v-else-if="selectedPoint" class="text-white font-bold truncate">
-              {{ currentFacility?.fac_name || currentFacility?.name }} ➜ {{ currentBay?.bay_name || currentBay?.name }} ➜ {{ currentDevice?.dev_name || currentDevice?.name }} ➜ <strong class="text-white font-bold underline underline-offset-2">{{ selectedPoint.name }}</strong>
-              <span v-if="selectedVerificationPointId" class="text-white ml-2 font-normal">
+            <span v-else-if="selectedPoint" class="text-black font-bold truncate">
+              {{ currentFacility?.fac_name || currentFacility?.name }} ➜ {{ currentBay?.bay_name || currentBay?.name }} ➜ {{ currentDevice?.dev_name || currentDevice?.name }} ➜ <strong class="text-sky-900 font-bold underline underline-offset-2">{{ selectedPoint.name }}</strong>
+              <span v-if="selectedVerificationPointId" class="text-black ml-2 font-normal">
                 (返校校验点: 已匹配配置)
               </span>
             </span>
-            <span v-else class="text-white font-medium opacity-80">
+            <span v-else class="text-neutral-700 font-medium">
               未选择任何测点
             </span>
           </div>
@@ -913,14 +922,14 @@ const handleSubmit = () => {
           <div class="flex items-center gap-2.5 shrink-0">
             <button
               type="button"
-              class="px-5 py-1.5 rounded text-xs sm:text-sm font-semibold border border-neutral-600 bg-neutral-900 hover:bg-neutral-800 text-white transition-colors cursor-pointer"
+              class="px-5 py-1.5 rounded text-xs sm:text-sm font-bold border border-[#b8ad96] bg-[#dfd6bf] hover:bg-[#d4caaf] text-black transition-colors cursor-pointer"
               @click="emit('close')"
             >
               取消
             </button>
             <button
               type="button"
-              class="px-6 py-1.5 rounded text-xs sm:text-sm font-bold bg-white hover:bg-neutral-200 text-black transition-colors cursor-pointer flex items-center gap-1.5"
+              class="px-6 py-1.5 rounded text-xs sm:text-sm font-bold bg-sky-700 hover:bg-sky-800 text-white border border-sky-950 transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
               @click="handleSubmit"
             >
               <Check class="w-4 h-4 stroke-[2.5]" />
@@ -933,17 +942,17 @@ const handleSubmit = () => {
         <template v-if="!isMaximized">
           <div
             @mousedown="startResize('e', $event)"
-            class="absolute top-0 right-0 w-2 h-full cursor-ew-resize hover:bg-white/10 transition-colors"
+            class="absolute top-0 right-0 w-2 h-full cursor-ew-resize hover:bg-sky-500/20 transition-colors"
             title="左右拖动调整宽度"
           ></div>
           <div
             @mousedown="startResize('s', $event)"
-            class="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize hover:bg-white/10 transition-colors"
+            class="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize hover:bg-sky-500/20 transition-colors"
             title="上下拖动调整高度"
           ></div>
           <div
             @mousedown="startResize('se', $event)"
-            class="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize flex items-end justify-end p-0.5 text-white/50 hover:text-white hover:bg-white/15 rounded-br transition-colors"
+            class="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize flex items-end justify-end p-0.5 text-neutral-600 hover:text-black hover:bg-black/10 rounded-br transition-colors"
             title="拖动右下角调整大小"
           >
             <svg class="w-2.5 h-2.5" viewBox="0 0 10 10" fill="currentColor">

@@ -13,9 +13,14 @@ import { currentUser, loginUser, PRESET_USERS } from '../utils/auth';
 
 interface Props {
   notice?: string;
+  standalone?: boolean;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  notice: '',
+  standalone: false
+});
+
 const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'success'): void;
@@ -44,6 +49,11 @@ const handleLogin = () => {
     const res = loginUser(selectedUsername.value, password.value);
     isSubmitting.value = false;
     if (res.success) {
+      if (typeof window !== 'undefined' && (window as any).electronAPI?.userLoggedIn) {
+        try {
+          (window as any).electronAPI.userLoggedIn(currentUser.value);
+        } catch {}
+      }
       emit('success');
       emit('close');
     } else {
@@ -53,102 +63,123 @@ const handleLogin = () => {
 };
 
 const handleLogoutToLoginScreen = () => {
+  if (typeof window !== 'undefined' && (window as any).electronAPI?.sendUserAction) {
+    try {
+      (window as any).electronAPI.sendUserAction('logout');
+    } catch {}
+  }
   emit('logout');
+  emit('close');
+};
+
+const handleCloseModal = () => {
+  if (props.standalone && typeof window !== 'undefined' && (window as any).electronAPI?.closeLogin) {
+    try {
+      (window as any).electronAPI.closeLogin();
+    } catch {}
+  }
   emit('close');
 };
 </script>
 
 <template>
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-6 animate-in fade-in duration-200">
-    <!-- 放大且加粗的登录切换弹框 -->
-    <div class="bg-[#050b18] border-2 border-cyan-500/50 rounded-2xl w-full max-w-xl shadow-[0_0_80px_rgba(0,242,255,0.3)] flex flex-col overflow-hidden font-sans">
+  <div
+    :class="standalone
+      ? 'w-full h-full bg-[#f2eee3] flex flex-col justify-center overflow-y-auto font-sans p-2 select-none text-black'
+      : 'fixed inset-0 z-[999999] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-6 animate-in fade-in duration-150 text-black'"
+  >
+    <!-- 对标凝思米白色工业质感弹框 -->
+    <div
+      class="bg-[#ebe4d4] border-2 border-[#8c826d] flex flex-col overflow-hidden font-sans shadow-2xl"
+      :class="standalone ? 'w-full shadow-none my-auto' : 'w-full max-w-lg'"
+    >
       <!-- Header -->
-      <div class="px-8 py-5 border-b border-cyan-500/25 flex items-center justify-between bg-slate-950/80">
-        <div class="flex items-center gap-3.5">
-          <div class="p-3 rounded-xl bg-cyan-950 border border-cyan-500/60 text-cyan-400 shadow-md">
-            <ShieldCheck class="w-6 h-6 stroke-[2.2]" />
+      <div class="px-5 py-3.5 border-b border-[#cfc5b0] flex items-center justify-between bg-[#e5decb]">
+        <div class="flex items-center gap-3">
+          <div class="p-2 bg-[#d4caaf] border border-[#b8ad96] text-sky-800">
+            <ShieldCheck class="w-5 h-5 stroke-[2.2]" />
           </div>
           <div>
-            <h2 class="text-xl font-extrabold text-white tracking-wide">SCADA 用户身份认证</h2>
-            <p class="text-sm font-semibold text-slate-300 mt-0.5">切换用户权限与操作身份</p>
+            <h2 class="text-base font-bold text-black tracking-wide">SCADA 用户身份认证</h2>
+            <p class="text-xs font-medium text-slate-700 mt-0.5">切换用户权限与操作身份</p>
           </div>
         </div>
 
         <button
-          @click="emit('close')"
-          class="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent hover:border-slate-700 transition-colors cursor-pointer"
+          @click="handleCloseModal"
+          class="p-1.5 hover:bg-[#ded5bf] border border-[#cfc5b0] text-slate-700 hover:text-black transition-colors cursor-pointer"
         >
-          <X class="w-6 h-6 stroke-[2]" />
+          <X class="w-5 h-5" />
         </button>
       </div>
 
       <!-- Notice Alert if triggered by permission failure -->
-      <div v-if="notice" class="mx-8 mt-5 p-3.5 rounded-xl bg-amber-950/50 border border-amber-500/50 flex items-start gap-2.5 text-sm font-bold text-amber-200">
-        <ShieldAlert class="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+      <div v-if="notice" class="mx-5 mt-4 p-3 bg-[#fff8e6] border border-[#e6a23c] flex items-start gap-2 text-xs font-bold text-[#b87a14]">
+        <ShieldAlert class="w-4 h-4 text-[#e6a23c] shrink-0 mt-0.5" />
         <div class="leading-relaxed">{{ notice }}</div>
       </div>
 
       <!-- Form Inputs -->
-      <form @submit.prevent="handleLogin" class="p-8 space-y-6">
+      <form @submit.prevent="handleLogin" class="p-6 space-y-4">
         <div>
-          <label class="block text-sm font-bold text-slate-200 mb-2 flex items-center justify-between">
-            <span class="text-base font-extrabold text-white">选择用户角色</span>
-            <span class="text-xs font-bold text-cyan-400 font-mono bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800">
+          <label class="block text-xs font-bold text-black mb-1.5 flex items-center justify-between">
+            <span class="text-sm font-bold text-black">选择用户角色</span>
+            <span class="text-xs font-mono font-medium text-slate-600 bg-[#dfd6bf] px-2 py-0.5 border border-[#cfc5b0]">
               共 {{ userList.length }} 个预设身份
             </span>
           </label>
           <div class="relative">
-            <User class="w-5 h-5 text-cyan-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <User class="w-4 h-4 text-slate-600 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <select
               v-model="selectedUsername"
-              class="w-full appearance-none bg-slate-900 border-2 border-slate-700 hover:border-cyan-500/70 rounded-xl pl-11 pr-10 py-3.5 text-base font-bold text-white focus:border-cyan-400 focus:outline-hidden transition-colors cursor-pointer"
+              class="w-full appearance-none bg-white border border-[#b8ad96] hover:border-sky-600 pl-9 pr-9 py-2.5 text-sm font-medium text-black focus:border-sky-700 focus:outline-hidden transition-colors cursor-pointer"
             >
               <option
                 v-for="u in userList"
                 :key="u.username"
                 :value="u.username"
-                class="bg-slate-900 text-white py-2 font-bold"
+                class="bg-white text-black py-1.5 font-medium"
               >
                 {{ u.name }} —— 【{{ u.roleName }}】
               </option>
             </select>
-            <ChevronDown class="w-5 h-5 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ChevronDown class="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
         </div>
 
         <div>
-          <label class="block text-sm font-bold text-slate-200 mb-2 flex items-center justify-between">
-            <span class="text-base font-extrabold text-white">登录密码</span>
-            <span class="text-xs font-bold text-slate-400 font-mono">初始密码: 123456</span>
+          <label class="block text-xs font-bold text-black mb-1.5 flex items-center justify-between">
+            <span class="text-sm font-bold text-black">登录密码</span>
+            <span class="text-xs font-medium text-slate-600 font-mono">初始密码: 123456</span>
           </label>
           <div class="relative">
-            <Lock class="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Lock class="w-4 h-4 text-slate-600 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               v-model="password"
               type="password"
               placeholder="请输入密码 (123456)"
-              class="w-full bg-slate-900 border-2 border-slate-700 rounded-xl pl-11 pr-4 py-3 text-base font-bold text-white placeholder-slate-500 focus:border-cyan-400 focus:outline-hidden font-mono tracking-widest"
+              class="w-full bg-white border border-[#b8ad96] pl-9 pr-4 py-2 text-sm font-medium text-black placeholder-slate-400 focus:border-sky-700 focus:outline-hidden font-mono"
             />
           </div>
         </div>
 
-        <div v-if="errorMessage" class="text-sm font-bold text-rose-300 bg-rose-950/60 border border-rose-500/40 p-3.5 rounded-xl">
+        <div v-if="errorMessage" class="text-xs font-bold text-[#cc0000] bg-[#ffe5e5] border border-[#ff0000] p-2.5">
           {{ errorMessage }}
         </div>
 
         <button
           type="submit"
           :disabled="isSubmitting"
-          class="w-full py-3.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-extrabold text-base shadow-[0_0_25px_rgba(0,242,255,0.4)] transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 tracking-wide"
+          class="w-full py-2.5 bg-sky-700 hover:bg-sky-800 border border-sky-950 text-white font-bold text-sm transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 tracking-wide"
         >
-          <LogIn class="w-5 h-5 stroke-[2.5]" />
+          <LogIn class="w-4 h-4" />
           <span>{{ isSubmitting ? '正在验证身份...' : '确认切换用户身份' }}</span>
         </button>
 
         <button
           type="button"
           @click="handleLogoutToLoginScreen"
-          class="w-full py-3 rounded-xl bg-slate-900/90 border border-slate-700 hover:border-amber-500/60 hover:bg-amber-950/30 text-amber-300 hover:text-amber-200 text-sm font-bold transition-all cursor-pointer tracking-wide"
+          class="w-full py-2 bg-[#f2eee3] hover:bg-[#e4dcce] border border-[#b8ad96] text-black text-xs font-medium transition-all cursor-pointer tracking-wide"
         >
           注销当前账号 / 返回 SCADA 登录界面
         </button>

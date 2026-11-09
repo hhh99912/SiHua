@@ -998,39 +998,39 @@ onUnmounted(() => {
   <Teleport to="body">
     <div
       v-if="visible"
-      class="fixed inset-2 z-[9999] bg-[#080f1e] text-slate-100 rounded-xl border border-slate-700/80 shadow-2xl flex flex-col overflow-hidden select-none font-sans"
+      class="fixed inset-2 z-[9999] bg-[#f2eee3] text-black rounded-lg border-2 border-[#8c826d] shadow-2xl flex flex-col overflow-hidden select-none font-sans scada-modal-body"
       @click="closeContextMenu"
     >
       <!-- ============================================================ -->
       <!-- A. 顶栏：自适应资产库 vs 专业工作台编辑器                     -->
       <!-- ============================================================ -->
-      <header class="h-12 px-4 bg-[#0d1627] border-b border-slate-800 flex items-center justify-between shrink-0">
+      <header class="h-12 px-4 bg-[#e5decb] border-b border-[#cfc5b0] flex items-center justify-between shrink-0 text-black">
         <!-- 资产库模式顶栏 -->
         <template v-if="currentView === 'gallery'">
           <div class="flex items-center gap-3">
-            <div class="w-2.5 h-2.5 rounded-full bg-cyan-400"></div>
-            <span class="text-base font-bold text-white tracking-wide">
+            <div class="w-2.5 h-2.5 rounded-full bg-sky-700"></div>
+            <span class="text-base font-extrabold text-black tracking-wide">
               图元工坊
             </span>
-            <span class="text-xs text-slate-400 font-mono">
+            <span class="text-xs text-[#5c5446] font-mono font-bold">
               (共 {{ symbols.length }} 个图元)
             </span>
           </div>
 
           <div class="flex items-center gap-3">
             <div class="relative w-64">
-              <Search class="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <Search class="w-4 h-4 text-[#706857] absolute left-2.5 top-1/2 -translate-y-1/2" />
               <input
                 v-model="searchQuery"
                 type="text"
                 placeholder="搜索图元名称..."
-                class="w-full bg-[#050b14] border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-cyan-400 focus:outline-hidden"
+                class="w-full bg-white border border-[#b8ad96] rounded pl-8 pr-3 py-1.5 text-xs text-black placeholder-[#706857] focus:border-sky-700 focus:outline-hidden font-bold"
               />
             </div>
 
             <button
               @click="loadSymbols"
-              class="p-1.5 rounded-lg border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer transition-colors"
+              class="p-1.5 rounded border border-[#b8ad96] bg-[#dfd6bf] hover:bg-[#d4caaf] text-black cursor-pointer transition-colors"
               title="刷新图元列表"
             >
               <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': isLoading }" />
@@ -1038,7 +1038,7 @@ onUnmounted(() => {
 
             <button
               @click="handleCreateNewSymbol"
-              class="px-3.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-md"
+              class="px-3.5 py-1.5 rounded bg-sky-700 hover:bg-sky-800 text-white font-extrabold text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-xs border border-sky-950"
             >
               <Plus class="w-4 h-4 stroke-[2.5]" />
               <span>新建图元</span>
@@ -1046,10 +1046,10 @@ onUnmounted(() => {
 
             <button
               @click="emit('close')"
-              class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              class="w-8 h-8 rounded flex items-center justify-center text-black hover:bg-[#d4caaf] transition-colors cursor-pointer"
               title="关闭"
             >
-              <X class="w-5 h-5" />
+              <X class="w-5 h-5 stroke-[2.2]" />
             </button>
           </div>
         </template>
@@ -1059,45 +1059,45 @@ onUnmounted(() => {
           <div class="flex items-center gap-3">
             <button
               @click="handleBackToGallery"
-              class="px-2.5 py-1 rounded border border-slate-700 bg-slate-900 hover:bg-slate-800 text-xs text-slate-300 hover:text-white flex items-center gap-1.5 cursor-pointer transition-colors"
+              class="px-2.5 py-1 rounded border border-[#b8ad96] bg-[#dfd6bf] hover:bg-[#d4caaf] text-xs font-bold text-black flex items-center gap-1.5 cursor-pointer transition-colors"
             >
               <ArrowLeft class="w-3.5 h-3.5" />
               <span>返回图元库</span>
             </button>
 
-            <div class="h-4 w-[1px] bg-slate-700"></div>
+            <div class="h-4 w-[1px] bg-[#cfc5b0]"></div>
 
             <!-- 图元名称重命名输入 -->
             <div class="flex items-center gap-2" v-if="editingSymbol">
               <input
                 v-model="editingSymbol.name"
                 type="text"
-                class="bg-transparent border-b border-transparent hover:border-slate-600 focus:border-cyan-400 text-sm font-bold text-white px-1.5 py-0.5 focus:outline-hidden transition-colors w-44"
+                class="bg-white border border-[#b8ad96] focus:border-sky-700 text-sm font-extrabold text-black px-2 py-0.5 rounded w-44 transition-colors"
                 placeholder="图元名称"
                 title="修改图元名称"
               />
-              <span class="text-xs text-slate-400 font-mono">
+              <span class="text-xs text-[#5c5446] font-mono font-bold">
                 {{ computedSymbolBounds.width }} × {{ computedSymbolBounds.height }} px
               </span>
             </div>
           </div>
 
           <!-- 分合闸多态管理切换器 -->
-          <div class="flex items-center gap-1 bg-[#050b14] border border-slate-800 rounded-lg p-0.5">
+          <div class="flex items-center gap-1 bg-[#dfd6bf] border border-[#b8ad96] rounded p-0.5">
             <button
               v-for="st in editorStates"
               :key="st.id"
               @click="switchState(st.id)"
-              class="px-2.5 py-1 rounded text-xs font-mono transition-colors cursor-pointer"
+              class="px-2.5 py-1 rounded text-xs font-mono transition-colors cursor-pointer font-bold"
               :class="activeStateId === st.id 
-                ? 'bg-cyan-500 text-slate-950 font-bold shadow-xs' 
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'"
+                ? 'bg-sky-700 text-white shadow-xs' 
+                : 'text-black hover:bg-[#ebe4d4]'"
             >
               状态 {{ st.id }}
             </button>
             <button
               @click="addNewState"
-              class="px-2 py-1 rounded text-xs text-slate-400 hover:text-cyan-300 hover:bg-slate-800 cursor-pointer flex items-center gap-1"
+              class="px-2 py-1 rounded text-xs text-black hover:bg-[#ebe4d4] cursor-pointer flex items-center gap-1 font-bold"
               title="添加新状态 (自动复制当前状态组件)"
             >
               <Plus class="w-3.5 h-3.5" />
@@ -1105,7 +1105,7 @@ onUnmounted(() => {
             <button
               v-if="editorStates.length > 1"
               @click="deleteCurrentState"
-              class="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-slate-800 cursor-pointer"
+              class="p-1 rounded text-rose-800 hover:bg-rose-100 cursor-pointer"
               title="删除当前状态"
             >
               <Trash2 class="w-3.5 h-3.5" />
@@ -1115,17 +1115,17 @@ onUnmounted(() => {
           <!-- 右侧操作区：缩放、网格、对齐与保存 -->
           <div class="flex items-center gap-2">
             <!-- 缩放控制 -->
-            <div class="flex items-center gap-1 border border-slate-700 rounded-lg px-2 py-1 bg-[#050b14] text-xs font-mono">
-              <button @click="zoom = Math.max(0.5, zoom - 0.1)" class="hover:text-cyan-400 cursor-pointer">-</button>
+            <div class="flex items-center gap-1 border border-[#b8ad96] rounded px-2 py-1 bg-white text-xs font-mono font-bold text-black">
+              <button @click="zoom = Math.max(0.5, zoom - 0.1)" class="hover:text-sky-700 cursor-pointer">-</button>
               <span class="w-10 text-center">{{ Math.round(zoom * 100) }}%</span>
-              <button @click="zoom = Math.min(2.5, zoom + 0.1)" class="hover:text-cyan-400 cursor-pointer">+</button>
+              <button @click="zoom = Math.min(2.5, zoom + 0.1)" class="hover:text-sky-700 cursor-pointer">+</button>
             </div>
 
             <!-- 网格开关 -->
             <button
               @click="showGrid = !showGrid"
-              class="p-1.5 rounded-lg border border-slate-700 cursor-pointer transition-colors"
-              :class="showGrid ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50' : 'text-slate-400 hover:bg-slate-800'"
+              class="p-1.5 rounded border border-[#b8ad96] cursor-pointer transition-colors"
+              :class="showGrid ? 'bg-sky-700 text-white' : 'bg-[#dfd6bf] text-black hover:bg-[#d4caaf]'"
               title="网格显示与对齐"
             >
               <Grid class="w-4 h-4" />
@@ -1134,7 +1134,7 @@ onUnmounted(() => {
             <!-- 保存图元 -->
             <button
               @click="handleSaveSymbol"
-              class="px-4 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-colors"
+              class="px-4 py-1.5 rounded bg-sky-700 hover:bg-sky-800 text-white font-extrabold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs border border-sky-950 transition-colors"
             >
               <Check class="w-4 h-4 stroke-[2.5]" />
               <span>保存图元</span>
@@ -1142,10 +1142,10 @@ onUnmounted(() => {
 
             <button
               @click="emit('close')"
-              class="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer ml-1"
+              class="w-8 h-8 rounded flex items-center justify-center text-black hover:bg-[#d4caaf] transition-colors cursor-pointer ml-1"
               title="关闭"
             >
-              <X class="w-5 h-5" />
+              <X class="w-5 h-5 stroke-[2.2]" />
             </button>
           </div>
         </template>
@@ -1157,13 +1157,13 @@ onUnmounted(() => {
       <div class="flex-1 flex overflow-hidden">
         <!-- ==================== 1. 资产库展示网格 (Gallery) ==================== -->
         <template v-if="currentView === 'gallery'">
-          <div class="flex-1 p-6 overflow-y-auto">
-            <div v-if="filteredSymbols.length === 0" class="h-full flex flex-col items-center justify-center text-slate-500">
-              <Zap class="w-12 h-12 stroke-[1.5] text-slate-600 mb-3" />
-              <div class="text-sm font-medium">未找到匹配的图元</div>
+          <div class="flex-1 p-6 overflow-y-auto bg-[#ebe4d4]">
+            <div v-if="filteredSymbols.length === 0" class="h-full flex flex-col items-center justify-center text-[#5c5446]">
+              <Zap class="w-12 h-12 stroke-[1.5] text-[#8c826d] mb-3" />
+              <div class="text-sm font-bold text-black">未找到匹配的图元</div>
               <button
                 @click="handleCreateNewSymbol"
-                class="mt-4 px-4 py-2 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                class="mt-4 px-4 py-2 rounded bg-sky-700 hover:bg-sky-800 text-white text-xs font-extrabold flex items-center gap-1.5 cursor-pointer border border-sky-950 shadow-xs"
               >
                 <Plus class="w-4 h-4" />
                 <span>立即新建图元</span>
@@ -1174,10 +1174,10 @@ onUnmounted(() => {
               <div
                 v-for="sym in filteredSymbols"
                 :key="sym.id"
-                class="bg-[#0b1424] border border-slate-800 hover:border-cyan-500/50 rounded-xl p-3 flex flex-col justify-between transition-all group"
+                class="bg-white border border-[#cfc5b0] hover:border-sky-600 rounded-lg p-3 flex flex-col justify-between transition-all group shadow-2xs"
               >
                 <!-- 卡片顶部缩略图预览 -->
-                <div class="w-full h-32 bg-[#040811] rounded-lg border border-slate-800/80 flex items-center justify-center overflow-hidden relative mb-2.5">
+                <div class="w-full h-32 bg-[#f2eee3] rounded border border-[#cfc5b0] flex items-center justify-center overflow-hidden relative mb-2.5">
                   <div
                     class="relative"
                     :style="{
@@ -1203,47 +1203,47 @@ onUnmounted(() => {
                     </div>
                   </div>
 
-                  <span class="absolute bottom-1 right-1.5 text-[10px] font-mono text-slate-500 bg-slate-900/80 px-1 rounded">
+                  <span class="absolute bottom-1 right-1.5 text-[10px] font-mono font-bold text-[#5c5446] bg-[#e5decb] px-1 rounded border border-[#cfc5b0]">
                     {{ sym.defaultWidth }}×{{ sym.defaultHeight }}
                   </span>
                 </div>
 
                 <!-- 图元信息 -->
                 <div class="mb-2">
-                  <div class="text-sm font-bold text-white truncate" :title="sym.name">
+                  <div class="text-sm font-extrabold text-black truncate" :title="sym.name">
                     {{ sym.name }}
                   </div>
-                  <div class="text-[11px] text-slate-400 font-mono mt-0.5">
+                  <div class="text-[11px] text-[#5c5446] font-mono font-bold mt-0.5">
                     {{ sym.states?.length || 1 }} 个状态
                   </div>
                 </div>
 
                 <!-- 底部操作按钮 -->
-                <div class="flex items-center gap-1.5 pt-2 border-t border-slate-800/80">
+                <div class="flex items-center gap-1.5 pt-2 border-t border-[#cfc5b0]">
                   <button
                     @click="handleUseSymbol(sym)"
-                    class="flex-1 py-1 rounded bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                    class="flex-1 py-1 rounded bg-sky-700 hover:bg-sky-800 text-white font-extrabold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors border border-sky-950 shadow-xs"
                     title="在当前组态画面中使用此图元"
                   >
                     <span>使用</span>
                   </button>
                   <button
                     @click="handleEditSymbol(sym)"
-                    class="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer transition-colors"
+                    class="p-1 rounded bg-[#dfd6bf] hover:bg-[#d4caaf] text-black border border-[#b8ad96] cursor-pointer transition-colors"
                     title="编辑图元结构与状态"
                   >
                     <Edit3 class="w-3.5 h-3.5" />
                   </button>
                   <button
                     @click="handleCloneSymbol(sym)"
-                    class="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white cursor-pointer transition-colors"
+                    class="p-1 rounded bg-[#dfd6bf] hover:bg-[#d4caaf] text-black border border-[#b8ad96] cursor-pointer transition-colors"
                     title="复制图元"
                   >
                     <Copy class="w-3.5 h-3.5" />
                   </button>
                   <button
                     @click="openDeleteConfirm(sym)"
-                    class="p-1 rounded bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-400 cursor-pointer transition-colors"
+                    class="p-1 rounded bg-[#dfd6bf] hover:bg-rose-100 text-rose-800 border border-rose-300 cursor-pointer transition-colors"
                     title="删除图元"
                   >
                     <Trash2 class="w-3.5 h-3.5" />
@@ -1256,58 +1256,58 @@ onUnmounted(() => {
 
         <!-- ==================== 2. 专业图元工作台编辑器 (Editor) ==================== -->
         <template v-else>
-          <!-- 左侧物料库 (具备常用基础、电力一次、控制测量三分类，丰富完备) -->
-          <div class="w-60 bg-[#0a1220] border-r border-slate-800 flex flex-col shrink-0">
+          <!-- 左侧物料库 (具备常用基础、电力一次、控制测量三分类) -->
+          <div class="w-60 bg-[#ebe4d4] border-r border-[#cfc5b0] flex flex-col shrink-0 text-black">
             <!-- 分类切换标签栏 -->
-            <div class="grid grid-cols-3 border-b border-slate-800 text-[11px] font-bold bg-[#070d17]">
+            <div class="grid grid-cols-3 border-b border-[#cfc5b0] text-[11px] font-extrabold bg-[#dfd6bf]">
               <button
                 @click="activePaletteTab = 'electrical'"
                 class="py-2 text-center transition-colors cursor-pointer border-b-2"
-                :class="activePaletteTab === 'electrical' ? 'border-cyan-400 text-cyan-300 bg-[#0a1220]' : 'border-transparent text-slate-400 hover:text-slate-200'"
+                :class="activePaletteTab === 'electrical' ? 'border-sky-800 text-sky-900 bg-[#ebe4d4]' : 'border-transparent text-black hover:bg-[#d4caaf]'"
               >
                 电力一次
               </button>
               <button
                 @click="activePaletteTab = 'basic'"
                 class="py-2 text-center transition-colors cursor-pointer border-b-2"
-                :class="activePaletteTab === 'basic' ? 'border-cyan-400 text-cyan-300 bg-[#0a1220]' : 'border-transparent text-slate-400 hover:text-slate-200'"
+                :class="activePaletteTab === 'basic' ? 'border-sky-800 text-sky-900 bg-[#ebe4d4]' : 'border-transparent text-black hover:bg-[#d4caaf]'"
               >
                 基础形状
               </button>
               <button
                 @click="activePaletteTab = 'control'"
                 class="py-2 text-center transition-colors cursor-pointer border-b-2"
-                :class="activePaletteTab === 'control' ? 'border-cyan-400 text-cyan-300 bg-[#0a1220]' : 'border-transparent text-slate-400 hover:text-slate-200'"
+                :class="activePaletteTab === 'control' ? 'border-sky-800 text-sky-900 bg-[#ebe4d4]' : 'border-transparent text-black hover:bg-[#d4caaf]'"
               >
                 指示控制
               </button>
             </div>
 
             <!-- 物料列表 -->
-            <div class="flex-1 p-2 overflow-y-auto space-y-1.5">
+            <div class="flex-1 p-2 overflow-y-auto space-y-1.5 custom-scrollbar">
               <button
                 v-for="part in PALETTE_CATEGORIES[activePaletteTab].parts"
                 :key="part.name"
                 @click="addPartToCanvas(part)"
-                class="w-full px-2.5 py-2 rounded-lg bg-[#0e192c] hover:bg-[#162542] border border-slate-800 hover:border-slate-700 text-slate-200 hover:text-white flex items-center gap-2.5 cursor-pointer transition-colors text-left"
+                class="w-full px-2.5 py-1.5 rounded bg-white hover:bg-[#f2eee3] border border-[#cfc5b0] text-black flex items-center gap-2 cursor-pointer transition-colors text-left shadow-2xs font-bold"
               >
-                <div class="w-6 h-6 rounded bg-slate-900 flex items-center justify-center shrink-0 text-cyan-400">
-                  <component :is="part.icon" class="w-3.5 h-3.5" />
+                <div class="w-6 h-6 rounded bg-[#dfd6bf] flex items-center justify-center shrink-0 text-sky-900">
+                  <component :is="part.icon" class="w-3.5 h-3.5 stroke-[2.2]" />
                 </div>
                 <div class="flex-1 min-w-0">
-                  <div class="text-xs font-medium truncate">{{ part.name }}</div>
-                  <div class="text-[10px] text-slate-500 font-mono">{{ part.defaultW }}×{{ part.defaultH }}</div>
+                  <div class="text-xs font-extrabold truncate text-black">{{ part.name }}</div>
+                  <div class="text-[10px] text-[#5c5446] font-mono">{{ part.defaultW }}×{{ part.defaultH }}</div>
                 </div>
               </button>
             </div>
           </div>
 
-          <!-- 中间主编辑画布区 (支持框选、右键菜单、多组件同时平移与吸附) -->
+          <!-- 中间主编辑画布区 -->
           <div 
             ref="canvasContainerRef"
             @mousedown="onCanvasMouseDown"
             @contextmenu.prevent="handleCanvasContextMenu"
-            class="flex-1 bg-[#060c18] relative overflow-hidden flex items-center justify-center cursor-default select-none"
+            class="flex-1 bg-[#1a2332] relative overflow-hidden flex items-center justify-center cursor-default select-none"
           >
             <!-- 背景点状工业网格 -->
             <div
@@ -1318,7 +1318,7 @@ onUnmounted(() => {
 
             <!-- 画布主视口 -->
             <div
-              class="relative border border-slate-700/80 bg-[#091122]/90 rounded-lg shadow-2xl transition-all"
+              class="relative border-2 border-[#8c826d] bg-[#0b1322] rounded shadow-2xl transition-all"
               :style="{
                 width: `${computedSymbolBounds.width + 120}px`,
                 height: `${computedSymbolBounds.height + 120}px`,
@@ -1327,7 +1327,7 @@ onUnmounted(() => {
               }"
             >
               <!-- 零刻度原点辅助虚线框 -->
-              <div class="absolute inset-14 border border-dashed border-cyan-500/25 pointer-events-none rounded"></div>
+              <div class="absolute inset-14 border border-dashed border-sky-400/30 pointer-events-none rounded"></div>
 
               <!-- 渲染子组件 -->
               <div
@@ -1349,52 +1349,52 @@ onUnmounted(() => {
 
                 <!-- 选中态边框与控制手柄 -->
                 <template v-if="selectedCompIds.includes(comp.id)">
-                  <div class="absolute inset-0 border-2 border-cyan-400 pointer-events-none rounded-xs shadow-[0_0_8px_rgba(0,242,255,0.4)]"></div>
+                  <div class="absolute inset-0 border-2 border-sky-400 pointer-events-none rounded-xs shadow-[0_0_8px_rgba(56,189,248,0.6)]"></div>
                   
                   <!-- 单选时展示 8 个尺寸缩放手柄 -->
                   <template v-if="selectedCompIds.length === 1">
                     <div
                       @mousedown="onResizeHandleMouseDown('nw', $event)"
-                      class="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-cyan-500 rounded-full cursor-nwse-resize z-30"
+                      class="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-sky-600 rounded-full cursor-nwse-resize z-30"
                     ></div>
                     <div
                       @mousedown="onResizeHandleMouseDown('ne', $event)"
-                      class="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-cyan-500 rounded-full cursor-nesw-resize z-30"
+                      class="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-sky-600 rounded-full cursor-nesw-resize z-30"
                     ></div>
                     <div
                       @mousedown="onResizeHandleMouseDown('se', $event)"
-                      class="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-cyan-500 rounded-full cursor-nwse-resize z-30"
+                      class="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-sky-600 rounded-full cursor-nwse-resize z-30"
                     ></div>
                     <div
                       @mousedown="onResizeHandleMouseDown('sw', $event)"
-                      class="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border border-cyan-500 rounded-full cursor-nesw-resize z-30"
+                      class="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border border-sky-600 rounded-full cursor-nesw-resize z-30"
                     ></div>
 
                     <div
                       @mousedown="onResizeHandleMouseDown('n', $event)"
-                      class="absolute -top-1 left-1/2 -translate-x-1/2 w-2.5 h-2 bg-white border border-cyan-500 rounded-xs cursor-ns-resize z-30"
+                      class="absolute -top-1 left-1/2 -translate-x-1/2 w-2.5 h-2 bg-white border border-sky-600 rounded-xs cursor-ns-resize z-30"
                     ></div>
                     <div
                       @mousedown="onResizeHandleMouseDown('s', $event)"
-                      class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2.5 h-2 bg-white border border-cyan-500 rounded-xs cursor-ns-resize z-30"
+                      class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2.5 h-2 bg-white border border-sky-600 rounded-xs cursor-ns-resize z-30"
                     ></div>
                     <div
                       @mousedown="onResizeHandleMouseDown('w', $event)"
-                      class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2.5 bg-white border border-cyan-500 rounded-xs cursor-ew-resize z-30"
+                      class="absolute top-1/2 -left-1 -translate-y-1/2 w-2 h-2.5 bg-white border border-sky-600 rounded-xs cursor-ew-resize z-30"
                     ></div>
                     <div
                       @mousedown="onResizeHandleMouseDown('e', $event)"
-                      class="absolute top-1/2 -right-1 -translate-y-1/2 w-2 h-2.5 bg-white border border-cyan-500 rounded-xs cursor-ew-resize z-30"
+                      class="absolute top-1/2 -right-1 -translate-y-1/2 w-2 h-2.5 bg-white border border-sky-600 rounded-xs cursor-ew-resize z-30"
                     ></div>
                   </template>
                 </template>
               </div>
             </div>
 
-            <!-- 框选蓝色虚线半透明矩形 -->
+            <!-- 框选虚线矩形 -->
             <div
               v-if="isMarqueeSelecting"
-              class="absolute border border-cyan-400 bg-cyan-500/15 pointer-events-none rounded-xs z-50"
+              class="absolute border border-sky-400 bg-sky-500/20 pointer-events-none rounded-xs z-50"
               :style="{
                 left: `${marqueeBox.x * zoom}px`,
                 top: `${marqueeBox.y * zoom}px`,
@@ -1404,18 +1404,18 @@ onUnmounted(() => {
             ></div>
 
             <!-- 顶部对齐工具栏 -->
-            <div class="absolute top-3 left-1/2 -translate-x-1/2 bg-[#0c1626]/95 border border-slate-700/80 rounded-lg px-2 py-1 flex items-center gap-1 shadow-lg text-slate-300 z-40">
-              <button @click="alignSelected('left')" class="p-1 hover:text-cyan-400 hover:bg-slate-800 rounded cursor-pointer" title="左对齐"><AlignLeft class="w-3.5 h-3.5" /></button>
-              <button @click="alignSelected('center')" class="p-1 hover:text-cyan-400 hover:bg-slate-800 rounded cursor-pointer" title="水平居中"><AlignCenter class="w-3.5 h-3.5" /></button>
-              <button @click="alignSelected('right')" class="p-1 hover:text-cyan-400 hover:bg-slate-800 rounded cursor-pointer" title="右对齐"><AlignRight class="w-3.5 h-3.5" /></button>
-              <div class="h-3 w-[1px] bg-slate-700 mx-0.5"></div>
-              <button @click="bringToFront" class="p-1 hover:text-cyan-400 hover:bg-slate-800 rounded cursor-pointer text-xs" title="置于顶层">上移</button>
-              <button @click="sendToBack" class="p-1 hover:text-cyan-400 hover:bg-slate-800 rounded cursor-pointer text-xs" title="置于底层">下移</button>
-              <div class="h-3 w-[1px] bg-slate-700 mx-0.5"></div>
+            <div class="absolute top-3 left-1/2 -translate-x-1/2 bg-[#f2eee3] border-2 border-[#8c826d] rounded px-2 py-1 flex items-center gap-1 shadow-lg text-black z-40">
+              <button @click="alignSelected('left')" class="p-1 hover:bg-sky-700 hover:text-white rounded cursor-pointer transition-colors" title="左对齐"><AlignLeft class="w-3.5 h-3.5" /></button>
+              <button @click="alignSelected('center')" class="p-1 hover:bg-sky-700 hover:text-white rounded cursor-pointer transition-colors" title="水平居中"><AlignCenter class="w-3.5 h-3.5" /></button>
+              <button @click="alignSelected('right')" class="p-1 hover:bg-sky-700 hover:text-white rounded cursor-pointer transition-colors" title="右对齐"><AlignRight class="w-3.5 h-3.5" /></button>
+              <div class="h-3 w-[1px] bg-[#cfc5b0] mx-0.5"></div>
+              <button @click="bringToFront" class="px-1.5 py-0.5 hover:bg-sky-700 hover:text-white rounded cursor-pointer text-xs font-bold transition-colors" title="置于顶层">上移</button>
+              <button @click="sendToBack" class="px-1.5 py-0.5 hover:bg-sky-700 hover:text-white rounded cursor-pointer text-xs font-bold transition-colors" title="置于底层">下移</button>
+              <div class="h-3 w-[1px] bg-[#cfc5b0] mx-0.5"></div>
               <button 
                 :disabled="selectedCompIds.length === 0"
                 @click="handleDeleteSelected" 
-                class="p-1 hover:text-rose-400 hover:bg-slate-800 rounded cursor-pointer disabled:opacity-30" 
+                class="p-1 hover:bg-rose-700 hover:text-white rounded cursor-pointer disabled:opacity-30 transition-colors text-rose-800" 
                 title="删除选中元件 (Delete)"
               >
                 <Trash2 class="w-3.5 h-3.5" />
@@ -1423,90 +1423,90 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- 右侧属性参数检查器 (支持文本颜色/字号/内容、线宽/描边/背景、几何尺寸) -->
-          <div class="w-64 bg-[#0a1220] border-l border-slate-800 flex flex-col shrink-0 text-xs">
-            <div class="px-3.5 py-2.5 border-b border-slate-800 text-xs font-bold text-slate-400 flex items-center justify-between">
+          <!-- 右侧属性参数检查器 -->
+          <div class="w-64 bg-[#ebe4d4] border-l border-[#cfc5b0] flex flex-col shrink-0 text-xs text-black">
+            <div class="px-3.5 py-2.5 border-b border-[#cfc5b0] text-xs font-extrabold text-black flex items-center justify-between">
               <span>属性配置</span>
-              <span v-if="selectedCompIds.length > 1" class="text-cyan-400 font-mono">已选 {{ selectedCompIds.length }} 个元件</span>
-              <span v-else-if="primarySelectedComponent" class="text-cyan-400 font-mono truncate max-w-[120px]">{{ primarySelectedComponent.name }}</span>
-              <span v-else class="text-slate-500">图元全局</span>
+              <span v-if="selectedCompIds.length > 1" class="text-sky-900 font-mono font-bold">已选 {{ selectedCompIds.length }} 个</span>
+              <span v-else-if="primarySelectedComponent" class="text-sky-900 font-mono font-bold truncate max-w-[120px]">{{ primarySelectedComponent.name }}</span>
+              <span v-else class="text-[#5c5446]">图元全局</span>
             </div>
 
             <!-- 多选批量操作面板 -->
-            <div v-if="selectedCompIds.length > 1" class="flex-1 p-3.5 space-y-4">
-              <div class="p-2.5 rounded bg-[#0e192c] border border-slate-800 text-slate-300 space-y-2">
-                <div class="text-[11px] font-bold text-cyan-300">多选对齐与分布</div>
+            <div v-if="selectedCompIds.length > 1" class="flex-1 p-3 space-y-3">
+              <div class="p-2.5 rounded bg-white border border-[#cfc5b0] text-black space-y-2 shadow-2xs">
+                <div class="text-[11px] font-extrabold text-sky-900">多选对齐与分布</div>
                 <div class="grid grid-cols-3 gap-1.5 pt-1">
-                  <button @click="alignSelected('left')" class="p-1 rounded bg-slate-800 hover:bg-slate-700 text-center">左对齐</button>
-                  <button @click="alignSelected('center')" class="p-1 rounded bg-slate-800 hover:bg-slate-700 text-center">水平居中</button>
-                  <button @click="alignSelected('right')" class="p-1 rounded bg-slate-800 hover:bg-slate-700 text-center">右对齐</button>
-                  <button @click="alignSelected('top')" class="p-1 rounded bg-slate-800 hover:bg-slate-700 text-center">顶端对齐</button>
-                  <button @click="alignSelected('middle')" class="p-1 rounded bg-slate-800 hover:bg-slate-700 text-center">垂直居中</button>
-                  <button @click="alignSelected('bottom')" class="p-1 rounded bg-slate-800 hover:bg-slate-700 text-center">底端对齐</button>
+                  <button @click="alignSelected('left')" class="p-1 rounded bg-[#dfd6bf] hover:bg-sky-700 hover:text-white text-center font-bold">左对齐</button>
+                  <button @click="alignSelected('center')" class="p-1 rounded bg-[#dfd6bf] hover:bg-sky-700 hover:text-white text-center font-bold">水平居中</button>
+                  <button @click="alignSelected('right')" class="p-1 rounded bg-[#dfd6bf] hover:bg-sky-700 hover:text-white text-center font-bold">右对齐</button>
+                  <button @click="alignSelected('top')" class="p-1 rounded bg-[#dfd6bf] hover:bg-sky-700 hover:text-white text-center font-bold">顶端对齐</button>
+                  <button @click="alignSelected('middle')" class="p-1 rounded bg-[#dfd6bf] hover:bg-sky-700 hover:text-white text-center font-bold">垂直居中</button>
+                  <button @click="alignSelected('bottom')" class="p-1 rounded bg-[#dfd6bf] hover:bg-sky-700 hover:text-white text-center font-bold">底端对齐</button>
                 </div>
               </div>
 
               <button
                 @click="handleDeleteSelected"
-                class="w-full py-1.5 rounded bg-rose-950/40 hover:bg-rose-900 border border-rose-800/80 text-rose-300 font-semibold cursor-pointer transition-colors"
+                class="w-full py-1.5 rounded bg-[#dfd6bf] hover:bg-rose-100 border border-rose-300 text-rose-800 font-extrabold cursor-pointer transition-colors"
               >
                 批量删除已选元件
               </button>
             </div>
 
             <!-- 单选组件属性调节面板 -->
-            <div v-else-if="primarySelectedComponent" class="flex-1 p-3.5 overflow-y-auto space-y-3.5">
-              <!-- 文本专属字段 (全面解决文本改颜色与内容问题) -->
-              <div v-if="primarySelectedComponent.type === 'draw-text'" class="space-y-2 p-2.5 rounded bg-[#0e192c] border border-cyan-500/20">
-                <div class="text-[11px] font-bold text-cyan-300 flex items-center gap-1.5">
+            <div v-else-if="primarySelectedComponent" class="flex-1 p-3 overflow-y-auto space-y-3 custom-scrollbar">
+              <!-- 文本专属字段 -->
+              <div v-if="primarySelectedComponent.type === 'draw-text'" class="space-y-2 p-2.5 rounded bg-white border border-[#cfc5b0] shadow-2xs">
+                <div class="text-[11px] font-extrabold text-sky-900 flex items-center gap-1.5">
                   <Type class="w-3.5 h-3.5" />
                   <span>文字配置</span>
                 </div>
 
                 <div>
-                  <label class="text-[10px] text-slate-400 block mb-1">文字内容</label>
+                  <label class="text-[10px] text-black font-extrabold block mb-1">文字内容</label>
                   <input
                     :value="primarySelectedComponent.style.text || primarySelectedComponent.name"
                     @input="updateTextContent(($event.target as HTMLInputElement).value)"
                     type="text"
-                    class="w-full bg-[#050b14] border border-slate-700 rounded px-2 py-1 text-white focus:border-cyan-400 focus:outline-hidden"
+                    class="w-full bg-white border border-[#b8ad96] rounded px-2 py-1 text-black font-bold focus:border-sky-700 focus:outline-hidden"
                   />
                 </div>
 
                 <div>
-                  <label class="text-[10px] text-slate-400 block mb-1">文字颜色</label>
+                  <label class="text-[10px] text-black font-extrabold block mb-1">文字颜色</label>
                   <div class="flex items-center gap-2">
                     <input
-                      :value="primarySelectedComponent.style.textColor || primarySelectedComponent.style.stroke || '#ffffff'"
+                      :value="primarySelectedComponent.style.textColor || primarySelectedComponent.style.stroke || '#000000'"
                       @input="updateTextColor(($event.target as HTMLInputElement).value)"
                       type="color"
                       class="w-7 h-7 bg-transparent border-0 rounded cursor-pointer"
                     />
                     <input
-                      :value="primarySelectedComponent.style.textColor || primarySelectedComponent.style.stroke || '#ffffff'"
+                      :value="primarySelectedComponent.style.textColor || primarySelectedComponent.style.stroke || '#000000'"
                       @input="updateTextColor(($event.target as HTMLInputElement).value)"
                       type="text"
-                      class="flex-1 bg-[#050b14] border border-slate-700 rounded px-2 py-1 text-white font-mono uppercase focus:border-cyan-400 focus:outline-hidden"
+                      class="flex-1 bg-white border border-[#b8ad96] rounded px-2 py-1 text-black font-mono font-bold uppercase focus:border-sky-700 focus:outline-hidden"
                     />
                   </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-2">
                   <div>
-                    <label class="text-[10px] text-slate-400 block mb-1">字号 (px)</label>
+                    <label class="text-[10px] text-black font-extrabold block mb-1">字号 (px)</label>
                     <input
                       v-model.number="primarySelectedComponent.style.fontSize"
                       type="number"
                       min="10"
                       max="48"
-                      class="w-full bg-[#050b14] border border-slate-700 rounded px-2 py-1 text-white font-mono focus:border-cyan-400 focus:outline-hidden"
+                      class="w-full bg-white border border-[#b8ad96] rounded px-2 py-1 text-black font-mono font-bold focus:border-sky-700 focus:outline-hidden"
                     />
                   </div>
                   <div>
-                    <label class="text-[10px] text-slate-400 block mb-1">字重粗细</label>
+                    <label class="text-[10px] text-black font-extrabold block mb-1">字重粗细</label>
                     <select
                       v-model="primarySelectedComponent.style.fontWeight"
-                      class="w-full bg-[#050b14] border border-slate-700 rounded px-2 py-1 text-white focus:border-cyan-400 focus:outline-hidden cursor-pointer"
+                      class="w-full bg-white border border-[#b8ad96] rounded px-2 py-1 text-black font-bold focus:border-sky-700 focus:outline-hidden cursor-pointer"
                     >
                       <option value="normal">常规</option>
                       <option value="bold">粗体</option>
@@ -1516,50 +1516,50 @@ onUnmounted(() => {
               </div>
 
               <!-- 位置与尺寸 -->
-              <div class="space-y-2">
-                <div class="text-[11px] font-bold text-slate-400">几何位置与尺寸</div>
+              <div class="space-y-2 p-2.5 rounded bg-white border border-[#cfc5b0] shadow-2xs">
+                <div class="text-[11px] font-extrabold text-sky-900">几何位置与尺寸</div>
                 <div class="grid grid-cols-2 gap-2">
                   <div>
-                    <label class="text-[10px] text-slate-500">X (水平坐标)</label>
+                    <label class="text-[10px] text-black font-extrabold">X (水平坐标)</label>
                     <input
                       v-model.number="primarySelectedComponent.x"
                       type="number"
-                      class="w-full bg-[#050b14] border border-slate-700 rounded px-2 py-1 text-white font-mono focus:border-cyan-400 focus:outline-hidden"
+                      class="w-full bg-white border border-[#b8ad96] rounded px-2 py-1 text-black font-mono font-bold focus:border-sky-700 focus:outline-hidden"
                     />
                   </div>
                   <div>
-                    <label class="text-[10px] text-slate-500">Y (垂直坐标)</label>
+                    <label class="text-[10px] text-black font-extrabold">Y (垂直坐标)</label>
                     <input
                       v-model.number="primarySelectedComponent.y"
                       type="number"
-                      class="w-full bg-[#050b14] border border-slate-700 rounded px-2 py-1 text-white font-mono focus:border-cyan-400 focus:outline-hidden"
+                      class="w-full bg-white border border-[#b8ad96] rounded px-2 py-1 text-black font-mono font-bold focus:border-sky-700 focus:outline-hidden"
                     />
                   </div>
                   <div>
-                    <label class="text-[10px] text-slate-500">宽 (Width)</label>
+                    <label class="text-[10px] text-black font-extrabold">宽 (Width)</label>
                     <input
                       v-model.number="primarySelectedComponent.width"
                       type="number"
-                      class="w-full bg-[#050b14] border border-slate-700 rounded px-2 py-1 text-white font-mono focus:border-cyan-400 focus:outline-hidden"
+                      class="w-full bg-white border border-[#b8ad96] rounded px-2 py-1 text-black font-mono font-bold focus:border-sky-700 focus:outline-hidden"
                     />
                   </div>
                   <div>
-                    <label class="text-[10px] text-slate-500">高 (Height)</label>
+                    <label class="text-[10px] text-black font-extrabold">高 (Height)</label>
                     <input
                       v-model.number="primarySelectedComponent.height"
                       type="number"
-                      class="w-full bg-[#050b14] border border-slate-700 rounded px-2 py-1 text-white font-mono focus:border-cyan-400 focus:outline-hidden"
+                      class="w-full bg-white border border-[#b8ad96] rounded px-2 py-1 text-black font-mono font-bold focus:border-sky-700 focus:outline-hidden"
                     />
                   </div>
                 </div>
               </div>
 
               <!-- 颜色与描边样式 (图形类) -->
-              <div class="space-y-2 pt-2 border-t border-slate-800">
-                <div class="text-[11px] font-bold text-slate-400">描边与填充</div>
+              <div class="space-y-2 p-2.5 rounded bg-white border border-[#cfc5b0] shadow-2xs">
+                <div class="text-[11px] font-extrabold text-sky-900">描边与填充</div>
                 
                 <div>
-                  <label class="text-[10px] text-slate-500 block mb-1">线条描边颜色</label>
+                  <label class="text-[10px] text-black font-extrabold block mb-1">线条描边颜色</label>
                   <div class="flex items-center gap-2">
                     <input
                       v-model="primarySelectedComponent.style.stroke"
@@ -1569,16 +1569,16 @@ onUnmounted(() => {
                     <input
                       v-model="primarySelectedComponent.style.stroke"
                       type="text"
-                      class="flex-1 bg-[#050b14] border border-slate-700 rounded px-2 py-1 text-white font-mono uppercase focus:border-cyan-400 focus:outline-hidden"
+                      class="flex-1 bg-white border border-[#b8ad96] rounded px-2 py-1 text-black font-mono font-bold uppercase focus:border-sky-700 focus:outline-hidden"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label class="text-[10px] text-slate-500 block mb-1">背景填充颜色</label>
+                  <label class="text-[10px] text-black font-extrabold block mb-1">背景填充颜色</label>
                   <div class="flex items-center gap-2">
                     <input
-                      :value="primarySelectedComponent.style.fill === 'transparent' ? '#000000' : primarySelectedComponent.style.fill"
+                      :value="primarySelectedComponent.style.fill === 'transparent' ? '#ffffff' : primarySelectedComponent.style.fill"
                       @input="primarySelectedComponent.style.fill = ($event.target as HTMLInputElement).value"
                       type="color"
                       class="w-7 h-7 bg-transparent border-0 rounded cursor-pointer"
@@ -1586,11 +1586,11 @@ onUnmounted(() => {
                     <input
                       v-model="primarySelectedComponent.style.fill"
                       type="text"
-                      class="flex-1 bg-[#050b14] border border-slate-700 rounded px-2 py-1 text-white font-mono uppercase focus:border-cyan-400 focus:outline-hidden"
+                      class="flex-1 bg-white border border-[#b8ad96] rounded px-2 py-1 text-black font-mono font-bold uppercase focus:border-sky-700 focus:outline-hidden"
                     />
                     <button
                       @click="primarySelectedComponent.style.fill = 'transparent'"
-                      class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-[10px] rounded text-slate-300"
+                      class="px-2 py-1 bg-[#dfd6bf] hover:bg-[#d4caaf] text-[10px] rounded text-black font-bold border border-[#b8ad96]"
                     >
                       透明
                     </button>
@@ -1598,22 +1598,22 @@ onUnmounted(() => {
                 </div>
 
                 <div>
-                  <label class="text-[10px] text-slate-500 block mb-1">线宽 (粗细)</label>
+                  <label class="text-[10px] text-black font-extrabold block mb-1">线宽 (粗细)</label>
                   <input
                     v-model.number="primarySelectedComponent.style.strokeWidth"
                     type="number"
                     min="1"
                     max="12"
-                    class="w-full bg-[#050b14] border border-slate-700 rounded px-2 py-1 text-white font-mono focus:border-cyan-400 focus:outline-hidden"
+                    class="w-full bg-white border border-[#b8ad96] rounded px-2 py-1 text-black font-mono font-bold focus:border-sky-700 focus:outline-hidden"
                   />
                 </div>
               </div>
 
               <!-- 操作 -->
-              <div class="pt-3 border-t border-slate-800">
+              <div class="pt-2">
                 <button
                   @click="handleDeleteSelected"
-                  class="w-full py-1.5 rounded bg-rose-950/40 hover:bg-rose-900 border border-rose-800/80 text-rose-300 font-semibold cursor-pointer transition-colors"
+                  class="w-full py-1.5 rounded bg-[#dfd6bf] hover:bg-rose-100 border border-rose-300 text-rose-800 font-extrabold cursor-pointer transition-colors"
                 >
                   删除此元件
                 </button>
@@ -1621,30 +1621,30 @@ onUnmounted(() => {
             </div>
 
             <!-- 未选中组件时的全局信息 -->
-            <div v-else class="flex-1 p-3.5 space-y-3.5 text-slate-400">
+            <div v-else class="flex-1 p-3 space-y-3 text-black">
               <div class="space-y-2">
-                <div class="text-[11px] font-bold text-slate-300">图元概况</div>
-                <div class="p-2.5 rounded-lg bg-[#050b14] border border-slate-800 space-y-1.5 font-mono text-[11px]">
+                <div class="text-[11px] font-extrabold text-sky-900">图元概况</div>
+                <div class="p-2.5 rounded bg-white border border-[#cfc5b0] space-y-1.5 font-mono text-[11px] shadow-2xs">
                   <div class="flex justify-between">
-                    <span class="text-slate-500">当前编辑状态:</span>
-                    <span class="text-cyan-300">状态 {{ activeStateId }}</span>
+                    <span class="text-[#5c5446]">当前状态:</span>
+                    <span class="text-sky-800 font-bold">状态 {{ activeStateId }}</span>
                   </div>
                   <div class="flex justify-between">
-                    <span class="text-slate-500">状态数量:</span>
-                    <span class="text-white">{{ editorStates.length }}</span>
+                    <span class="text-[#5c5446]">状态数量:</span>
+                    <span class="text-black font-bold">{{ editorStates.length }}</span>
                   </div>
                   <div class="flex justify-between">
-                    <span class="text-slate-500">当前状态元件数:</span>
-                    <span class="text-white">{{ editorComponents.length }}</span>
+                    <span class="text-[#5c5446]">元件数量:</span>
+                    <span class="text-black font-bold">{{ editorComponents.length }}</span>
                   </div>
                   <div class="flex justify-between">
-                    <span class="text-slate-500">紧致尺寸:</span>
-                    <span class="text-white">{{ computedSymbolBounds.width }} × {{ computedSymbolBounds.height }}</span>
+                    <span class="text-[#5c5446]">紧致尺寸:</span>
+                    <span class="text-black font-bold">{{ computedSymbolBounds.width }} × {{ computedSymbolBounds.height }}</span>
                   </div>
                 </div>
               </div>
 
-              <div class="text-[11px] text-slate-500 leading-relaxed space-y-1">
+              <div class="text-[11px] text-[#5c5446] font-medium leading-relaxed space-y-1 bg-white p-2.5 rounded border border-[#cfc5b0]">
                 <div>• 点击左侧零件添加至画布</div>
                 <div>• 画布空白处拖拽可拉框多选</div>
                 <div>• 支持右键菜单 (复制/剪切/粘贴/对齐)</div>
@@ -1659,7 +1659,7 @@ onUnmounted(() => {
       <!-- ============================================================ -->
       <div
         v-if="contextMenu.visible"
-        class="fixed z-[10000] w-48 bg-[#0d1627] border border-slate-700/80 rounded-lg shadow-2xl py-1 text-xs text-slate-200 select-none divide-y divide-slate-800"
+        class="fixed z-[10000] w-48 bg-[#f2eee3] border-2 border-[#8c826d] rounded shadow-2xl py-1 text-xs text-black select-none divide-y divide-[#cfc5b0]"
         :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
         @click.stop
       >
@@ -1668,34 +1668,34 @@ onUnmounted(() => {
           <button
             :disabled="selectedCompIds.length === 0"
             @click="handleCopy"
-            class="w-full px-3 py-1.5 text-left hover:bg-slate-800 hover:text-white flex items-center justify-between cursor-pointer disabled:opacity-30 disabled:pointer-events-none"
+            class="w-full px-3 py-1.5 text-left hover:bg-sky-700 hover:text-white flex items-center justify-between cursor-pointer disabled:opacity-30 disabled:pointer-events-none font-bold"
           >
             <span class="flex items-center gap-2"><Copy class="w-3.5 h-3.5" /> 复制</span>
-            <span class="text-[10px] text-slate-500 font-mono">Ctrl+C</span>
+            <span class="text-[10px] text-[#706857] font-mono font-bold">Ctrl+C</span>
           </button>
           <button
             :disabled="selectedCompIds.length === 0"
             @click="handleCut"
-            class="w-full px-3 py-1.5 text-left hover:bg-slate-800 hover:text-white flex items-center justify-between cursor-pointer disabled:opacity-30 disabled:pointer-events-none"
+            class="w-full px-3 py-1.5 text-left hover:bg-sky-700 hover:text-white flex items-center justify-between cursor-pointer disabled:opacity-30 disabled:pointer-events-none font-bold"
           >
             <span class="flex items-center gap-2"><Scissors class="w-3.5 h-3.5" /> 剪切</span>
-            <span class="text-[10px] text-slate-500 font-mono">Ctrl+X</span>
+            <span class="text-[10px] text-[#706857] font-mono font-bold">Ctrl+X</span>
           </button>
           <button
             :disabled="clipboardComponents.length === 0"
             @click="handlePaste"
-            class="w-full px-3 py-1.5 text-left hover:bg-slate-800 hover:text-white flex items-center justify-between cursor-pointer disabled:opacity-30 disabled:pointer-events-none"
+            class="w-full px-3 py-1.5 text-left hover:bg-sky-700 hover:text-white flex items-center justify-between cursor-pointer disabled:opacity-30 disabled:pointer-events-none font-bold"
           >
             <span class="flex items-center gap-2"><Clipboard class="w-3.5 h-3.5" /> 粘贴</span>
-            <span class="text-[10px] text-slate-500 font-mono">Ctrl+V</span>
+            <span class="text-[10px] text-[#706857] font-mono font-bold">Ctrl+V</span>
           </button>
           <button
             :disabled="selectedCompIds.length === 0"
             @click="handleDuplicate"
-            class="w-full px-3 py-1.5 text-left hover:bg-slate-800 hover:text-white flex items-center justify-between cursor-pointer disabled:opacity-30 disabled:pointer-events-none"
+            class="w-full px-3 py-1.5 text-left hover:bg-sky-700 hover:text-white flex items-center justify-between cursor-pointer disabled:opacity-30 disabled:pointer-events-none font-bold"
           >
             <span class="flex items-center gap-2"><Copy class="w-3.5 h-3.5" /> 复制副本</span>
-            <span class="text-[10px] text-slate-500 font-mono">Ctrl+D</span>
+            <span class="text-[10px] text-[#706857] font-mono font-bold">Ctrl+D</span>
           </button>
         </div>
 
@@ -1703,13 +1703,13 @@ onUnmounted(() => {
         <div class="py-1" v-if="selectedCompIds.length > 0">
           <button
             @click="bringToFront"
-            class="w-full px-3 py-1.5 text-left hover:bg-slate-800 hover:text-white flex items-center gap-2 cursor-pointer"
+            class="w-full px-3 py-1.5 text-left hover:bg-sky-700 hover:text-white flex items-center gap-2 cursor-pointer font-bold"
           >
             <ArrowUpToLine class="w-3.5 h-3.5" /> 置于顶层
           </button>
           <button
             @click="sendToBack"
-            class="w-full px-3 py-1.5 text-left hover:bg-slate-800 hover:text-white flex items-center gap-2 cursor-pointer"
+            class="w-full px-3 py-1.5 text-left hover:bg-sky-700 hover:text-white flex items-center gap-2 cursor-pointer font-bold"
           >
             <ArrowDownToLine class="w-3.5 h-3.5" /> 置于底层
           </button>
@@ -1717,22 +1717,22 @@ onUnmounted(() => {
 
         <!-- 对齐动作 (多选有效) -->
         <div class="py-1" v-if="selectedCompIds.length >= 2">
-          <button @click="alignSelected('left')" class="w-full px-3 py-1.5 text-left hover:bg-slate-800 hover:text-white flex items-center gap-2 cursor-pointer">
+          <button @click="alignSelected('left')" class="w-full px-3 py-1.5 text-left hover:bg-sky-700 hover:text-white flex items-center gap-2 cursor-pointer font-bold">
             <AlignLeft class="w-3.5 h-3.5" /> 左对齐
           </button>
-          <button @click="alignSelected('center')" class="w-full px-3 py-1.5 text-left hover:bg-slate-800 hover:text-white flex items-center gap-2 cursor-pointer">
+          <button @click="alignSelected('center')" class="w-full px-3 py-1.5 text-left hover:bg-sky-700 hover:text-white flex items-center gap-2 cursor-pointer font-bold">
             <AlignCenter class="w-3.5 h-3.5" /> 水平居中
           </button>
-          <button @click="alignSelected('right')" class="w-full px-3 py-1.5 text-left hover:bg-slate-800 hover:text-white flex items-center gap-2 cursor-pointer">
+          <button @click="alignSelected('right')" class="w-full px-3 py-1.5 text-left hover:bg-sky-700 hover:text-white flex items-center gap-2 cursor-pointer font-bold">
             <AlignRight class="w-3.5 h-3.5" /> 右对齐
           </button>
-          <button @click="alignSelected('top')" class="w-full px-3 py-1.5 text-left hover:bg-slate-800 hover:text-white flex items-center gap-2 cursor-pointer">
+          <button @click="alignSelected('top')" class="w-full px-3 py-1.5 text-left hover:bg-sky-700 hover:text-white flex items-center gap-2 cursor-pointer font-bold">
             <AlignVerticalJustifyStart class="w-3.5 h-3.5" /> 顶端对齐
           </button>
-          <button @click="alignSelected('middle')" class="w-full px-3 py-1.5 text-left hover:bg-slate-800 hover:text-white flex items-center gap-2 cursor-pointer">
+          <button @click="alignSelected('middle')" class="w-full px-3 py-1.5 text-left hover:bg-sky-700 hover:text-white flex items-center gap-2 cursor-pointer font-bold">
             <AlignVerticalJustifyCenter class="w-3.5 h-3.5" /> 垂直居中
           </button>
-          <button @click="alignSelected('bottom')" class="w-full px-3 py-1.5 text-left hover:bg-slate-800 hover:text-white flex items-center gap-2 cursor-pointer">
+          <button @click="alignSelected('bottom')" class="w-full px-3 py-1.5 text-left hover:bg-sky-700 hover:text-white flex items-center gap-2 cursor-pointer font-bold">
             <AlignVerticalJustifyEnd class="w-3.5 h-3.5" /> 底端对齐
           </button>
         </div>
@@ -1741,42 +1741,42 @@ onUnmounted(() => {
         <div class="py-1" v-if="selectedCompIds.length > 0">
           <button
             @click="handleDeleteSelected"
-            class="w-full px-3 py-1.5 text-left text-rose-400 hover:bg-rose-950 hover:text-rose-300 flex items-center justify-between cursor-pointer"
+            class="w-full px-3 py-1.5 text-left text-rose-800 hover:bg-rose-700 hover:text-white flex items-center justify-between cursor-pointer font-bold"
           >
             <span class="flex items-center gap-2"><Trash2 class="w-3.5 h-3.5" /> 删除</span>
-            <span class="text-[10px] text-slate-500 font-mono">Del</span>
+            <span class="text-[10px] font-mono">Del</span>
           </button>
         </div>
       </div>
 
       <!-- ============================================================ -->
-      <!-- D. 安全删除确认模态框 (解决 iframe sandbox 下 confirm 被阻拦)  -->
+      <!-- D. 安全删除确认模态框                                         -->
       <!-- ============================================================ -->
       <div
         v-if="deleteConfirmModal.visible"
-        class="fixed inset-0 z-[10001] bg-black/70 flex items-center justify-center p-4"
+        class="fixed inset-0 z-[10001] bg-black/50 flex items-center justify-center p-4"
         @click.self="deleteConfirmModal.visible = false"
       >
-        <div class="bg-[#0e172a] border border-rose-500/40 rounded-xl max-w-sm w-full p-5 shadow-2xl space-y-4">
-          <div class="flex items-center gap-2.5 text-rose-400 font-bold text-sm">
+        <div class="bg-[#f2eee3] border-2 border-rose-600 rounded-lg max-w-sm w-full p-5 shadow-2xl space-y-4 text-black">
+          <div class="flex items-center gap-2.5 text-rose-800 font-extrabold text-sm">
             <AlertCircle class="w-5 h-5" />
             <span>确认删除图元</span>
           </div>
 
-          <p class="text-xs text-slate-300 leading-relaxed">
-            确定要从项目中删除图元 <strong class="text-white underline">「{{ deleteConfirmModal.symbol?.name }}」</strong> 及其磁盘 JSON 文件吗？此操作不可逆。
+          <p class="text-xs text-black leading-relaxed">
+            确定要从项目中删除图元 <strong class="text-rose-900 underline">「{{ deleteConfirmModal.symbol?.name }}」</strong> 及其磁盘 JSON 文件吗？此操作不可逆。
           </p>
 
           <div class="flex items-center justify-end gap-2.5 pt-2">
             <button
               @click="deleteConfirmModal.visible = false"
-              class="px-4 py-1.5 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs cursor-pointer"
+              class="px-4 py-1.5 rounded border border-[#b8ad96] bg-[#dfd6bf] hover:bg-[#d4caaf] text-black text-xs font-bold cursor-pointer"
             >
               取消
             </button>
             <button
               @click="confirmDeleteSymbol"
-              class="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs cursor-pointer shadow-md"
+              class="px-4 py-1.5 rounded bg-rose-700 hover:bg-rose-800 text-white font-extrabold text-xs cursor-pointer shadow-xs border border-rose-900"
             >
               确认删除
             </button>
@@ -1787,9 +1787,9 @@ onUnmounted(() => {
       <!-- 全局浮动操作反馈提示 -->
       <div
         v-if="saveNotice"
-        class="absolute bottom-5 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg bg-[#0d1627] border border-cyan-500/60 text-cyan-300 font-bold text-xs shadow-2xl flex items-center gap-2 z-50 animate-fade-in"
+        class="absolute bottom-5 left-1/2 -translate-x-1/2 px-4 py-2 rounded bg-[#e5decb] border-2 border-[#8c826d] text-black font-extrabold text-xs shadow-2xl flex items-center gap-2 z-50 animate-fade-in"
       >
-        <Check class="w-4 h-4 text-cyan-400" />
+        <Check class="w-4 h-4 text-emerald-700 stroke-[2.5]" />
         <span>{{ saveNotice }}</span>
       </div>
     </div>

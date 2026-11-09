@@ -1396,15 +1396,78 @@ export function handlePostScadaWarnClear() {
 }
 
 /**
+ * 6.0 GET /api/scada/warn/tree_meta
+ */
+export function handleGetScadaWarnTreeMeta() {
+  return {
+    code: 200,
+    msg: "success",
+    data: {
+      levels: [
+        { id: 1, name: "提示信息", color: "#67C23A" },
+        { id: 2, name: "告警信息", color: "#E6A23C" },
+        { id: 3, name: "事故信息", color: "#FF0000" }
+      ],
+      types: [
+        { table_no: 43, name: "遥信变位" },
+        { table_no: 44, name: "遥测越限" },
+        { table_no: 55, name: "事件SOE" },
+        { table_no: 45, name: "设备工况" },
+        { table_no: 46, name: "结点工况" },
+        { table_no: 47, name: "人工遥信封锁" },
+        { table_no: 48, name: "人工遥测封锁" },
+        { table_no: 49, name: "逻辑设备封锁" },
+        { table_no: 50, name: "人工遥控" },
+        { table_no: 51, name: "人工遥调" },
+        { table_no: 362, name: "保护事件" },
+        { table_no: 364, name: "保护自诊断" },
+        { table_no: 365, name: "保护操作" },
+        { table_no: 167, name: "人工置牌" },
+        { table_no: 306, name: "用户事件登录" },
+        { table_no: 307, name: "其它应用告警" },
+        { table_no: 310, name: "通道工况登录" },
+        { table_no: 258, name: "进程起停记录" }
+      ]
+    }
+  };
+}
+
+/**
  * 6. POST /api/scada/warn/history
  */
 export function handlePostScadaWarnHistory(body: any) {
   const startTime = Number(body?.start_time) || 0;
   const endTime = Number(body?.end_time) || Math.floor(Date.now() / 1000);
+  const facIds: number[] = Array.isArray(body?.fac_ids) ? body.fac_ids.map(Number).filter((n: number) => !isNaN(n)) : [];
+  const bayIds: number[] = Array.isArray(body?.bay_ids) ? body.bay_ids.map(Number).filter((n: number) => !isNaN(n)) : [];
+  const devIds: number[] = Array.isArray(body?.dev_ids) ? body.dev_ids.map(Number).filter((n: number) => !isNaN(n)) : [];
+  const levelIds: number[] = Array.isArray(body?.level_ids) ? body.level_ids.map(Number).filter((n: number) => !isNaN(n)) : [];
+  const tableNos: number[] = Array.isArray(body?.table_nos) ? body.table_nos.map(Number).filter((n: number) => !isNaN(n)) : [];
   const keyword = String(body?.keyword || "").trim().toLowerCase();
-  const limit = Math.min(Math.max(1, Number(body?.limit) || 500), 1000);
+  const page = Math.max(1, Number(body?.page) || 1);
+  const pageSize = Math.min(Math.max(1, Number(body?.page_size) || Number(body?.limit) || 200), 2000);
 
-  let results = [...mockHistoryWarnPool];
+  const inferLevel = (r: any): { level: number; level_name: string; level_color: string } => {
+    if (r.level && r.level_name && r.level_color) {
+      return { level: r.level, level_name: r.level_name, level_color: r.level_color };
+    }
+    if (r.table_no === 362 || r.table_no === 55 || (r.content && (r.content.includes("事故") || r.content.includes("跳闸")))) {
+      return { level: 3, level_name: "事故信息", level_color: "#FF0000" };
+    }
+    if (r.table_no === 44 || (r.content && (r.content.includes("越限") || r.content.includes("告警")))) {
+      return { level: 2, level_name: "告警信息", level_color: "#E6A23C" };
+    }
+    return { level: 1, level_name: "提示信息", level_color: "#67C23A" };
+  };
+
+  let results: any[] = mockHistoryWarnPool.map(r => ({
+    ...r,
+    ...inferLevel(r),
+    fac_name: r.fac_id === 4000003 ? "苏州晟高" : "东郊变",
+    bay_name: r.bay_id === 430000001 ? "苏州晟高一体柜" : (r.bay_id === 430000002 ? "柜子2" : "1号主变间隔"),
+    dev_name: r.dev_id === 7000001 ? "6开关" : (r.dev_id === 7000003 ? "6YT" : "7开关"),
+    obj_name: "开关位置"
+  }));
 
   // 若内存实时告警中有已确认的项目，也归入检索候选
   realtimeWarnList.forEach(item => {
@@ -1414,14 +1477,21 @@ export function handlePostScadaWarnHistory(body: any) {
         time: item.time,
         timestamp: item.timestamp,
         msec: 0,
-        table_no: item.type === 1 ? 43 : (item.type === 2 ? 44 : (item.type === 28 ? 362 : 55)),
-        table_name: item.type === 1 ? "遥信变位" : (item.type === 2 ? "遥测越限" : (item.type === 28 ? "保护动作" : "事件 SOE")),
+        table_no: item.type === 1 ? 43 : (item.type === 2 ? 44 : (item.type === 28 ? 362 : (item.type === 8 ? 50 : 55))),
+        table_name: item.type === 1 ? "遥信变位登录表" : (item.type === 2 ? "遥测越限登录表" : (item.type === 28 ? "保护事件表" : (item.type === 8 ? "人工遥控表" : "事件SOE表"))),
+        level: item.level,
+        level_name: item.level_name,
+        level_color: item.level_color,
         content: item.content,
         alias: `DEV_${item.dev_id}_PT_${item.key_id}`,
         fac_id: item.fac_id,
         bay_id: item.bay_id,
         dev_id: item.dev_id,
         key_id: item.key_id,
+        fac_name: item.fac_name,
+        bay_name: item.bay_name,
+        dev_name: item.dev_name,
+        obj_name: item.key_name,
         status: item.val === 1 ? 7 : 8,
         val: item.val,
         host: "SCADA-SVR-01",
@@ -1436,22 +1506,49 @@ export function handlePostScadaWarnHistory(body: any) {
   if (endTime > 0) {
     results = results.filter(r => r.timestamp <= endTime);
   }
+  if (facIds.length > 0) {
+    results = results.filter(r => r.fac_id && facIds.includes(Number(r.fac_id)));
+  }
+  if (bayIds.length > 0) {
+    results = results.filter(r => r.bay_id && bayIds.includes(Number(r.bay_id)));
+  }
+  if (devIds.length > 0) {
+    results = results.filter(r => r.dev_id && devIds.includes(Number(r.dev_id)));
+  }
+  if (levelIds.length > 0) {
+    results = results.filter(r => r.level && levelIds.includes(Number(r.level)));
+  }
+  if (tableNos.length > 0) {
+    results = results.filter(r => tableNos.includes(Number(r.table_no)));
+  }
   if (keyword) {
     results = results.filter(r =>
-      r.content.toLowerCase().includes(keyword) ||
+      (r.content && r.content.toLowerCase().includes(keyword)) ||
       (r.alias && r.alias.toLowerCase().includes(keyword)) ||
-      r.table_name.toLowerCase().includes(keyword)
+      (r.table_name && r.table_name.toLowerCase().includes(keyword)) ||
+      (r.operator && r.operator.toLowerCase().includes(keyword))
     );
   }
 
   // 排序：时间倒序
   results.sort((a, b) => b.timestamp - a.timestamp);
 
-  const paged = results.slice(0, limit);
+  const total = results.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const startIdx = (safePage - 1) * pageSize;
+
+  const paged = results.slice(startIdx, startIdx + pageSize).map((item, idx) => ({
+    ...item,
+    index: startIdx + idx + 1
+  }));
   return {
     code: 200,
     msg: "success",
-    total: results.length,
+    total,
+    page: safePage,
+    page_size: pageSize,
+    total_pages: totalPages,
     data: paged
   };
 }

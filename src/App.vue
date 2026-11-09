@@ -32,6 +32,7 @@ import ScadaBatchPointModal from './components/ScadaBatchPointModal.vue';
 import DesktopPlatformModal from './components/DesktopPlatformModal.vue';
 import PreviewScreen from './components/PreviewScreen.vue';
 import RealtimeAlarmModal from './components/RealtimeAlarmModal.vue';
+import { startBackgroundAlarmPolling } from './utils/realtimeAlarmStore';
 import HistoryCurveModal from './components/HistoryCurveModal.vue';
 import HistoryAlarmModal from './components/HistoryAlarmModal.vue';
 import ReportManagerModal from './components/ReportManagerModal.vue';
@@ -78,7 +79,8 @@ import {
   Sliders,
   Tv,
   Activity,
-  Power
+  Power,
+  Bell
 } from 'lucide-vue-next';
 
 // 1. Initial State: Load Multi-Screen Electrical Project (快速本地缓存引导与主索引初态加载，彻底消除一次系统图一闪而过)
@@ -173,6 +175,18 @@ const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.loc
 const standaloneModuleId = ref<string | null>(urlParams?.get('module') || null);
 const isDaemonBarOnly = computed(() => urlParams?.get('mode') === 'daemon-bar');
 const isStartMenuOnly = computed(() => urlParams?.get('mode') === 'start-menu');
+const isUserMenuOnly = computed(() => urlParams?.get('mode') === 'user-menu');
+
+const handleOpenLoginModal = () => {
+  if (typeof window !== 'undefined' && (window as any).electronAPI?.sendUserAction) {
+    try {
+      (window as any).electronAPI.sendUserAction('open:login');
+    } catch {}
+  }
+  if (!isDaemonBarOnly.value && !isStartMenuOnly.value && !isUserMenuOnly.value) {
+    showLoginModal.value = true;
+  }
+};
 
 const MODULE_TITLES: Record<string, string> = {
   'monitor-screen': '监控运行',
@@ -185,13 +199,57 @@ const MODULE_TITLES: Record<string, string> = {
 };
 
 onMounted(() => {
+  // 菜单与底栏窗口立即设置米白底色并隐藏首屏加载盾，杜绝黑角与黑屏
+  if (isStartMenuOnly.value || isUserMenuOnly.value || isDaemonBarOnly.value) {
+    document.body.style.backgroundColor = '#f2eee3';
+    document.documentElement.style.backgroundColor = '#f2eee3';
+    const splash = document.getElementById('scada-boot-splash');
+    if (splash) splash.style.display = 'none';
+  }
+
   if (isDaemonBarOnly.value) {
     document.title = '总管进程';
   } else if (isStartMenuOnly.value) {
     document.title = '系统菜单';
+  } else if (isUserMenuOnly.value) {
+    document.title = '用户菜单';
   } else if (standaloneModuleId.value && MODULE_TITLES[standaloneModuleId.value]) {
     document.title = MODULE_TITLES[standaloneModuleId.value];
   }
+
+  // 跨窗口同步登录用户信息
+  if (typeof window !== 'undefined' && (window as any).electronAPI?.onUserUpdated) {
+    (window as any).electronAPI.onUserUpdated((user: any) => {
+      if (user) {
+        currentUser.value = user;
+        try {
+          localStorage.setItem('scada_current_user', JSON.stringify(user));
+        } catch {}
+      }
+    });
+  }
+
+  // 跨窗口广播用户操作 (切换用户 / 注销)
+  if (typeof window !== 'undefined' && (window as any).electronAPI?.onUserAction) {
+    (window as any).electronAPI.onUserAction((action: string) => {
+      if (action === 'open:login') {
+        if (!isDaemonBarOnly.value && !isStartMenuOnly.value && !isUserMenuOnly.value) {
+          showLoginModal.value = true;
+        }
+      } else if (action === 'logout') {
+        handleLogout();
+      }
+    });
+  }
+
+  // 通知 Electron 窗口前端首帧已上屏渲染就绪，立即呼出消除白屏
+  nextTick(() => {
+    if (typeof window !== 'undefined' && (window as any).electronAPI?.notifyAppReady) {
+      try {
+        (window as any).electronAPI.notifyAppReady();
+      } catch {}
+    }
+  });
 });
 
 // ---------------- GE-SCADA 多组态 MDI 独立窗口系统状态 ----------------
@@ -256,10 +314,10 @@ const mdiWindows = ref<MdiWindowItem[]>([
     isMinimized: false,
     isMaximized: true,
     zIndex: 35,
-    x: 80,
-    y: 40,
-    width: 1100,
-    height: 640,
+    x: 0,
+    y: 0,
+    width: 1400,
+    height: 860,
     headerTheme: 'white'
   },
   {
@@ -271,10 +329,10 @@ const mdiWindows = ref<MdiWindowItem[]>([
     isMinimized: false,
     isMaximized: true,
     zIndex: 36,
-    x: 100,
-    y: 50,
-    width: 1120,
-    height: 660,
+    x: 0,
+    y: 0,
+    width: 1400,
+    height: 860,
     headerTheme: 'white'
   },
   {
@@ -286,10 +344,10 @@ const mdiWindows = ref<MdiWindowItem[]>([
     isMinimized: false,
     isMaximized: true,
     zIndex: 37,
-    x: 120,
-    y: 60,
-    width: 1120,
-    height: 660,
+    x: 0,
+    y: 0,
+    width: 1400,
+    height: 860,
     headerTheme: 'white'
   },
   {
@@ -301,10 +359,10 @@ const mdiWindows = ref<MdiWindowItem[]>([
     isMinimized: false,
     isMaximized: true,
     zIndex: 38,
-    x: 140,
-    y: 70,
-    width: 1120,
-    height: 660,
+    x: 0,
+    y: 0,
+    width: 1400,
+    height: 860,
     headerTheme: 'white'
   }
 ]);
@@ -360,17 +418,40 @@ const openWindow = async (id: string) => {
 };
 
 // 专用系统菜单项点击调度 (Electron 环境下打开独立模块原生窗口并自动收起菜单，Web 模式直接打开)
+let lastStartMenuTriggerTime = 0;
 const handleStartMenuItemClick = async (id: string) => {
+  const now = Date.now();
+  if (now - lastStartMenuTriggerTime < 250) return;
+  lastStartMenuTriggerTime = now;
+
   if (typeof window !== 'undefined' && (window as any).electronAPI?.openModule) {
     try {
-      await (window as any).electronAPI.openModule(id);
       await (window as any).electronAPI.closeStartMenu?.();
+      await (window as any).electronAPI.openModule(id);
       return;
     } catch (e) {
       console.warn('打开模块失败:', e);
     }
   }
   openWindow(id);
+};
+
+// 专用用户菜单项点击调度 (Electron 环境下广播用户操作并自动收起菜单，Web 模式直接执行)
+const handleUserActionFromMenu = async (action: string) => {
+  if (typeof window !== 'undefined' && (window as any).electronAPI?.sendUserAction) {
+    try {
+      await (window as any).electronAPI.sendUserAction(action);
+      await (window as any).electronAPI.closeUserMenu?.();
+      return;
+    } catch (e) {
+      console.warn('发送用户操作失败:', e);
+    }
+  }
+  if (action === 'open:login') {
+    showLoginModal.value = true;
+  } else if (action === 'logout') {
+    handleLogout();
+  }
 };
 
 const closeWindow = (id: string) => {
@@ -562,6 +643,8 @@ let diskNotificationTimer: any = null;
 // 底栏安全运行天数 (严格从 cfg/base.json 读取 SAFE_DATA_START 并在启动及每日零点计算)
 const safetyDays = ref<number>(computeSafetyDays('2025-05-06'));
 let cleanupMidnightTask: (() => void) | null = null;
+let cleanupScreensUpdated: (() => void) | null = null;
+let screensBroadcastChannel: BroadcastChannel | null = null;
 
 const showDiskNotification = (msg: string) => {
   diskNotification.value = msg;
@@ -822,11 +905,18 @@ const handleSaveCurrentScreenToDisk = async () => {
       diskFileCount.value = screens.value.length;
       showDiskNotification(`已保存当前大屏「${cur.name}」到 graph/${res.filename || cur.name + '.json'}`);
 
-      // 关键 SCADA 规则：只有保存后，修改才在实时监控中同步体现！
+      // 关键 SCADA 规则：保存后，修改在实时监控中同步体现并广播至所有窗口
       if (monitorActiveScreenId.value === cur.id) {
         monitorScreen.value = JSON.parse(JSON.stringify(cur.screen));
         monitorComponents.value = JSON.parse(JSON.stringify(cur.components));
       }
+      try {
+        screensBroadcastChannel?.postMessage({
+          type: 'screen-saved',
+          screenId: cur.id,
+          screenName: cur.name
+        });
+      } catch {}
     } else {
       showDiskNotification(`保存失败: ${res.error || ''}`);
     }
@@ -2071,6 +2161,8 @@ const handleKeyDown = (e: KeyboardEvent) => {
 };
 
 onMounted(async () => {
+  // 启动后台常驻实时告警轮询服务 (100ms 持续刷新，即使未打开告警窗也持续记录)
+  startBackgroundAlarmPolling();
   // 1. 启动时自动扫描并读取 graph 目录下的所有独立大屏 JSON 文件 (确保至少有一个合规文件)
   try {
     const res = await loadScreensFromDisk();
@@ -2199,6 +2291,53 @@ onMounted(async () => {
   window.addEventListener('keydown', handleKeyDown);
   window.addEventListener('datav:jump:screen', handleGlobalJumpEvent);
   window.addEventListener('scada:open:control', handleGlobalScadaControlEvent);
+
+  // 跨窗口/跨模块画面变更同步监听：图形编辑界面保存后，实时监控运行模块自动重载最新大屏
+  if (typeof window !== 'undefined' && (window as any).electronAPI?.onScreensUpdated) {
+    cleanupScreensUpdated = (window as any).electronAPI.onScreensUpdated(async (info: any) => {
+      console.log('[SCADA] 监听到全局大屏工程更新通知:', info);
+      try {
+        const res = await loadScreensFromDisk();
+        if (res.success && res.screens && res.screens.length > 0) {
+          screens.value = res.screens;
+          diskFileCount.value = res.screens.length;
+          const curId = monitorActiveScreenId.value || activeScreenId.value;
+          const matched = res.screens.find(s => s.id === curId) || res.screens[0];
+          if (matched) {
+            monitorScreen.value = JSON.parse(JSON.stringify(matched.screen));
+            monitorComponents.value = JSON.parse(JSON.stringify(matched.components));
+          }
+        }
+      } catch (err) {
+        console.warn('[SCADA] 同步更新大屏失败:', err);
+      }
+    });
+  }
+
+  // Web 端多标签页/窗口 BroadcastChannel 同步支持
+  if (typeof BroadcastChannel !== 'undefined') {
+    try {
+      screensBroadcastChannel = new BroadcastChannel('scada-screens-sync');
+      screensBroadcastChannel.onmessage = async (event) => {
+        if (event.data?.type === 'screen-saved') {
+          console.log('[SCADA Web] 收到 BroadcastChannel 画面保存通知:', event.data);
+          try {
+            const res = await loadScreensFromDisk();
+            if (res.success && res.screens && res.screens.length > 0) {
+              screens.value = res.screens;
+              diskFileCount.value = res.screens.length;
+              const curId = monitorActiveScreenId.value || activeScreenId.value;
+              const matched = res.screens.find(s => s.id === curId) || res.screens[0];
+              if (matched) {
+                monitorScreen.value = JSON.parse(JSON.stringify(matched.screen));
+                monitorComponents.value = JSON.parse(JSON.stringify(matched.components));
+              }
+            }
+          } catch {}
+        }
+      };
+    } catch {}
+  }
 });
 
 // Login and Logout Handlers
@@ -2268,7 +2407,8 @@ onBeforeUnmount(() => {
   if (simulationTimer) clearInterval(simulationTimer);
   if (alarmSyncTimer) clearInterval(alarmSyncTimer);
   if (cleanupMidnightTask) cleanupMidnightTask();
-  if (diskNotificationTimer) clearTimeout(diskNotificationTimer);
+  if (cleanupScreensUpdated) cleanupScreensUpdated();
+  if (screensBroadcastChannel) screensBroadcastChannel.close();
   window.removeEventListener('resize', fitToScreen);
   window.removeEventListener('keydown', handleKeyDown);
   window.removeEventListener('datav:jump:screen', handleGlobalJumpEvent);
@@ -2277,8 +2417,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <!-- -1. 专用系统菜单弹出窗口模式 (深瑞架构：由 Electron 向上弹出的独立轻量级无边框窗口，位于左下角，不被44px底栏截断) -->
-  <div v-if="isStartMenuOnly" class="h-screen w-screen bg-[#f2eee3] border border-[#cfc5b0] rounded-xl shadow-2xl text-slate-800 flex flex-col justify-between overflow-hidden select-none p-0 box-border">
+  <!-- -1. 专用系统菜单弹出窗口模式 (深瑞架构：由 Electron 向上弹出的独立轻量级无边框窗口，直角设计杜绝Linux X11透明圆角四角发黑漏色) -->
+  <div v-if="isStartMenuOnly" class="h-screen w-screen bg-[#f2eee3] border-2 border-[#b8ad96] rounded-none shadow-2xl text-slate-800 flex flex-col justify-between overflow-hidden select-none p-0 box-border font-sans">
     <!-- 菜单顶栏：简洁标题 -->
     <div class="px-3.5 py-2.5 bg-[#e5decb] border-b border-[#ded5bf] flex items-center justify-between text-[13.5px] font-bold text-slate-700 shrink-0">
       <span class="flex items-center gap-2 text-slate-900 font-bold">
@@ -2288,31 +2428,24 @@ onBeforeUnmount(() => {
       <span class="text-[12px] text-[#d81e06] font-bold">KND科能达</span>
     </div>
 
-    <!-- 菜单项列表 (监控运行 / 图形编辑 / 全站告警 / 历史曲线 / 历史告警 / 报表 / 系统健康) -->
+    <!-- 菜单项列表 (监控运行 / 图形编辑 / 全站告警 / 历史曲线 / 历史告警 / 综合报表) -->
     <div class="py-1 flex-1 overflow-y-auto divide-y divide-[#ded5bf]/40">
       <button
         v-for="item in [
           { id: 'monitor-screen', title: '监控运行', icon: Zap, color: 'text-amber-500' },
           { id: 'graphic-editor', title: '图形编辑', icon: PenTool, color: 'text-sky-600' },
-          { id: 'alarm-window', title: '全站告警', icon: ShieldAlert, color: 'text-rose-500', isAlarm: true },
+          { id: 'alarm-window', title: '全站告警', icon: Bell, color: 'text-rose-500' },
           { id: 'history-curve', title: '历史曲线', icon: LineChart, color: 'text-indigo-600' },
           { id: 'history-alarm', title: '历史告警', icon: History, color: 'text-orange-500' },
-          { id: 'report-window', title: '综合报表', icon: FileSpreadsheet, color: 'text-emerald-600' },
-          { id: 'health-monitor', title: '系统健康与黑匣子', icon: Activity, color: 'text-cyan-600' }
+          { id: 'report-window', title: '综合报表', icon: FileSpreadsheet, color: 'text-emerald-600' }
         ]"
         :key="item.id"
+        @mousedown.left.prevent="handleStartMenuItemClick(item.id)"
         @click="handleStartMenuItemClick(item.id)"
         class="w-full px-3.5 py-2.5 text-left hover:bg-[#e4dcce] flex items-center justify-between transition-colors cursor-pointer text-[15px] font-medium text-slate-800 hover:text-sky-700"
       >
         <div class="flex items-center gap-3">
-          <span v-if="item.isAlarm" class="w-5 h-5 flex items-center justify-center shrink-0">
-            <span
-              class="w-3.5 h-3.5 rounded-full inline-block"
-              :class="globalUnconfirmedAlarmCount > 0 ? 'scada-alarm-dot-blinking' : 'bg-emerald-500'"
-            />
-          </span>
           <component
-            v-else
             :is="item.icon"
             class="w-5 h-5 shrink-0 stroke-[2]"
             :class="item.color"
@@ -2338,6 +2471,30 @@ onBeforeUnmount(() => {
     </div>
   </div>
 
+  <!-- -2. 专用用户菜单弹出窗口模式 (深瑞架构：由 Electron 向上弹出的独立轻量级无边框窗口，位于右下角，保证最上层显示，直角设计杜绝黑角) -->
+  <div v-else-if="isUserMenuOnly" class="h-screen w-screen bg-[#f2eee3] border-2 border-[#b8ad96] rounded-none shadow-2xl text-slate-800 flex flex-col justify-between overflow-hidden select-none p-0 box-border tracking-wide font-sans">
+    <div class="px-3.5 py-2.5 bg-[#e5decb] border-b border-[#ded5bf] shrink-0">
+      <div class="font-bold text-[14.5px] text-slate-900">{{ currentUser.name }}</div>
+      <div class="text-[12px] text-slate-500 font-mono">{{ currentUser.role }}</div>
+    </div>
+    <div class="py-1 flex-1 flex flex-col justify-center divide-y divide-[#ded5bf]">
+      <button
+        @click="handleUserActionFromMenu('open:login')"
+        class="w-full px-3.5 py-2.5 text-left hover:bg-[#e4dcce] flex items-center gap-2.5 cursor-pointer text-slate-800 font-medium text-[14px]"
+      >
+        <User class="w-4.5 h-4.5 text-sky-600 stroke-[2]" />
+        <span>切换用户</span>
+      </button>
+      <button
+        @click="handleUserActionFromMenu('logout')"
+        class="w-full px-3.5 py-2.5 text-left hover:bg-rose-50 text-rose-600 flex items-center gap-2.5 cursor-pointer font-medium text-[14px]"
+      >
+        <LogOut class="w-4.5 h-4.5 text-rose-500 stroke-[2]" />
+        <span>注销登录</span>
+      </button>
+    </div>
+  </div>
+
   <!-- 0. 总管底栏进程模式 (深瑞架构：常驻系统底部，只有一个底栏，纯净无遮挡) -->
   <div v-else-if="isDaemonBarOnly" class="h-full w-full overflow-hidden bg-[#ebe4d4]">
     <PrsBottomBar
@@ -2348,28 +2505,32 @@ onBeforeUnmount(() => {
       @toggle:window="openWindow"
       @close:window="closeWindow"
       @logout="handleLogout"
-      @open:login="showLoginModal = true"
+      @open:login="handleOpenLoginModal"
       @open:health="openWindow('health-monitor')"
       @exit:app="handleExitApp"
     />
-    <LoginModal
-      v-if="showLoginModal"
-      :notice="loginNotice"
-      @close="showLoginModal = false; loginNotice = '';"
-      @success="showLoginModal = false; loginNotice = '';"
-    />
   </div>
 
-  <!-- 1. 独立子模块窗口模式 (深瑞架构：由 Electron 打开独立操作系统窗口时直接全屏渲染对应子模块) -->
-  <div v-else-if="standaloneModuleId" class="h-screen w-screen fixed inset-0 overflow-hidden bg-[#edf0f5] text-slate-900 font-sans select-none">
+  <!-- 1. 独立子模块窗口模式 (深瑞架构：由 Electron 打开独立操作系统窗口时直接全屏渲染对应子模块，留出底栏 44px 空间，彻底防止画面列表被遮挡) -->
+  <div v-else-if="standaloneModuleId" class="fixed top-0 left-0 right-0 bottom-11 overflow-hidden bg-[#edf0f5] text-slate-900 font-sans select-none">
     <!-- 监控运行 -->
     <PreviewScreen
       v-if="standaloneModuleId === 'monitor-screen'"
+      :screen="monitorScreen"
+      :components="monitorComponents"
+      :datasets="datasets"
+      :isStreaming="isStreaming"
       :screens="screens"
-      :activeScreenId="activeScreenId"
-      :isLiveMode="true"
-      @switch:screen="handleSelectScreen"
+      :activeScreenId="monitorActiveScreenId"
+      :indexScreenId="indexScreenId"
+      :indexScreenName="indexScreenName"
+      :isEmbedded="true"
+      @switch:screen="handleMonitorSwitchScreen"
+      @reload:current-screen="handleReloadCurrentMonitorScreen"
+      @logout="handleLogout"
+      @open:alarm="openWindow('alarm-window')"
       @open:window="openWindow"
+      @reorder:screens="handleReorderScreens"
     />
 
     <!-- 图形编辑工作台 -->
@@ -2403,7 +2564,7 @@ onBeforeUnmount(() => {
         @update:showRuler="showRuler = $event"
         @toggle:streaming="isStreaming = !isStreaming"
         @save:screen="handleSaveCurrentScreenToDisk"
-        @open:preview="openWindow('monitor-screen')"
+        @open:preview="handleOpenPreview"
         @open:datasets="showDatasetsModal = true"
         @open:control="showControlModal = true; controlInitialDeviceId = undefined;"
         @open:disk-storage="showDiskStorageModal = true"
@@ -3087,146 +3248,153 @@ onBeforeUnmount(() => {
       @open:health="showSystemHealthModal = true"
       @exit:app="handleExitApp"
     />
-
-    <!-- ======================================================== -->
-    <!-- 4. 全局弹窗模态框群 (数据集 / 图元工坊 / 测点关联 / 遥控遥调等) -->
-    <!-- ======================================================== -->
-    <!-- 4.1 数据集与测点配置中心 -->
-    <DatasetManagerModal
-      :visible="showDatasetsModal"
-      :datasets="datasets"
-      @close="showDatasetsModal = false"
-      @update:datasets="datasets = $event"
-    />
-
-    <!-- 4.2 自定义多态图元工坊 (资产库与编辑器) -->
-    <CustomSymbolModal
-      :visible="showSymbolModal"
-      @close="showSymbolModal = false"
-      @use:symbol="handleAddCustomSymbolToCanvas"
-      @update:symbols="() => {}"
-    />
-
-    <!-- 4.3 封装为自定义图元弹窗 -->
-    <SaveSymbolModal
-      v-if="showSaveSymbolModal"
-      :visible="showSaveSymbolModal"
-      :selectedComponents="componentsToSave"
-      @close="showSaveSymbolModal = false"
-      @saved="handleSymbolSaved"
-    />
-
-    <!-- 4.4 单图元测点数据关联配置 -->
-    <DataAssociationModal
-      v-if="showDataAssociationModal"
-      :visible="showDataAssociationModal"
-      :component="associationTargetComponent"
-      @close="showDataAssociationModal = false"
-      @submit="handleDataAssociationSubmit"
-    />
-
-    <!-- 4.5 批量图元测点关联配置 -->
-    <BatchDataAssociationModal
-      v-if="showBatchAssociationModal"
-      :visible="showBatchAssociationModal"
-      :components="batchAssociationComponents"
-      :category="batchAssociationCategory"
-      :datasets="datasets"
-      @close="showBatchAssociationModal = false"
-      @submit="handleBatchAssociationSubmit"
-    />
-
-    <!-- 4.6 工业遥控闭环操作弹窗 (YK) -->
-    <ScadaTeleControlModal
-      v-if="showControlModal"
-      :visible="showControlModal"
-      :initialDeviceId="controlInitialDeviceId"
-      :initialPointId="controlInitialPointId"
-      :initialTargetVerificationPointId="controlInitialTargetVerificationPointId"
-      @close="showControlModal = false"
-      @success="() => { showControlModal = false; scadaLiveTick++; }"
-    />
-
-    <!-- 4.7 工业遥调闭环操作弹窗 (YT) -->
-    <ScadaTeleRegulationModal
-      v-if="showRegulationModal"
-      :visible="showRegulationModal"
-      :initialDeviceId="controlInitialDeviceId"
-      :initialPointId="controlInitialPointId"
-      :initialTargetVerificationPointId="controlInitialTargetVerificationPointId"
-      @close="showRegulationModal = false"
-      @success="() => { showRegulationModal = false; scadaLiveTick++; }"
-    />
-
-    <!-- 4.8 批量测点总览管理与自动生成看板 -->
-    <ScadaBatchPointModal
-      v-if="showBatchPointModal"
-      :visible="showBatchPointModal"
-      :datasets="datasets"
-      :selectedComponents="selectedComponents"
-      @close="showBatchPointModal = false"
-      @update:datasets="datasets = $event"
-      @open:control="(devId, ptId, type) => {
-        controlInitialDeviceId = devId;
-        controlInitialPointId = ptId;
-        if (type === 'regulation') {
-          showRegulationModal = true;
-        } else {
-          showControlModal = true;
-        }
-      }"
-    />
-
-    <!-- 6. Multi-Platform Compatibility & Packaging Studio Modal -->
-    <DesktopPlatformModal
-      :visible="showPlatformModal"
-      @close="showPlatformModal = false"
-    />
-
-    <!-- 7. SCADA User Auth & Login Modal -->
-    <LoginModal
-      v-if="showLoginModal"
-      :notice="loginNotice"
-      @close="showLoginModal = false; loginNotice = '';"
-      @success="showLoginModal = false; loginNotice = '';"
-      @logout="handleLogout"
-    />
-
-    <!-- 8. System SCADA Disk Storage & File-per-Screen Manager Modal -->
-    <DiskStorageModal
-      :visible="showDiskStorageModal"
-      :screens="screens"
-      :activeScreenId="activeScreenId"
-      :indexScreenId="indexScreenId"
-      :indexScreenName="indexScreenName"
-      @close="showDiskStorageModal = false"
-      @reload:screens="handleReloadScreensFromDisk"
-      @update:index-screen="payload => { indexScreenName = payload.indexScreenName; indexScreenId = payload.indexScreenId; }"
-      @notify="showDiskNotification"
-    />
-
-    <!-- 8.5 系统运行健康与重启黑匣子监控模态框 -->
-    <SystemHealthModal
-      :visible="showSystemHealthModal"
-      @close="showSystemHealthModal = false"
-    />
-
-    <!-- Floating Disk Sync Status Toast -->
-    <transition
-      enter-active-class="transition duration-200 ease-out"
-      enter-from-class="opacity-0 translate-y-2"
-      enter-to-class="opacity-100 translate-y-0"
-      leave-active-class="transition duration-200 ease-in"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0 translate-y-2"
-    >
-      <div
-        v-if="diskNotification"
-        class="fixed bottom-12 right-6 z-50 px-3.5 py-2 rounded-lg bg-[#071328]/95 border border-cyan-400/60 shadow-[0_0_20px_rgba(0,242,255,0.25)] flex items-center gap-2.5 text-xs text-cyan-200 font-mono backdrop-blur-md"
-      >
-        <HardDrive class="w-4 h-4 text-cyan-400 shrink-0" />
-        <span>{{ diskNotification }}</span>
-      </div>
-    </transition>
   </div>
+
+  <!-- ===================================================================== -->
+  <!-- 4. 全局弹窗模态框群 (对工作台主界面及所有独立子模块窗口全局可用，杜绝底栏污染与无法弹出问题) -->
+  <!-- ===================================================================== -->
+  <div v-if="!isDaemonBarOnly && !isStartMenuOnly && !isUserMenuOnly" id="scada-global-modals">
+    <!-- 4.1 数据集与测点配置中心 -->
+      <DatasetManagerModal
+        v-if="showDatasetsModal"
+        :visible="showDatasetsModal"
+        :datasets="datasets"
+        @close="showDatasetsModal = false"
+        @update:datasets="datasets = $event"
+      />
+
+      <!-- 4.2 自定义多态图元工坊 (资产库与编辑器) -->
+      <CustomSymbolModal
+        v-if="showSymbolModal"
+        :visible="showSymbolModal"
+        @close="showSymbolModal = false"
+        @use:symbol="handleAddCustomSymbolToCanvas"
+        @update:symbols="() => {}"
+      />
+
+      <!-- 4.3 封装为自定义图元弹窗 -->
+      <SaveSymbolModal
+        v-if="showSaveSymbolModal"
+        :visible="showSaveSymbolModal"
+        :selectedComponents="componentsToSave"
+        @close="showSaveSymbolModal = false"
+        @saved="handleSymbolSaved"
+      />
+
+      <!-- 4.4 单图元测点数据关联配置 -->
+      <DataAssociationModal
+        v-if="showDataAssociationModal"
+        :visible="showDataAssociationModal"
+        :component="associationTargetComponent"
+        @close="showDataAssociationModal = false"
+        @submit="handleDataAssociationSubmit"
+      />
+
+      <!-- 4.5 批量图元测点关联配置 -->
+      <BatchDataAssociationModal
+        v-if="showBatchAssociationModal"
+        :visible="showBatchAssociationModal"
+        :components="batchAssociationComponents"
+        :category="batchAssociationCategory"
+        :datasets="datasets"
+        @close="showBatchAssociationModal = false"
+        @submit="handleBatchAssociationSubmit"
+      />
+
+      <!-- 4.6 工业遥控闭环操作弹窗 (YK) -->
+      <ScadaTeleControlModal
+        v-if="showControlModal"
+        :visible="showControlModal"
+        :initialDeviceId="controlInitialDeviceId"
+        :initialPointId="controlInitialPointId"
+        :initialTargetVerificationPointId="controlInitialTargetVerificationPointId"
+        @close="showControlModal = false"
+        @success="() => { showControlModal = false; scadaLiveTick++; }"
+      />
+
+      <!-- 4.7 工业遥调闭环操作弹窗 (YT) -->
+      <ScadaTeleRegulationModal
+        v-if="showRegulationModal"
+        :visible="showRegulationModal"
+        :initialDeviceId="controlInitialDeviceId"
+        :initialPointId="controlInitialPointId"
+        :initialTargetVerificationPointId="controlInitialTargetVerificationPointId"
+        @close="showRegulationModal = false"
+        @success="() => { showRegulationModal = false; scadaLiveTick++; }"
+      />
+
+      <!-- 4.8 批量测点总览管理与自动生成看板 -->
+      <ScadaBatchPointModal
+        v-if="showBatchPointModal"
+        :visible="showBatchPointModal"
+        :datasets="datasets"
+        :selectedComponents="selectedComponents"
+        @close="showBatchPointModal = false"
+        @update:datasets="datasets = $event"
+        @open:control="(devId, ptId, type) => {
+          controlInitialDeviceId = devId;
+          controlInitialPointId = ptId;
+          if (type === 'regulation') {
+            showRegulationModal = true;
+          } else {
+            showControlModal = true;
+          }
+        }"
+      />
+
+      <!-- 4.9 多平台工控机打包与适配中心 -->
+      <DesktopPlatformModal
+        v-if="showPlatformModal"
+        :visible="showPlatformModal"
+        @close="showPlatformModal = false"
+      />
+
+      <!-- 4.10 登录与身份鉴权弹窗 -->
+      <LoginModal
+        v-if="showLoginModal"
+        :notice="loginNotice"
+        @close="showLoginModal = false; loginNotice = '';"
+        @success="showLoginModal = false; loginNotice = '';"
+        @logout="handleLogout"
+      />
+
+      <!-- 4.11 大屏磁盘工程存储与管理弹窗 -->
+      <DiskStorageModal
+        v-if="showDiskStorageModal"
+        :visible="showDiskStorageModal"
+        :screens="screens"
+        :activeScreenId="activeScreenId"
+        :indexScreenId="indexScreenId"
+        :indexScreenName="indexScreenName"
+        @close="showDiskStorageModal = false"
+        @reload:screens="handleReloadScreensFromDisk"
+        @update:index-screen="payload => { indexScreenName = payload.indexScreenName; indexScreenId = payload.indexScreenId; }"
+        @notify="showDiskNotification"
+      />
+
+      <!-- 4.12 系统运行健康与重启黑匣子监控模态框 -->
+      <SystemHealthModal
+        v-if="showSystemHealthModal"
+        :visible="showSystemHealthModal"
+        @close="showSystemHealthModal = false"
+      />
+
+      <!-- 浮动磁盘同步通知状态 Toast -->
+      <transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="opacity-0 translate-y-2"
+        enter-to-class="opacity-100 translate-y-0"
+        leave-active-class="transition duration-200 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0 translate-y-2"
+      >
+        <div
+          v-if="diskNotification"
+          class="fixed bottom-12 right-6 z-[999999] px-3.5 py-2 rounded-lg bg-[#071328]/95 border border-cyan-400/60 shadow-[0_0_20px_rgba(0,242,255,0.25)] flex items-center gap-2.5 text-xs text-cyan-200 font-mono backdrop-blur-md"
+        >
+          <HardDrive class="w-4 h-4 text-cyan-400 shrink-0" />
+          <span>{{ diskNotification }}</span>
+        </div>
+      </transition>
+    </div>
 </template>

@@ -647,7 +647,7 @@ const handleDirectControlClick = (p: FlatScadaPoint) => {
 <template>
   <div
     v-if="visible"
-    class="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 select-none font-sans"
+    class="fixed inset-0 z-[999999] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 select-none font-sans"
   >
     <!-- Toast Notification -->
     <div

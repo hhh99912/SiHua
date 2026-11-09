@@ -385,7 +385,7 @@ onBeforeUnmount(() => {
   <div
     v-if="visible"
     id="scada-telecontrol-dialog"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 select-none font-sans text-slate-100"
+    class="fixed inset-0 z-[999999] flex items-center justify-center bg-black/80 p-4 select-none font-sans text-slate-100"
     style="transform: translateZ(0); will-change: transform;"
   >
     <!-- Main Industrial DO Dialog (专业工控纯净配色，去除顶部/底部接口字样) -->

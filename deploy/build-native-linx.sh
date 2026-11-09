@@ -274,9 +274,10 @@ exec "$APP_EXEC" \
   --disable-backgrounding-occluded-windows \
   --force-device-scale-factor=1 \
   --high-dpi-support=1 \
-  --enable-lcd-text \
+  --font-render-hinting=slight \
+  --disable-lcd-text \
+  --disable-font-subpixel-positioning \
   --enable-font-antialiasing \
-  --font-render-hinting=full \
   --force-color-profile=srgb \
   --gtk-version=3 \
   --js-flags="--max-old-space-size=2048 --expose-gc" \

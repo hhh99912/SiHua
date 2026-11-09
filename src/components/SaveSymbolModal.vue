@@ -330,11 +330,11 @@ const handleSave = () => {
   <Teleport to="body">
     <div
       v-if="visible"
-      class="fixed inset-0 z-[9999] pointer-events-none select-none"
+      class="fixed inset-0 z-[9999] pointer-events-none select-none font-sans"
     >
-      <!-- 弹窗容器：对齐数据关联配置中心 (纯黑底色、硬质深灰边框、全白高对比字体、支持拖拽、无荧光背景) -->
+      <!-- 弹窗容器：凝思工控米白风格、硬质深边框、纯黑高对比字体、支持拖拽 -->
       <div
-        class="pointer-events-auto absolute bg-black text-white rounded-lg border border-neutral-700 shadow-2xl flex flex-col overflow-hidden"
+        class="pointer-events-auto absolute bg-[#f2eee3] text-black rounded-lg border-2 border-[#8c826d] shadow-2xl flex flex-col overflow-hidden"
         :style="{
           left: `${modalPos.x}px`,
           top: `${modalPos.y}px`,
@@ -344,15 +344,15 @@ const handleSave = () => {
         <!-- 顶栏：标明标题，可按住拖拽，关闭按钮 -->
         <header
           @mousedown="onHeaderMouseDown"
-          class="h-11 px-3.5 bg-[#111111] border-b border-[#2a2a2a] flex items-center justify-between shrink-0 cursor-move select-none"
+          class="h-11 px-3.5 bg-[#e5decb] border-b border-[#cfc5b0] flex items-center justify-between shrink-0 cursor-move select-none"
           title="按住鼠标左键可拖动"
         >
           <div class="flex items-center gap-2.5 min-w-0 pr-3">
-            <div class="w-2.5 h-2.5 rounded-full bg-white shrink-0"></div>
-            <span class="text-sm sm:text-base font-bold text-white tracking-normal truncate drop-shadow-xs">
+            <div class="w-2.5 h-2.5 rounded-full bg-sky-700 shrink-0"></div>
+            <span class="text-sm sm:text-base font-bold text-black tracking-normal truncate">
               封装为自定义图元
             </span>
-            <span v-if="selectedComponents.length" class="text-xs text-white/90 font-mono hidden sm:inline ml-1">
+            <span v-if="selectedComponents.length" class="text-xs text-black font-mono font-bold bg-[#dfd6bf] px-2 py-0.5 rounded border border-[#b8ad96] hidden sm:inline ml-1">
               [{{ selectedComponents.length }} 个元件]
             </span>
           </div>
@@ -360,7 +360,7 @@ const handleSave = () => {
           <!-- 关闭按钮 -->
           <button
             @click="emit('close')"
-            class="w-7 h-7 rounded flex items-center justify-center text-white hover:bg-neutral-800 border border-transparent hover:border-neutral-600 transition-colors cursor-pointer"
+            class="w-7 h-7 rounded flex items-center justify-center text-black hover:bg-rose-100 hover:text-rose-700 border border-transparent hover:border-rose-300 transition-colors cursor-pointer"
             title="关闭窗口"
           >
             <X class="w-4 h-4" />
@@ -368,57 +368,57 @@ const handleSave = () => {
         </header>
 
         <!-- 模式切换标签 -->
-        <div class="px-4 pt-2.5 flex items-center gap-2 border-b border-neutral-800 bg-[#0d0d0d]">
+        <div class="px-4 pt-2.5 flex items-center gap-2 border-b border-[#cfc5b0] bg-[#ebe4d4]">
           <button
             type="button"
             @click="switchMode('new')"
-            class="px-4 py-1.5 text-sm font-semibold rounded-t cursor-pointer transition-colors"
+            class="px-4 py-1.5 text-xs sm:text-sm font-bold rounded-t cursor-pointer transition-colors"
             :class="mode === 'new' 
-              ? 'bg-black text-white border-t-2 border-t-white border-x border-neutral-700 -mb-[1px]' 
-              : 'text-neutral-400 hover:text-white'"
+              ? 'bg-[#f2eee3] text-black border-t-2 border-t-sky-700 border-x border-[#cfc5b0] -mb-[1px]' 
+              : 'text-neutral-700 hover:text-black'"
           >
             新建图元
           </button>
           <button
             type="button"
             @click="switchMode('update_state')"
-            class="px-4 py-1.5 text-sm font-semibold rounded-t cursor-pointer transition-colors"
+            class="px-4 py-1.5 text-xs sm:text-sm font-bold rounded-t cursor-pointer transition-colors"
             :class="mode === 'update_state' 
-              ? 'bg-black text-white border-t-2 border-t-white border-x border-neutral-700 -mb-[1px]' 
-              : 'text-neutral-400 hover:text-white'"
+              ? 'bg-[#f2eee3] text-black border-t-2 border-t-sky-700 border-x border-[#cfc5b0] -mb-[1px]' 
+              : 'text-neutral-700 hover:text-black'"
           >
             更新图元多状态
           </button>
         </div>
 
         <!-- 主体区域：极简表单 + 精简图样预览 -->
-        <div class="p-5 flex gap-5 bg-black">
+        <div class="p-5 flex gap-5 bg-[#f2eee3]">
           <!-- 左侧极简表单输入区 -->
           <div class="flex-1 space-y-4">
             <!-- 模式一：新建图元 -->
             <template v-if="mode === 'new'">
               <div>
-                <label class="block text-sm font-semibold text-white mb-1.5">
+                <label class="block text-sm font-bold text-black mb-1.5">
                   图元名称
                 </label>
                 <input
                   v-model="symbolName"
                   type="text"
                   autofocus
-                  class="w-full bg-[#111111] border border-neutral-700 rounded px-3 py-2 text-sm text-white placeholder-neutral-600 focus:border-white focus:outline-hidden"
+                  class="w-full bg-white border border-[#b8ad96] rounded px-3 py-2 text-sm text-black placeholder:text-neutral-500 focus:border-sky-700 focus:outline-hidden font-medium"
                   placeholder="请输入图元名称"
                   @keydown.enter.prevent="handleSave"
                 />
               </div>
 
               <div>
-                <label class="block text-sm font-semibold text-white mb-1.5">
+                <label class="block text-sm font-bold text-black mb-1.5">
                   当前状态值
                 </label>
                 <input
                   v-model="stateValue"
                   type="text"
-                  class="w-full bg-[#111111] border border-neutral-700 rounded px-3 py-2 text-sm text-white font-mono focus:border-white focus:outline-hidden"
+                  class="w-full bg-white border border-[#b8ad96] rounded px-3 py-2 text-sm text-black font-mono focus:border-sky-700 focus:outline-hidden font-medium"
                   placeholder="请输入整数状态值"
                   @keydown.enter.prevent="handleSave"
                 />
@@ -429,13 +429,13 @@ const handleSave = () => {
             <template v-else>
               <div>
                 <div class="flex items-center justify-between mb-1.5">
-                  <label class="text-sm font-semibold text-white">
+                  <label class="text-sm font-bold text-black">
                     目标图元
                   </label>
                   <button
                     type="button"
                     @click="loadExistingSymbols"
-                    class="text-xs text-neutral-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
+                    class="text-xs text-neutral-700 hover:text-black flex items-center gap-1 cursor-pointer transition-colors font-bold"
                     title="刷新图元列表"
                   >
                     <RefreshCw class="w-3 h-3" :class="{ 'animate-spin': isLoadingSymbols }" />
@@ -444,7 +444,7 @@ const handleSave = () => {
                 </div>
                 <select
                   v-model="selectedExistingSymbolId"
-                  class="w-full bg-[#111111] border border-neutral-700 rounded px-3 py-2 text-sm text-white focus:border-white focus:outline-hidden cursor-pointer"
+                  class="w-full bg-white border border-[#b8ad96] rounded px-3 py-2 text-sm text-black focus:border-sky-700 focus:outline-hidden cursor-pointer font-medium"
                 >
                   <option v-for="sym in existingSymbols" :key="sym.id" :value="sym.id">
                     {{ sym.name }}
@@ -453,13 +453,13 @@ const handleSave = () => {
               </div>
 
               <div>
-                <label class="block text-sm font-semibold text-white mb-1.5">
+                <label class="block text-sm font-bold text-black mb-1.5">
                   状态值
                 </label>
                 <input
                   v-model="stateValue"
                   type="text"
-                  class="w-full bg-[#111111] border border-neutral-700 rounded px-3 py-2 text-sm text-white font-mono focus:border-white focus:outline-hidden"
+                  class="w-full bg-white border border-[#b8ad96] rounded px-3 py-2 text-sm text-black font-mono focus:border-sky-700 focus:outline-hidden font-medium"
                   placeholder="请输入整数状态值"
                   @keydown.enter.prevent="handleSave"
                 />
@@ -467,9 +467,9 @@ const handleSave = () => {
             </template>
           </div>
 
-          <!-- 右侧精简预览框 (黑色底、无荧光背景、极简尺寸展示) -->
-          <div class="w-52 bg-[#0d0d0d] border border-neutral-800 rounded p-3 flex flex-col items-center justify-between shrink-0">
-            <div class="w-full h-36 flex items-center justify-center relative overflow-hidden bg-[#050505] rounded border border-neutral-900">
+          <!-- 右侧精简预览框 -->
+          <div class="w-52 bg-[#ebe4d4] border border-[#cfc5b0] rounded p-3 flex flex-col items-center justify-between shrink-0">
+            <div class="w-full h-36 flex items-center justify-center relative overflow-hidden bg-white rounded border border-[#cfc5b0]">
               <div
                 class="relative"
                 :style="{
@@ -495,22 +495,21 @@ const handleSave = () => {
                 </div>
               </div>
             </div>
-
-            <div class="text-xs text-neutral-400 font-mono mt-2 text-center">
+            <div class="text-xs text-neutral-700 font-mono font-bold mt-2 text-center">
               {{ symbolWidth }} × {{ symbolHeight }} px
             </div>
           </div>
         </div>
 
-        <!-- 校验失败提示 (统一直接显示编辑失败，无多余提示) -->
-        <div v-if="validationError" class="px-4 py-2 bg-rose-950/70 border-t border-rose-800 text-rose-300 text-sm flex items-center gap-2">
-          <AlertCircle class="w-4 h-4 shrink-0 text-rose-400" />
+        <!-- 校验失败提示 -->
+        <div v-if="validationError" class="px-4 py-2 bg-rose-100 border-t border-rose-300 text-rose-900 font-bold text-sm flex items-center gap-2">
+          <AlertCircle class="w-4 h-4 shrink-0 text-rose-700" />
           <span>{{ validationError }}</span>
         </div>
 
-        <!-- 底栏 (对齐数据关联配置中心) -->
-        <footer class="h-14 px-4 bg-[#111111] border-t border-[#2a2a2a] flex items-center justify-between shrink-0 select-none">
-          <div class="text-xs text-neutral-400 truncate pr-3">
+        <!-- 底栏 -->
+        <footer class="h-14 px-4 bg-[#e5decb] border-t border-[#cfc5b0] flex items-center justify-between shrink-0 select-none">
+          <div class="text-xs text-neutral-700 font-bold truncate pr-3">
             <span>存储至 cell/ 目录</span>
           </div>
 
@@ -518,14 +517,14 @@ const handleSave = () => {
             <button
               type="button"
               @click="emit('close')"
-              class="px-5 py-2 rounded text-sm font-semibold border border-neutral-600 bg-neutral-900 hover:bg-neutral-800 text-white transition-colors cursor-pointer"
+              class="px-4 py-1.5 rounded text-xs sm:text-sm font-bold border border-[#b8ad96] bg-[#dfd6bf] hover:bg-[#d4caaf] text-black transition-colors cursor-pointer"
             >
               取消
             </button>
             <button
               type="button"
               @click="handleSave"
-              class="px-6 py-2 rounded text-sm font-bold bg-white hover:bg-neutral-200 text-black transition-colors cursor-pointer flex items-center gap-1.5"
+              class="px-5 py-1.5 rounded text-xs sm:text-sm font-bold bg-sky-700 hover:bg-sky-800 text-white border border-sky-950 transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
             >
               <Check class="w-4 h-4 stroke-[2.5]" />
               <span>{{ mode === 'new' ? '保存图元' : '保存状态' }}</span>

@@ -412,7 +412,7 @@ onBeforeUnmount(() => {
   <div
     v-if="visible"
     id="scada-teleregulation-dialog"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 select-none font-sans text-slate-100"
+    class="fixed inset-0 z-[999999] flex items-center justify-center bg-black/80 p-4 select-none font-sans text-slate-100"
     style="transform: translateZ(0); will-change: transform;"
   >
     <!-- Main Industrial AO Dialog (纯净工控风格，无顶部/底部接口字样) -->

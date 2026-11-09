@@ -40,6 +40,20 @@ import {
   checkAlarmPassesFilterAndShield,
   ScadaAlarmFilterRules
 } from '../utils/scadaTreeData';
+import {
+  realtimeAlarms,
+  realtimeLastSeqId,
+  realtimeKnownSeqIds,
+  realtimeIsPaused,
+  realtimeSoundEnabled,
+  realtimeMaxCapacity,
+  realtimeIsLoading,
+  startBackgroundAlarmPolling,
+  pollRealtimeAlarmsOnce,
+  restartRealtimePollingTimer,
+  setOnNewAlarmsHook,
+  playAlarmBeepSound
+} from '../utils/realtimeAlarmStore';
 
 interface Props {
   visible?: boolean;
@@ -58,11 +72,11 @@ const emit = defineEmits<{
 // SCADA 底栏 12 个分类标签 (覆盖全部规范，默认选中第1项：时序信息)
 const tabList = SCADA_WARN_TAB_NAMES;
 const activeTab = ref<string>('时序信息');
-const isPaused = ref<boolean>(false);
+const isPaused = realtimeIsPaused;
 const showQuickSearch = ref<boolean>(false);
 const quickSearchText = ref<string>('');
 const selectedAlarmIds = ref<Set<number>>(new Set());
-const isLoading = ref<boolean>(false);
+const isLoading = realtimeIsLoading;
 const sortOrder = ref<'desc' | 'asc'>('desc'); // 'desc': 最新置顶 (倒序), 'asc': 时序正序 (升序)
 
 const isAcking = ref<boolean>(false);
@@ -71,10 +85,10 @@ const isAcking = ref<boolean>(false);
 // 1. “选项”下拉菜单与用户偏好配置 (解决“点不开”并提供工业定制)
 // ============================================================================
 const showOptionsMenu = ref<boolean>(false);
-const soundAlertEnabled = ref<boolean>(false); // 报警声音蜂鸣器
+const soundAlertEnabled = realtimeSoundEnabled; // 报警声音蜂鸣器
 const pinToTopLocked = ref<boolean>(true); // 自动置顶锁定 (默认开启，仅在有新告警产生时置顶)
 const colorAlarmText = ref<boolean>(false); // 告警字体是否着色 (默认不着色)
-const maxCapacity = ref<number>(2000); // 单屏缓存上限：默认 2000 条 (防止浏览器内存溢出)
+const maxCapacity = realtimeMaxCapacity; // 南瑞后台常驻环形缓存上限：默认 10000 条
 
 // 列可见性控制 (测点名称与动作语义默认不显示)
 const columnVisibility = ref({
@@ -195,7 +209,7 @@ const resetColumnVisibility = () => {
   resetColumnWidths();
 };
 
-// 计算当前显示的列总数，用于空数据和 Spacer 的 colspan
+// 计算当前显示的列总数与总宽度，用于虚拟列表与表头同步
 const visibleColumnCount = computed(() => {
   let count = 0;
   if (columnVisibility.value.status) count++;
@@ -211,22 +225,23 @@ const visibleColumnCount = computed(() => {
   return count || 1;
 });
 
+const totalTableWidth = computed(() => {
+  let w = 0;
+  if (columnVisibility.value.status) w += colWidths.value.status;
+  if (columnVisibility.value.level) w += colWidths.value.level;
+  if (columnVisibility.value.station) w += colWidths.value.station;
+  if (columnVisibility.value.bay) w += colWidths.value.bay;
+  if (columnVisibility.value.device) w += colWidths.value.device;
+  if (columnVisibility.value.key) w += colWidths.value.key;
+  if (columnVisibility.value.action) w += colWidths.value.action;
+  if (columnVisibility.value.type) w += colWidths.value.type;
+  if (columnVisibility.value.time) w += colWidths.value.time;
+  if (columnVisibility.value.content) w += colWidths.value.content;
+  return w || 600;
+});
+
 // 声音蜂鸣提醒试听
-const playBeepSound = () => {
-  try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, ctx.currentTime); // A5 蜂鸣警报音
-    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.35);
-  } catch {}
-};
+const playBeepSound = playAlarmBeepSound;
 
 // ============================================================================
 // 2. 六维过滤 (白名单) 与 屏蔽 (黑名单) 状态管理 (参考现场实测截图)
@@ -436,13 +451,12 @@ const filteredTreeStations = computed(() => {
 // 4. 表格与虚拟视口滚动计算 (凝思系统极致防卡死 + 自动置顶锁定)
 // ============================================================================
 const tableContainerRef = ref<HTMLDivElement | null>(null);
+const headerRef = ref<HTMLDivElement | null>(null);
 
-// 核心极致优化 1：使用 shallowRef 消除深层 Proxy 劫持，节省 80% 内存与 GC 开销
-const alarms = shallowRef<ScadaRealtimeWarnItem[]>([]);
-const lastSeqId = ref<number>(0);
-
-// 核心极致优化 2：常驻 Set 快速 O(1) 去重，严格与容量限制同步，杜绝内存泄漏
-const knownSeqIds = new Set<number>();
+// 绑定后台常驻实时告警环形缓存 (关闭/隐藏窗口不丢失、不重新计算)
+const alarms = realtimeAlarms;
+const lastSeqId = realtimeLastSeqId;
+const knownSeqIds = realtimeKnownSeqIds;
 
 // 核心极致优化 3：1Hz 离散步进闪烁，彻底消除 Chromium 60fps CSS 动画引发的 CPU 100% 跑满与软死锁
 const isBlinkPhase = ref<boolean>(true);
@@ -457,52 +471,6 @@ const contextMenuVisible = ref<boolean>(false);
 const contextMenuX = ref<number>(0);
 const contextMenuY = ref<number>(0);
 const contextMenuItem = ref<ScadaRealtimeWarnItem | null>(null);
-
-// 规范化后端条目 (普通对象，避免深层 Proxy 与 Object.freeze 产生的巨量堆分配)
-const normalizeAlarmItem = (item: ScadaRealtimeWarnItem): ScadaRealtimeWarnItem => {
-  const levelName = item.level_name || (item.level === 3 ? '事故信息' : item.level === 2 ? '告警信息' : item.level === 1 ? '提示信息' : '操作记录');
-  const levelColor = item.level_color || (item.level === 3 ? '#FF0000' : item.level === 2 ? '#E6A23C' : item.level === 1 ? '#67C23A' : '#00FFFF');
-  const typeName = item.type_name || (item.type === 28 ? '保护动作' : item.type === 10 ? '事件SOE' : item.type === 1 ? '遥信变位' : item.type === 2 ? '遥测越限' : item.type === 3 ? '厂站工况' : item.type === 4 ? '结点工况' : item.type === 8 ? '遥控' : item.type === 9 ? '人工操作' : '系统');
-
-  // 若后端未预先计算 tabs，前端按 3.1 规则自动补齐
-  const tabs = Array.isArray(item.tabs) && item.tabs.length > 0
-    ? [...item.tabs]
-    : [
-        '时序信息',
-        ...(levelName === '提示信息' || item.level === 1 ? ['提示信息'] : []),
-        ...(levelName === '告警信息' || item.level === 2 ? ['告警信息'] : []),
-        ...(levelName === '事故信息' || item.level === 3 ? ['事故信息'] : []),
-        ...(typeName === '遥信变位' || item.type === 1 ? ['遥信变位'] : []),
-        ...(typeName === '遥测越限' || item.type === 2 ? ['遥测越限'] : []),
-        ...(typeName === '厂站工况' || item.type === 3 ? ['厂站工况'] : []),
-        ...(typeName === '结点工况' || item.type === 4 ? ['结点工况'] : []),
-        ...(typeName === '遥控' || item.type === 8 ? ['遥控'] : []),
-        ...(typeName === '人工操作' || item.type === 9 ? ['人工操作'] : []),
-        ...(item.is_examine === true ? ['检修信息'] : []),
-        ...(item.is_revert === false && item.is_examine === false ? ['未复归信息'] : [])
-      ];
-
-  const fullText = item.full_text || `${levelName}  ${item.time}  ${item.content || ''}`;
-
-  return {
-    ...item,
-    level_name: levelName,
-    level_color: levelColor,
-    type_name: typeName,
-    tabs,
-    full_text: fullText,
-    is_examine: Boolean(item.is_examine),
-    is_revert: item.is_revert !== undefined ? Boolean(item.is_revert) : true,
-    fac_name: item.fac_name || '东郊变电站',
-    bay_name: item.bay_name || '220kV第一线间隔',
-    dev_name: item.dev_name || '断路器',
-    key_name: item.key_name || (item.key_id ? `KEY_${item.key_id}` : '开关位置'),
-    val_desc: item.val_desc || (item.val === 1 ? '合闸/闭合' : '分闸/断开'),
-    status_desc: item.status_desc || item.val_desc || (item.val === 1 ? '合闸' : '分闸'),
-    confirm: item.confirm === 1 ? 1 : 0,
-    confirm_desc: item.confirm === 1 ? '已确认' : '未确认'
-  };
-};
 
 // 核心优化 1：单趟 O(N) 聚合统计 12 个分类 Tab 的总数与未确认数 (绝对不依赖 isBlinkPhase，杜绝 1Hz 时的无谓全量重算)
 const alarmTabStats = computed(() => {
@@ -641,8 +609,8 @@ const filteredAlarms = computed(() => {
   return filtered;
 });
 
-// 预渲染缓冲窗口为上下各 30 行 (~1080px)，彻底消除滚轮快速滑动时的白块与闪烁
-const OVERSCAN = 30;
+// 预渲染缓冲窗口为上下各 45 行 (~1620px)，彻底消除凝思 Electron 快速拖动滚动条时的白屏页与闪烁
+const OVERSCAN = 45;
 
 // 计算虚拟视口渲染窗口切片
 const startIndex = computed(() => {
@@ -660,35 +628,14 @@ const visibleAlarms = computed(() => {
   return filteredAlarms.value.slice(startIndex.value, endIndex.value);
 });
 
-const topSpacerHeight = computed(() => {
-  return startIndex.value * rowHeight;
-});
-
-const bottomSpacerHeight = computed(() => {
-  return Math.max(0, (filteredAlarms.value.length - endIndex.value) * rowHeight);
-});
-
-let scrollRafId: number | null = null;
-let userScrollTimer: any = null;
-const isUserScrolling = ref<boolean>(false);
-
 const onTableScroll = (e: Event) => {
   const target = e.target as HTMLElement;
   if (!target) return;
-  const currentScrollTop = target.scrollTop;
-
-  // 用户主动滚轮翻看历史，标记并在 1.8 秒后解除，期间新产生告警绝不强行将视口扯回顶部
-  isUserScrolling.value = true;
-  if (userScrollTimer) clearTimeout(userScrollTimer);
-  userScrollTimer = setTimeout(() => {
-    isUserScrolling.value = false;
-  }, 1800);
-
-  if (scrollRafId !== null) return;
-  scrollRafId = requestAnimationFrame(() => {
-    scrollTop.value = currentScrollTop;
-    scrollRafId = null;
-  });
+  // 同步更新 scrollTop 与表头横向偏移，杜绝 rAF 延迟导致的快速拖动白屏页
+  scrollTop.value = target.scrollTop;
+  if (headerRef.value) {
+    headerRef.value.scrollLeft = target.scrollLeft;
+  }
 };
 
 // 未确认数目：严格根据当前筛选与分类过滤后的结果 (filteredAlarms) 动态统计未确认数目
@@ -821,19 +768,9 @@ const handleClearAll = () => {
 const togglePause = async () => {
   isPaused.value = !isPaused.value;
   if (!isPaused.value) {
-    // 恢复时立即清除并重置定时器，确保时序严格对齐
-    if (pollTimer) {
-      clearInterval(pollTimer);
-      pollTimer = null;
-    }
-    // 解除可能遗留的请求锁，确保立即拉取
-    isPollingActive = false;
-    // 点击“继续”：毫秒级瞬间发起一次增量拉取，把暂停期间积累的所有告警瞬间追平，立即呈现给用户
-    await pollRealtimeAlarms();
-    // 重新开启 1000ms 周期性轮询
-    pollTimer = setInterval(() => {
-      pollRealtimeAlarms();
-    }, 1000);
+    // 点击“继续”：毫秒级瞬间发起一次增量拉取，把暂停期间积累的所有告警瞬间追平，并重启 100ms 轮询
+    await pollRealtimeAlarmsOnce();
+    restartRealtimePollingTimer();
     console.log('[SCADA] 告警流已恢复，已自动发起增量轮询补齐暂停期间数据');
   } else {
     console.log('[SCADA] 告警流已暂停，画面已冻结，保持断点游标 lastSeqId =', lastSeqId.value);
@@ -899,94 +836,15 @@ const updateGlobalUnconfirmedCount = () => {
   globalUnconfirmedAlarmCount.value = alarmTabStats.value.totalUnack;
 };
 
-// 动态刷新时置顶优化：
-// 1. 受 pinToTopLocked 约束
-// 2. 关键优化：仅当用户未主动滚轮翻看历史记录（或当前正在顶部区域 scrollTop < 50）时置顶；若用户正向下浏览历史，绝不强行扯回顶部引发视口剧烈抖动
+// 正常刷新有新告警进入时，立即滚轮置顶
 const pinScrollToTop = () => {
   if (!pinToTopLocked.value) return;
   if (tableContainerRef.value) {
-    if (isUserScrolling.value || tableContainerRef.value.scrollTop > 50) {
-      return;
-    }
     tableContainerRef.value.scrollTop = 0;
     scrollTop.value = 0;
   }
 };
 
-// 增量轮询获取实时告警 (1秒一次动态刷新，性能优先，最大容量受 maxCapacity 控制，滚轮一直置顶)
-let isPollingActive = false;
-let gcCheckCounter = 0;
-
-const pollRealtimeAlarms = async () => {
-  // 处于暂停状态时不发起增量请求，画面完全定格
-  if (isPaused.value || isPollingActive) return;
-  isPollingActive = true;
-
-  try {
-    // 2. 定时增量轮询：带着上次记录的断点游标 lastSeqId 拉取差量新记录 (limit=100)
-    const res = await fetchScadaWarnRealtime({
-      limit: 100,
-      after_seq: lastSeqId.value
-    });
-
-    if (res.success && res.data && res.data.length > 0) {
-      const newItems = res.data.map(normalizeAlarmItem);
-      // 更新断点游标为最新一条的 seq_id
-      lastSeqId.value = res.data[res.data.length - 1].seq_id;
-
-      const filteredNew: ScadaRealtimeWarnItem[] = [];
-      for (let i = 0; i < newItems.length; i++) {
-        const item = newItems[i];
-        if (!knownSeqIds.has(item.seq_id)) {
-          knownSeqIds.add(item.seq_id);
-          filteredNew.push(item);
-        }
-      }
-
-      if (filteredNew.length > 0) {
-        // 如果开启声音报警且有新告警产生，触发蜂鸣提示音
-        if (soundAlertEnabled.value) {
-          playBeepSound();
-        }
-
-        // 依次追加至当前列表末尾
-        const currentList = [...alarms.value, ...filteredNew];
-        const cap = maxCapacity.value || 2000;
-        if (currentList.length > cap) {
-          const dropCount = currentList.length - cap;
-          for (let i = 0; i < dropCount; i++) {
-            knownSeqIds.delete(currentList[i].seq_id);
-          }
-          currentList.splice(0, dropCount);
-        }
-        alarms.value = currentList;
-        updateGlobalUnconfirmedCount();
-
-        // 动态刷新置顶优化：仅在有新告警产生且开启置顶锁定时跳转置顶，绝不每秒强制置顶
-        if (props.visible && pinToTopLocked.value && sortOrder.value === 'desc') {
-          nextTick(() => {
-            pinScrollToTop();
-          });
-        }
-      }
-    }
-
-    // 内存安全防护：每 40 次轮询触发一次空闲垃圾回收检查
-    gcCheckCounter++;
-    if (gcCheckCounter >= 40) {
-      gcCheckCounter = 0;
-      if (typeof window !== 'undefined' && (window as any).gc) {
-        try { (window as any).gc(); } catch {}
-      }
-    }
-  } catch (err) {
-    // 忽略偶发网络波动
-  } finally {
-    isPollingActive = false;
-  }
-};
-
-let pollTimer: any = null;
 let blinkTimer: any = null;
 
 const updateContainerHeight = () => {
@@ -996,7 +854,6 @@ const updateContainerHeight = () => {
 };
 
 onMounted(async () => {
-  isLoading.value = true;
   window.addEventListener('click', closeContextMenu);
   window.addEventListener('resize', updateContainerHeight);
 
@@ -1005,58 +862,30 @@ onMounted(async () => {
     isBlinkPhase.value = !isBlinkPhase.value;
   }, 1000);
 
-  try {
-    await fetchScadaWarnConfig();
-
-    // 1. 初始化拉取首屏数据 (取系统当前最新产生的 100 条告警铺满表格)
-    const res = await fetchScadaWarnRealtime({ limit: 100, after_seq: 0 });
-    if (res.success && res.data && res.data.length > 0) {
-      const mapped = res.data.map(normalizeAlarmItem);
-      // 记录最新一条记录的 seq_id 为 lastSeqId 游标
-      lastSeqId.value = res.data[res.data.length - 1].seq_id;
-
-      const cap = maxCapacity.value || 2000;
-      const sliced = mapped.slice(-cap);
-      knownSeqIds.clear();
-      for (const item of sliced) {
-        knownSeqIds.add(item.seq_id);
-      }
-      alarms.value = sliced;
-      updateGlobalUnconfirmedCount();
-
+  // 注册新告警到达时的自动置顶回调
+  setOnNewAlarmsHook(() => {
+    if (props.visible && pinToTopLocked.value && sortOrder.value === 'desc') {
       nextTick(() => {
-        updateContainerHeight();
         pinScrollToTop();
       });
     }
-  } catch (err) {
-    console.warn('初始化告警模块失败:', err);
-  } finally {
-    isLoading.value = false;
-  }
+  });
 
-  // 1 秒 1 次高精度平滑轮询
-  pollTimer = setInterval(() => {
-    pollRealtimeAlarms();
-  }, 1000);
+  // 启动/复用后台常驻 100ms 实时告警轮询服务 (已启动则直接复用缓存，绝不重新计算)
+  await startBackgroundAlarmPolling();
+  updateGlobalUnconfirmedCount();
+
+  nextTick(() => {
+    updateContainerHeight();
+    pinScrollToTop();
+  });
 });
 
 onBeforeUnmount(() => {
-  if (scrollRafId !== null) {
-    cancelAnimationFrame(scrollRafId);
-    scrollRafId = null;
-  }
-  if (userScrollTimer) {
-    clearTimeout(userScrollTimer);
-    userScrollTimer = null;
-  }
+  setOnNewAlarmsHook(null);
   stopColResize();
   window.removeEventListener('click', closeContextMenu);
   window.removeEventListener('resize', updateContainerHeight);
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
-  }
   if (blinkTimer) {
     clearInterval(blinkTimer);
     blinkTimer = null;
@@ -1110,14 +939,14 @@ watch(() => props.visible, (val) => {
       <!-- ===================================================================== -->
       <!-- 1. 顶部操作工具栏 (工业连续工具条，带图标，悬浮/激活时呈现按键间断)       -->
       <!-- ===================================================================== -->
-      <div class="h-10 bg-slate-100 border-b border-slate-400 px-2 flex items-center justify-between shrink-0 select-none text-[14px] font-bold relative z-20">
+      <div class="h-10 bg-slate-100 border-b border-slate-400 px-2 flex items-center justify-between shrink-0 select-none text-[14px] font-medium relative z-20">
         <!-- 左侧：功能操作按键连排条 (无缝平铺，带图标，仅在鼠标悬浮/点击时呈现独立按键间断) -->
         <div class="flex items-stretch bg-slate-200 border border-slate-400 divide-x divide-slate-300 shadow-2xs h-8">
           <!-- 选项菜单按钮 (纯文本显示，无下拉图标和选项图标) -->
           <div class="relative flex items-stretch">
             <button
               @click.stop="showOptionsMenu = !showOptionsMenu"
-              class="px-2.5 h-full bg-transparent hover:bg-slate-300 active:bg-slate-400/80 flex items-center text-slate-900 text-[14px] font-bold cursor-pointer transition-all hover:shadow-xs relative hover:z-10"
+              class="px-2.5 h-full bg-transparent hover:bg-slate-300 active:bg-slate-400/80 flex items-center text-slate-900 text-[14px] font-medium cursor-pointer transition-all hover:shadow-xs relative hover:z-10"
               :class="{ 'bg-slate-300 shadow-inner': showOptionsMenu }"
               title="系统选项配置"
             >
@@ -1128,10 +957,10 @@ watch(() => props.visible, (val) => {
             <div
               v-if="showOptionsMenu"
               @click.stop
-              class="absolute left-0 top-9 z-50 bg-white border-2 border-slate-600 shadow-2xl w-80 py-2 text-[14px] font-bold text-slate-900 select-none"
+              class="absolute left-0 top-9 z-50 bg-white border-2 border-slate-600 shadow-2xl w-80 py-2 text-[14px] font-medium text-slate-900 select-none"
             >
               <div class="px-3 py-1.5 bg-slate-200 border-b border-slate-300 flex items-center justify-between">
-                <span class="font-bold text-slate-900">告警监视窗口偏好设置</span>
+                <span class="font-medium text-slate-900">告警监视窗口偏好设置</span>
                 <button @click="showOptionsMenu = false" class="text-slate-600 hover:text-slate-900">
                   <X class="w-4 h-4" />
                 </button>
@@ -1157,16 +986,19 @@ watch(() => props.visible, (val) => {
 
               <!-- 单屏最大缓存容量 -->
               <div class="px-3 py-2 border-b border-slate-200">
-                <div class="text-slate-900 mb-1.5">单屏告警容量上限 (性能调优):</div>
-                <div class="flex items-center gap-4 text-xs font-bold text-slate-800">
+                <div class="text-slate-900 mb-1.5">后台实时告警缓存上限:</div>
+                <div class="grid grid-cols-2 gap-2 text-xs font-medium text-slate-800">
                   <label class="flex items-center gap-1 cursor-pointer">
-                    <input type="radio" :value="500" v-model="maxCapacity" name="cap" /> 500条
+                    <input type="radio" :value="2000" v-model="maxCapacity" name="cap" /> 2000条
                   </label>
                   <label class="flex items-center gap-1 cursor-pointer">
-                    <input type="radio" :value="1000" v-model="maxCapacity" name="cap" /> 1000条
+                    <input type="radio" :value="5000" v-model="maxCapacity" name="cap" /> 5000条
                   </label>
                   <label class="flex items-center gap-1 cursor-pointer">
-                    <input type="radio" :value="2000" v-model="maxCapacity" name="cap" /> 2000条 (默认推荐)
+                    <input type="radio" :value="10000" v-model="maxCapacity" name="cap" /> 10000条 (默认推荐)
+                  </label>
+                  <label class="flex items-center gap-1 cursor-pointer">
+                    <input type="radio" :value="20000" v-model="maxCapacity" name="cap" /> 20000条
                   </label>
                 </div>
               </div>
@@ -1234,11 +1066,11 @@ watch(() => props.visible, (val) => {
           <!-- 确认全部 -->
           <button
             @click="handleAcknowledgeAll"
-            class="px-2.5 h-full bg-transparent hover:bg-slate-300 active:bg-slate-400/80 flex items-center gap-1.5 text-slate-900 text-[14px] font-bold cursor-pointer transition-all hover:shadow-xs relative hover:z-10 disabled:opacity-40 disabled:cursor-not-allowed"
+            class="px-2.5 h-full bg-transparent hover:bg-slate-300 active:bg-slate-400/80 flex items-center gap-1.5 text-slate-900 text-[14px] font-medium cursor-pointer transition-all hover:shadow-xs relative hover:z-10 disabled:opacity-40 disabled:cursor-not-allowed"
             :disabled="isAcking"
             title="对位复归并确认当前所有告警"
           >
-            <CheckCheck class="w-4 h-4 text-emerald-700 stroke-[2.5]" />
+            <CheckCheck class="w-4 h-4 text-emerald-700 stroke-[2]" />
             <span>{{ isAcking ? '确认中...' : '确认全部' }}</span>
           </button>
 
@@ -1246,79 +1078,79 @@ watch(() => props.visible, (val) => {
           <button
             @click="handleAcknowledgeSelected"
             :disabled="isAcking || selectedAlarmIds.size === 0"
-            class="px-2.5 h-full bg-transparent hover:bg-slate-300 active:bg-slate-400/80 flex items-center gap-1.5 text-slate-900 text-[14px] font-bold cursor-pointer transition-all hover:shadow-xs relative hover:z-10 disabled:opacity-40 disabled:cursor-not-allowed"
+            class="px-2.5 h-full bg-transparent hover:bg-slate-300 active:bg-slate-400/80 flex items-center gap-1.5 text-slate-900 text-[14px] font-medium cursor-pointer transition-all hover:shadow-xs relative hover:z-10 disabled:opacity-40 disabled:cursor-not-allowed"
             title="确认当前勾选的告警条目"
           >
-            <Check class="w-4 h-4 text-sky-700 stroke-[2.5]" />
+            <Check class="w-4 h-4 text-sky-700 stroke-[2]" />
             <span>确认选中</span>
           </button>
 
           <!-- 清屏 (4.4 清屏：清空视觉显示，不影响系统后台数据，保持断点游标不变) -->
           <button
             @click="handleClearAll"
-            class="px-2.5 h-full bg-transparent hover:bg-slate-300 active:bg-slate-400/80 flex items-center gap-1.5 text-slate-900 text-[14px] font-bold cursor-pointer transition-all hover:shadow-xs relative hover:z-10"
+            class="px-2.5 h-full bg-transparent hover:bg-slate-300 active:bg-slate-400/80 flex items-center gap-1.5 text-slate-900 text-[14px] font-medium cursor-pointer transition-all hover:shadow-xs relative hover:z-10"
             title="清屏 (仅清空前端视觉显示，保持增量游标不变)"
           >
-            <Trash2 class="w-4 h-4 text-rose-700 stroke-[2.2]" />
+            <Trash2 class="w-4 h-4 text-rose-700 stroke-[2]" />
             <span>清屏</span>
           </button>
 
           <!-- 暂停 / 继续 (4.3 自由暂停与恢复刷新，0漏报) -->
           <button
             @click="togglePause"
-            class="px-2.5 h-full bg-transparent hover:bg-slate-300 active:bg-slate-400/80 flex items-center gap-1.5 text-slate-900 text-[14px] font-bold cursor-pointer transition-all hover:shadow-xs relative hover:z-10"
+            class="px-2.5 h-full bg-transparent hover:bg-slate-300 active:bg-slate-400/80 flex items-center gap-1.5 text-slate-900 text-[14px] font-medium cursor-pointer transition-all hover:shadow-xs relative hover:z-10"
             :class="{ 'bg-amber-100 text-amber-900 shadow-inner': isPaused }"
             :title="isPaused ? '恢复刷新 (使用断点游标追平暂停期间所有数据)' : '暂停刷新 (定格画面，后台继续缓存)'"
           >
-            <component :is="isPaused ? Play : Pause" class="w-4 h-4 text-amber-700 stroke-[2.5]" />
+            <component :is="isPaused ? Play : Pause" class="w-4 h-4 text-amber-700 stroke-[2]" />
             <span>{{ isPaused ? '继续' : '暂停' }}</span>
           </button>
 
           <!-- 保存 -->
           <button
             @click="handleSave"
-            class="px-2.5 h-full bg-transparent hover:bg-slate-300 active:bg-slate-400/80 flex items-center gap-1.5 text-slate-900 text-[14px] font-bold cursor-pointer transition-all hover:shadow-xs relative hover:z-10"
+            class="px-2.5 h-full bg-transparent hover:bg-slate-300 active:bg-slate-400/80 flex items-center gap-1.5 text-slate-900 text-[14px] font-medium cursor-pointer transition-all hover:shadow-xs relative hover:z-10"
             title="导出/保存当前告警清单为 CSV"
           >
-            <Save class="w-4 h-4 text-sky-700 stroke-[2.2]" />
+            <Save class="w-4 h-4 text-sky-700 stroke-[2]" />
             <span>保存</span>
           </button>
 
           <!-- 打印 -->
           <button
             @click="handlePrint"
-            class="px-2.5 h-full bg-transparent hover:bg-slate-300 active:bg-slate-400/80 flex items-center gap-1.5 text-slate-900 text-[14px] font-bold cursor-pointer transition-all hover:shadow-xs relative hover:z-10"
+            class="px-2.5 h-full bg-transparent hover:bg-slate-300 active:bg-slate-400/80 flex items-center gap-1.5 text-slate-900 text-[14px] font-medium cursor-pointer transition-all hover:shadow-xs relative hover:z-10"
             title="打印当前列表"
           >
-            <Printer class="w-4 h-4 text-slate-700 stroke-[2.2]" />
+            <Printer class="w-4 h-4 text-slate-700 stroke-[2]" />
             <span>打印</span>
           </button>
 
           <!-- 快速查找 -->
           <button
             @click="showQuickSearch = !showQuickSearch"
-            class="px-2.5 h-full bg-transparent hover:bg-slate-300 active:bg-slate-400/80 flex items-center gap-1.5 text-slate-900 text-[14px] font-bold cursor-pointer transition-all hover:shadow-xs relative hover:z-10"
+            class="px-2.5 h-full bg-transparent hover:bg-slate-300 active:bg-slate-400/80 flex items-center gap-1.5 text-slate-900 text-[14px] font-medium cursor-pointer transition-all hover:shadow-xs relative hover:z-10"
             :class="{ 'bg-slate-300 shadow-inner': showQuickSearch }"
             title="快速文本检索"
           >
-            <Search class="w-4 h-4 text-indigo-700 stroke-[2.5]" />
+            <Search class="w-4 h-4 text-indigo-700 stroke-[2]" />
             <span>快速查找</span>
           </button>
 
           <!-- 隐藏 (打开/关闭右侧过滤与屏蔽弹出菜单) -->
           <button
             @click="showShieldDrawer = !showShieldDrawer"
-            class="px-2.5 h-full bg-transparent hover:bg-slate-300 active:bg-slate-400/80 flex items-center gap-1.5 text-slate-900 text-[14px] font-bold cursor-pointer transition-all hover:shadow-xs relative hover:z-10"
+            class="px-2.5 h-full bg-transparent hover:bg-slate-300 active:bg-slate-400/80 flex items-center gap-1.5 text-slate-900 text-[14px] font-medium cursor-pointer transition-all hover:shadow-xs relative hover:z-10"
             :class="{ 'bg-slate-300 shadow-inner': showShieldDrawer }"
             title="打开/关闭右侧过滤与屏蔽弹出菜单"
           >
-            <ShieldAlert class="w-4 h-4 text-amber-600 stroke-[2.2]" />
+            <ShieldAlert class="w-4 h-4 text-amber-600 stroke-[2]" />
             <span>隐藏</span>
           </button>
         </div>
 
         <!-- 右侧：只显示未确认数目和总数目 -->
-        <div class="flex items-center text-[14px] font-bold text-slate-900 tracking-tight shrink-0 bg-slate-200 px-3 h-8 border border-slate-400 ml-2 shadow-2xs">
+        <div class="flex items-center text-[14px] font-medium text-slate-900 tracking-tight shrink-0 bg-slate-200 px-3 h-8 border border-slate-400 ml-2 shadow-2xs">
           未确认数目: {{ unackCount }}&nbsp;&nbsp;&nbsp;&nbsp;总数目: {{ totalCount }}
         </div>
       </div>
@@ -1356,180 +1188,196 @@ watch(() => props.visible, (val) => {
       <!-- 2. 中间主区域：左侧数据表格 + 右侧过滤/屏蔽操作面板 (参照现场图片实测布局) -->
       <!-- ===================================================================== -->
       <div class="flex-1 flex overflow-hidden border-b border-slate-400 relative">
-        <!-- 主数据表格容器 (虚拟视口极速渲染，字体统一 text-[15px] font-bold，允许横向滚轮) -->
-        <div 
-          ref="tableContainerRef"
-          @scroll.passive="onTableScroll"
-          class="flex-1 overflow-auto bg-white relative"
-        >
-          <table class="w-max min-w-full border-separate border-spacing-0 text-left font-sans text-[15px] font-bold select-none">
-            <!-- 表头 (纯白/灰工业风格，每一列支持鼠标拖动调整宽度，弹窗打开时降低层叠级) -->
-            <thead 
-              class="sticky top-0 bg-slate-200 border-b-2 border-slate-400 text-slate-900 font-bold select-none text-[15px] transition-all z-10"
-              :class="selectorModalVisible ? 'z-0 opacity-50 pointer-events-none' : 'z-10'"
+        <!-- 主数据表格容器 (固定表头 + GPU合成 translate3d 虚拟视口，彻底消除凝思 Electron 行高抖动与快速拖动白屏页) -->
+        <div class="flex-1 flex flex-col overflow-hidden bg-white relative">
+          <!-- 固定表头 (与滚动区横向同步，scrollbar-gutter: stable 保持列宽严格对齐) -->
+          <div
+            ref="headerRef"
+            class="overflow-hidden shrink-0 bg-slate-200 border-b-2 border-slate-400 text-slate-900 font-bold select-none text-[15px]"
+            :class="selectorModalVisible ? 'opacity-50 pointer-events-none' : ''"
+            style="scrollbar-gutter: stable;"
+          >
+            <div
+              class="flex items-center box-border"
+              :style="{ width: `${totalTableWidth}px`, minWidth: '100%' }"
             >
-              <tr>
-                <!-- 状态 -->
-                <th
-                  v-if="columnVisibility.status"
-                  :style="{ width: `${colWidths.status}px`, minWidth: `${colWidths.status}px`, maxWidth: `${colWidths.status}px` }"
-                  class="relative py-2.5 px-3 border-r border-slate-400 text-center font-bold"
-                >
-                  <div class="flex items-center justify-center gap-2 cursor-pointer" @click="toggleSelectAll">
-                    <component :is="isAllSelected ? CheckSquare : Square" class="w-5 h-5 text-slate-800" />
-                    <span class="text-[15px] font-bold">状态</span>
-                  </div>
-                  <div
-                    @mousedown.stop.prevent="startColResize('status', $event)"
-                    class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
-                    title="拖动调整列宽"
-                  ></div>
-                </th>
+              <!-- 状态 -->
+              <div
+                v-if="columnVisibility.status"
+                :style="{ width: `${colWidths.status}px`, minWidth: `${colWidths.status}px`, maxWidth: `${colWidths.status}px`, flexShrink: 0 }"
+                class="relative py-2.5 px-3 border-r border-slate-400 text-center font-bold box-border"
+              >
+                <div class="flex items-center justify-center gap-2 cursor-pointer" @click="toggleSelectAll">
+                  <component :is="isAllSelected ? CheckSquare : Square" class="w-5 h-5 text-slate-800" />
+                  <span class="text-[15px] font-bold">状态</span>
+                </div>
+                <div
+                  @mousedown.stop.prevent="startColResize('status', $event)"
+                  class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
+                  title="拖动调整列宽"
+                ></div>
+              </div>
 
-                <!-- 级别 -->
-                <th
-                  v-if="columnVisibility.level"
-                  :style="{ width: `${colWidths.level}px`, minWidth: `${colWidths.level}px`, maxWidth: `${colWidths.level}px` }"
-                  class="relative py-2.5 px-3 border-r border-slate-400 text-center text-[15px] font-bold"
-                >
-                  <span>级别</span>
-                  <div
-                    @mousedown.stop.prevent="startColResize('level', $event)"
-                    class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
-                    title="拖动调整列宽"
-                  ></div>
-                </th>
+              <!-- 级别 -->
+              <div
+                v-if="columnVisibility.level"
+                :style="{ width: `${colWidths.level}px`, minWidth: `${colWidths.level}px`, maxWidth: `${colWidths.level}px`, flexShrink: 0 }"
+                class="relative py-2.5 px-3 border-r border-slate-400 text-center text-[15px] font-bold box-border"
+              >
+                <span>级别</span>
+                <div
+                  @mousedown.stop.prevent="startColResize('level', $event)"
+                  class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
+                  title="拖动调整列宽"
+                ></div>
+              </div>
 
-                <!-- 厂站 -->
-                <th
-                  v-if="columnVisibility.station"
-                  :style="{ width: `${colWidths.station}px`, minWidth: `${colWidths.station}px`, maxWidth: `${colWidths.station}px` }"
-                  class="relative py-2.5 px-3 border-r border-slate-400 text-[15px] font-bold"
-                >
-                  <span>厂站</span>
-                  <div
-                    @mousedown.stop.prevent="startColResize('station', $event)"
-                    class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
-                    title="拖动调整列宽"
-                  ></div>
-                </th>
+              <!-- 厂站 -->
+              <div
+                v-if="columnVisibility.station"
+                :style="{ width: `${colWidths.station}px`, minWidth: `${colWidths.station}px`, maxWidth: `${colWidths.station}px`, flexShrink: 0 }"
+                class="relative py-2.5 px-3 border-r border-slate-400 text-[15px] font-bold box-border"
+              >
+                <span>厂站</span>
+                <div
+                  @mousedown.stop.prevent="startColResize('station', $event)"
+                  class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
+                  title="拖动调整列宽"
+                ></div>
+              </div>
 
-                <!-- 间隔 -->
-                <th
-                  v-if="columnVisibility.bay"
-                  :style="{ width: `${colWidths.bay}px`, minWidth: `${colWidths.bay}px`, maxWidth: `${colWidths.bay}px` }"
-                  class="relative py-2.5 px-3 border-r border-slate-400 text-[15px] font-bold"
-                >
-                  <span>间隔</span>
-                  <div
-                    @mousedown.stop.prevent="startColResize('bay', $event)"
-                    class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
-                    title="拖动调整列宽"
-                  ></div>
-                </th>
+              <!-- 间隔 -->
+              <div
+                v-if="columnVisibility.bay"
+                :style="{ width: `${colWidths.bay}px`, minWidth: `${colWidths.bay}px`, maxWidth: `${colWidths.bay}px`, flexShrink: 0 }"
+                class="relative py-2.5 px-3 border-r border-slate-400 text-[15px] font-bold box-border"
+              >
+                <span>间隔</span>
+                <div
+                  @mousedown.stop.prevent="startColResize('bay', $event)"
+                  class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
+                  title="拖动调整列宽"
+                ></div>
+              </div>
 
-                <!-- 设备 -->
-                <th
-                  v-if="columnVisibility.device"
-                  :style="{ width: `${colWidths.device}px`, minWidth: `${colWidths.device}px`, maxWidth: `${colWidths.device}px` }"
-                  class="relative py-2.5 px-3 border-r border-slate-400 text-[15px] font-bold"
-                >
-                  <span>设备</span>
-                  <div
-                    @mousedown.stop.prevent="startColResize('device', $event)"
-                    class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
-                    title="拖动调整列宽"
-                  ></div>
-                </th>
+              <!-- 设备 -->
+              <div
+                v-if="columnVisibility.device"
+                :style="{ width: `${colWidths.device}px`, minWidth: `${colWidths.device}px`, maxWidth: `${colWidths.device}px`, flexShrink: 0 }"
+                class="relative py-2.5 px-3 border-r border-slate-400 text-[15px] font-bold box-border"
+              >
+                <span>设备</span>
+                <div
+                  @mousedown.stop.prevent="startColResize('device', $event)"
+                  class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
+                  title="拖动调整列宽"
+                ></div>
+              </div>
 
-                <!-- 测点 -->
-                <th
-                  v-if="columnVisibility.key"
-                  :style="{ width: `${colWidths.key}px`, minWidth: `${colWidths.key}px`, maxWidth: `${colWidths.key}px` }"
-                  class="relative py-2.5 px-3 border-r border-slate-400 text-[15px] font-bold"
-                >
-                  <span>测点名称</span>
-                  <div
-                    @mousedown.stop.prevent="startColResize('key', $event)"
-                    class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
-                    title="拖动调整列宽"
-                  ></div>
-                </th>
+              <!-- 测点 -->
+              <div
+                v-if="columnVisibility.key"
+                :style="{ width: `${colWidths.key}px`, minWidth: `${colWidths.key}px`, maxWidth: `${colWidths.key}px`, flexShrink: 0 }"
+                class="relative py-2.5 px-3 border-r border-slate-400 text-[15px] font-bold box-border"
+              >
+                <span>测点名称</span>
+                <div
+                  @mousedown.stop.prevent="startColResize('key', $event)"
+                  class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
+                  title="拖动调整列宽"
+                ></div>
+              </div>
 
-                <!-- 动作语义 -->
-                <th
-                  v-if="columnVisibility.action"
-                  :style="{ width: `${colWidths.action}px`, minWidth: `${colWidths.action}px`, maxWidth: `${colWidths.action}px` }"
-                  class="relative py-2.5 px-3 border-r border-slate-400 text-center text-[15px] font-bold"
-                >
-                  <span>动作语义</span>
-                  <div
-                    @mousedown.stop.prevent="startColResize('action', $event)"
-                    class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
-                    title="拖动调整列宽"
-                  ></div>
-                </th>
+              <!-- 动作语义 -->
+              <div
+                v-if="columnVisibility.action"
+                :style="{ width: `${colWidths.action}px`, minWidth: `${colWidths.action}px`, maxWidth: `${colWidths.action}px`, flexShrink: 0 }"
+                class="relative py-2.5 px-3 border-r border-slate-400 text-center text-[15px] font-bold box-border"
+              >
+                <span>动作语义</span>
+                <div
+                  @mousedown.stop.prevent="startColResize('action', $event)"
+                  class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
+                  title="拖动调整列宽"
+                ></div>
+              </div>
 
-                <!-- 类型 -->
-                <th
-                  v-if="columnVisibility.type"
-                  :style="{ width: `${colWidths.type}px`, minWidth: `${colWidths.type}px`, maxWidth: `${colWidths.type}px` }"
-                  class="relative py-2.5 px-3 border-r border-slate-400 text-center text-[15px] font-bold"
-                >
-                  <span>类型</span>
-                  <div
-                    @mousedown.stop.prevent="startColResize('type', $event)"
-                    class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
-                    title="拖动调整列宽"
-                  ></div>
-                </th>
+              <!-- 类型 -->
+              <div
+                v-if="columnVisibility.type"
+                :style="{ width: `${colWidths.type}px`, minWidth: `${colWidths.type}px`, maxWidth: `${colWidths.type}px`, flexShrink: 0 }"
+                class="relative py-2.5 px-3 border-r border-slate-400 text-center text-[15px] font-bold box-border"
+              >
+                <span>类型</span>
+                <div
+                  @mousedown.stop.prevent="startColResize('type', $event)"
+                  class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
+                  title="拖动调整列宽"
+                ></div>
+              </div>
 
-                <!-- 动作时间 -->
-                <th
-                  v-if="columnVisibility.time"
-                  :style="{ width: `${colWidths.time}px`, minWidth: `${colWidths.time}px`, maxWidth: `${colWidths.time}px` }"
-                  class="relative py-2.5 px-3 border-r border-slate-400 text-[15px] font-bold"
-                >
-                  <span>动作时间</span>
-                  <div
-                    @mousedown.stop.prevent="startColResize('time', $event)"
-                    class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
-                    title="拖动调整列宽"
-                  ></div>
-                </th>
+              <!-- 动作时间 -->
+              <div
+                v-if="columnVisibility.time"
+                :style="{ width: `${colWidths.time}px`, minWidth: `${colWidths.time}px`, maxWidth: `${colWidths.time}px`, flexShrink: 0 }"
+                class="relative py-2.5 px-3 border-r border-slate-400 text-[15px] font-bold box-border"
+              >
+                <span>动作时间</span>
+                <div
+                  @mousedown.stop.prevent="startColResize('time', $event)"
+                  class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
+                  title="拖动调整列宽"
+                ></div>
+              </div>
 
-                <!-- 告警内容 (允许拖拽，表头与内容自适应，不允许缩写...) -->
-                <th
-                  v-if="columnVisibility.content"
-                  :style="{ width: `${colWidths.content}px`, minWidth: `${colWidths.content}px` }"
-                  class="relative py-2.5 px-4 text-[15px] font-bold text-slate-900 border-r border-slate-400"
-                >
-                  <span>告警完整内容</span>
-                  <div
-                    @mousedown.stop.prevent="startColResize('content', $event)"
-                    class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
-                    title="拖动调整列宽"
-                  ></div>
-                </th>
-              </tr>
-            </thead>
+              <!-- 告警内容 -->
+              <div
+                v-if="columnVisibility.content"
+                :style="{ flex: `1 1 ${colWidths.content}px`, minWidth: `${colWidths.content}px` }"
+                class="relative py-2.5 px-4 text-[15px] font-bold text-slate-900 border-r border-slate-400 box-border"
+              >
+                <span>告警完整内容</span>
+                <div
+                  @mousedown.stop.prevent="startColResize('content', $event)"
+                  class="absolute right-0 top-0 bottom-0 w-2.5 cursor-col-resize hover:bg-sky-500/50 active:bg-sky-600 transition-colors z-20"
+                  title="拖动调整列宽"
+                ></div>
+              </div>
+            </div>
+          </div>
 
-            <!-- 表体行 (虚拟切片渲染：严格锁定 36px 物理高度，顶底由 Spacer 撑开，消除抖动与白块) -->
-            <tbody>
-              <!-- 顶部占位 Spacer -->
-              <tr v-if="topSpacerHeight > 0" :style="{ height: `${topSpacerHeight}px`, maxHeight: `${topSpacerHeight}px` }">
-                <td :colspan="visibleColumnCount" class="p-0 m-0 border-0 pointer-events-none" :style="{ height: `${topSpacerHeight}px` }"></td>
-              </tr>
-
-              <!-- 视口可见真实行 (严格锁定 height: 36px，彻底消除高度跳变与抖动) -->
-              <tr
-                v-for="item in visibleAlarms"
+          <!-- 虚拟滚动视口容器 -->
+          <div
+            ref="tableContainerRef"
+            @scroll.passive="onTableScroll"
+            class="flex-1 overflow-auto bg-white relative"
+            style="scrollbar-gutter: stable; overflow-anchor: none;"
+          >
+            <div
+              v-if="filteredAlarms.length > 0"
+              :style="{
+                height: `${filteredAlarms.length * rowHeight}px`,
+                width: `${totalTableWidth}px`,
+                minWidth: '100%',
+                position: 'relative'
+              }"
+            >
+              <div
+                v-for="(item, localIdx) in visibleAlarms"
                 :key="item.seq_id"
                 @click="toggleSelectRow(item.seq_id)"
                 @dblclick="acknowledgeItem(item)"
                 @contextmenu="handleRowContextMenu($event, item)"
-                :style="{ height: '36px', minHeight: '36px', maxHeight: '36px' }"
-                class="cursor-pointer select-none text-[15px] font-bold h-[36px] box-border"
+                :style="{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: `${rowHeight}px`,
+                  transform: `translate3d(0, ${(startIndex + localIdx) * rowHeight}px, 0)`,
+                  contain: 'layout style paint'
+                }"
+                class="flex items-center cursor-pointer select-none text-[15px] font-bold box-border"
                 :class="[
                   selectedAlarmIds.has(item.seq_id)
                     ? 'bg-sky-200 text-slate-950 font-bold'
@@ -1538,11 +1386,11 @@ watch(() => props.visible, (val) => {
                       : 'bg-white hover:bg-slate-100 text-slate-800 font-bold'
                 ]"
               >
-                <!-- 状态 (未确认醒目提示 / 已确认静态) -->
-                <td
+                <!-- 状态 -->
+                <div
                   v-if="columnVisibility.status"
-                  :style="{ width: `${colWidths.status}px`, minWidth: `${colWidths.status}px`, maxWidth: `${colWidths.status}px`, height: '36px' }"
-                  class="h-[36px] max-h-[36px] py-0 px-3 border-b border-r border-slate-300 text-center whitespace-nowrap text-[15px] font-bold overflow-hidden box-border leading-[36px]"
+                  :style="{ width: `${colWidths.status}px`, minWidth: `${colWidths.status}px`, maxWidth: `${colWidths.status}px`, height: '36px', flexShrink: 0 }"
+                  class="px-3 border-b border-r border-slate-300 text-center whitespace-nowrap text-[15px] font-bold overflow-hidden box-border leading-[36px]"
                 >
                   <div class="flex items-center justify-center gap-2 h-full">
                     <input
@@ -1560,120 +1408,113 @@ watch(() => props.visible, (val) => {
                       {{ item.confirm_desc }}
                     </span>
                   </div>
-                </td>
+                </div>
 
-                <!-- 级别 (受“告警字体是否着色”选项控制，默认不着色) -->
-                <td 
+                <!-- 级别 -->
+                <div
                   v-if="columnVisibility.level"
                   :style="[
-                    { width: `${colWidths.level}px`, minWidth: `${colWidths.level}px`, maxWidth: `${colWidths.level}px`, height: '36px' },
+                    { width: `${colWidths.level}px`, minWidth: `${colWidths.level}px`, maxWidth: `${colWidths.level}px`, height: '36px', flexShrink: 0 },
                     colorAlarmText ? { color: item.level_color } : {}
                   ]"
-                  class="h-[36px] max-h-[36px] py-0 px-3 border-b border-r border-slate-300 text-center whitespace-nowrap text-[15px] font-bold overflow-hidden box-border leading-[36px]"
+                  class="px-3 border-b border-r border-slate-300 text-center whitespace-nowrap text-[15px] font-bold overflow-hidden box-border leading-[36px]"
                   :class="!colorAlarmText ? 'text-slate-900' : ''"
                 >
                   {{ item.level_name }}
-                </td>
+                </div>
 
                 <!-- 厂站中文名 -->
-                <td
+                <div
                   v-if="columnVisibility.station"
-                  :style="{ width: `${colWidths.station}px`, minWidth: `${colWidths.station}px`, maxWidth: `${colWidths.station}px`, height: '36px' }"
-                  class="h-[36px] max-h-[36px] py-0 px-3 border-b border-r border-slate-300 whitespace-nowrap text-[15px] font-bold text-slate-900 truncate box-border leading-[36px]"
+                  :style="{ width: `${colWidths.station}px`, minWidth: `${colWidths.station}px`, maxWidth: `${colWidths.station}px`, height: '36px', flexShrink: 0 }"
+                  class="px-3 border-b border-r border-slate-300 whitespace-nowrap text-[15px] font-bold text-slate-900 truncate box-border leading-[36px]"
                   :title="item.fac_name"
                 >
                   {{ item.fac_name }}
-                </td>
+                </div>
 
                 <!-- 间隔中文名 -->
-                <td
+                <div
                   v-if="columnVisibility.bay"
-                  :style="{ width: `${colWidths.bay}px`, minWidth: `${colWidths.bay}px`, maxWidth: `${colWidths.bay}px`, height: '36px' }"
-                  class="h-[36px] max-h-[36px] py-0 px-3 border-b border-r border-slate-300 whitespace-nowrap text-[15px] font-bold text-slate-900 truncate box-border leading-[36px]"
+                  :style="{ width: `${colWidths.bay}px`, minWidth: `${colWidths.bay}px`, maxWidth: `${colWidths.bay}px`, height: '36px', flexShrink: 0 }"
+                  class="px-3 border-b border-r border-slate-300 whitespace-nowrap text-[15px] font-bold text-slate-900 truncate box-border leading-[36px]"
                   :title="item.bay_name"
                 >
                   {{ item.bay_name }}
-                </td>
+                </div>
 
                 <!-- 设备中文名 -->
-                <td
+                <div
                   v-if="columnVisibility.device"
-                  :style="{ width: `${colWidths.device}px`, minWidth: `${colWidths.device}px`, maxWidth: `${colWidths.device}px`, height: '36px' }"
-                  class="h-[36px] max-h-[36px] py-0 px-3 border-b border-r border-slate-300 whitespace-nowrap text-[15px] font-bold text-slate-900 truncate box-border leading-[36px]"
+                  :style="{ width: `${colWidths.device}px`, minWidth: `${colWidths.device}px`, maxWidth: `${colWidths.device}px`, height: '36px', flexShrink: 0 }"
+                  class="px-3 border-b border-r border-slate-300 whitespace-nowrap text-[15px] font-bold text-slate-900 truncate box-border leading-[36px]"
                   :title="item.dev_name"
                 >
                   {{ item.dev_name }}
-                </td>
+                </div>
 
                 <!-- 测点中文名 -->
-                <td
+                <div
                   v-if="columnVisibility.key"
-                  :style="{ width: `${colWidths.key}px`, minWidth: `${colWidths.key}px`, maxWidth: `${colWidths.key}px`, height: '36px' }"
-                  class="h-[36px] max-h-[36px] py-0 px-3 border-b border-r border-slate-300 whitespace-nowrap text-[15px] font-bold text-slate-800 truncate box-border leading-[36px]"
+                  :style="{ width: `${colWidths.key}px`, minWidth: `${colWidths.key}px`, maxWidth: `${colWidths.key}px`, height: '36px', flexShrink: 0 }"
+                  class="px-3 border-b border-r border-slate-300 whitespace-nowrap text-[15px] font-bold text-slate-800 truncate box-border leading-[36px]"
                   :title="item.key_name"
                 >
                   {{ item.key_name }}
-                </td>
+                </div>
 
-                <!-- 动作物理语义 (分闸/断开 或 合闸/闭合 或 越上限，纯文本无小卡片，不附加字体颜色) -->
-                <td
+                <!-- 动作物理语义 -->
+                <div
                   v-if="columnVisibility.action"
-                  :style="{ width: `${colWidths.action}px`, minWidth: `${colWidths.action}px`, maxWidth: `${colWidths.action}px`, height: '36px' }"
-                  class="h-[36px] max-h-[36px] py-0 px-3 border-b border-r border-slate-300 text-center whitespace-nowrap text-[15px] font-bold text-slate-800 overflow-hidden box-border leading-[36px]"
+                  :style="{ width: `${colWidths.action}px`, minWidth: `${colWidths.action}px`, maxWidth: `${colWidths.action}px`, height: '36px', flexShrink: 0 }"
+                  class="px-3 border-b border-r border-slate-300 text-center whitespace-nowrap text-[15px] font-bold text-slate-800 overflow-hidden box-border leading-[36px]"
                 >
                   <span>{{ item.status_desc || item.val_desc }}</span>
-                </td>
+                </div>
 
-                <!-- 类型 (遥信变位/保护动作/事件SOE/厂站工况等) -->
-                <td
+                <!-- 类型 -->
+                <div
                   v-if="columnVisibility.type"
-                  :style="{ width: `${colWidths.type}px`, minWidth: `${colWidths.type}px`, maxWidth: `${colWidths.type}px`, height: '36px' }"
-                  class="h-[36px] max-h-[36px] py-0 px-3 border-b border-r border-slate-300 text-center whitespace-nowrap text-[15px] font-bold text-slate-800 overflow-hidden box-border leading-[36px]"
+                  :style="{ width: `${colWidths.type}px`, minWidth: `${colWidths.type}px`, maxWidth: `${colWidths.type}px`, height: '36px', flexShrink: 0 }"
+                  class="px-3 border-b border-r border-slate-300 text-center whitespace-nowrap text-[15px] font-bold text-slate-800 overflow-hidden box-border leading-[36px]"
                 >
                   {{ item.type_name }}
-                </td>
+                </div>
 
                 <!-- 动作时间 -->
-                <td
+                <div
                   v-if="columnVisibility.time"
-                  :style="{ width: `${colWidths.time}px`, minWidth: `${colWidths.time}px`, maxWidth: `${colWidths.time}px`, height: '36px' }"
-                  class="h-[36px] max-h-[36px] py-0 px-3 border-b border-r border-slate-300 whitespace-nowrap font-mono text-[15px] font-bold text-slate-800 overflow-hidden box-border leading-[36px]"
+                  :style="{ width: `${colWidths.time}px`, minWidth: `${colWidths.time}px`, maxWidth: `${colWidths.time}px`, height: '36px', flexShrink: 0 }"
+                  class="px-3 border-b border-r border-slate-300 whitespace-nowrap font-mono text-[15px] font-bold text-slate-800 overflow-hidden box-border leading-[36px]"
                 >
                   {{ item.time }}
-                </td>
+                </div>
 
-                <!-- 告警完整内容 (完整显示，不允许缩写为...，支持横向滚动，受“告警字体是否着色”选项控制) -->
-                <td
+                <!-- 告警完整内容 -->
+                <div
                   v-if="columnVisibility.content"
                   :style="[
-                    { width: `${colWidths.content}px`, minWidth: `${colWidths.content}px`, height: '36px' },
+                    { flex: `1 1 ${colWidths.content}px`, minWidth: `${colWidths.content}px`, height: '36px' },
                     colorAlarmText ? { color: item.level_color } : {}
                   ]"
-                  class="h-[36px] max-h-[36px] py-0 px-4 text-[15px] font-bold whitespace-nowrap overflow-visible border-b border-r border-slate-300 box-border leading-[36px]"
+                  class="px-4 text-[15px] font-bold whitespace-nowrap overflow-hidden border-b border-r border-slate-300 box-border leading-[36px]"
                   :class="!colorAlarmText ? 'text-slate-900' : ''"
                 >
                   {{ item.full_text || item.content }}
-                </td>
-              </tr>
+                </div>
+              </div>
+            </div>
 
-              <!-- 底部占位 Spacer -->
-              <tr v-if="bottomSpacerHeight > 0" :style="{ height: `${bottomSpacerHeight}px`, maxHeight: `${bottomSpacerHeight}px` }">
-                <td :colspan="visibleColumnCount" class="p-0 m-0 border-0 pointer-events-none" :style="{ height: `${bottomSpacerHeight}px` }"></td>
-              </tr>
-
-              <!-- 无数据占位行 -->
-              <tr v-if="filteredAlarms.length === 0">
-                <td :colspan="visibleColumnCount" class="py-16 text-center text-slate-500 font-bold text-[15px]">
-                  <div class="flex flex-col items-center justify-center gap-2">
-                    <span>暂无相关告警事件记录</span>
-                    <span v-if="filterStations.length || filterBays.length || filterDevices.length || shieldStations.length || shieldBays.length || shieldDevices.length" class="text-xs text-amber-700 font-normal">
-                      (当前过滤/屏蔽规则生效中，若需查看全量告警请在右侧面板点击“清除全部”)
-                    </span>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+            <!-- 无数据占位 -->
+            <div v-else class="py-16 text-center text-slate-500 font-bold text-[15px]">
+              <div class="flex flex-col items-center justify-center gap-2">
+                <span>暂无相关告警事件记录</span>
+                <span v-if="filterStations.length || filterBays.length || filterDevices.length || shieldStations.length || shieldBays.length || shieldDevices.length" class="text-xs text-amber-700 font-normal">
+                  (当前过滤/屏蔽规则生效中，若需查看全量告警请在右侧面板点击“清除全部”)
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- =================================================================== -->

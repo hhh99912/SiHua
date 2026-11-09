@@ -4,46 +4,63 @@
 
 @layer base {
   :root {
-    --scada-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "WenQuanYi Micro Hei", "WenQuanYi Zen Hei", "Noto Sans CJK SC", "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Source Han Sans SC", system-ui, sans-serif;
-    --scada-mono-family: 'JetBrains Mono', 'Chakra Petch', Consolas, 'Courier New', monospace;
+    /* 对齐 Qt/凝思系统的工业点阵与清晰微调字库：优先文泉驿微米黑/正黑、仿宋点阵、系统默认界面宋体与黑体，杜绝浮点渲染毛刺 */
+    --scada-font-family: "WenQuanYi Zen Hei", "WenQuanYi Micro Hei", "SimSun", "Songti SC", "Noto Sans CJK SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --scada-mono-family: 'JetBrains Mono', Consolas, 'Liberation Mono', 'Courier New', monospace;
   }
 
-  body {
+  /* 彻底对齐 Qt 原生纯灰度抗锯齿与几何精度，根除 Linux 与远程桌面 VNC/RDP 下的彩色毛刺与双线性模糊 */
+  *, *::before, *::after {
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+    text-rendering: optimizeLegibility !important;
+  }
+
+  html, body {
     background-color: #0b1322;
-    color: #cccf28;
+    color: #000000;
     font-family: var(--scada-font-family);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+    text-rendering: optimizeLegibility !important;
     font-feature-settings: "tnum" 1;
     font-variant-numeric: tabular-nums;
     overflow: hidden;
-    letter-spacing: 0.015em;
+    letter-spacing: 0.01em;
   }
 
-  /* 输入框、按钮、侧边栏、菜单、弹窗等全局字体标准清晰锐利 */
-  input, textarea, select, button, optgroup, option, label {
+  /* 输入框、按钮、侧边栏、菜单、弹窗、属性框、图元工坊等全局字体标准清晰锐利，纯黑高对比 */
+  input, textarea, select, button, optgroup, option, label, span, p, h1, h2, h3, h4, th, td {
     font-family: var(--scada-font-family);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+    text-rendering: optimizeLegibility !important;
   }
 
-  /* 左栏/顶栏/底栏菜单通用清晰度增强与字距微调 */
+  /* 左栏/顶栏/底栏菜单及所有弹窗子模块通用清晰度增强与字距微调 */
   .scada-menu-btn,
   .prs-menu-container button,
-  .prs-bottom-bar-item {
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
-    letter-spacing: 0.025em;
+  .prs-bottom-bar-item,
+  .scada-context-menu,
+  .scada-modal-body,
+  .property-inspector-panel {
+    font-family: var(--scada-font-family) !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+    text-rendering: geometricPrecision !important;
+    letter-spacing: 0.02em;
   }
 
-  /* SVG Text & Vector Rendering for Crisp Industrial Visuals */
-  svg text {
-    font-family: var(--scada-font-family);
-    text-rendering: geometricPrecision;
-    -webkit-font-smoothing: antialiased;
+  /* 图元组件内部文字与 SVG 矢量文字渲染：强制整数吸附，绝不模糊发虚 */
+  svg text,
+  .component-node text,
+  .component-node span,
+  .component-node p,
+  .component-node label {
+    font-family: var(--scada-font-family) !important;
+    text-rendering: geometricPrecision !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
   }
 
   svg {
@@ -69,9 +86,9 @@
   .font-tabular {
     font-family: var(--scada-mono-family) !important;
     font-variant-numeric: tabular-nums;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+    text-rendering: optimizeLegibility !important;
   }
 }
 

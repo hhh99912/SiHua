@@ -235,8 +235,9 @@ exec "$TARGET_BIN" \
   --disable-backgrounding-occluded-windows \
   --force-device-scale-factor=1 \
   --high-dpi-support=1 \
-  --font-render-hinting=full \
-  --enable-lcd-text \
+  --font-render-hinting=slight \
+  --disable-lcd-text \
+  --disable-font-subpixel-positioning \
   --enable-font-antialiasing \
   --disable-gpu-rasterization \
   --force-color-profile=srgb \

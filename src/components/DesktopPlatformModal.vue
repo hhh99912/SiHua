@@ -111,9 +111,9 @@ fi
 export GDK_SCALE=1
 export GDK_DPI_SCALE=1
 export SCADA_SCALE_FACTOR=1
-export SCADA_FONT_HINTING=medium
-export FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=1 type1:no-stem-darkening=1 autofitter:warping=1"
-exec ./ge-scada --no-sandbox --disable-gpu-sandbox --disable-dev-shm-usage --disable-renderer-backgrounding --disable-background-timer-throttling --disable-backgrounding-occluded-windows --force-device-scale-factor=1 --high-dpi-support=1 --font-render-hinting=medium --enable-lcd-text --enable-font-antialiasing --disable-features=CanvasOopRasterization,UseSkiaRendererByDefaultForOOPR --disable-gpu-rasterization --force-color-profile=srgb "$@"
+export SCADA_FONT_HINTING=slight
+export FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=0 type1:no-stem-darkening=0 autofitter:warping=0"
+exec ./ge-scada --no-sandbox --disable-gpu-sandbox --disable-dev-shm-usage --disable-renderer-backgrounding --disable-background-timer-throttling --disable-backgrounding-occluded-windows --force-device-scale-factor=1 --high-dpi-support=1 --font-render-hinting=slight --disable-lcd-text --disable-font-subpixel-positioning --enable-font-antialiasing --disable-features=CanvasOopRasterization,UseSkiaRendererByDefaultForOOPR --disable-gpu-rasterization --force-color-profile=srgb "$@"
 EOF
 chmod +x run-crisp.sh
 ./run-crisp.sh`
@@ -244,7 +244,7 @@ const copyCommand = (cmd: string, index: number | string) => {
 <template>
   <div 
     v-if="visible"
-    class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-6 select-none font-sans"
+    class="fixed inset-0 bg-black/85 backdrop-blur-md z-[999999] flex items-center justify-center p-6 select-none font-sans"
     @click.self="emit('close')"
   >
     <div class="w-full max-w-3xl bg-[#060c18] border border-cyan-500/40 rounded-2xl shadow-[0_20px_70px_rgba(0,0,0,0.9)] flex flex-col max-h-[90vh] overflow-hidden">

@@ -34,12 +34,36 @@ const apiBridge = {
   closeStartMenu: () => ipcRenderer.invoke('scada:close-start-menu'),
   toggleUserMenu: () => ipcRenderer.invoke('scada:toggle-user-menu'),
   closeUserMenu: () => ipcRenderer.invoke('scada:close-user-menu'),
+  openLogin: () => ipcRenderer.invoke('scada:open-login'),
+  closeLogin: () => ipcRenderer.invoke('scada:close-login'),
+  userLoggedIn: (user: any) => ipcRenderer.invoke('scada:user-logged-in', safePojo(user)),
+  onUserUpdated: (callback: (user: any) => void) => {
+    const handler = (_e: any, user: any) => callback(user);
+    ipcRenderer.on('scada:user-updated', handler);
+    return () => {
+      ipcRenderer.removeListener('scada:user-updated', handler);
+    };
+  },
   sendUserAction: (action: string) => ipcRenderer.invoke('scada:user-action', String(action)),
   onUserAction: (callback: (action: string) => void) => {
     const handler = (_e: any, action: string) => callback(action);
     ipcRenderer.on('scada:user-action', handler);
     return () => {
       ipcRenderer.removeListener('scada:user-action', handler);
+    };
+  },
+  onFullscreenState: (callback: (isFull: boolean) => void) => {
+    const handler = (_e: any, isFull: boolean) => callback(isFull);
+    ipcRenderer.on('scada:fullscreen-state', handler);
+    return () => {
+      ipcRenderer.removeListener('scada:fullscreen-state', handler);
+    };
+  },
+  onScreensUpdated: (callback: (info: { screenId?: string; screenName?: string }) => void) => {
+    const handler = (_e: any, info: any) => callback(info);
+    ipcRenderer.on('scada:screens-updated', handler);
+    return () => {
+      ipcRenderer.removeListener('scada:screens-updated', handler);
     };
   },
   notifyAppReady: () => ipcRenderer.send('app:renderer-ready'),

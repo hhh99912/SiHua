@@ -622,7 +622,7 @@ const previewComponent = computed<ScreenComponent | null>(() => {
               <!-- 子分类下的图元列表 (鼠标悬浮即时显示右侧纯图形预览) -->
               <div 
                 v-show="expandedNodes[sub.id] !== false"
-                class="ml-4 pl-3 border-l-2 border-[#cfc5b0]/60 space-y-0.5 my-1 mr-2"
+                class="ml-4 pl-3 border-l border-dashed border-[#8c826d] space-y-0.5 my-1 mr-2"
               >
                 <div
                   v-for="item in sub.items"
@@ -632,12 +632,12 @@ const previewComponent = computed<ScreenComponent | null>(() => {
                   @mouseenter="handleItemMouseEnter($event, item.def)"
                   @mouseleave="handleItemMouseLeave"
                   @click="handleItemClick(item.def)"
-                  class="group w-full px-2 py-1.5 hover:bg-[#ded5bf] rounded transition-colors cursor-pointer flex items-center justify-between gap-2"
-                  :class="{ 'bg-[#ded5bf] text-sky-800 font-medium': previewModal.visible && previewModal.def?.name === item.def.name }"
+                  class="group w-full px-2 py-1.5 hover:bg-[#ded5bf] rounded transition-colors cursor-pointer flex items-center justify-between gap-2 relative"
+                  :class="{ 'bg-[#ded5bf] text-sky-800 font-semibold': previewModal.visible && previewModal.def?.name === item.def.name }"
                   :title="item.def.description || item.def.name"
                 >
                   <div class="flex items-center min-w-0 flex-1">
-                    <span class="text-[13px] font-normal text-slate-800 group-hover:text-sky-800 truncate tracking-wide">
+                    <span class="text-[13.5px] font-medium text-black group-hover:text-sky-950 truncate tracking-wide">
                       {{ item.def.name }}
                     </span>
                   </div>
@@ -649,7 +649,7 @@ const previewComponent = computed<ScreenComponent | null>(() => {
                     >
                       <Plus class="w-3.5 h-3.5" />
                     </button>
-                    <GripVertical class="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 shrink-0" />
+                    <GripVertical class="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700 shrink-0" />
                   </div>
                 </div>
               </div>
@@ -658,7 +658,7 @@ const previewComponent = computed<ScreenComponent | null>(() => {
 
           <!-- B. 常规未分二级子组列表 (同样支持鼠标悬浮预览) -->
           <template v-else>
-            <div class="ml-6 pl-4 border-l-2 border-[#cfc5b0]/70 space-y-0.5 my-1 mr-2">
+            <div class="ml-6 pl-4 border-l border-dashed border-[#8c826d] space-y-0.5 my-1 mr-2">
               <div
                 v-for="item in branch.items"
                 :key="item.key"
@@ -668,12 +668,12 @@ const previewComponent = computed<ScreenComponent | null>(() => {
                 @mouseleave="handleItemMouseLeave"
                 @click="handleItemClick(item.def)"
                 class="group w-full px-2.5 py-1.5 hover:bg-[#e4dcce] rounded transition-colors cursor-pointer flex items-center justify-between gap-2"
-                :class="{ 'bg-[#e4dcce] text-sky-800 font-medium': previewModal.visible && previewModal.def?.name === item.def.name }"
+                :class="{ 'bg-[#e4dcce] text-sky-800 font-semibold': previewModal.visible && previewModal.def?.name === item.def.name }"
                 :title="item.def.description || item.def.name"
               >
                 <!-- 左侧：图元名称 -->
                 <div class="flex items-center min-w-0 flex-1">
-                  <span class="text-[13.5px] font-normal text-slate-800 group-hover:text-sky-800 truncate tracking-wide">
+                  <span class="text-[13.5px] font-medium text-black group-hover:text-sky-950 truncate tracking-wide">
                     {{ item.def.name }}
                   </span>
                 </div>

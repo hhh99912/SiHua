@@ -299,10 +299,10 @@ const handleResetPresets = async () => {
       v-if="visible"
       class="fixed inset-0 z-[9999] pointer-events-none select-none font-sans"
     >
-      <!-- 统一数据关联弹框风格：纯黑背景、硬质深灰边框、纯白高对比字体、支持拖动 -->
+      <!-- 统一凝思工控米白质感风格：纯正米白背景、工控立体灰边框、纯黑高对比字体、支持拖动 -->
       <div
         ref="modalRef"
-        class="pointer-events-auto absolute bg-black text-white rounded-lg border border-neutral-700 shadow-2xl flex flex-col overflow-hidden"
+        class="pointer-events-auto absolute bg-[#ebe4d4] text-black border-2 border-[#8c826d] shadow-2xl flex flex-col overflow-hidden"
         :style="{
           left: `${modalPos.x}px`,
           top: `${modalPos.y}px`,
@@ -312,22 +312,22 @@ const handleResetPresets = async () => {
       >
         <!-- Modal Header -->
         <header
-          class="h-12 px-4 bg-[#111111] border-b border-[#2a2a2a] flex items-center justify-between shrink-0 cursor-move"
+          class="h-11 px-3.5 bg-[#e5decb] border-b border-[#cfc5b0] flex items-center justify-between shrink-0 cursor-move text-black"
           @mousedown="onHeaderMouseDown"
           @dblclick="toggleMaximize"
         >
           <div class="flex items-center gap-2.5">
-            <HardDrive class="w-4 h-4 text-white" />
-            <h3 class="text-sm font-bold text-white tracking-wide flex items-center gap-2">
+            <HardDrive class="w-4 h-4 text-sky-800" />
+            <h3 class="text-sm font-bold text-black tracking-wide flex items-center gap-2">
               <span>磁盘文件管理</span>
-              <span class="text-xs px-2 py-0.5 rounded bg-neutral-800 border border-neutral-600 text-white font-mono">graph/ 独立目录</span>
+              <span class="text-xs px-2 py-0.5 bg-[#d4caaf] border border-[#b8ad96] text-black font-mono">graph/ 独立目录</span>
             </h3>
           </div>
 
           <div class="flex items-center gap-1">
             <button
               type="button"
-              class="p-1.5 text-white hover:bg-neutral-800 rounded transition-colors cursor-pointer"
+              class="p-1.5 text-slate-700 hover:text-black hover:bg-[#ded5bf] border border-transparent hover:border-[#cfc5b0] transition-colors cursor-pointer"
               :title="isMaximized ? '向下还原' : '最大化'"
               @click.stop="toggleMaximize"
             >
@@ -336,7 +336,7 @@ const handleResetPresets = async () => {
             </button>
             <button
               type="button"
-              class="p-1.5 text-white hover:bg-neutral-800 rounded transition-colors cursor-pointer"
+              class="p-1.5 text-slate-700 hover:text-black hover:bg-[#ded5bf] border border-transparent hover:border-[#cfc5b0] transition-colors cursor-pointer"
               title="关闭"
               @click.stop="emit('close')"
             >
@@ -346,48 +346,48 @@ const handleResetPresets = async () => {
         </header>
 
         <!-- Modal Body -->
-        <div class="p-4 bg-[#0a0a0a] flex-1 min-h-0 flex flex-col gap-3 overflow-hidden text-white">
+        <div class="p-3.5 bg-[#f2eee3] flex-1 min-h-0 flex flex-col gap-2.5 overflow-hidden text-black">
           <!-- Top Config Cards: 2-Column Responsive Grid -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 shrink-0">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 shrink-0">
             <!-- 1. Fixed Storage Directory Card -->
-            <div class="bg-[#121212] border border-[#2a2a2a] rounded-lg p-3 flex flex-col justify-between gap-1.5">
+            <div class="bg-[#ebe4d4] border border-[#cfc5b0] p-2.5 flex flex-col justify-between gap-1.5">
               <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2 text-xs font-bold text-white">
-                  <FolderOpen class="w-3.5 h-3.5 text-white" />
+                <div class="flex items-center gap-2 text-xs font-bold text-black">
+                  <FolderOpen class="w-3.5 h-3.5 text-sky-800" />
                   <span>存储路径 (独立 JSON 文件存储)</span>
                 </div>
                 <button
                   v-if="isElectron()"
                   @click="handleOpenStorageDirectory"
-                  class="flex items-center gap-1 px-2.5 py-0.5 rounded bg-neutral-800 hover:bg-neutral-700 border border-neutral-600 text-xs text-white font-bold cursor-pointer transition-colors"
+                  class="flex items-center gap-1 px-2 py-0.5 bg-[#dfd6bf] hover:bg-[#d4caaf] border border-[#b8ad96] text-xs text-black font-medium cursor-pointer transition-colors"
                 >
                   <span>在文件管理器打开</span>
                 </button>
               </div>
 
-              <div class="flex items-center gap-2 bg-[#181818] px-2.5 py-1.5 rounded border border-[#2a2a2a] text-xs text-white break-all font-mono font-bold">
-                <span class="text-white shrink-0">graph/</span>
-                <span class="text-white truncate">{{ config.absolutePath }}</span>
+              <div class="flex items-center gap-2 bg-white px-2.5 py-1 border border-[#b8ad96] text-xs text-black break-all font-mono font-medium">
+                <span class="text-slate-600 shrink-0">graph/</span>
+                <span class="text-black truncate">{{ config.absolutePath }}</span>
               </div>
             </div>
 
             <!-- 2. Login Index Screen Configuration Card -->
-            <div class="bg-[#121212] border border-[#2a2a2a] rounded-lg p-3 flex flex-col justify-between gap-1.5">
+            <div class="bg-[#ebe4d4] border border-[#cfc5b0] p-2.5 flex flex-col justify-between gap-1.5">
               <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2 text-xs font-bold text-white">
-                  <Star class="w-3.5 h-3.5 text-white fill-white/20" />
+                <div class="flex items-center gap-2 text-xs font-bold text-black">
+                  <Star class="w-3.5 h-3.5 text-amber-600 fill-amber-500/20" />
                   <span>登录主索引工程配置</span>
                 </div>
-                <span class="text-[11px] text-white font-medium">
+                <span class="text-[11px] text-slate-600 font-medium">
                   登录成功后默认展示
                 </span>
               </div>
 
-              <div class="flex items-center gap-2 bg-[#181818] p-1 rounded border border-[#2a2a2a]">
+              <div class="flex items-center gap-1.5 bg-white p-1 border border-[#b8ad96]">
                 <select
                   v-model="selectedIndexScreenId"
                   @change="handleSetIndexScreen(selectedIndexScreenId)"
-                  class="flex-1 bg-[#121212] border border-neutral-700 rounded px-2.5 py-1 text-xs text-white focus:outline-none focus:border-white cursor-pointer font-sans font-bold"
+                  class="flex-1 bg-transparent border-0 px-2 py-0.5 text-xs text-black focus:outline-none cursor-pointer font-sans font-medium"
                 >
                   <option
                     v-for="s in screens"
@@ -399,7 +399,7 @@ const handleResetPresets = async () => {
                 </select>
                 <button
                   @click="handleSetIndexScreen(selectedIndexScreenId)"
-                  class="px-3 py-1 bg-white hover:bg-neutral-200 text-black rounded text-xs font-bold transition-colors cursor-pointer shrink-0"
+                  class="px-2.5 py-0.5 bg-[#dfd6bf] hover:bg-[#d4caaf] border border-[#b8ad96] text-black text-xs font-medium transition-colors cursor-pointer shrink-0"
                 >
                   设为登录首页
                 </button>
@@ -410,41 +410,41 @@ const handleResetPresets = async () => {
           <!-- 3. Status Notification Message -->
           <div
             v-if="statusMessage"
-            class="px-3 py-2 rounded-lg text-xs flex items-center gap-2 border font-medium shrink-0"
+            class="px-3 py-1.5 text-xs flex items-center gap-2 border font-medium shrink-0"
             :class="{
-              'bg-[#121f15] border-emerald-600 text-white font-bold': statusType === 'success',
-              'bg-[#221013] border-rose-600 text-white font-bold': statusType === 'error',
-              'bg-[#141414] border-neutral-600 text-white': statusType === 'info'
+              'bg-[#f0f9eb] border-[#67c23a] text-[#529b2e] font-bold': statusType === 'success',
+              'bg-[#fef0f0] border-[#f56c6c] text-[#c45656] font-bold': statusType === 'error',
+              'bg-[#f4f4f5] border-[#d3d4d6] text-slate-800': statusType === 'info'
             }"
           >
-            <Check v-if="statusType === 'success'" class="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-            <AlertCircle v-else-if="statusType === 'error'" class="w-3.5 h-3.5 text-rose-400 shrink-0" />
-            <Info v-else class="w-3.5 h-3.5 text-white shrink-0" />
-            <span class="flex-1 font-bold">{{ statusMessage }}</span>
+            <Check v-if="statusType === 'success'" class="w-3.5 h-3.5 text-[#67c23a] shrink-0" />
+            <AlertCircle v-else-if="statusType === 'error'" class="w-3.5 h-3.5 text-[#f56c6c] shrink-0" />
+            <Info v-else class="w-3.5 h-3.5 text-slate-600 shrink-0" />
+            <span class="flex-1">{{ statusMessage }}</span>
           </div>
 
           <!-- 4. Files List Container -->
-          <div class="flex-1 min-h-0 flex flex-col bg-[#121212] border border-[#2a2a2a] rounded-lg p-3 gap-2.5">
+          <div class="flex-1 min-h-0 flex flex-col bg-[#ebe4d4] border border-[#cfc5b0] p-2.5 gap-2">
             <!-- Files List Header with Search Filter -->
-            <div class="flex items-center justify-between text-xs font-bold text-white shrink-0">
+            <div class="flex items-center justify-between text-xs font-bold text-black shrink-0">
               <span class="flex items-center gap-2">
-                <FileJson class="w-4 h-4 text-white" />
+                <FileJson class="w-4 h-4 text-sky-800" />
                 <span>工程文件清单 (共 {{ config.files?.length || 0 }} 个，合规 {{ config.fileCount }} 个)</span>
               </span>
 
-              <div class="relative w-44">
-                <Search class="w-3.5 h-3.5 text-white absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <div class="relative w-48">
+                <Search class="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
                 <input
                   v-model="searchQuery"
                   type="text"
                   placeholder="搜索工程文件..."
-                  class="w-full bg-[#181818] border border-neutral-700 rounded pl-8 pr-2.5 py-1 text-xs text-white placeholder-neutral-400 focus:outline-none focus:border-white font-sans font-medium"
+                  class="w-full bg-white border border-[#b8ad96] pl-8 pr-2.5 py-1 text-xs text-black placeholder-slate-400 focus:outline-none focus:border-sky-600 font-sans font-medium"
                 />
               </div>
             </div>
 
             <!-- Table Wrapper -->
-            <div class="flex-1 min-h-0 border border-[#2a2a2a] rounded overflow-y-auto bg-black">
+            <div class="flex-1 min-h-0 border border-[#b8ad96] overflow-y-auto bg-white">
               <table class="w-full text-left text-xs border-collapse" style="table-layout: fixed;">
                 <colgroup>
                   <col style="width: auto;" />
@@ -453,60 +453,60 @@ const handleResetPresets = async () => {
                   <col style="width: 120px;" />
                   <col style="width: 90px;" />
                 </colgroup>
-                <thead class="bg-[#141414] text-white font-bold border-b border-[#2a2a2a] sticky top-0 z-10 h-9">
+                <thead class="bg-[#ebe4d4] text-black font-bold border-b border-[#b8ad96] sticky top-0 z-10 h-8">
                   <tr>
-                    <th class="py-2 px-3">文件名</th>
-                    <th class="py-2 px-3">检测状态</th>
-                    <th class="py-2 px-3">大小</th>
-                    <th class="py-2 px-3">主索引状态</th>
-                    <th class="py-2 px-3 text-right pr-4">操作</th>
+                    <th class="py-1.5 px-3">文件名</th>
+                    <th class="py-1.5 px-3">检测状态</th>
+                    <th class="py-1.5 px-3">大小</th>
+                    <th class="py-1.5 px-3">主索引状态</th>
+                    <th class="py-1.5 px-3 text-right pr-4">操作</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-[#1e1e1e] text-white font-medium">
+                <tbody class="divide-y divide-slate-200 text-black font-medium">
                   <tr
                     v-for="f in filteredFiles"
                     :key="f.filename"
-                    class="hover:bg-[#161616] transition-colors h-10"
+                    class="hover:bg-[#f8f5ee] transition-colors h-9"
                   >
-                    <td class="py-2 px-3 flex items-center gap-2 truncate">
-                      <FileJson class="w-3.5 h-3.5 text-white shrink-0" />
-                      <span class="font-bold text-white text-xs truncate">{{ f.filename }}</span>
+                    <td class="py-1.5 px-3 flex items-center gap-2 truncate">
+                      <FileJson class="w-3.5 h-3.5 text-sky-700 shrink-0" />
+                      <span class="font-medium text-black text-xs truncate">{{ f.filename }}</span>
                     </td>
-                    <td class="py-2 px-3">
+                    <td class="py-1.5 px-3">
                       <span
                         v-if="f.isValid"
-                        class="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded font-bold bg-neutral-800 border border-neutral-600 text-white"
+                        class="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.2 font-medium bg-[#f0f9eb] border border-[#67c23a] text-[#529b2e]"
                       >
-                        <ShieldCheck class="w-3 h-3 text-white" /> 合规
+                        <ShieldCheck class="w-3 h-3 text-[#67c23a]" /> 合规
                       </span>
                       <span
                         v-else
-                        class="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded font-bold bg-rose-950/80 border border-rose-500 text-rose-200"
+                        class="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.2 font-medium bg-[#fef0f0] border border-[#f56c6c] text-[#c45656]"
                         :title="f.reason || '文件格式异常'"
                       >
-                        <ShieldAlert class="w-3 h-3 text-rose-400" /> {{ f.reason || '格式异常' }}
+                        <ShieldAlert class="w-3 h-3 text-[#f56c6c]" /> {{ f.reason || '格式异常' }}
                       </span>
                     </td>
-                    <td class="py-2 px-3 text-[11px] font-mono font-bold text-white">
+                    <td class="py-1.5 px-3 text-[11px] font-mono text-slate-800">
                       {{ (f.sizeBytes / 1024).toFixed(1) }} KB
                     </td>
-                    <td class="py-2 px-3">
+                    <td class="py-1.5 px-3">
                       <span
                         v-if="f.screenName === config.indexScreen?.indexScreenName || f.screenName === indexScreenName"
-                        class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded font-bold bg-white text-black shadow-sm"
+                        class="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.2 font-bold bg-[#fff8e6] border border-[#e6a23c] text-[#b87a14]"
                       >
                         ★ 登录首页
                       </span>
-                      <span v-else class="text-[11px] text-white font-bold">-</span>
+                      <span v-else class="text-[11px] text-slate-400 font-medium">-</span>
                     </td>
-                    <td class="py-2 px-3 text-right pr-4">
+                    <td class="py-1.5 px-3 text-right pr-4">
                       <button
                         v-if="f.isValid && f.screenName !== config.indexScreen?.indexScreenName"
                         @click="() => {
                           const target = screens.find(s => s.name === f.screenName);
                           if (target) handleSetIndexScreen(target.id);
                         }"
-                        class="px-2.5 py-0.5 rounded bg-neutral-800 hover:bg-neutral-700 text-white text-[11px] font-bold transition-colors cursor-pointer border border-neutral-600"
+                        class="px-2 py-0.5 bg-[#f2eee3] hover:bg-[#e4dcce] text-black text-[11px] font-medium transition-colors cursor-pointer border border-[#b8ad96]"
                       >
                         设为首页
                       </button>
@@ -514,7 +514,7 @@ const handleResetPresets = async () => {
                   </tr>
 
                   <tr v-if="!filteredFiles || filteredFiles.length === 0">
-                    <td colspan="5" class="py-12 text-center text-white text-xs font-medium">
+                    <td colspan="5" class="py-10 text-center text-slate-500 text-xs font-medium">
                       {{ searchQuery ? '未找到匹配的工程文件' : 'graph 目录下暂无文件' }}
                     </td>
                   </tr>
@@ -525,24 +525,24 @@ const handleResetPresets = async () => {
         </div>
 
         <!-- Modal Footer Action Bar -->
-        <footer class="h-13 px-5 bg-[#111111] border-t border-[#2a2a2a] flex items-center justify-between shrink-0">
+        <footer class="h-12 px-4 bg-[#e5decb] border-t border-[#cfc5b0] flex items-center justify-between shrink-0 text-black">
           <div class="flex items-center gap-2">
             <button
               type="button"
               @click="handleResetPresets"
-              class="px-3.5 py-1.5 rounded bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-white text-xs font-bold transition-colors cursor-pointer"
+              class="px-3 py-1 bg-[#dfd6bf] hover:bg-[#d4caaf] border border-[#b8ad96] text-black text-xs font-medium transition-colors cursor-pointer"
               title="在 graph 目录下生成/恢复系统预设的标准工程 JSON 文件"
             >
               <span>重置预设工程文件</span>
             </button>
           </div>
 
-          <div class="flex items-center gap-2.5">
+          <div class="flex items-center gap-2">
             <button
               type="button"
               @click="handleReloadFromDisk"
               :disabled="isReloading"
-              class="flex items-center gap-1.5 px-3.5 py-1.5 rounded bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+              class="flex items-center gap-1.5 px-3 py-1 bg-[#dfd6bf] hover:bg-[#d4caaf] border border-[#b8ad96] text-black text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
               title="从 graph 目录重新读取并载入合规 JSON 工程文件"
             >
               <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isReloading }" />
@@ -553,7 +553,7 @@ const handleResetPresets = async () => {
               type="button"
               @click="handleSaveCurrentToDisk"
               :disabled="isSavingCurrent"
-              class="flex items-center gap-1.5 px-4 py-1.5 rounded bg-white hover:bg-neutral-200 text-black text-xs font-bold transition-colors cursor-pointer shadow-sm disabled:opacity-50"
+              class="flex items-center gap-1.5 px-3.5 py-1 bg-sky-700 hover:bg-sky-800 border border-sky-950 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
               :title="`仅保存当前选中的工程「${currentActiveScreen?.name}」到对应 JSON 文件`"
             >
               <Save class="w-3.5 h-3.5" :class="{ 'animate-spin': isSavingCurrent }" />
@@ -563,7 +563,7 @@ const handleResetPresets = async () => {
             <button
               type="button"
               @click="emit('close')"
-              class="px-4 py-1.5 rounded bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-white text-xs font-bold transition-colors cursor-pointer"
+              class="px-3.5 py-1 bg-[#dfd6bf] hover:bg-[#d4caaf] border border-[#b8ad96] text-black text-xs font-medium transition-colors cursor-pointer"
             >
               关闭
             </button>

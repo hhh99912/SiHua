@@ -82,7 +82,7 @@ const textFontWeight = computed(() => {
 });
 
 const textFontFamily = computed(() => {
-  return style.value.fontFamily || "'Noto Sans SC', 'Noto Sans CJK SC', 'Source Han Sans SC', 'WenQuanYi Micro Hei', 'Microsoft YaHei', 'PingFang SC', 'SimHei', system-ui, -apple-system, sans-serif";
+  return style.value.fontFamily || "var(--scada-font-family), 'WenQuanYi Zen Hei', 'WenQuanYi Micro Hei', 'SimSun', 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif";
 });
 
 const textAlign = computed(() => {

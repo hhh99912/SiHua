@@ -71,12 +71,18 @@ if (process.platform === 'linux') {
   app.commandLine.appendSwitch('high-dpi-support', '1');
   app.commandLine.appendSwitch('force-color-profile', 'srgb');
 
-  // 3. 字体清晰度与 FreeType 亚像素渲染 (针对 96 DPI VGA 屏幕深度调优)
+  // 3. 彻底对标 Qt 原生工业渲染引擎 (解决凝思本地及远程桌面 VNC/RDP 毛刺与模糊的核心技术方案)
+  // 核心机理：Qt 在 Linux 下默认采用纯灰度抗锯齿 (Grayscale Antialiasing) 与整数物理像素对齐，
+  // 绝不开启 LCD RGB 次像素彩边渲染。
+  // 远程桌面 (VNC/RDP/XRDP/SPICE) 使用 JPEG/H.264 视频流编码并采用 YUV 4:2:0 颜色下采样，
+  // 次像素红蓝伪彩边会被压缩算法严重劣化为脏斑和彩色毛刺；
+  // 因此彻底禁用 LCD 彩色次像素，切换为高精度纯净灰度抗锯齿，使字形在远程压缩下依然如 Qt 般极其干净锐利！
   app.commandLine.appendSwitch('enable-font-antialiasing');
-  app.commandLine.appendSwitch('enable-lcd-text'); // 开启 LCD RGB 次像素文字微调，消除灰度抗锯齿导致的字体发虚发灰
+  app.commandLine.appendSwitch('disable-lcd-text'); // 彻底关闭 LCD RGB 次像素，消除远程桌面红蓝毛刺
+  app.commandLine.appendSwitch('disable-font-subpixel-positioning'); // 消除亚像素浮点排版，让文字字形与 Qt 一样严格吸附于整数物理像素网格
   
-  // 关键：Linux 96 DPI 屏幕下，full hinting 将汉字横平竖直笔画对齐到物理屏幕整数像素，彻底消除未放大时的发虚
-  const hintingMode = process.env.SCADA_FONT_HINTING || 'full';
+  // 字体微调采用 slight 模式：保留矢量字形原貌，消除 full hinting 强制对齐带来的笔画粗细不均与断笔毛刺
+  const hintingMode = process.env.SCADA_FONT_HINTING || 'slight';
   app.commandLine.appendSwitch('font-render-hinting', hintingMode);
 
   // 4. 显卡与图形光栅化调优 (严格适配 Intel 2代核显 i915 / Linux 4.9 内核稳定防护)
@@ -339,9 +345,28 @@ const moduleWindows = new Map<string, BrowserWindow>();
 let daemonBarWindow: BrowserWindow | null = null;
 let startMenuWindow: BrowserWindow | null = null;
 let userMenuWindow: BrowserWindow | null = null;
+let isGlobalScadaFullscreen = false;
+
+// 锁定点对点物理 1:1 像素直出，防止 Chromium 偶发缩放导致双线性插值全屏模糊与毛刺
+function lockCrispDisplay(win: BrowserWindow) {
+  try {
+    win.webContents.on('did-finish-load', () => {
+      try {
+        win.webContents.setVisualZoomLevelLimits(1, 1);
+        win.webContents.setZoomFactor(1);
+      } catch {}
+    });
+    win.webContents.on('zoom-changed', () => {
+      try {
+        win.webContents.setZoomLevel(0);
+      } catch {}
+    });
+  } catch {}
+}
 
 // 统一的页面 URL 加载器，在开发环境优先直连 Vite 端口，打包后加载 dist/index.html
 function loadAppUrl(win: BrowserWindow, queryParams?: Record<string, string>) {
+  lockCrispDisplay(win);
   const queryStr = queryParams ? '?' + new URLSearchParams(queryParams).toString() : '';
   const devUrl = process.env.VITE_DEV_SERVER_URL || (isDev ? 'http://localhost:3000' : '');
 
@@ -400,10 +425,21 @@ function createDaemonBarWindow(): BrowserWindow {
 
   Menu.setApplicationMenu(null);
   crashMonitor.attachWindow(daemonBarWindow);
+  daemonBarWindow.setAlwaysOnTop(true, 'screen-saver');
+  daemonBarWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
   daemonBarWindow.once('ready-to-show', () => {
     daemonBarWindow?.setSkipTaskbar(true);
+    daemonBarWindow?.setAlwaysOnTop(true, 'screen-saver');
     daemonBarWindow?.show();
+    daemonBarWindow?.moveTop();
+  });
+
+  daemonBarWindow.on('blur', () => {
+    if (daemonBarWindow && !daemonBarWindow.isDestroyed() && daemonBarWindow.isVisible()) {
+      daemonBarWindow.setAlwaysOnTop(true, 'screen-saver');
+      daemonBarWindow.moveTop();
+    }
   });
 
   daemonBarWindow.on('closed', () => {
@@ -426,7 +462,7 @@ function createStartMenuWindow(): BrowserWindow {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { height: screenHeight } = primaryDisplay.bounds;
   const menuWidth = 240;
-  const menuHeight = 420;
+  const menuHeight = 350;
   const barHeight = 44;
 
   startMenuWindow = new BrowserWindow({
@@ -453,11 +489,15 @@ function createStartMenuWindow(): BrowserWindow {
   });
 
   Menu.setApplicationMenu(null);
-  startMenuWindow.setAlwaysOnTop(true, 'pop-up-menu');
+  startMenuWindow.setAlwaysOnTop(true, 'screen-saver');
 
-  // 失去焦点时自动收起菜单
+  // 失去焦点时延迟收起菜单，避免 Linux X11 点击瞬间焦点切换导致吞掉首次点击
   startMenuWindow.on('blur', () => {
-    startMenuWindow?.hide();
+    setTimeout(() => {
+      if (startMenuWindow && !startMenuWindow.isDestroyed() && !startMenuWindow.isFocused()) {
+        startMenuWindow.hide();
+      }
+    }, 120);
   });
 
   loadAppUrl(startMenuWindow, { mode: 'start-menu' });
@@ -501,7 +541,7 @@ function createUserMenuWindow(): BrowserWindow {
   });
 
   Menu.setApplicationMenu(null);
-  userMenuWindow.setAlwaysOnTop(true, 'pop-up-menu');
+  userMenuWindow.setAlwaysOnTop(true, 'screen-saver');
 
   // 失去焦点时自动收起用户菜单
   userMenuWindow.on('blur', () => {
@@ -512,8 +552,11 @@ function createUserMenuWindow(): BrowserWindow {
   return userMenuWindow;
 }
 
+let isAppQuitting = false;
+
 // 退出总管进程：推掉所有子进程并彻底退出系统
 function exitAllScadaProcesses() {
+  isAppQuitting = true;
   if (startMenuWindow && !startMenuWindow.isDestroyed()) {
     startMenuWindow.destroy();
     startMenuWindow = null;
@@ -535,39 +578,93 @@ function exitAllScadaProcesses() {
   app.quit();
 }
 
-function openModuleWindow(moduleId: string): BrowserWindow {
-  if (startMenuWindow && !startMenuWindow.isDestroyed()) {
-    startMenuWindow.hide();
+// 凝思 X11 窗口置顶与焦点抢占强化：突破 X11 焦点窃取防护 (Focus Stealing Prevention)，确保新开或切换的子模块窗口真实跃升到当前活动窗口之上
+function bringModuleWindowToFront(win: BrowserWindow) {
+  if (!win || win.isDestroyed()) return;
+  try {
+    win.setSkipTaskbar(false);
+    if (win.isMinimized()) win.restore();
+
+    if (process.platform === 'linux') {
+      win.setAlwaysOnTop(true);
+    }
+
+    win.show();
+    win.moveTop();
+    app.focus({ steal: true });
+    win.focus();
+
+    if (isGlobalScadaFullscreen || !win.isMaximized()) {
+      win.maximize();
+    }
+
+    if (isGlobalScadaFullscreen) {
+      win.webContents.send('scada:fullscreen-state', true);
+    }
+
+    if (process.platform === 'linux') {
+      setTimeout(() => {
+        if (win && !win.isDestroyed()) {
+          win.setAlwaysOnTop(false);
+          win.moveTop();
+          win.focus();
+        }
+        if (daemonBarWindow && !daemonBarWindow.isDestroyed() && daemonBarWindow.isVisible()) {
+          daemonBarWindow.setAlwaysOnTop(true, 'screen-saver');
+          daemonBarWindow.moveTop();
+        }
+      }, 60);
+    }
+  } catch (err) {
+    console.warn('[SCADA] bringModuleWindowToFront warning:', err);
   }
-  if (userMenuWindow && !userMenuWindow.isDestroyed()) {
-    userMenuWindow.hide();
+}
+
+function openModuleWindow(moduleId: string, silentBackground = false): BrowserWindow {
+  if (!silentBackground) {
+    if (startMenuWindow && !startMenuWindow.isDestroyed()) {
+      startMenuWindow.hide();
+    }
+    if (userMenuWindow && !userMenuWindow.isDestroyed()) {
+      userMenuWindow.hide();
+    }
   }
 
   const existing = moduleWindows.get(moduleId);
   if (existing && !existing.isDestroyed()) {
-    if (existing.isMinimized()) existing.restore();
-    existing.maximize();
-    existing.show();
-    existing.focus();
+    if (!silentBackground) {
+      bringModuleWindowToFront(existing);
+    }
     return existing;
   }
 
+  const { screen } = require('electron');
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const workArea = primaryDisplay.workArea || primaryDisplay.bounds;
+
   const conf = MODULE_CONFIGS[moduleId] || {
     title: moduleId,
-    width: 1600,
-    height: 960
+    width: workArea.width,
+    height: workArea.height
   };
 
+  const targetBg = moduleId === 'graphic-editor' ? '#0b132b' : '#080f1e';
+
+  // 核心优化：初始窗口尺寸直接采用全屏工作区尺寸，并且背景设为与子模块主题完全一致的深色，
+  // 彻底根除浅色/白色闪烁以及窗口最初显示为较小矩形随后被 maximize 撑大的跳跃效果
   const win = new BrowserWindow({
-    width: conf.width,
-    height: conf.height,
+    x: workArea.x,
+    y: workArea.y,
+    width: workArea.width,
+    height: workArea.height,
     minWidth: conf.minWidth || 900,
     minHeight: conf.minHeight || 600,
     title: conf.title, // 核心：严格为子模块中文名称，在凝思系统应用面板显示为'监控运行'、'图形编辑'等
     frame: true, // 凝思系统原生窗口标题栏与操作按键
     autoHideMenuBar: true,
-    backgroundColor: '#080f1e',
+    backgroundColor: targetBg, // 与子模块工作区底色严格一致，彻底杜绝白屏闪烁
     show: false,
+    paintWhenInitiallyHidden: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -582,21 +679,45 @@ function openModuleWindow(moduleId: string): BrowserWindow {
 
   crashMonitor.attachWindow(win);
 
-  const showWin = () => {
-    if (win && !win.isDestroyed() && !win.isVisible()) {
-      // 用户明确要求：每个子模块打开时默认最大化！
-      win.maximize();
-      win.show();
-      win.focus();
-    }
-  };
+  // 后台静默预启动模式（如全站告警后台常驻服务）：先隐藏任务栏图标，待用户点击打开时再显示
+  if (silentBackground) {
+    win.setSkipTaskbar(true);
+  } else {
+    let hasShown = false;
+    const showWin = () => {
+      if (hasShown) return;
+      if (win && !win.isDestroyed()) {
+        hasShown = true;
+        bringModuleWindowToFront(win);
+      }
+    };
 
-  win.once('ready-to-show', () => {
-    setTimeout(showWin, 50);
-  });
+    // 优先等待前端 DOM 装载与首帧提交，消除任何空白白屏过渡
+    win.webContents.once('did-finish-load', () => {
+      if (isGlobalScadaFullscreen) {
+        win.webContents.send('scada:fullscreen-state', true);
+      }
+      setTimeout(showWin, 80);
+    });
 
-  // 保底：即使 ready-to-show 触发受阻，在 1500ms 后强制呼出窗口
-  setTimeout(showWin, 1500);
+    win.once('ready-to-show', () => {
+      setTimeout(showWin, 100);
+    });
+
+    // 保底：即使 ready-to-show 触发受阻，在 1200ms 后强制呼出窗口
+    setTimeout(showWin, 1200);
+  }
+
+  // 全站告警窗口采用南瑞后台常驻机制：点击关闭按钮仅隐藏到后台继续 100ms 轮询记录，不销毁进程
+  if (moduleId === 'alarm-window') {
+    win.on('close', (e) => {
+      if (!isAppQuitting) {
+        e.preventDefault();
+        win.setSkipTaskbar(true);
+        win.hide();
+      }
+    });
+  }
 
   win.on('closed', () => {
     moduleWindows.delete(moduleId);
@@ -638,7 +759,7 @@ function setupIpcHandlers() {
     return openIds;
   });
 
-  // 向上弹出/隐藏系统菜单窗口 (解决底层44px窗口无法向外展示溢出菜单的难题)
+  // 向上弹出/隐藏系统菜单窗口 (解决底层44px窗口无法向外展示溢出菜单的难题，保证最上层显示)
   ipcMain.handle('scada:toggle-start-menu', () => {
     if (!startMenuWindow || startMenuWindow.isDestroyed()) {
       createStartMenuWindow();
@@ -650,15 +771,18 @@ function setupIpcHandlers() {
       const primaryDisplay = screen.getPrimaryDisplay();
       const { height: screenHeight } = primaryDisplay.bounds;
       const menuWidth = 240;
-      const menuHeight = 410;
+      const menuHeight = 420;
       const barHeight = 44;
       startMenuWindow.setBounds({
         x: 8,
-        y: screenHeight - barHeight - menuHeight - 6,
+        y: screenHeight - barHeight - menuHeight - 4,
         width: menuWidth,
         height: menuHeight
       });
+      startMenuWindow.setAlwaysOnTop(true, 'screen-saver');
+      startMenuWindow.moveTop();
       startMenuWindow.show();
+      app.focus({ steal: true });
       startMenuWindow.focus();
     }
     return { success: true };
@@ -671,7 +795,7 @@ function setupIpcHandlers() {
     return { success: true };
   });
 
-  // 向上弹出/隐藏用户菜单窗口 (最上层显示，不被44px底栏截断)
+  // 向上弹出/隐藏用户菜单窗口 (保证最上层显示，不被44px底栏截断)
   ipcMain.handle('scada:toggle-user-menu', () => {
     if (!userMenuWindow || userMenuWindow.isDestroyed()) {
       createUserMenuWindow();
@@ -691,6 +815,8 @@ function setupIpcHandlers() {
         width: menuWidth,
         height: menuHeight
       });
+      userMenuWindow.setAlwaysOnTop(true, 'screen-saver');
+      userMenuWindow.moveTop();
       userMenuWindow.show();
       userMenuWindow.focus();
     }
@@ -704,21 +830,88 @@ function setupIpcHandlers() {
     return { success: true };
   });
 
+  // 监听所有渲染进程首帧就绪通知，立即呈现窗口消除黑屏白屏
+  ipcMain.on('app:renderer-ready', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (!win || win.isDestroyed()) return;
+    // 系统菜单、用户菜单、总控底栏窗口绝不由 renderer-ready 自动最大化或弹出
+    if (win === startMenuWindow || win === userMenuWindow || win === daemonBarWindow) {
+      return;
+    }
+    if (!win.isVisible()) {
+      bringModuleWindowToFront(win);
+    }
+  });
+
+  ipcMain.handle('scada:open-login', () => {
+    // 广播 open:login 到当前焦点窗口或活动模块窗口，作为窗口内最上层普通弹框展示
+    let targetWin = BrowserWindow.getFocusedWindow();
+    if (!targetWin || targetWin === userMenuWindow || targetWin === startMenuWindow || targetWin === daemonBarWindow) {
+      targetWin = moduleWindows.get('monitor-screen') || moduleWindows.get('graphic-editor') || mainWindow;
+    }
+    if (targetWin && !targetWin.isDestroyed()) {
+      targetWin.webContents.send('scada:user-action', 'open:login');
+      targetWin.focus();
+    } else {
+      moduleWindows.forEach((w) => {
+        if (!w.isDestroyed()) w.webContents.send('scada:user-action', 'open:login');
+      });
+    }
+    return { success: true };
+  });
+
+  ipcMain.handle('scada:close-login', () => {
+    return { success: true };
+  });
+
+  ipcMain.handle('scada:user-logged-in', (_event, user: any) => {
+    if (daemonBarWindow && !daemonBarWindow.isDestroyed()) {
+      daemonBarWindow.webContents.send('scada:user-updated', user);
+    }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('scada:user-updated', user);
+    }
+    moduleWindows.forEach((win) => {
+      if (!win.isDestroyed()) {
+        win.webContents.send('scada:user-updated', user);
+      }
+    });
+    return { success: true };
+  });
+
   ipcMain.handle('scada:user-action', (_event, action: string) => {
     if (userMenuWindow && !userMenuWindow.isDestroyed()) {
       userMenuWindow.hide();
     }
-    if (daemonBarWindow && !daemonBarWindow.isDestroyed()) {
-      daemonBarWindow.webContents.send('scada:user-action', action);
-    }
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('scada:user-action', action);
-    }
-    moduleWindows.forEach((win) => {
-      if (!win.isDestroyed()) {
-        win.webContents.send('scada:user-action', action);
+    if (action === 'open:login') {
+      let targetWin = BrowserWindow.getFocusedWindow();
+      if (!targetWin || targetWin === userMenuWindow || targetWin === startMenuWindow || targetWin === daemonBarWindow) {
+        targetWin = moduleWindows.get('monitor-screen') || moduleWindows.get('graphic-editor') || mainWindow;
       }
-    });
+      if (targetWin && !targetWin.isDestroyed()) {
+        targetWin.webContents.send('scada:user-action', 'open:login');
+        targetWin.focus();
+      } else {
+        moduleWindows.forEach((w) => {
+          if (!w.isDestroyed()) w.webContents.send('scada:user-action', 'open:login');
+        });
+      }
+      return { success: true };
+    }
+    if (action === 'logout') {
+      if (daemonBarWindow && !daemonBarWindow.isDestroyed()) {
+        daemonBarWindow.webContents.send('scada:user-action', 'logout');
+      }
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('scada:user-action', 'logout');
+      }
+      moduleWindows.forEach((win) => {
+        if (!win.isDestroyed()) {
+          win.webContents.send('scada:user-action', 'logout');
+        }
+      });
+      return { success: true };
+    }
     return { success: true };
   });
 
@@ -740,12 +933,13 @@ function setupIpcHandlers() {
   });
 
   // Native Save File Dialog
-  ipcMain.handle('dialog:save-file', async (_event, payload: { data: string; defaultName?: string; filters?: any[] }) => {
-    if (!mainWindow) return { success: false, error: 'No active window' };
+  ipcMain.handle('dialog:save-file', async (event, payload: { data: string; defaultName?: string; filters?: any[] }) => {
+    const callerWin = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+    if (!callerWin) return { success: false, error: 'No active window' };
 
     const { defaultName = 'scada-project.json', filters = [{ name: 'JSON Project', extensions: ['json'] }] } = payload;
 
-    const result = await dialog.showSaveDialog(mainWindow, {
+    const result = await dialog.showSaveDialog(callerWin, {
       title: '导出大屏工程文件',
       defaultPath: defaultName,
       filters
@@ -764,12 +958,13 @@ function setupIpcHandlers() {
   });
 
   // Native Open File Dialog
-  ipcMain.handle('dialog:open-file', async (_event, payload?: { filters?: any[] }) => {
-    if (!mainWindow) return { success: false, error: 'No active window' };
+  ipcMain.handle('dialog:open-file', async (event, payload?: { filters?: any[] }) => {
+    const callerWin = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+    if (!callerWin) return { success: false, error: 'No active window' };
 
     const { filters = [{ name: 'SCADA JSON Project', extensions: ['json', 'txt'] }] } = payload || {};
 
-    const result = await dialog.showOpenDialog(mainWindow, {
+    const result = await dialog.showOpenDialog(callerWin, {
       title: '打开大屏工程文件',
       properties: ['openFile'],
       filters
@@ -789,35 +984,72 @@ function setupIpcHandlers() {
   });
 
   // Window Controls
-  ipcMain.handle('window:minimize', () => {
-    if (mainWindow) mainWindow.minimize();
+  ipcMain.handle('window:minimize', (event) => {
+    const callerWin = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+    if (callerWin && !callerWin.isDestroyed()) callerWin.minimize();
   });
 
-  ipcMain.handle('window:maximize', () => {
-    if (mainWindow) {
-      if (mainWindow.isMaximized()) {
-        mainWindow.unmaximize();
+  ipcMain.handle('window:maximize', (event) => {
+    const callerWin = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+    if (callerWin && !callerWin.isDestroyed()) {
+      if (callerWin.isMaximized()) {
+        callerWin.unmaximize();
       } else {
-        mainWindow.maximize();
+        callerWin.maximize();
       }
     }
   });
 
-  ipcMain.handle('window:is-maximized', () => {
-    return mainWindow ? mainWindow.isMaximized() : false;
+  ipcMain.handle('window:is-maximized', (event) => {
+    const callerWin = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+    return callerWin && !callerWin.isDestroyed() ? callerWin.isMaximized() : false;
   });
 
-  ipcMain.handle('window:close', () => {
-    if (mainWindow) mainWindow.close();
+  ipcMain.handle('window:close', (event) => {
+    const callerWin = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+    if (callerWin && !callerWin.isDestroyed()) callerWin.close();
   });
 
-  ipcMain.handle('window:toggle-fullscreen', () => {
-    if (mainWindow) {
-      const isFull = mainWindow.isFullScreen();
-      mainWindow.setFullScreen(!isFull);
-      return !isFull;
+  ipcMain.handle('window:toggle-fullscreen', (event) => {
+    isGlobalScadaFullscreen = !isGlobalScadaFullscreen;
+
+    const { screen } = require('electron');
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width: screenWidth, height: screenHeight } = primaryDisplay.bounds;
+    const barHeight = 44;
+
+    // 核心保证：总控底栏永远固定在最底部 (0, screenHeight - 44, screenWidth, 44)，且保持最上层显示
+    if (daemonBarWindow && !daemonBarWindow.isDestroyed()) {
+      daemonBarWindow.setBounds({
+        x: 0,
+        y: screenHeight - barHeight,
+        width: screenWidth,
+        height: barHeight
+      });
+      daemonBarWindow.setAlwaysOnTop(true, 'screen-saver');
+      daemonBarWindow.show();
     }
-    return false;
+
+    // 联动调整所有打开的子模块窗口，并广播全局全屏状态
+    moduleWindows.forEach((win) => {
+      if (!win.isDestroyed()) {
+        if (isGlobalScadaFullscreen) {
+          if (!win.isMaximized()) {
+            win.maximize();
+          }
+        }
+        win.webContents.send('scada:fullscreen-state', isGlobalScadaFullscreen);
+      }
+    });
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (isGlobalScadaFullscreen && !mainWindow.isMaximized()) {
+        mainWindow.maximize();
+      }
+      mainWindow.webContents.send('scada:fullscreen-state', isGlobalScadaFullscreen);
+    }
+
+    return isGlobalScadaFullscreen;
   });
 
   // External shell opener
@@ -1030,6 +1262,17 @@ function setupIpcHandlers() {
       };
 
       await fs.promises.writeFile(path.join(dir, newFname), JSON.stringify(data, null, 2), 'utf-8');
+      
+      // 核心 SCADA 跨模块同步：保存大屏后向所有子模块窗口广播画面更新通知
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('scada:screens-updated', { screenId: data.id, screenName: data.name });
+      }
+      moduleWindows.forEach((w) => {
+        if (!w.isDestroyed()) {
+          w.webContents.send('scada:screens-updated', { screenId: data.id, screenName: data.name });
+        }
+      });
+
       return { success: true, filename: newFname, storageDir: dir };
     } catch (err: any) {
       console.error('[Electron Main] 保存大屏发生异常:', err);
@@ -1740,10 +1983,40 @@ if (!gotTheLock) {
     // 1. 创建常驻系统底部的“总管底栏进程” (深瑞模式：常驻桌面底部，不遮挡凝思桌面，没有多余大窗口)
     createDaemonBarWindow();
 
-    // 2. 默认拉起“监控运行”子模块独立窗口
+    // 2. 后台静默预热系统菜单与用户菜单窗口 (内存预先解析完成，点击时即时瞬开，彻底杜绝等待过渡)
+    setTimeout(() => {
+      createStartMenuWindow();
+      createUserMenuWindow();
+    }, 150);
+
+    // 3. 默认拉起“监控运行”子模块独立窗口，并后台静默常驻启动“全站告警”采集进程
     setTimeout(() => {
       openModuleWindow('monitor-screen');
+      openModuleWindow('alarm-window', true);
     }, 450);
+
+    // 4. 凝思 X11 桌面防遮挡守护：确保总进程底栏永远处于所有桌面程序的最顶层
+    setInterval(() => {
+      if (daemonBarWindow && !daemonBarWindow.isDestroyed() && daemonBarWindow.isVisible()) {
+        daemonBarWindow.setAlwaysOnTop(true, 'screen-saver');
+        daemonBarWindow.moveTop();
+        if (startMenuWindow && !startMenuWindow.isDestroyed() && startMenuWindow.isVisible()) {
+          startMenuWindow.setAlwaysOnTop(true, 'screen-saver');
+          startMenuWindow.moveTop();
+        }
+        if (userMenuWindow && !userMenuWindow.isDestroyed() && userMenuWindow.isVisible()) {
+          userMenuWindow.setAlwaysOnTop(true, 'screen-saver');
+          userMenuWindow.moveTop();
+        }
+      }
+    }, 1000);
+
+    app.on('browser-window-focus', () => {
+      if (daemonBarWindow && !daemonBarWindow.isDestroyed() && daemonBarWindow.isVisible()) {
+        daemonBarWindow.setAlwaysOnTop(true, 'screen-saver');
+        daemonBarWindow.moveTop();
+      }
+    });
 
     app.on('activate', () => {
       if (!daemonBarWindow || daemonBarWindow.isDestroyed()) {
@@ -1753,6 +2026,7 @@ if (!gotTheLock) {
   });
 
   app.on('before-quit', () => {
+    isAppQuitting = true;
     crashMonitor.markCleanExit();
   });
 

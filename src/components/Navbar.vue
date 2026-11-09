@@ -70,7 +70,6 @@ import {
   Lightbulb,
   Network,
   PenTool,
-  LayoutGrid,
   Ruler as RulerIcon,
   Minus,
   Copy,
@@ -234,16 +233,18 @@ const basicGeometryTools = [
 ];
 
 // Fullscreen Control
-const isFullscreen = ref(typeof document !== 'undefined' && Boolean(document.fullscreenElement));
+const isFullscreen = ref(false);
 
 const handleFullscreenToggle = async () => {
   const state = await windowToggleFullscreen();
-  isFullscreen.value = typeof document !== 'undefined' ? Boolean(document.fullscreenElement) : state;
+  isFullscreen.value = Boolean(state);
 };
 
 const handleFullscreenChange = () => {
-  if (typeof document !== 'undefined') {
-    isFullscreen.value = Boolean(document.fullscreenElement);
+  if (typeof document !== 'undefined' && document.fullscreenElement !== undefined) {
+    if (document.fullscreenElement) {
+      isFullscreen.value = true;
+    }
   }
 };
 
@@ -254,16 +255,37 @@ const handleGlobalClick = (e: MouseEvent) => {
   }
 };
 
+const handleKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'F11') {
+    e.preventDefault();
+    handleFullscreenToggle();
+  }
+};
+
+let unlistenFullscreen: (() => void) | null = null;
+
 onMounted(() => {
   document.addEventListener('fullscreenchange', handleFullscreenChange);
   document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
   window.addEventListener('click', handleGlobalClick);
+  window.addEventListener('keydown', handleKeydown);
+
+  if (typeof window !== 'undefined' && (window as any).electronAPI?.onFullscreenState) {
+    unlistenFullscreen = (window as any).electronAPI.onFullscreenState((isFull: boolean) => {
+      isFullscreen.value = isFull;
+    });
+  }
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', handleFullscreenChange);
   document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
   window.removeEventListener('click', handleGlobalClick);
+  window.removeEventListener('keydown', handleKeydown);
+  if (unlistenFullscreen) {
+    unlistenFullscreen();
+    unlistenFullscreen = null;
+  }
 });
 
 // =========================================================================
@@ -609,24 +631,6 @@ const standardPalette = [
                 >
                   <FileSpreadsheet class="w-4.5 h-4.5 text-emerald-600" />
                   <span>综合运行报表</span>
-                </button>
-              </div>
-
-              <!-- 窗口布局管理 -->
-              <div class="py-1">
-                <button
-                  @click="emit('tile:windows'); closeMenus();"
-                  class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
-                >
-                  <LayoutGrid class="w-4.5 h-4.5 text-sky-600" />
-                  <span>平铺所有组态窗口</span>
-                </button>
-                <button
-                  @click="emit('cascade:windows'); closeMenus();"
-                  class="w-full px-3.5 py-2 text-left hover:bg-[#e4dcce] hover:text-sky-700 flex items-center gap-2.5 cursor-pointer"
-                >
-                  <Layers class="w-4.5 h-4.5 text-sky-600" />
-                  <span>层叠所有组态窗口</span>
                 </button>
               </div>
             </div>

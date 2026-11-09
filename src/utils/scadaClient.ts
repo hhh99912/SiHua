@@ -1935,22 +1935,75 @@ export interface ScadaRealtimeWarnItem {
 }
 
 export interface ScadaHistoryWarnItem {
+  index?: number;
   time: string;
-  timestamp: number;
+  timestamp?: number;
   msec?: number;
   table_no: number;
   table_name: string;
+  level?: number;
+  level_name?: string;
+  level_color?: string;
   content: string;
   alias?: string;
   fac_id?: number;
   bay_id?: number;
   dev_id?: number;
   key_id?: number;
+  fac_name?: string;
+  bay_name?: string;
+  dev_name?: string;
+  obj_name?: string;
   status?: number;
   val?: number;
   host?: string;
   operator?: string;
 }
+
+export interface ScadaWarnTreeMetaLevel {
+  id: number;
+  name: string;
+  color: string;
+}
+
+export interface ScadaWarnTreeMetaType {
+  table_no: number;
+  name: string;
+  group?: string;
+  standalone?: boolean;
+}
+
+export interface ScadaWarnTreeMeta {
+  levels: ScadaWarnTreeMetaLevel[];
+  types: ScadaWarnTreeMetaType[];
+}
+
+export const SCADA_HISTORY_LEVEL_DICT: ScadaWarnTreeMetaLevel[] = [
+  { id: 1, name: '提示信息', color: '#67C23A' },
+  { id: 2, name: '告警信息', color: '#E6A23C' },
+  { id: 3, name: '事故信息', color: '#FF0000' }
+];
+
+export const SCADA_HISTORY_TABLE_DICT: ScadaWarnTreeMetaType[] = [
+  { table_no: 43, name: '遥信变位', group: '量测与事件' },
+  { table_no: 44, name: '遥测越限', group: '量测与事件' },
+  { table_no: 55, name: '事件SOE', group: '量测与事件' },
+  { table_no: 362, name: '保护事件', group: '继电保护' },
+  { table_no: 364, name: '保护自诊断', group: '继电保护' },
+  { table_no: 365, name: '保护操作', group: '继电保护' },
+  { table_no: 50, name: '人工遥控', group: '遥控与人工操作' },
+  { table_no: 51, name: '人工遥调', group: '遥控与人工操作' },
+  { table_no: 47, name: '人工遥信封锁', group: '遥控与人工操作' },
+  { table_no: 48, name: '人工遥测封锁', group: '遥控与人工操作' },
+  { table_no: 49, name: '逻辑设备封锁', group: '遥控与人工操作' },
+  { table_no: 167, name: '人工置牌', group: '遥控与人工操作' },
+  { table_no: 45, name: '设备工况', group: '工况与系统审计' },
+  { table_no: 46, name: '结点工况', group: '工况与系统审计' },
+  { table_no: 310, name: '通道工况登录', group: '工况与系统审计' },
+  { table_no: 306, name: '用户事件登录', group: '工况与系统审计' },
+  { table_no: 258, name: '进程起停记录', group: '工况与系统审计' },
+  { table_no: 307, name: '其它应用告警', group: '工况与系统审计' }
+];
 
 export interface ScadaWarnReport {
   fac_name: string;
@@ -2220,52 +2273,102 @@ export async function clearScadaWarnCache(): Promise<{ success: boolean; error?:
 }
 
 /**
- * 6. 历史告警综合检索: POST /api/scada/warn/history
+ * 6.0 获取历史告警筛选面板元数据字典: GET /api/scada/warn/tree_meta
+ */
+export async function fetchScadaWarnTreeMeta(): Promise<{
+  success: boolean;
+  data?: ScadaWarnTreeMeta;
+  error?: string;
+}> {
+  const baseUrl = getScadaApiBaseUrl().replace(/\/+$/, '');
+  const url = baseUrl ? `${baseUrl}/api/scada/warn/tree_meta` : '/api/scada/warn/tree_meta';
+
+  try {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (json && json.code === 200 && json.data) {
+      return { success: true, data: json.data };
+    }
+    return { success: false, error: json?.msg || '获取历史告警元数据字典异常' };
+  } catch (err: any) {
+    return { success: false, error: err?.message || '网络连接异常' };
+  }
+}
+
+/**
+ * 6. 多维级联历史告警综合检索: POST /api/scada/warn/history
  */
 export async function queryScadaWarnHistory(params: {
   start_time?: number;
   end_time?: number;
   search_type?: number;
-  select_all_fac?: boolean;
+  page?: number;
+  page_size?: number;
   fac_ids?: number[];
-  select_all_bay?: boolean;
   bay_ids?: number[];
-  select_all_dev?: boolean;
   dev_ids?: number[];
-  select_all_level?: boolean;
   level_ids?: number[];
-  table_options?: Array<{ table_no: number; status_mask: number }>;
+  table_nos?: number[];
   keyword?: string;
   limit?: number;
-}): Promise<{ success: boolean; data?: ScadaHistoryWarnItem[]; total?: number; error?: string }> {
+}): Promise<{
+  success: boolean;
+  data?: ScadaHistoryWarnItem[];
+  total?: number;
+  page?: number;
+  page_size?: number;
+  total_pages?: number;
+  error?: string;
+}> {
   const baseUrl = getScadaApiBaseUrl().replace(/\/+$/, '');
   const url = baseUrl ? `${baseUrl}/api/scada/warn/history` : '/api/scada/warn/history';
 
   try {
+    const page = params.page ?? 1;
+    const pageSize = params.page_size ?? params.limit ?? 200;
+    const bodyPayload: Record<string, any> = {
+      search_type: params.search_type ?? 0,
+      page,
+      page_size: pageSize,
+      fac_ids: params.fac_ids ?? [],
+      bay_ids: params.bay_ids ?? [],
+      dev_ids: params.dev_ids ?? [],
+      level_ids: params.level_ids ?? [],
+      table_nos: params.table_nos ?? [],
+      keyword: params.keyword ?? ''
+    };
+    if (params.start_time !== undefined) {
+      bodyPayload.start_time = params.start_time;
+    }
+    if (params.end_time !== undefined) {
+      bodyPayload.end_time = params.end_time;
+    }
+
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({
-        start_time: params.start_time || 0,
-        end_time: params.end_time || Math.floor(Date.now() / 1000),
-        search_type: params.search_type ?? 0,
-        select_all_fac: params.select_all_fac ?? true,
-        fac_ids: params.fac_ids || [],
-        select_all_bay: params.select_all_bay ?? true,
-        bay_ids: params.bay_ids || [],
-        select_all_dev: params.select_all_dev ?? true,
-        dev_ids: params.dev_ids || [],
-        select_all_level: params.select_all_level ?? true,
-        level_ids: params.level_ids || [],
-        table_options: params.table_options,
-        keyword: params.keyword || '',
-        limit: params.limit || 500
-      })
+      body: JSON.stringify(bodyPayload)
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
     if (json && json.code === 200) {
-      return { success: true, data: json.data || [], total: json.total || 0 };
+      const list = json.data || [];
+      const total = json.total ?? list.length;
+      const resPage = json.page ?? page;
+      const resPageSize = json.page_size ?? pageSize;
+      const totalPages = json.total_pages ?? Math.max(1, Math.ceil(total / Math.max(1, resPageSize)));
+      return {
+        success: true,
+        data: list,
+        total,
+        page: resPage,
+        page_size: resPageSize,
+        total_pages: totalPages
+      };
     }
     return { success: false, error: json?.msg || '检索历史告警失败' };
   } catch (err: any) {

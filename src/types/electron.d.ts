@@ -36,6 +36,16 @@ export interface ElectronAPI {
   exitApp?: () => Promise<void>;
   toggleStartMenu?: () => Promise<{ success: boolean }>;
   closeStartMenu?: () => Promise<{ success: boolean }>;
+  toggleUserMenu?: () => Promise<{ success: boolean }>;
+  closeUserMenu?: () => Promise<{ success: boolean }>;
+  openLogin?: () => Promise<{ success: boolean }>;
+  closeLogin?: () => Promise<{ success: boolean }>;
+  userLoggedIn?: (user: any) => Promise<{ success: boolean }>;
+  onUserUpdated?: (callback: (user: any) => void) => () => void;
+  sendUserAction?: (action: string) => Promise<{ success: boolean }>;
+  onUserAction?: (callback: (action: string) => void) => () => void;
+  onFullscreenState?: (callback: (isFull: boolean) => void) => () => void;
+  onScreensUpdated?: (callback: (info: { screenId?: string; screenName?: string }) => void) => () => void;
   screens?: {
     loadAll: () => Promise<{ success: boolean; screens: any[]; storageDir: string; count: number; files: string[] }>;
     saveAll: (screens: any[]) => Promise<{ success: boolean; count: number; storageDir: string; savedFiles: string[] }>;

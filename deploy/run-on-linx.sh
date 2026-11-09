@@ -57,8 +57,8 @@ else
       -e GDK_SCALE=${GDK_SCALE:-1} \
       -e GDK_DPI_SCALE=${GDK_DPI_SCALE:-1} \
       -e SCADA_SCALE_FACTOR=${SCADA_SCALE_FACTOR:-1} \
-      -e SCADA_FONT_HINTING=${SCADA_FONT_HINTING:-full} \
-      -e FREETYPE_PROPERTIES="truetype:interpreter-version=35 cff:no-stem-darkening=1 type1:no-stem-darkening=1 autofitter:warping=1" \
+      -e SCADA_FONT_HINTING=${SCADA_FONT_HINTING:-slight} \
+      -e FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=0 type1:no-stem-darkening=0 autofitter:warping=0" \
       --privileged \
       ${IMAGE_NAME} >/dev/null 2>&1
 fi

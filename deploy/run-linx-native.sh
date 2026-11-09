@@ -76,12 +76,12 @@ else
   export SDL_IM_MODULE="fcitx"
 fi
 
-# 4. 锁定 1:1 物理像素比与 FreeType 次像素全微调 (专治 1080p VGA 96DPI 汉字未放大时发虚问题)
+# 4. 锁定 1:1 物理像素比与 Qt 级灰度微调 (彻底根除凝思本地与远程桌面毛刺与模糊)
 export GDK_SCALE=1
 export GDK_DPI_SCALE=1
 export SCADA_SCALE_FACTOR=1
-export SCADA_FONT_HINTING=full
-export FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=0 type1:no-stem-darkening=0 autofitter:warping=1"
+export SCADA_FONT_HINTING=slight
+export FREETYPE_PROPERTIES="truetype:interpreter-version=40 cff:no-stem-darkening=0 type1:no-stem-darkening=0 autofitter:warping=0"
 
 # 5. 字体缓存优化
 if [ -f "/etc/fonts/fonts.conf" ]; then
@@ -213,8 +213,9 @@ exec "$TARGET_BIN" \
   --disable-backgrounding-occluded-windows \
   --force-device-scale-factor=1 \
   --high-dpi-support=1 \
-  --font-render-hinting=full \
-  --enable-lcd-text \
+  --font-render-hinting=slight \
+  --disable-lcd-text \
+  --disable-font-subpixel-positioning \
   --enable-font-antialiasing \
   --disable-gpu-rasterization \
   --force-color-profile=srgb \

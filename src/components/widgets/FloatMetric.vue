@@ -120,7 +120,7 @@ const dynamicFontSize = computed(() => {
         fontSize: dynamicFontSize,
         fontWeight: staticStyle.fontWeight,
         textAlign: staticStyle.textAlign as any,
-        fontFamily: `'Chakra Petch', 'JetBrains Mono', Consolas, monospace`,
+        fontFamily: `var(--scada-mono-family), 'JetBrains Mono', Consolas, monospace`,
         fontVariantNumeric: 'tabular-nums',
         lineHeight: 1
       }"

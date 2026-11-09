@@ -42,6 +42,7 @@ import {
   handlePostScadaWarnAck,
   handlePostScadaWarnAckAll,
   handlePostScadaWarnClear,
+  handleGetScadaWarnTreeMeta,
   handlePostScadaWarnHistory,
   handleGetScadaWarnReport,
   startMockAlarmGenerator
@@ -195,6 +196,12 @@ function registerEndpoints(middlewares: any) {
         // 10. POST /api/scada/warn/clear - 实时告警清屏
         if (method === 'POST' && pathname === '/api/scada/warn/clear') {
           const result = handlePostScadaWarnClear();
+          return sendJson(res, 200, result);
+        }
+
+        // 10.5 GET /api/scada/warn/tree_meta - 历史告警筛选面板元数据字典
+        if (method === 'GET' && pathname === '/api/scada/warn/tree_meta') {
+          const result = handleGetScadaWarnTreeMeta();
           return sendJson(res, 200, result);
         }
 

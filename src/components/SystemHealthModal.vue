@@ -129,7 +129,7 @@ const handleCopyCommand = async (text: string) => {
 <template>
   <div
     v-if="visible"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 select-none"
+    class="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 select-none"
   >
     <div
       class="w-full max-w-4xl bg-[#0b1322] border border-cyan-500/40 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] text-slate-200 animate-in fade-in zoom-in-95 duration-150"

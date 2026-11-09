@@ -19,7 +19,8 @@ import {
   History,
   FileSpreadsheet,
   Volume2,
-  VolumeX
+  VolumeX,
+  Bell
 } from 'lucide-vue-next';
 import { currentUser } from '../utils/auth';
 
@@ -105,6 +106,19 @@ const handleToggleStartMenu = async () => {
   showStartMenu.value = !showStartMenu.value;
 };
 
+// 切换用户菜单 (在 Electron 中唤起专用不被截断的用户菜单独立窗口，在 Web 中切换内置浮层，保证最上层显示)
+const handleToggleUserMenu = async () => {
+  if (typeof window !== 'undefined' && (window as any).electronAPI?.toggleUserMenu) {
+    try {
+      await (window as any).electronAPI.toggleUserMenu();
+      return;
+    } catch (err) {
+      console.warn('调用 Electron toggleUserMenu 失败:', err);
+    }
+  }
+  showUserMenu.value = !showUserMenu.value;
+};
+
 // 点击菜单项
 const handleSelectMenuItem = (id: string) => {
   if (id === 'health-monitor') {
@@ -139,23 +153,22 @@ onBeforeUnmount(() => {
   window.removeEventListener('click', handleGlobalClick);
 });
 
-// 向上竖向系统菜单项 (按用户要求：监控运行/图形编辑/全站告警/历史曲线/历史告警/报表/系统健康)
+// 向上竖向系统菜单项 (按用户要求：监控运行/图形编辑/全站告警/历史曲线/历史告警/报表)
 const verticalMenuItems = [
   { id: 'monitor-screen', title: '监控运行', icon: Zap, color: 'text-amber-500' },
   { id: 'graphic-editor', title: '图形编辑', icon: PenTool, color: 'text-sky-600' },
-  { id: 'alarm-window', title: '全站告警', icon: ShieldAlert, color: 'text-rose-500', isAlarm: true },
+  { id: 'alarm-window', title: '全站告警', icon: Bell, color: 'text-rose-500' },
   { id: 'history-curve', title: '历史曲线', icon: LineChart, color: 'text-indigo-600' },
   { id: 'history-alarm', title: '历史告警', icon: History, color: 'text-orange-500' },
-  { id: 'report-window', title: '报表', icon: FileSpreadsheet, color: 'text-emerald-600' },
-  { id: 'health-monitor', title: '系统健康与黑匣子', icon: Activity, color: 'text-cyan-600' }
+  { id: 'report-window', title: '报表', icon: FileSpreadsheet, color: 'text-emerald-600' }
 ];
 </script>
 
 <template>
   <!-- ===================================================================== -->
-  <!-- 简洁化常驻底栏 (护眼暖白/米白主题，字体图标大小与顶栏对齐，不加深字体) -->
+  <!-- 简洁化常驻底栏 (护眼暖白/米白主题，字体图标大小与顶栏对齐，保证最高层级) -->
   <!-- ===================================================================== -->
-  <footer class="fixed bottom-0 left-0 right-0 h-11 bg-[#ebe4d4] border-t border-[#cfc5b0] z-50 flex items-center justify-between px-3.5 text-slate-800 shadow-xs font-sans select-none tracking-wide">
+  <footer class="fixed bottom-0 left-0 right-0 h-11 bg-[#ebe4d4] border-t border-[#cfc5b0] z-[99990] flex items-center justify-between px-3.5 text-slate-800 shadow-xs font-sans select-none tracking-wide">
     <!-- ======================================================= -->
     <!-- 1. 左侧：系统菜单按钮 + 全站告警单图标 + 窗口任务栏           -->
     <!-- ======================================================= -->
@@ -175,7 +188,7 @@ const verticalMenuItems = [
           <ChevronUp class="w-4.5 h-4.5 transition-transform stroke-[2]" :class="{ 'rotate-180': showStartMenu }" />
         </button>
 
-        <!-- 向上打开的竖向菜单 (垂直排列：监控运行 / 图形编辑 / 全站告警) -->
+        <!-- 向上打开的竖向菜单 (垂直排列：监控运行 / 图形编辑 / 全站告警，直角防透黑，最上层显示) -->
         <transition
           enter-active-class="transition duration-150 ease-out"
           enter-from-class="opacity-0 translate-y-2 scale-95"
@@ -186,7 +199,7 @@ const verticalMenuItems = [
         >
           <div
             v-if="showStartMenu"
-            class="absolute left-0 bottom-full mb-2 w-58 bg-[#f2eee3] border border-[#cfc5b0] rounded-xl shadow-2xl z-50 text-slate-800 py-1 divide-y divide-[#ded5bf] overflow-hidden tracking-wide"
+            class="absolute left-0 bottom-full mb-2 w-58 bg-[#f2eee3] border-2 border-[#b8ad96] rounded-none shadow-2xl z-[99999] text-slate-800 py-1 divide-y divide-[#ded5bf] overflow-hidden tracking-wide"
           >
             <!-- 菜单顶栏：简洁标题 -->
             <div class="px-3.5 py-2.5 bg-[#e5decb] border-b border-[#ded5bf] flex items-center justify-between text-[13.5px] font-medium text-slate-700">
@@ -197,7 +210,7 @@ const verticalMenuItems = [
               <span class="text-[12px] text-[#d81e06] font-bold">KND科能达</span>
             </div>
 
-            <!-- 竖向主菜单项 (监控运行 / 图形编辑 / 全站告警，字体不加深) -->
+            <!-- 竖向主菜单项 (监控运行 / 图形编辑 / 全站告警 / 历史曲线 / 历史告警 / 报表) -->
             <div class="py-1">
               <button
                 v-for="item in verticalMenuItems"
@@ -206,48 +219,13 @@ const verticalMenuItems = [
                 class="w-full px-3.5 py-2.5 text-left hover:bg-[#e4dcce] flex items-center justify-between transition-colors cursor-pointer text-[15px] font-medium text-slate-800 hover:text-sky-700"
               >
                 <div class="flex items-center gap-3">
-                  <span v-if="item.isAlarm" class="w-5 h-5 flex items-center justify-center shrink-0">
-                    <span
-                      class="w-3.5 h-3.5 rounded-full inline-block"
-                      :class="unconfirmedAlarmCount > 0 ? 'scada-alarm-dot-blinking' : 'bg-emerald-500'"
-                    />
-                  </span>
                   <component
-                    v-else
                     :is="item.icon"
                     class="w-5 h-5 shrink-0 stroke-[2]"
                     :class="item.color"
                   />
                   <span>{{ item.title }}</span>
                 </div>
-              </button>
-            </div>
-
-            <!-- 辅助窗口管理选项与退出程序 -->
-            <div class="py-1.5 px-2 bg-[#e5decb] flex items-center justify-between text-[13px] border-b border-[#ded5bf]">
-              <button
-                @click="emit('tile:windows'); showStartMenu = false;"
-                class="px-2.5 py-1.5 rounded-md bg-[#f2eee3] hover:bg-[#e4dcce] border border-[#cfc5b0] text-slate-800 text-[13px] font-medium flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                title="平铺窗口"
-              >
-                <LayoutGrid class="w-4 h-4 text-sky-600" />
-                <span>平铺</span>
-              </button>
-              <button
-                @click="emit('cascade:windows'); showStartMenu = false;"
-                class="px-2.5 py-1.5 rounded-md bg-[#f2eee3] hover:bg-[#e4dcce] border border-[#cfc5b0] text-slate-800 text-[13px] font-medium flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                title="层叠窗口"
-              >
-                <Layers class="w-4 h-4 text-sky-600" />
-                <span>层叠</span>
-              </button>
-              <button
-                @click="emit('minimize:all'); showStartMenu = false;"
-                class="px-2.5 py-1.5 rounded-md hover:bg-[#e4dcce] text-slate-700 text-[13px] font-medium flex items-center gap-1.5 cursor-pointer"
-                title="最小化全部"
-              >
-                <Minimize2 class="w-4 h-4" />
-                <span>桌面</span>
               </button>
             </div>
 
@@ -295,10 +273,10 @@ const verticalMenuItems = [
         title="实时告警 (点击打开告警窗)"
       />
 
-      <!-- 登录账号 (简化：就一个用户图标+用户名，无卡片底色，字体加粗) -->
+      <!-- 登录账号 (点击呼出用户菜单，在最上层展示，无黑角) -->
       <div class="relative bottom-user-menu-container">
         <button
-          @click.stop="showUserMenu = !showUserMenu"
+          @click.stop="handleToggleUserMenu"
           class="flex items-center gap-1.5 text-slate-900 hover:text-sky-700 transition-colors cursor-pointer text-[14.5px] font-bold"
           :title="`当前操作员: ${currentUser.name} (${currentUser.role})`"
         >
@@ -306,10 +284,10 @@ const verticalMenuItems = [
           <span>{{ currentUser.name }}</span>
         </button>
 
-        <!-- 登录账号菜单浮层 -->
+        <!-- 登录账号菜单浮层 (保证最上层显示，直角设计防止在X11系统上产生黑角) -->
         <div
           v-if="showUserMenu"
-          class="absolute right-0 bottom-full mb-2 w-48 bg-[#f2eee3] border border-[#cfc5b0] rounded-xl shadow-xl py-1 z-50 text-[14px] text-slate-800 divide-y divide-[#ded5bf] tracking-wide"
+          class="absolute right-0 bottom-full mb-2 w-48 bg-[#f2eee3] border-2 border-[#b8ad96] rounded-none shadow-2xl py-1 z-[99999] text-[14px] text-slate-800 divide-y divide-[#ded5bf] tracking-wide"
         >
           <div class="px-3.5 py-2 bg-[#e5decb]">
             <div class="font-bold text-slate-900">{{ currentUser.name }}</div>

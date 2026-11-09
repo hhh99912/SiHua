@@ -335,10 +335,10 @@ watch(() => props.visible, (isOpen) => {
       id="dataset-manager-modal"
       class="fixed inset-0 z-[9999] pointer-events-none select-none font-sans"
     >
-      <!-- 统一数据关联弹框风格：纯黑背景、硬质深灰边框、纯白高对比字体、支持拖动与拉伸 -->
+      <!-- 统一凝思工控米白质感风格：纯正米白背景、工控立体灰边框、纯黑高对比字体、支持拖动 -->
       <div
         ref="modalRef"
-        class="pointer-events-auto absolute bg-black text-white rounded-lg border border-neutral-700 shadow-2xl flex flex-col overflow-hidden"
+        class="pointer-events-auto absolute bg-[#ebe4d4] text-black border-2 border-[#8c826d] shadow-2xl flex flex-col overflow-hidden"
         :style="{
           left: `${modalPos.x}px`,
           top: `${modalPos.y}px`,
@@ -346,21 +346,21 @@ watch(() => props.visible, (isOpen) => {
           height: `${modalSize.height}px`
         }"
       >
-        <!-- Header -->
+        <!-- Modal Header -->
         <header
-          class="h-12 px-4 bg-[#111111] border-b border-[#2a2a2a] flex items-center justify-between shrink-0 cursor-move"
+          class="h-11 px-3.5 bg-[#e5decb] border-b border-[#cfc5b0] flex items-center justify-between shrink-0 cursor-move text-black"
           @mousedown="onHeaderMouseDown"
           @dblclick="toggleMaximize"
         >
           <div class="flex items-center gap-2.5">
-            <Server class="w-4 h-4 text-white" />
-            <h2 class="text-sm font-bold tracking-wide text-white">SCADA 数据集与测点配置中心</h2>
+            <Server class="w-4 h-4 text-sky-800" />
+            <h2 class="text-sm font-bold tracking-wide text-black">SCADA 数据集与测点配置中心</h2>
           </div>
 
           <div class="flex items-center gap-1">
             <button
               type="button"
-              class="p-1.5 text-white hover:bg-neutral-800 rounded transition-colors cursor-pointer"
+              class="p-1.5 text-slate-700 hover:text-black hover:bg-[#ded5bf] border border-transparent hover:border-[#cfc5b0] transition-colors cursor-pointer"
               :title="isMaximized ? '向下还原' : '最大化'"
               @click.stop="toggleMaximize"
             >
@@ -369,7 +369,7 @@ watch(() => props.visible, (isOpen) => {
             </button>
             <button
               type="button"
-              class="p-1.5 text-white hover:bg-neutral-800 rounded transition-colors cursor-pointer"
+              class="p-1.5 text-slate-700 hover:text-black hover:bg-[#ded5bf] border border-transparent hover:border-[#cfc5b0] transition-colors cursor-pointer"
               title="关闭"
               @click.stop="emit('close')"
             >
@@ -379,10 +379,10 @@ watch(() => props.visible, (isOpen) => {
         </header>
 
         <!-- Top SCADA API Config Bar -->
-        <div class="px-4 py-2.5 bg-[#141414] border-b border-[#2a2a2a] flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
+        <div class="px-4 py-2 bg-[#ebe4d4] border-b border-[#cfc5b0] flex flex-wrap items-center justify-between gap-3 text-xs shrink-0 text-black">
           <div class="flex items-center gap-3 flex-1 min-w-[300px]">
-            <div class="flex items-center gap-2 text-white font-bold shrink-0 text-xs">
-              <Server class="w-3.5 h-3.5 text-white" />
+            <div class="flex items-center gap-2 text-black font-bold shrink-0 text-xs">
+              <Server class="w-3.5 h-3.5 text-sky-800" />
               <span>服务 IP 地址:</span>
             </div>
             <input
@@ -390,14 +390,14 @@ watch(() => props.visible, (isOpen) => {
               id="scada-api-ip-input"
               type="text"
               placeholder="127.0.0.1"
-              class="w-52 px-3 py-1 bg-[#181818] border border-neutral-700 rounded text-xs text-white placeholder-neutral-400 focus:outline-none focus:border-white font-mono font-bold"
+              class="w-48 px-2.5 py-1 bg-white border border-[#b8ad96] text-xs text-black placeholder-slate-400 focus:outline-none focus:border-sky-700 font-mono font-medium"
               @blur="handleSaveApiIp"
               @keyup.enter="handleFetchConfig"
             />
             <button
               id="btn-fetch-scada-config"
               :disabled="isConfigLoading"
-              class="px-3.5 py-1 bg-white hover:bg-neutral-200 text-black rounded text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+              class="px-3 py-1 bg-sky-700 hover:bg-sky-800 border border-sky-950 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
               @click="handleFetchConfig"
             >
               <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isConfigLoading }" />
@@ -407,12 +407,12 @@ watch(() => props.visible, (isOpen) => {
 
           <div class="flex items-center gap-3 shrink-0">
             <!-- Connection status indicator -->
-            <div class="flex items-center gap-2 px-3 py-1 bg-[#181818] border border-[#2a2a2a] rounded">
+            <div class="flex items-center gap-2 px-2.5 py-1 bg-white border border-[#b8ad96]">
               <span
                 class="w-2 h-2 rounded-full"
-                :class="scadaApiConnStatus === 'connected' ? 'bg-emerald-400' : (scadaApiConnStatus === 'disconnected' ? 'bg-rose-400' : 'bg-amber-400')"
+                :class="scadaApiConnStatus === 'connected' ? 'bg-[#67c23a]' : (scadaApiConnStatus === 'disconnected' ? 'bg-[#f56c6c]' : 'bg-[#e6a23c]')"
               />
-              <span class="text-white font-bold text-xs">
+              <span class="text-black font-medium text-xs">
                 {{ scadaApiConnStatus === 'connected' ? '已连接生产服务' : (scadaApiConnStatus === 'disconnected' ? '未连接 (等待上线)' : '服务就绪 (本地已就绪)') }}
               </span>
             </div>
@@ -420,33 +420,33 @@ watch(() => props.visible, (isOpen) => {
         </div>
 
         <!-- Main Body (3-Column Hierarchy + Point Tables) -->
-        <div class="flex-1 flex overflow-hidden bg-black">
+        <div class="flex-1 flex overflow-hidden bg-[#f2eee3] text-black">
           <!-- 1. 厂站 (Facility) Column -->
-          <div class="w-52 border-r border-[#2a2a2a] bg-[#111111] flex flex-col shrink-0">
-            <div class="p-3 border-b border-[#2a2a2a] bg-[#141414] flex items-center justify-between">
-              <div class="flex items-center gap-1.5 text-xs font-bold text-white">
-                <Building2 class="w-4 h-4 text-white" />
+          <div class="w-52 border-r border-[#cfc5b0] bg-[#ebe4d4] flex flex-col shrink-0">
+            <div class="p-2.5 border-b border-[#cfc5b0] bg-[#e5decb] flex items-center justify-between text-black">
+              <div class="flex items-center gap-1.5 text-xs font-bold text-black">
+                <Building2 class="w-4 h-4 text-sky-800" />
                 <span>1. 厂站选择</span>
               </div>
-              <span class="px-1.5 py-0.2 text-[11px] bg-black rounded font-mono font-bold text-white border border-neutral-700">
+              <span class="px-1.5 py-0.2 text-[11px] bg-[#dfd6bf] font-mono font-medium text-black border border-[#cfc5b0]">
                 {{ scadaFacilities.length }}
               </span>
             </div>
 
             <div
-              class="flex-1 overflow-y-auto p-2 space-y-1.5"
+              class="flex-1 overflow-y-auto p-1.5 space-y-1"
               style="scrollbar-gutter: stable;"
             >
               <div
                 v-for="fac in scadaFacilities"
                 :key="fac.fac_id"
                 :id="`facility-item-${fac.fac_id}`"
-                class="p-2.5 rounded cursor-pointer border transition-colors text-left"
-                :class="selectedFacId === fac.fac_id ? 'bg-neutral-800 border-neutral-500 text-white font-bold' : 'bg-[#161616] border-[#262626] text-white hover:bg-neutral-800'"
+                class="p-2 cursor-pointer border transition-colors text-left"
+                :class="selectedFacId === fac.fac_id ? 'bg-[#dfd6bf] border-[#8c826d] text-black font-bold' : 'bg-white border-[#b8ad96] text-black hover:bg-[#f8f5ee]'"
                 @click="selectedFacId = fac.fac_id; if (fac.bays?.[0]) selectedBayId = fac.bays[0].bay_id; if (fac.bays?.[0]?.devices?.[0]) selectedDevId = fac.bays[0].devices[0].dev_id;"
               >
-                <div class="truncate text-white font-bold text-xs mb-1">{{ fac.fac_name }}</div>
-                <div class="flex items-center justify-between text-[11px] text-white font-mono">
+                <div class="truncate text-black font-bold text-xs mb-1">{{ fac.fac_name }}</div>
+                <div class="flex items-center justify-between text-[11px] text-slate-600 font-mono">
                   <span>ID: {{ fac.fac_id }}</span>
                   <span>{{ fac.bays?.length || 0 }} 间隔</span>
                 </div>
@@ -455,31 +455,31 @@ watch(() => props.visible, (isOpen) => {
           </div>
 
           <!-- 2. 间隔 (Bay) Column -->
-          <div class="w-56 border-r border-[#2a2a2a] bg-[#111111] flex flex-col shrink-0">
-            <div class="p-3 border-b border-[#2a2a2a] bg-[#141414] flex items-center justify-between">
-              <div class="flex items-center gap-1.5 text-xs font-bold text-white">
-                <Layers class="w-4 h-4 text-white" />
+          <div class="w-56 border-r border-[#cfc5b0] bg-[#ebe4d4] flex flex-col shrink-0">
+            <div class="p-2.5 border-b border-[#cfc5b0] bg-[#e5decb] flex items-center justify-between text-black">
+              <div class="flex items-center gap-1.5 text-xs font-bold text-black">
+                <Layers class="w-4 h-4 text-sky-800" />
                 <span>2. 间隔选择</span>
               </div>
-              <span class="px-1.5 py-0.2 text-[11px] bg-black rounded font-mono font-bold text-white border border-neutral-700">
+              <span class="px-1.5 py-0.2 text-[11px] bg-[#dfd6bf] font-mono font-medium text-black border border-[#cfc5b0]">
                 {{ currentFacility?.bays?.length || 0 }}
               </span>
             </div>
 
             <div
-              class="flex-1 overflow-y-auto p-2 space-y-1.5"
+              class="flex-1 overflow-y-auto p-1.5 space-y-1"
               style="scrollbar-gutter: stable;"
             >
               <div
                 v-for="bay in (currentFacility?.bays || [])"
                 :key="bay.bay_id"
                 :id="`bay-item-${bay.bay_id}`"
-                class="p-2.5 rounded cursor-pointer border transition-colors text-left"
-                :class="selectedBayId === bay.bay_id ? 'bg-neutral-800 border-neutral-500 text-white font-bold' : 'bg-[#161616] border-[#262626] text-white hover:bg-neutral-800'"
+                class="p-2 cursor-pointer border transition-colors text-left"
+                :class="selectedBayId === bay.bay_id ? 'bg-[#dfd6bf] border-[#8c826d] text-black font-bold' : 'bg-white border-[#b8ad96] text-black hover:bg-[#f8f5ee]'"
                 @click="selectedBayId = bay.bay_id; if (bay.devices?.[0]) selectedDevId = bay.devices[0].dev_id; else if (bay.cb_devices?.[0]) selectedDevId = bay.cb_devices[0].dev_id;"
               >
-                <div class="truncate text-white font-bold text-xs mb-1">{{ bay.bay_name }}</div>
-                <div class="flex items-center justify-between text-[11px] text-white font-mono">
+                <div class="truncate text-black font-bold text-xs mb-1">{{ bay.bay_name }}</div>
+                <div class="flex items-center justify-between text-[11px] text-slate-600 font-mono">
                   <span>ID: {{ bay.bay_id }}</span>
                   <span>{{ (bay.devices || bay.cb_devices || []).length }} 设备</span>
                 </div>
@@ -488,31 +488,31 @@ watch(() => props.visible, (isOpen) => {
           </div>
 
           <!-- 3. 设备 (Device) Column -->
-          <div class="w-56 border-r border-[#2a2a2a] bg-[#111111] flex flex-col shrink-0">
-            <div class="p-3 border-b border-[#2a2a2a] bg-[#141414] flex items-center justify-between">
-              <div class="flex items-center gap-1.5 text-xs font-bold text-white">
-                <Cpu class="w-4 h-4 text-white" />
+          <div class="w-56 border-r border-[#cfc5b0] bg-[#ebe4d4] flex flex-col shrink-0">
+            <div class="p-2.5 border-b border-[#cfc5b0] bg-[#e5decb] flex items-center justify-between text-black">
+              <div class="flex items-center gap-1.5 text-xs font-bold text-black">
+                <Cpu class="w-4 h-4 text-sky-800" />
                 <span>3. 设备选择</span>
               </div>
-              <span class="px-1.5 py-0.2 text-[11px] bg-black rounded font-mono font-bold text-white border border-neutral-700">
+              <span class="px-1.5 py-0.2 text-[11px] bg-[#dfd6bf] font-mono font-medium text-black border border-[#cfc5b0]">
                 {{ (currentBay?.devices || currentBay?.cb_devices || []).length }}
               </span>
             </div>
 
             <div
-              class="flex-1 overflow-y-auto p-2 space-y-1.5"
+              class="flex-1 overflow-y-auto p-1.5 space-y-1"
               style="scrollbar-gutter: stable;"
             >
               <div
                 v-for="dev in (currentBay?.devices || currentBay?.cb_devices || [])"
                 :key="dev.dev_id"
                 :id="`dev-item-${dev.dev_id}`"
-                class="p-2.5 rounded cursor-pointer border transition-colors text-left"
-                :class="selectedDevId === dev.dev_id ? 'bg-neutral-800 border-neutral-500 text-white font-bold' : 'bg-[#161616] border-[#262626] text-white hover:bg-neutral-800'"
+                class="p-2 cursor-pointer border transition-colors text-left"
+                :class="selectedDevId === dev.dev_id ? 'bg-[#dfd6bf] border-[#8c826d] text-black font-bold' : 'bg-white border-[#b8ad96] text-black hover:bg-[#f8f5ee]'"
                 @click="selectedDevId = dev.dev_id"
               >
-                <div class="truncate text-white font-bold text-xs mb-1">{{ dev.dev_name }}</div>
-                <div class="flex items-center justify-between text-[11px] text-white font-mono">
+                <div class="truncate text-black font-bold text-xs mb-1">{{ dev.dev_name }}</div>
+                <div class="flex items-center justify-between text-[11px] text-slate-600 font-mono">
                   <span>ID: {{ dev.dev_id }}</span>
                   <span>测点 {{ (dev.yc_list || dev.yc_points || []).length + (dev.yx_list || dev.yx_points || []).length }}</span>
                 </div>
@@ -521,82 +521,82 @@ watch(() => props.visible, (isOpen) => {
           </div>
 
           <!-- 4. 测点数据主展示区 (Point Tabs & Tables) -->
-          <div class="flex-1 flex flex-col overflow-hidden bg-black">
+          <div class="flex-1 flex flex-col overflow-hidden bg-white text-black">
             <!-- Tabs & Filter Bar -->
-            <div class="h-12 px-4 bg-[#111111] border-b border-[#2a2a2a] flex items-center justify-between gap-3 shrink-0">
+            <div class="h-10 px-3 bg-[#e5decb] border-b border-[#cfc5b0] flex items-center justify-between gap-3 shrink-0">
               <div class="flex items-center gap-1.5">
                 <button
                   type="button"
-                  class="px-3 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border"
-                  :class="activeTab === 'yc' ? 'bg-white text-black border-white shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+                  class="px-2.5 py-0.5 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border"
+                  :class="activeTab === 'yc' ? 'bg-white text-black border-[#8c826d]' : 'bg-[#dfd6bf] text-black border-[#cfc5b0] hover:bg-[#d4caaf]'"
                   @click="activeTab = 'yc'"
                 >
-                  <Activity class="w-3.5 h-3.5" />
+                  <Activity class="w-3.5 h-3.5 text-sky-800" />
                   <span>遥测 (YC)</span>
-                  <span class="px-1.5 py-0.2 rounded text-[10px] font-mono" :class="activeTab === 'yc' ? 'bg-black text-white' : 'bg-black/60 text-white'">
+                  <span class="px-1 text-[10px] font-mono bg-[#ebe4d4] text-black border border-[#cfc5b0]">
                     {{ (currentDevice?.yc_list || currentDevice?.yc_points || []).length }}
                   </span>
                 </button>
 
                 <button
                   type="button"
-                  class="px-3 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border"
-                  :class="activeTab === 'yx' ? 'bg-white text-black border-white shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+                  class="px-2.5 py-0.5 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border"
+                  :class="activeTab === 'yx' ? 'bg-white text-black border-[#8c826d]' : 'bg-[#dfd6bf] text-black border-[#cfc5b0] hover:bg-[#d4caaf]'"
                   @click="activeTab = 'yx'"
                 >
-                  <Radio class="w-3.5 h-3.5" />
+                  <Radio class="w-3.5 h-3.5 text-sky-800" />
                   <span>遥信 (YX)</span>
-                  <span class="px-1.5 py-0.2 rounded text-[10px] font-mono" :class="activeTab === 'yx' ? 'bg-black text-white' : 'bg-black/60 text-white'">
+                  <span class="px-1 text-[10px] font-mono bg-[#ebe4d4] text-black border border-[#cfc5b0]">
                     {{ (currentDevice?.yx_list || currentDevice?.yx_points || []).length }}
                   </span>
                 </button>
 
                 <button
                   type="button"
-                  class="px-3 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border"
-                  :class="activeTab === 'dd' ? 'bg-white text-black border-white shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+                  class="px-2.5 py-0.5 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border"
+                  :class="activeTab === 'dd' ? 'bg-white text-black border-[#8c826d]' : 'bg-[#dfd6bf] text-black border-[#cfc5b0] hover:bg-[#d4caaf]'"
                   @click="activeTab = 'dd'"
                 >
-                  <Zap class="w-3.5 h-3.5" />
+                  <Zap class="w-3.5 h-3.5 text-amber-600" />
                   <span>电度 (DD)</span>
-                  <span class="px-1.5 py-0.2 rounded text-[10px] font-mono" :class="activeTab === 'dd' ? 'bg-black text-white' : 'bg-black/60 text-white'">
+                  <span class="px-1 text-[10px] font-mono bg-[#ebe4d4] text-black border border-[#cfc5b0]">
                     {{ (currentDevice?.dd_list || currentDevice?.dd_points || []).length }}
                   </span>
                 </button>
 
                 <button
                   type="button"
-                  class="px-3 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border"
-                  :class="activeTab === 'yk' ? 'bg-white text-black border-white shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+                  class="px-2.5 py-0.5 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border"
+                  :class="activeTab === 'yk' ? 'bg-white text-black border-[#8c826d]' : 'bg-[#dfd6bf] text-black border-[#cfc5b0] hover:bg-[#d4caaf]'"
                   @click="activeTab = 'yk'"
                 >
-                  <Sliders class="w-3.5 h-3.5" />
+                  <Sliders class="w-3.5 h-3.5 text-sky-800" />
                   <span>遥控 (YK)</span>
-                  <span class="px-1.5 py-0.2 rounded text-[10px] font-mono" :class="activeTab === 'yk' ? 'bg-black text-white' : 'bg-black/60 text-white'">
+                  <span class="px-1 text-[10px] font-mono bg-[#ebe4d4] text-black border border-[#cfc5b0]">
                     {{ (currentDevice?.yk_list || currentDevice?.yk_points || []).length }}
                   </span>
                 </button>
 
                 <button
                   type="button"
-                  class="px-3 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border"
-                  :class="activeTab === 'yt' ? 'bg-white text-black border-white shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+                  class="px-2.5 py-0.5 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border"
+                  :class="activeTab === 'yt' ? 'bg-white text-black border-[#8c826d]' : 'bg-[#dfd6bf] text-black border-[#cfc5b0] hover:bg-[#d4caaf]'"
                   @click="activeTab = 'yt'"
                 >
-                  <Workflow class="w-3.5 h-3.5" />
+                  <Workflow class="w-3.5 h-3.5 text-sky-800" />
                   <span>遥调 (YT)</span>
-                  <span class="px-1.5 py-0.2 rounded text-[10px] font-mono" :class="activeTab === 'yt' ? 'bg-black text-white' : 'bg-black/60 text-white'">
+                  <span class="px-1 text-[10px] font-mono bg-[#ebe4d4] text-black border border-[#cfc5b0]">
                     {{ (currentDevice?.yt_list || currentDevice?.yt_points || []).length }}
                   </span>
                 </button>
 
                 <button
                   type="button"
-                  class="px-3 py-1 rounded text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border"
-                  :class="activeTab === 'json' ? 'bg-white text-black border-white shadow-sm' : 'bg-[#181818] text-white border-[#2a2a2a] hover:bg-neutral-800'"
+                  class="px-2.5 py-0.5 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border"
+                  :class="activeTab === 'json' ? 'bg-white text-black border-[#8c826d]' : 'bg-[#dfd6bf] text-black border-[#cfc5b0] hover:bg-[#d4caaf]'"
                   @click="activeTab = 'json'"
                 >
-                  <Code class="w-3.5 h-3.5" />
+                  <Code class="w-3.5 h-3.5 text-slate-700" />
                   <span>JSON 树</span>
                 </button>
               </div>
@@ -607,16 +607,16 @@ watch(() => props.visible, (isOpen) => {
                   v-model="searchQuery"
                   type="text"
                   placeholder="搜索测点..."
-                  class="w-full pl-8 pr-2.5 py-1 bg-[#181818] border border-neutral-700 rounded text-xs text-white placeholder-neutral-400 focus:outline-none focus:border-white font-medium"
+                  class="w-full pl-7 pr-2.5 py-0.5 bg-white border border-[#b8ad96] text-xs text-black placeholder-slate-400 focus:outline-none focus:border-sky-700 font-medium"
                 />
-                <FileText class="w-3.5 h-3.5 text-white absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <FileText class="w-3.5 h-3.5 text-slate-500 absolute left-2 top-1/2 -translate-y-1/2" />
               </div>
             </div>
 
             <!-- Tab Content 1: 遥测 (YC) Table -->
             <div
               v-if="activeTab === 'yc'"
-              class="flex-1 overflow-y-auto p-2.5"
+              class="flex-1 overflow-y-auto p-2"
               style="contain: strict; will-change: scroll-position; transform: translateZ(0); scrollbar-gutter: stable;"
             >
               <table class="w-full text-left text-xs border-collapse" style="table-layout: fixed;">
@@ -626,25 +626,25 @@ watch(() => props.visible, (isOpen) => {
                   <col style="width: 220px;" />
                 </colgroup>
                 <thead>
-                  <tr class="border-b border-[#2a2a2a] text-white bg-[#141414] font-bold sticky top-0 z-10 h-10">
-                    <th class="p-2.5">测点 ID</th>
-                    <th class="p-2.5">测点名称</th>
-                    <th class="p-2.5">点位别名 / 类型</th>
+                  <tr class="border-b border-[#b8ad96] text-black bg-[#ebe4d4] font-bold sticky top-0 z-10 h-8">
+                    <th class="p-2">测点 ID</th>
+                    <th class="p-2">测点名称</th>
+                    <th class="p-2">点位别名 / 类型</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-[#1e1e1e] font-mono text-white">
+                <tbody class="divide-y divide-slate-200 font-mono text-black">
                   <tr
                     v-for="yc in filteredYcList"
                     :key="yc.id"
                     :id="`yc-row-${yc.id}`"
-                    class="hover:bg-[#161616] transition-colors h-10"
+                    class="hover:bg-[#f8f5ee] transition-colors h-8.5"
                   >
-                    <td class="p-2.5 font-bold text-white">{{ yc.id }}</td>
-                    <td class="p-2.5 font-sans font-bold text-white truncate">{{ yc.name }}</td>
-                    <td class="p-2.5 text-white truncate">{{ yc.alias || yc.type_name || '-' }}</td>
+                    <td class="p-2 font-medium text-black">{{ yc.id }}</td>
+                    <td class="p-2 font-sans font-medium text-black truncate">{{ yc.name }}</td>
+                    <td class="p-2 text-slate-700 truncate">{{ yc.alias || yc.type_name || '-' }}</td>
                   </tr>
                   <tr v-if="filteredYcList.length === 0">
-                    <td colspan="3" class="p-8 text-center text-white font-sans font-medium text-xs">
+                    <td colspan="3" class="p-8 text-center text-slate-500 font-sans font-medium text-xs">
                       暂无符合条件的遥测测点
                     </td>
                   </tr>
@@ -655,7 +655,7 @@ watch(() => props.visible, (isOpen) => {
             <!-- Tab Content 2: 遥信 (YX) Table -->
             <div
               v-if="activeTab === 'yx'"
-              class="flex-1 overflow-y-auto p-2.5"
+              class="flex-1 overflow-y-auto p-2"
               style="scrollbar-gutter: stable;"
             >
               <table class="w-full text-left text-xs border-collapse" style="table-layout: fixed;">
@@ -665,25 +665,25 @@ watch(() => props.visible, (isOpen) => {
                   <col style="width: 220px;" />
                 </colgroup>
                 <thead>
-                  <tr class="border-b border-[#2a2a2a] text-white bg-[#141414] font-bold sticky top-0 z-10 h-10">
-                    <th class="p-2.5">测点 ID</th>
-                    <th class="p-2.5">测点名称</th>
-                    <th class="p-2.5">点位别名 / 类型</th>
+                  <tr class="border-b border-[#b8ad96] text-black bg-[#ebe4d4] font-bold sticky top-0 z-10 h-8">
+                    <th class="p-2">测点 ID</th>
+                    <th class="p-2">测点名称</th>
+                    <th class="p-2">点位别名 / 类型</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-[#1e1e1e] font-mono text-white">
+                <tbody class="divide-y divide-slate-200 font-mono text-black">
                   <tr
                     v-for="yx in filteredYxList"
                     :key="yx.id"
                     :id="`yx-row-${yx.id}`"
-                    class="hover:bg-[#161616] transition-colors h-10"
+                    class="hover:bg-[#f8f5ee] transition-colors h-8.5"
                   >
-                    <td class="p-2.5 font-bold text-white">{{ yx.id }}</td>
-                    <td class="p-2.5 font-sans font-bold text-white truncate">{{ yx.name }}</td>
-                    <td class="p-2.5 text-white truncate">{{ yx.alias || yx.type_name || '-' }}</td>
+                    <td class="p-2 font-medium text-black">{{ yx.id }}</td>
+                    <td class="p-2 font-sans font-medium text-black truncate">{{ yx.name }}</td>
+                    <td class="p-2 text-slate-700 truncate">{{ yx.alias || yx.type_name || '-' }}</td>
                   </tr>
                   <tr v-if="filteredYxList.length === 0">
-                    <td colspan="3" class="p-8 text-center text-white font-sans font-medium text-xs">
+                    <td colspan="3" class="p-8 text-center text-slate-500 font-sans font-medium text-xs">
                       暂无符合条件的遥信测点
                     </td>
                   </tr>
@@ -694,7 +694,7 @@ watch(() => props.visible, (isOpen) => {
             <!-- Tab Content 3: 电度 (DD) Table -->
             <div
               v-if="activeTab === 'dd'"
-              class="flex-1 overflow-y-auto p-2.5"
+              class="flex-1 overflow-y-auto p-2"
               style="scrollbar-gutter: stable;"
             >
               <table class="w-full text-left text-xs border-collapse" style="table-layout: fixed;">
@@ -704,25 +704,25 @@ watch(() => props.visible, (isOpen) => {
                   <col style="width: 220px;" />
                 </colgroup>
                 <thead>
-                  <tr class="border-b border-[#2a2a2a] text-white bg-[#141414] font-bold sticky top-0 z-10 h-10">
-                    <th class="p-2.5">电度 ID</th>
-                    <th class="p-2.5">测点名称</th>
-                    <th class="p-2.5">点位别名 / 单位</th>
+                  <tr class="border-b border-[#b8ad96] text-black bg-[#ebe4d4] font-bold sticky top-0 z-10 h-8">
+                    <th class="p-2">电度 ID</th>
+                    <th class="p-2">测点名称</th>
+                    <th class="p-2">点位别名 / 单位</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-[#1e1e1e] font-mono text-white">
+                <tbody class="divide-y divide-slate-200 font-mono text-black">
                   <tr
                     v-for="dd in filteredDdList"
                     :key="dd.id"
                     :id="`dd-row-${dd.id}`"
-                    class="hover:bg-[#161616] transition-colors h-10"
+                    class="hover:bg-[#f8f5ee] transition-colors h-8.5"
                   >
-                    <td class="p-2.5 font-bold text-white">{{ dd.id }}</td>
-                    <td class="p-2.5 font-sans font-bold text-white truncate">{{ dd.name }}</td>
-                    <td class="p-2.5 text-white truncate">{{ dd.alias || dd.unit || 'kWh' }}</td>
+                    <td class="p-2 font-medium text-black">{{ dd.id }}</td>
+                    <td class="p-2 font-sans font-medium text-black truncate">{{ dd.name }}</td>
+                    <td class="p-2 text-slate-700 truncate">{{ dd.alias || dd.unit || 'kWh' }}</td>
                   </tr>
                   <tr v-if="filteredDdList.length === 0">
-                    <td colspan="3" class="p-8 text-center text-white font-sans font-medium text-xs">
+                    <td colspan="3" class="p-8 text-center text-slate-500 font-sans font-medium text-xs">
                       暂无符合条件的电度测点
                     </td>
                   </tr>
@@ -733,7 +733,7 @@ watch(() => props.visible, (isOpen) => {
             <!-- Tab Content 4: 遥控 (YK) Table -->
             <div
               v-if="activeTab === 'yk'"
-              class="flex-1 overflow-y-auto p-2.5"
+              class="flex-1 overflow-y-auto p-2"
               style="scrollbar-gutter: stable;"
             >
               <table class="w-full text-left text-xs border-collapse" style="table-layout: fixed;">
@@ -744,32 +744,32 @@ watch(() => props.visible, (isOpen) => {
                   <col style="width: 180px;" />
                 </colgroup>
                 <thead>
-                  <tr class="border-b border-[#2a2a2a] text-white bg-[#141414] font-bold sticky top-0 z-10 h-10">
-                    <th class="p-2.5">遥控 ID</th>
-                    <th class="p-2.5">控制名称</th>
-                    <th class="p-2.5">别名 / 编号</th>
-                    <th class="p-2.5">关联返校遥信点 (YX)</th>
+                  <tr class="border-b border-[#b8ad96] text-black bg-[#ebe4d4] font-bold sticky top-0 z-10 h-8">
+                    <th class="p-2">遥控 ID</th>
+                    <th class="p-2">控制名称</th>
+                    <th class="p-2">别名 / 编号</th>
+                    <th class="p-2">关联返校遥信点 (YX)</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-[#1e1e1e] font-mono text-white">
+                <tbody class="divide-y divide-slate-200 font-mono text-black">
                   <tr
                     v-for="yk in filteredYkList"
                     :key="yk.id"
                     :id="`yk-row-${yk.id}`"
-                    class="hover:bg-[#161616] transition-colors h-10"
+                    class="hover:bg-[#f8f5ee] transition-colors h-8.5"
                   >
-                    <td class="p-2.5 font-bold text-white">{{ yk.id }}</td>
-                    <td class="p-2.5 font-sans font-bold text-white truncate">{{ yk.name }}</td>
-                    <td class="p-2.5 text-white truncate">{{ yk.alias || '-' }}</td>
-                    <td class="p-2.5 text-white text-xs font-bold">
-                      <span v-if="yk.targetVerificationPointId" class="px-2 py-0.5 rounded bg-neutral-800 border border-neutral-600">
+                    <td class="p-2 font-medium text-black">{{ yk.id }}</td>
+                    <td class="p-2 font-sans font-medium text-black truncate">{{ yk.name }}</td>
+                    <td class="p-2 text-slate-700 truncate">{{ yk.alias || '-' }}</td>
+                    <td class="p-2 text-black text-xs font-medium">
+                      <span v-if="yk.targetVerificationPointId" class="px-1.5 py-0.5 bg-[#dfd6bf] border border-[#cfc5b0]">
                         YX_{{ yk.targetVerificationPointId }}
                       </span>
-                      <span v-else class="text-white">未指定默认</span>
+                      <span v-else class="text-slate-500">未指定默认</span>
                     </td>
                   </tr>
                   <tr v-if="filteredYkList.length === 0">
-                    <td colspan="4" class="p-8 text-center text-white font-sans font-medium text-xs">
+                    <td colspan="4" class="p-8 text-center text-slate-500 font-sans font-medium text-xs">
                       暂无符合条件的遥控点位
                     </td>
                   </tr>
@@ -780,7 +780,7 @@ watch(() => props.visible, (isOpen) => {
             <!-- Tab Content 5: 遥调 (YT) Table -->
             <div
               v-if="activeTab === 'yt'"
-              class="flex-1 overflow-y-auto p-2.5"
+              class="flex-1 overflow-y-auto p-2"
               style="scrollbar-gutter: stable;"
             >
               <table class="w-full text-left text-xs border-collapse" style="table-layout: fixed;">
@@ -791,32 +791,32 @@ watch(() => props.visible, (isOpen) => {
                   <col style="width: 180px;" />
                 </colgroup>
                 <thead>
-                  <tr class="border-b border-[#2a2a2a] text-white bg-[#141414] font-bold sticky top-0 z-10 h-10">
-                    <th class="p-2.5">遥调 ID</th>
-                    <th class="p-2.5">遥调名称</th>
-                    <th class="p-2.5">别名 / 编号</th>
-                    <th class="p-2.5">关联返校遥测点 (YC)</th>
+                  <tr class="border-b border-[#b8ad96] text-black bg-[#ebe4d4] font-bold sticky top-0 z-10 h-8">
+                    <th class="p-2">遥调 ID</th>
+                    <th class="p-2">遥调名称</th>
+                    <th class="p-2">别名 / 编号</th>
+                    <th class="p-2">关联返校遥测点 (YC)</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-[#1e1e1e] font-mono text-white">
+                <tbody class="divide-y divide-slate-200 font-mono text-black">
                   <tr
                     v-for="yt in filteredYtList"
                     :key="yt.id"
                     :id="`yt-row-${yt.id}`"
-                    class="hover:bg-[#161616] transition-colors h-10"
+                    class="hover:bg-[#f8f5ee] transition-colors h-8.5"
                   >
-                    <td class="p-2.5 font-bold text-white">{{ yt.id }}</td>
-                    <td class="p-2.5 font-sans font-bold text-white truncate">{{ yt.name }}</td>
-                    <td class="p-2.5 text-white truncate">{{ yt.alias || '-' }}</td>
-                    <td class="p-2.5 text-white text-xs font-bold">
-                      <span v-if="yt.targetVerificationPointId" class="px-2 py-0.5 rounded bg-neutral-800 border border-neutral-600">
+                    <td class="p-2 font-medium text-black">{{ yt.id }}</td>
+                    <td class="p-2 font-sans font-medium text-black truncate">{{ yt.name }}</td>
+                    <td class="p-2 text-slate-700 truncate">{{ yt.alias || '-' }}</td>
+                    <td class="p-2 text-black text-xs font-medium">
+                      <span v-if="yt.targetVerificationPointId" class="px-1.5 py-0.5 bg-[#dfd6bf] border border-[#cfc5b0]">
                         YC_{{ yt.targetVerificationPointId }}
                       </span>
-                      <span v-else class="text-white">未指定默认</span>
+                      <span v-else class="text-slate-500">未指定默认</span>
                     </td>
                   </tr>
                   <tr v-if="filteredYtList.length === 0">
-                    <td colspan="4" class="p-8 text-center text-white font-sans font-medium text-xs">
+                    <td colspan="4" class="p-8 text-center text-slate-500 font-sans font-medium text-xs">
                       暂无符合条件的遥调点位
                     </td>
                   </tr>
@@ -825,13 +825,13 @@ watch(() => props.visible, (isOpen) => {
             </div>
 
             <!-- Tab Content 6: JSON Config Viewer -->
-            <div v-if="activeTab === 'json'" class="flex-1 p-3 overflow-hidden flex flex-col bg-black">
-              <div class="mb-2 flex items-center justify-between text-xs text-white font-bold">
+            <div v-if="activeTab === 'json'" class="flex-1 p-3 overflow-hidden flex flex-col bg-white">
+              <div class="mb-2 flex items-center justify-between text-xs text-black font-bold">
                 <span>SCADA 配置结构体 (符合 GET /api/scada/config 格式):</span>
               </div>
               <textarea
                 readonly
-                class="flex-1 w-full p-3 bg-[#0e0e0e] border border-neutral-700 rounded text-xs font-mono text-white resize-none focus:outline-none"
+                class="flex-1 w-full p-2.5 bg-[#f8f5ee] border border-[#b8ad96] text-xs font-mono text-black resize-none focus:outline-none"
                 :value="scadaConfigJsonString"
               ></textarea>
             </div>
@@ -839,23 +839,23 @@ watch(() => props.visible, (isOpen) => {
         </div>
 
         <!-- Footer -->
-        <footer class="h-13 px-5 bg-[#111111] border-t border-[#2a2a2a] flex items-center justify-between shrink-0">
-          <div class="text-xs text-white font-medium">
+        <footer class="h-12 px-4 bg-[#e5decb] border-t border-[#cfc5b0] flex items-center justify-between shrink-0 text-black">
+          <div class="text-xs text-black font-medium">
             当前选中: {{ currentFacility?.fac_name || '-' }} ➜ {{ currentBay?.bay_name || '-' }} ➜ {{ currentDevice?.dev_name || '-' }}
           </div>
 
-          <div class="flex items-center gap-2.5">
+          <div class="flex items-center gap-2">
             <button
               type="button"
               @click="syncToParentDatasets(); showToast('已成功同步测点至全局数据集', 'success');"
-              class="px-4 py-1.5 rounded bg-white hover:bg-neutral-200 text-black text-xs font-bold transition-colors cursor-pointer shadow-sm"
+              class="px-3.5 py-1 bg-sky-700 hover:bg-sky-800 border border-sky-950 text-white text-xs font-bold transition-colors cursor-pointer"
             >
               同步全局数据集
             </button>
             <button
               type="button"
               @click="emit('close')"
-              class="px-4 py-1.5 rounded bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-white text-xs font-bold transition-colors cursor-pointer"
+              class="px-3.5 py-1 bg-[#dfd6bf] hover:bg-[#d4caaf] border border-[#b8ad96] text-black text-xs font-medium transition-colors cursor-pointer"
             >
               关闭
             </button>
@@ -865,10 +865,10 @@ watch(() => props.visible, (isOpen) => {
         <!-- Toast Notification -->
         <div
           v-if="toastMessage"
-          class="fixed bottom-6 right-6 px-4 py-2.5 rounded text-xs font-bold shadow-2xl flex items-center gap-2 z-50 transition-all border border-neutral-600 bg-neutral-900 text-white"
+          class="fixed bottom-6 right-6 px-4 py-2 border border-[#8c826d] bg-[#f2eee3] text-black text-xs font-bold shadow-2xl flex items-center gap-2 z-50 transition-all"
         >
-          <Check v-if="toastMessage.type === 'success'" class="w-4 h-4 text-emerald-400" />
-          <AlertCircle v-else class="w-4 h-4 text-rose-400" />
+          <Check v-if="toastMessage.type === 'success'" class="w-4 h-4 text-[#67c23a]" />
+          <AlertCircle v-else class="w-4 h-4 text-[#f56c6c]" />
           <span>{{ toastMessage.text }}</span>
         </div>
       </div>

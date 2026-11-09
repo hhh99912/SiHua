@@ -82,6 +82,7 @@ import LoginModal from './LoginModal.vue';
 import ScadaTeleControlModal from './ScadaTeleControlModal.vue';
 import ScadaTeleRegulationModal from './ScadaTeleRegulationModal.vue';
 import ScadaRealtimeCurveModal from './ScadaRealtimeCurveModal.vue';
+import { windowToggleFullscreen } from '../utils/platform';
 
 interface Props {
   screen?: ScreenConfig;
@@ -798,17 +799,27 @@ const scaleRatio = computed(() => {
   return { scaleX: s, scaleY: s };
 });
 
-const toggleBrowserFullscreen = () => {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch(() => {});
-    isBrowserFullscreen.value = true;
+const toggleBrowserFullscreen = async () => {
+  if (typeof window !== 'undefined' && (window as any).electronAPI?.isElectron) {
+    const res = await windowToggleFullscreen();
+    isBrowserFullscreen.value = Boolean(res);
   } else {
-    document.exitFullscreen().catch(() => {});
-    isBrowserFullscreen.value = false;
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+      isBrowserFullscreen.value = true;
+    } else {
+      document.exitFullscreen().catch(() => {});
+      isBrowserFullscreen.value = false;
+    }
   }
 };
 
 const handleKeyDown = (e: KeyboardEvent) => {
+  if (e.key === 'F11') {
+    e.preventDefault();
+    toggleBrowserFullscreen();
+    return;
+  }
   if (e.code === 'Space' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
     isSpacePressed.value = true;
   }
@@ -1205,11 +1216,19 @@ watch(
   }
 );
 
+let unlistenPreviewFullscreen: (() => void) | null = null;
+
 onMounted(() => {
   window.addEventListener('resize', handleResize);
   window.addEventListener('keydown', handleKeyDown);
   window.addEventListener('keyup', handleKeyUp);
   window.addEventListener('blur', handleWindowBlur);
+
+  if (typeof window !== 'undefined' && (window as any).electronAPI?.onFullscreenState) {
+    unlistenPreviewFullscreen = (window as any).electronAPI.onFullscreenState((isFull: boolean) => {
+      isBrowserFullscreen.value = isFull;
+    });
+  }
   updateClock();
   updateScadaClock();
   clockTimer = setInterval(() => {
@@ -1255,6 +1274,10 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   isUnmounted = true;
+  if (unlistenPreviewFullscreen) {
+    unlistenPreviewFullscreen();
+    unlistenPreviewFullscreen = null;
+  }
   window.removeEventListener('resize', handleResize);
   window.removeEventListener('keydown', handleKeyDown);
   window.removeEventListener('keyup', handleKeyUp);
@@ -1794,12 +1817,12 @@ onBeforeUnmount(() => {
           </span>
         </div>
 
-        <!-- 右键操作菜单 (去蓝色边框，不显示组件名称) -->
+        <!-- 右键操作菜单 (凝思工控米白风格，纯黑清晰字体与天蓝高亮) -->
         <div
           v-if="contextMenu.visible"
           @click.stop
           @contextmenu.stop.prevent
-          class="fixed z-50 bg-[#0b1322] border border-slate-700/80 rounded-xl shadow-[0_12px_40px_rgba(0,0,0,0.95)] p-2 w-72 max-h-[calc(100vh-20px)] overflow-y-auto custom-scrollbar text-sm font-sans divide-y divide-slate-700/60"
+          class="fixed z-50 bg-[#f2eee3] border-2 border-[#8c826d] rounded-md shadow-[0_8px_30px_rgba(0,0,0,0.35)] p-1.5 w-72 max-h-[calc(100vh-20px)] overflow-y-auto text-xs font-sans divide-y divide-[#cfc5b0] text-black"
           :style="{
             left: `${Math.round(contextMenu.x)}px`,
             top: `${Math.round(contextMenu.y)}px`,
@@ -1811,67 +1834,67 @@ onBeforeUnmount(() => {
         >
 
           <!-- 遥测/遥控/遥调功能区 (只有确实关联的测点才显示对应项) -->
-          <div v-if="contextMenu.isTelemetry || contextMenu.hasControl || contextMenu.hasRegulation" class="py-1.5 space-y-1">
+          <div v-if="contextMenu.isTelemetry || contextMenu.hasControl || contextMenu.hasRegulation" class="py-1 space-y-0.5">
             <!-- 遥测组件实时曲线 -->
             <button
               v-if="contextMenu.isTelemetry"
               @click="openRealtimeCurve(contextMenu.targetComponent)"
-              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-[#00f2ff]/20 rounded-lg text-[#00f2ff] hover:text-[#38bdf8] cursor-pointer flex items-center gap-2.5 group transition-colors"
+              class="w-full text-left px-2.5 py-1.5 rounded text-black hover:bg-sky-700 hover:text-white cursor-pointer flex items-center gap-2 group transition-colors"
             >
-              <TrendingUp class="w-4 h-4 text-[#00f2ff] stroke-[2]" />
-              <span class="font-bold text-[#00f2ff] group-hover:text-[#38bdf8] tracking-wide text-sm">实时曲线</span>
+              <TrendingUp class="w-4 h-4 text-sky-700 group-hover:text-white stroke-[2.2]" />
+              <span class="font-extrabold tracking-wide text-xs">实时曲线</span>
             </button>
 
             <!-- 执行遥控 (YK) - 严格仅在组件关联了遥控时出现 -->
             <button
               v-if="contextMenu.hasControl"
               @click="executeContextMenuControl('control')"
-              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-[#fbbf24]/20 rounded-lg text-[#fbbf24] hover:text-[#fde047] cursor-pointer flex items-center gap-2.5 group transition-colors"
+              class="w-full text-left px-2.5 py-1.5 rounded text-amber-900 hover:bg-sky-700 hover:text-white cursor-pointer flex items-center gap-2 group transition-colors"
             >
-              <Radio class="w-4 h-4 text-[#fbbf24] stroke-[2]" />
-              <span class="font-bold text-[#fbbf24] tracking-wide text-sm">执行工业遥控 (YK)</span>
+              <Radio class="w-4 h-4 text-amber-700 group-hover:text-white stroke-[2.2]" />
+              <span class="font-extrabold tracking-wide text-xs">执行工业遥控 (YK)</span>
             </button>
 
             <!-- 执行遥调 (YT) - 严格仅在组件关联了遥调时出现 -->
             <button
               v-if="contextMenu.hasRegulation"
               @click="executeContextMenuControl('regulation')"
-              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-[#38bdf8]/20 rounded-lg text-[#38bdf8] hover:text-[#7dd3fc] cursor-pointer flex items-center gap-2.5 group transition-colors"
+              class="w-full text-left px-2.5 py-1.5 rounded text-sky-900 hover:bg-sky-700 hover:text-white cursor-pointer flex items-center gap-2 group transition-colors"
             >
-              <SlidersHorizontal class="w-4 h-4 text-[#38bdf8] stroke-[2]" />
-              <span class="font-bold text-[#38bdf8] tracking-wide text-sm">执行工业遥调 (YT)</span>
+              <SlidersHorizontal class="w-4 h-4 text-sky-700 group-hover:text-white stroke-[2.2]" />
+              <span class="font-extrabold tracking-wide text-xs">执行工业遥调 (YT)</span>
             </button>
           </div>
 
           <!-- 变位清闪功能区 (画面清闪 / 全部清闪) -->
-          <div class="py-1.5 space-y-1">
+          <div class="py-1 space-y-0.5">
             <!-- 画面清闪 -->
             <button
               @click="handleClearScreenFlash"
-              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-amber-500/20 rounded-lg text-amber-300 hover:text-amber-100 cursor-pointer flex items-center gap-2.5 group transition-colors"
+              class="w-full text-left px-2.5 py-1.5 rounded text-black hover:bg-sky-700 hover:text-white cursor-pointer flex items-center gap-2 group transition-colors"
             >
-              <Sparkles class="w-4 h-4 text-amber-400 stroke-[2]" />
-              <span class="font-bold text-amber-300 group-hover:text-amber-100 tracking-wide text-sm">画面清闪</span>
+              <Sparkles class="w-4 h-4 text-amber-600 group-hover:text-white stroke-[2.2]" />
+              <span class="font-bold tracking-wide text-xs">画面清闪</span>
             </button>
 
             <!-- 全部清闪 -->
             <button
               @click="handleClearAllFlash"
-              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-orange-500/20 rounded-lg text-orange-300 hover:text-orange-100 cursor-pointer flex items-center gap-2.5 group transition-colors"
+              class="w-full text-left px-2.5 py-1.5 rounded text-black hover:bg-sky-700 hover:text-white cursor-pointer flex items-center gap-2 group transition-colors"
             >
-              <RefreshCw class="w-4 h-4 text-orange-400 stroke-[2]" />
-              <span class="font-bold text-orange-300 group-hover:text-orange-100 tracking-wide text-sm">全部清闪</span>
+              <RefreshCw class="w-4 h-4 text-amber-600 group-hover:text-white stroke-[2.2]" />
+              <span class="font-bold tracking-wide text-xs">全部清闪</span>
             </button>
           </div>
 
           <!-- 退出监控直接跳转编辑界面 -->
-          <div class="pt-1.5">
+          <div class="pt-1">
             <button
               @click="handleExitPreview(); closeContextMenu();"
-              class="w-full text-left px-3 py-1.5 bg-transparent hover:bg-rose-500/20 rounded-lg text-rose-300 hover:text-rose-100 cursor-pointer flex items-center gap-2.5 group transition-colors"
+              class="w-full text-left px-2.5 py-1.5 rounded text-rose-800 hover:bg-rose-700 hover:text-white cursor-pointer flex items-center gap-2 group transition-colors"
             >
-              <Edit3 class="w-4 h-4 text-rose-400 stroke-[2]" />
-              <span class="font-bold text-rose-300 group-hover:text-rose-100 tracking-wide text-sm">退出监控 / 跳转编辑界面</span>
+              <Edit3 class="w-4 h-4 text-rose-700 group-hover:text-white stroke-[2.2]" />
+              <span class="font-bold tracking-wide text-xs">退出监控 / 跳转编辑界面</span>
             </button>
           </div>
         </div>
@@ -1885,28 +1908,7 @@ onBeforeUnmount(() => {
       v-if="!isEmbedded" 
       class="bg-[#ebe4d4] border-t border-[#cfc5b0] flex flex-col shrink-0 select-none z-40 font-sans relative shadow-xs text-slate-800"
     >
-      <!-- 3.1 顶部实时跑马灯告警带 (Rolling SOE Alarm Strip) -->
-      <div class="h-6.5 bg-[#e5decb] border-b border-[#cfc5b0] px-3 flex items-center justify-between text-xs font-mono">
-        <div class="flex items-center gap-2 truncate flex-1 mr-4">
-          <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-600 text-white uppercase animate-pulse shrink-0">
-            最新告警
-          </span>
-          <span class="text-sky-700 font-bold shrink-0">[{{ latestRollingAlarm.time }}]</span>
-          <span class="text-slate-600 font-semibold shrink-0">[{{ latestRollingAlarm.bay }}]</span>
-          <span class="text-rose-600 truncate font-sans">{{ latestRollingAlarm.message }}</span>
-        </div>
-
-        <div class="flex items-center gap-1.5 shrink-0">
-          <button
-            @click="handleOpenAlarm"
-            class="px-2 py-0.5 rounded bg-[#f2eee3] hover:bg-[#e4dcce] border border-[#cfc5b0] text-slate-700 text-[10px] font-bold transition-colors cursor-pointer"
-          >
-            告警窗
-          </button>
-        </div>
-      </div>
-
-      <!-- 3.2 简洁底部主控制与状态菜单栏 (护眼暖白/米白背景，字号放大更清晰) -->
+      <!-- 3.1 简洁底部主控制与状态菜单栏 (护眼暖白/米白背景，字号放大更清晰) -->
       <div class="h-9 px-3 flex items-center justify-between text-[13px] bg-[#ebe4d4] tracking-wide">
         <!-- 左侧：基础功能按钮群 (简洁显示) -->
         <div class="flex items-center gap-1.5">
