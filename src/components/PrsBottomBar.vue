@@ -157,6 +157,7 @@ onBeforeUnmount(() => {
 const verticalMenuItems = [
   { id: 'monitor-screen', title: '监控运行', icon: Zap, color: 'text-amber-500' },
   { id: 'graphic-editor', title: '图形编辑', icon: PenTool, color: 'text-sky-600' },
+  { id: 'realtime-data', title: '实时数据', icon: Activity, color: 'text-teal-600' },
   { id: 'alarm-window', title: '全站告警', icon: Bell, color: 'text-rose-500' },
   { id: 'history-curve', title: '历史曲线', icon: LineChart, color: 'text-indigo-600' },
   { id: 'history-alarm', title: '历史告警', icon: History, color: 'text-orange-500' },

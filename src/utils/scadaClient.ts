@@ -486,7 +486,7 @@ export function sanitizeFacilities(rawList: any[]): ScadaFacilityNode[] {
               min: Number(yt.min ?? 0),
               max: Number(yt.max ?? 100),
               step: Number(yt.step ?? 1),
-              unit: String(yt.unit || '档')
+              unit: String(yt.unit || '')
             }));
 
             const rawDds = Array.isArray(dev.dd_points) ? dev.dd_points : (Array.isArray(dev.dd_list) ? dev.dd_list : []);
@@ -647,7 +647,8 @@ export async function fetchScadaConfig(apiUrl?: string): Promise<{
 
     const response = await fetch(url, {
       method: 'GET',
-      headers: { 'Accept': 'application/json' },
+      headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' },
+      cache: 'no-store',
       signal: controller.signal
     });
 
@@ -711,8 +712,10 @@ export async function fetchScadaRealtime(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache'
       },
+      cache: 'no-store',
       body: JSON.stringify({
         yc_ids: req.yc_ids || [],
         yx_ids: req.yx_ids || [],
@@ -804,10 +807,8 @@ export async function fetchScadaRealtime(
         }
       }
 
-      // 核心防卡顿：仅在首帧无数据时触发一次初始化脉冲；后续由各测点精准 notifyPointChanged 独立驱动局部重绘，绝不无脑让全屏 200+ 图元每秒重绘
-      if (scadaLiveTick.value === 0) {
-        scadaLiveTick.value++;
-      }
+      // 实时数据驱动脉冲：每次成功拉取到实时量测，递增脉冲驱动所有监控图元与仪表同步重绘
+      scadaLiveTick.value++;
 
       lastRealtimeSyncTime.value = new Date().toLocaleTimeString();
       scadaApiConnStatus.value = 'connected';
@@ -1035,7 +1036,7 @@ export async function executeClosedLoopControl(options: {
           success: true,
           verified: true,
           elapsedMs: elapsed,
-          message: `返校确认成功！遥信测点 [YX_${vPointId}] 变位为 ${expectedYxValue === 1 ? '合闸 (1)' : '分闸 (0)'}，耗时 ${(elapsed / 1000).toFixed(1)}s`,
+          message: `返校确认成功！遥信测点 [YX_${vPointId}] 变位为 ${expectedYxValue === 1 ? '合 (1)' : '分 (0)'}，耗时 ${(elapsed / 1000).toFixed(1)}s`,
           finalValue: currentYxVal
         };
       }
@@ -1761,7 +1762,7 @@ export function convertFacilitiesToDatasets(facilities: ScadaFacilityNode[] = sc
             pointId: yt.id,
             name: yt.name,
             alias: yt.alias,
-            unit: yt.unit || '档',
+            unit: yt.unit || '',
             min: yt.min ?? 0,
             max: yt.max ?? 100,
             step: yt.step ?? 1,
@@ -1842,44 +1843,13 @@ export const SCADA_STANDARD_POINT_NAMES: Record<string, string> = {
 };
 
 /**
- * 解析并展示标准的测点工程名称 (确保测点名称清晰可读，不展示枯燥的物理ID)
+ * 解析并展示标准的测点工程名称 (严格使用测点实际原始名称，严禁编造虚假值)
  */
 export function getScadaPointDisplayName(pt: any): string {
-  if (!pt) return '未命名测点';
-  const rawName = String(pt.name || '').trim();
-  const lowerName = rawName.toLowerCase();
-
-  // 1. 标准字典直查
-  if (SCADA_STANDARD_POINT_NAMES[lowerName]) {
-    return SCADA_STANDARD_POINT_NAMES[lowerName];
-  }
-
-  // 2. 规范化前缀数字 (如 yc1 -> yc01)
-  const m = lowerName.match(/^(yc|yx|dd|yk|yt)[-_]?0*(\d+)$/i);
-  if (m) {
-    const normKey = `${m[1].toLowerCase()}${String(m[2]).padStart(2, '0')}`;
-    if (SCADA_STANDARD_POINT_NAMES[normKey]) {
-      return SCADA_STANDARD_POINT_NAMES[normKey];
-    }
-  }
-
-  // 3. 自定义中文名称或长名称直接使用
-  if (rawName && !/^yc\d+$/i.test(rawName) && !/^yx\d+$/i.test(rawName) && !/^dd\d+$/i.test(rawName)) {
-    return rawName;
-  }
-
-  // 4. 别名与描述备选
-  if (pt.desc || pt.description) {
-    return String(pt.desc || pt.description);
-  }
-  if (pt.alias && !pt.alias.includes('.') && pt.alias.length > 2) {
-    return pt.alias;
-  }
-  if (pt.type_name) {
-    return `${pt.type_name}`;
-  }
-
-  return rawName || '测点';
+  if (!pt) return '';
+  if (typeof pt === 'string') return pt.trim();
+  const rawName = String(pt.name || pt.pointName || pt.title || pt.id || '').trim();
+  return rawName;
 }
 
 // ============================================================================
@@ -2129,7 +2099,8 @@ export async function fetchScadaWarnConfig(): Promise<{ success: boolean; data?:
   try {
     const res = await fetch(url, {
       method: 'GET',
-      headers: { 'Accept': 'application/json' }
+      headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' },
+      cache: 'no-store'
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
@@ -2166,7 +2137,8 @@ export async function fetchScadaWarnRealtime(params?: { limit?: number; after_se
   try {
     const res = await fetch(url, {
       method: 'GET',
-      headers: { 'Accept': 'application/json' }
+      headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' },
+      cache: 'no-store'
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
@@ -2205,8 +2177,9 @@ export async function ackScadaWarn(params: {
 
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(payload)
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Cache-Control': 'no-cache' },
+      body: JSON.stringify(payload),
+      cache: 'no-store'
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
@@ -2234,8 +2207,9 @@ export async function ackAllScadaWarn(params?: { operator?: string }): Promise<{
     const payload = params?.operator ? { operator: params.operator } : {};
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(payload)
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Cache-Control': 'no-cache' },
+      body: JSON.stringify(payload),
+      cache: 'no-store'
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
@@ -2258,8 +2232,9 @@ export async function clearScadaWarnCache(): Promise<{ success: boolean; error?:
   try {
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({})
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Cache-Control': 'no-cache' },
+      body: JSON.stringify({}),
+      cache: 'no-store'
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
@@ -2286,7 +2261,8 @@ export async function fetchScadaWarnTreeMeta(): Promise<{
   try {
     const res = await fetch(url, {
       method: 'GET',
-      headers: { 'Accept': 'application/json' }
+      headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' },
+      cache: 'no-store'
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
@@ -2350,8 +2326,9 @@ export async function queryScadaWarnHistory(params: {
 
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(bodyPayload)
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Cache-Control': 'no-cache' },
+      body: JSON.stringify(bodyPayload),
+      cache: 'no-store'
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
@@ -2391,7 +2368,8 @@ export async function fetchScadaWarnReport(
   try {
     const res = await fetch(url, {
       method: 'GET',
-      headers: { 'Accept': 'application/json' }
+      headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' },
+      cache: 'no-store'
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();

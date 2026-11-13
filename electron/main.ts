@@ -156,8 +156,12 @@ if (totalHostMemMb <= 2500) {
 }
 
 app.commandLine.appendSwitch('js-flags', `--max-old-space-size=${v8MaxOldSpaceMb} --expose-gc --optimize-for-size --max-semi-space-size=64`);
-app.commandLine.appendSwitch('disk-cache-size', '33554432');
-app.commandLine.appendSwitch('media-cache-size', '8388608');
+// 核心冷启动优化与防磁盘卡死：在 SCADA 工业模式下彻底禁用 HTTP 磁盘缓存与 GPU 着色器缓存
+// SCADA 数据全部为实时接口流，彻底杜绝 Chromium 将数十万次增量告警轮询写入机械磁盘导致第二天启动扫描索引严重卡死
+app.commandLine.appendSwitch('disable-http-cache');
+app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+app.commandLine.appendSwitch('disk-cache-size', '1');
+app.commandLine.appendSwitch('media-cache-size', '1');
 
 // Linux 凝思安全操作系统底层内核防重启加固：关闭内核 Panic-on-OOM 与 Softlockup Panic
 if (process.platform === 'linux') {
@@ -331,6 +335,13 @@ const MODULE_CONFIGS: Record<string, ModuleWindowConfig> = {
     height: 820,
     minWidth: 1000,
     minHeight: 600
+  },
+  'realtime-data': {
+    title: '实时数据',
+    width: 1450,
+    height: 860,
+    minWidth: 1050,
+    minHeight: 650
   },
   'health-monitor': {
     title: '系统健康',
@@ -1989,10 +2000,15 @@ if (!gotTheLock) {
       createUserMenuWindow();
     }, 150);
 
-    // 3. 默认拉起“监控运行”子模块独立窗口，并后台静默常驻启动“全站告警”采集进程
+    // 异步清理历史累积的 Chromium 磁盘缓存与临时碎片，彻底消除第二天开机冷启动缓慢
+    try {
+      const { session } = require('electron');
+      session.defaultSession.clearCache().catch(() => {});
+    } catch {}
+
+    // 3. 默认仅拉起“监控运行”子模块独立窗口，按需唤出“全站告警”，避免多窗口冷启动磁盘 I/O 争抢与双倍内存开销
     setTimeout(() => {
       openModuleWindow('monitor-screen');
-      openModuleWindow('alarm-window', true);
     }, 450);
 
     // 4. 凝思 X11 桌面防遮挡守护：确保总进程底栏永远处于所有桌面程序的最顶层

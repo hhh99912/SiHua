@@ -33,10 +33,14 @@ import {
   ScadaRealtimeWarnItem,
   SCADA_WARN_12_TABS,
   SCADA_WARN_TAB_NAMES,
-  checkAlarmMatchesTab
+  checkAlarmMatchesTab,
+  scadaFacilities,
+  fetchScadaConfig
 } from '../utils/scadaClient';
 import {
   SCADA_STATION_TREE,
+  buildStationTreeFromFacilities,
+  ScadaStationMeta,
   checkAlarmPassesFilterAndShield,
   ScadaAlarmFilterRules
 } from '../utils/scadaTreeData';
@@ -88,7 +92,7 @@ const showOptionsMenu = ref<boolean>(false);
 const soundAlertEnabled = realtimeSoundEnabled; // 报警声音蜂鸣器
 const pinToTopLocked = ref<boolean>(true); // 自动置顶锁定 (默认开启，仅在有新告警产生时置顶)
 const colorAlarmText = ref<boolean>(false); // 告警字体是否着色 (默认不着色)
-const maxCapacity = realtimeMaxCapacity; // 南瑞后台常驻环形缓存上限：默认 10000 条
+const maxCapacity = realtimeMaxCapacity; // 南瑞/凝思工控机环形缓存上限：默认 1000 条
 
 // 列可见性控制 (测点名称与动作语义默认不显示)
 const columnVisibility = ref({
@@ -277,8 +281,10 @@ const selectorTargetType = ref<'station' | 'bay' | 'device'>('bay');
 const selectorMode = ref<'filter' | 'shield'>('filter'); // filter = 筛选(白名单), shield = 屏蔽(黑名单)
 const tempSelectedItems = ref<string[]>([]); // 临时选中的项 (确定前可取消)
 const treeSearchText = ref<string>('');
-const expandedStationIds = ref<Set<string | number>>(new Set([10001, 10002, 10003]));
-const expandedBayIds = ref<Set<string | number>>(new Set());
+// 严格按照实际厂站配置构建的动态拓扑树 (默认真实厂站: 苏州晟高)
+const activeStationTree = computed<ScadaStationMeta[]>(() => buildStationTreeFromFacilities(scadaFacilities.value));
+const expandedStationIds = ref<Set<string | number>>(new Set([4000003]));
+const expandedBayIds = ref<Set<string | number>>(new Set([430000001, 430000002]));
 
 // 打开选择器
 const openSelector = (target: 'station' | 'bay' | 'device', mode: 'filter' | 'shield') => {
@@ -335,7 +341,7 @@ const toggleExpandBay = (id: string | number) => {
 
 // 展开/收起全部树节点
 const expandAllTreeNodes = () => {
-  SCADA_STATION_TREE.forEach(st => {
+  activeStationTree.value.forEach(st => {
     expandedStationIds.value.add(st.id);
     st.bays.forEach(b => expandedBayIds.value.add(b.id));
   });
@@ -375,7 +381,7 @@ const clearTempSelected = () => {
 // 全选当前类型所有项
 const selectAllCurrentType = () => {
   const items: string[] = [];
-  SCADA_STATION_TREE.forEach(st => {
+  activeStationTree.value.forEach(st => {
     if (selectorTargetType.value === 'station') {
       items.push(st.name);
     } else if (selectorTargetType.value === 'bay') {
@@ -420,9 +426,10 @@ const handleCancelSelector = () => {
 // 过滤后的树形节点 (支持搜索)
 const filteredTreeStations = computed(() => {
   const q = treeSearchText.value.trim().toLowerCase();
-  if (!q) return SCADA_STATION_TREE;
+  const tree = activeStationTree.value;
+  if (!q) return tree;
 
-  return SCADA_STATION_TREE.map(station => {
+  return tree.map(station => {
     const matchStation = station.name.toLowerCase().includes(q) || station.alias.toLowerCase().includes(q);
     const matchedBays = station.bays.map(bay => {
       const matchBay = bay.name.toLowerCase().includes(q);
@@ -444,7 +451,7 @@ const filteredTreeStations = computed(() => {
       };
     }
     return null;
-  }).filter(Boolean) as typeof SCADA_STATION_TREE;
+  }).filter(Boolean) as ScadaStationMeta[];
 });
 
 // ============================================================================
@@ -871,6 +878,13 @@ onMounted(async () => {
     }
   });
 
+  // 确保实际厂站拓扑元数据与配置完全加载
+  try {
+    await fetchScadaConfig();
+  } catch (err) {
+    console.warn('[RealtimeAlarmModal] fetchScadaConfig err:', err);
+  }
+
   // 启动/复用后台常驻 100ms 实时告警轮询服务 (已启动则直接复用缓存，绝不重新计算)
   await startBackgroundAlarmPolling();
   updateGlobalUnconfirmedCount();
@@ -984,21 +998,24 @@ watch(() => props.visible, (val) => {
                 <input type="checkbox" v-model="colorAlarmText" class="w-4.5 h-4.5 cursor-pointer text-sky-600 rounded-none" />
               </div>
 
-              <!-- 单屏最大缓存容量 -->
+              <!-- 单屏最大缓存容量 (针对凝思工控机防整机重启与内存调优) -->
               <div class="px-3 py-2 border-b border-slate-200">
-                <div class="text-slate-900 mb-1.5">后台实时告警缓存上限:</div>
+                <div class="text-slate-900 mb-1.5 flex items-center justify-between">
+                  <span>实时告警缓存上限:</span>
+                  <span class="text-xs text-emerald-800 font-bold">{{ maxCapacity }}条</span>
+                </div>
                 <div class="grid grid-cols-2 gap-2 text-xs font-medium text-slate-800">
                   <label class="flex items-center gap-1 cursor-pointer">
-                    <input type="radio" :value="2000" v-model="maxCapacity" name="cap" /> 2000条
+                    <input type="radio" :value="1000" v-model="maxCapacity" name="cap" /> 1000条 (凝思推荐)
                   </label>
                   <label class="flex items-center gap-1 cursor-pointer">
-                    <input type="radio" :value="5000" v-model="maxCapacity" name="cap" /> 5000条
+                    <input type="radio" :value="500" v-model="maxCapacity" name="cap" /> 500条 (极低内存)
                   </label>
                   <label class="flex items-center gap-1 cursor-pointer">
-                    <input type="radio" :value="10000" v-model="maxCapacity" name="cap" /> 10000条 (默认推荐)
+                    <input type="radio" :value="2000" v-model="maxCapacity" name="cap" /> 2000条 (标准)
                   </label>
                   <label class="flex items-center gap-1 cursor-pointer">
-                    <input type="radio" :value="20000" v-model="maxCapacity" name="cap" /> 20000条
+                    <input type="radio" :value="5000" v-model="maxCapacity" name="cap" /> 5000条 (高配机)
                   </label>
                 </div>
               </div>

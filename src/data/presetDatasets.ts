@@ -431,6 +431,17 @@ export function tickDataset(dataset: DatasetItem): DatasetItem {
         targetData[`${devId}_DD_${dd.pointId}`] = dd.value;
       }
     }
+
+    // 3. Tick Tele-signals (遥信状态周期性动态刷新)
+    if (dev.teleSignals) {
+      for (let s = 0; s < dev.teleSignals.length; s++) {
+        const yx = dev.teleSignals[s];
+        if (s % 3 === 0 && Math.random() < 0.15) {
+          yx.value = yx.value === 1 ? 0 : 1;
+        }
+        targetData[`${devId}_YX_${yx.pointId}`] = yx.value;
+      }
+    }
   }
 
   targetData.timestamp = new Date().toLocaleTimeString();

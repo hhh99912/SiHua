@@ -89,18 +89,64 @@ const modalRef = ref<HTMLElement | null>(null);
 const isMaximized = ref(false);
 const isDragging = ref(false);
 const modalPos = ref({ x: 0, y: 0 });
-const modalSize = ref({ width: 1100, height: 720 });
+const modalSize = ref({ width: 1400, height: 760 });
 let dragStart = { mouseX: 0, mouseY: 0, posX: 0, posY: 0 };
-let preMaxState = { x: 0, y: 0, width: 1100, height: 720 };
+let preMaxState = { x: 0, y: 0, width: 1400, height: 760 };
+
+const isResizing = ref(false);
+let resizeStart = { mouseX: 0, mouseY: 0, width: 0, height: 0 };
+let currentResizeDir: 'e' | 's' | 'se' = 'se';
 
 const initModalPosition = () => {
-  const w = Math.min(window.innerWidth - 32, 1140);
-  const h = Math.min(window.innerHeight - 32, 740);
+  const w = Math.min(window.innerWidth - 32, 1420);
+  const h = Math.min(window.innerHeight - 32, 780);
   modalSize.value = { width: w, height: h };
   modalPos.value = {
     x: Math.max(16, (window.innerWidth - w) / 2),
     y: Math.max(16, (window.innerHeight - h) / 2)
   };
+};
+
+const startResize = (dir: 'e' | 's' | 'se', e: MouseEvent) => {
+  if (isMaximized.value) return;
+  e.preventDefault();
+  e.stopPropagation();
+
+  isResizing.value = true;
+  currentResizeDir = dir;
+  resizeStart = {
+    mouseX: e.clientX,
+    mouseY: e.clientY,
+    width: modalSize.value.width,
+    height: modalSize.value.height
+  };
+
+  const onMouseMove = (ev: MouseEvent) => {
+    if (!isResizing.value) return;
+    const dx = ev.clientX - resizeStart.mouseX;
+    const dy = ev.clientY - resizeStart.mouseY;
+
+    let newW = resizeStart.width;
+    let newH = resizeStart.height;
+
+    if (currentResizeDir === 'e' || currentResizeDir === 'se') {
+      newW = Math.max(820, Math.min(window.innerWidth - modalPos.value.x - 8, resizeStart.width + dx));
+    }
+    if (currentResizeDir === 's' || currentResizeDir === 'se') {
+      newH = Math.max(480, Math.min(window.innerHeight - modalPos.value.y - 8, resizeStart.height + dy));
+    }
+
+    modalSize.value = { width: newW, height: newH };
+  };
+
+  const onMouseUp = () => {
+    isResizing.value = false;
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+  };
+
+  window.addEventListener('mousemove', onMouseMove);
+  window.addEventListener('mouseup', onMouseUp);
 };
 
 const toggleMaximize = () => {
@@ -422,7 +468,7 @@ watch(() => props.visible, (isOpen) => {
         <!-- Main Body (3-Column Hierarchy + Point Tables) -->
         <div class="flex-1 flex overflow-hidden bg-[#f2eee3] text-black">
           <!-- 1. 厂站 (Facility) Column -->
-          <div class="w-52 border-r border-[#cfc5b0] bg-[#ebe4d4] flex flex-col shrink-0">
+          <div class="w-56 border-r border-[#cfc5b0] bg-[#ebe4d4] flex flex-col shrink-0">
             <div class="p-2.5 border-b border-[#cfc5b0] bg-[#e5decb] flex items-center justify-between text-black">
               <div class="flex items-center gap-1.5 text-xs font-bold text-black">
                 <Building2 class="w-4 h-4 text-sky-800" />
@@ -455,7 +501,7 @@ watch(() => props.visible, (isOpen) => {
           </div>
 
           <!-- 2. 间隔 (Bay) Column -->
-          <div class="w-56 border-r border-[#cfc5b0] bg-[#ebe4d4] flex flex-col shrink-0">
+          <div class="w-60 border-r border-[#cfc5b0] bg-[#ebe4d4] flex flex-col shrink-0">
             <div class="p-2.5 border-b border-[#cfc5b0] bg-[#e5decb] flex items-center justify-between text-black">
               <div class="flex items-center gap-1.5 text-xs font-bold text-black">
                 <Layers class="w-4 h-4 text-sky-800" />
@@ -488,7 +534,7 @@ watch(() => props.visible, (isOpen) => {
           </div>
 
           <!-- 3. 设备 (Device) Column -->
-          <div class="w-56 border-r border-[#cfc5b0] bg-[#ebe4d4] flex flex-col shrink-0">
+          <div class="w-60 border-r border-[#cfc5b0] bg-[#ebe4d4] flex flex-col shrink-0">
             <div class="p-2.5 border-b border-[#cfc5b0] bg-[#e5decb] flex items-center justify-between text-black">
               <div class="flex items-center gap-1.5 text-xs font-bold text-black">
                 <Cpu class="w-4 h-4 text-sky-800" />
@@ -532,7 +578,7 @@ watch(() => props.visible, (isOpen) => {
                   @click="activeTab = 'yc'"
                 >
                   <Activity class="w-3.5 h-3.5 text-sky-800" />
-                  <span>遥测 (YC)</span>
+                  <span>遥测</span>
                   <span class="px-1 text-[10px] font-mono bg-[#ebe4d4] text-black border border-[#cfc5b0]">
                     {{ (currentDevice?.yc_list || currentDevice?.yc_points || []).length }}
                   </span>
@@ -545,7 +591,7 @@ watch(() => props.visible, (isOpen) => {
                   @click="activeTab = 'yx'"
                 >
                   <Radio class="w-3.5 h-3.5 text-sky-800" />
-                  <span>遥信 (YX)</span>
+                  <span>遥信</span>
                   <span class="px-1 text-[10px] font-mono bg-[#ebe4d4] text-black border border-[#cfc5b0]">
                     {{ (currentDevice?.yx_list || currentDevice?.yx_points || []).length }}
                   </span>
@@ -558,7 +604,7 @@ watch(() => props.visible, (isOpen) => {
                   @click="activeTab = 'dd'"
                 >
                   <Zap class="w-3.5 h-3.5 text-amber-600" />
-                  <span>电度 (DD)</span>
+                  <span>电度</span>
                   <span class="px-1 text-[10px] font-mono bg-[#ebe4d4] text-black border border-[#cfc5b0]">
                     {{ (currentDevice?.dd_list || currentDevice?.dd_points || []).length }}
                   </span>
@@ -571,7 +617,7 @@ watch(() => props.visible, (isOpen) => {
                   @click="activeTab = 'yk'"
                 >
                   <Sliders class="w-3.5 h-3.5 text-sky-800" />
-                  <span>遥控 (YK)</span>
+                  <span>遥控</span>
                   <span class="px-1 text-[10px] font-mono bg-[#ebe4d4] text-black border border-[#cfc5b0]">
                     {{ (currentDevice?.yk_list || currentDevice?.yk_points || []).length }}
                   </span>
@@ -584,7 +630,7 @@ watch(() => props.visible, (isOpen) => {
                   @click="activeTab = 'yt'"
                 >
                   <Workflow class="w-3.5 h-3.5 text-sky-800" />
-                  <span>遥调 (YT)</span>
+                  <span>遥调</span>
                   <span class="px-1 text-[10px] font-mono bg-[#ebe4d4] text-black border border-[#cfc5b0]">
                     {{ (currentDevice?.yt_list || currentDevice?.yt_points || []).length }}
                   </span>
@@ -748,7 +794,7 @@ watch(() => props.visible, (isOpen) => {
                     <th class="p-2">遥控 ID</th>
                     <th class="p-2">控制名称</th>
                     <th class="p-2">别名 / 编号</th>
-                    <th class="p-2">关联返校遥信点 (YX)</th>
+                    <th class="p-2">关联返校遥信点</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200 font-mono text-black">
@@ -763,7 +809,7 @@ watch(() => props.visible, (isOpen) => {
                     <td class="p-2 text-slate-700 truncate">{{ yk.alias || '-' }}</td>
                     <td class="p-2 text-black text-xs font-medium">
                       <span v-if="yk.targetVerificationPointId" class="px-1.5 py-0.5 bg-[#dfd6bf] border border-[#cfc5b0]">
-                        YX_{{ yk.targetVerificationPointId }}
+                        {{ yk.targetVerificationPointId }}
                       </span>
                       <span v-else class="text-slate-500">未指定默认</span>
                     </td>
@@ -795,7 +841,7 @@ watch(() => props.visible, (isOpen) => {
                     <th class="p-2">遥调 ID</th>
                     <th class="p-2">遥调名称</th>
                     <th class="p-2">别名 / 编号</th>
-                    <th class="p-2">关联返校遥测点 (YC)</th>
+                    <th class="p-2">关联返校遥测点</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-200 font-mono text-black">
@@ -810,7 +856,7 @@ watch(() => props.visible, (isOpen) => {
                     <td class="p-2 text-slate-700 truncate">{{ yt.alias || '-' }}</td>
                     <td class="p-2 text-black text-xs font-medium">
                       <span v-if="yt.targetVerificationPointId" class="px-1.5 py-0.5 bg-[#dfd6bf] border border-[#cfc5b0]">
-                        YC_{{ yt.targetVerificationPointId }}
+                        {{ yt.targetVerificationPointId }}
                       </span>
                       <span v-else class="text-slate-500">未指定默认</span>
                     </td>
@@ -871,6 +917,29 @@ watch(() => props.visible, (isOpen) => {
           <AlertCircle v-else class="w-4 h-4 text-[#f56c6c]" />
           <span>{{ toastMessage.text }}</span>
         </div>
+
+        <!-- 窗体拉伸控制边缘 (未最大化时有效) -->
+        <template v-if="!isMaximized">
+          <div
+            @mousedown="startResize('e', $event)"
+            class="absolute top-0 right-0 w-2 h-full cursor-ew-resize hover:bg-sky-500/20 transition-colors"
+            title="左右拖动调整宽度"
+          ></div>
+          <div
+            @mousedown="startResize('s', $event)"
+            class="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize hover:bg-sky-500/20 transition-colors"
+            title="上下拖动调整高度"
+          ></div>
+          <div
+            @mousedown="startResize('se', $event)"
+            class="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize flex items-end justify-end p-0.5 text-neutral-600 hover:text-black hover:bg-black/10 rounded-br transition-colors"
+            title="拖动右下角调整大小"
+          >
+            <svg class="w-2.5 h-2.5" viewBox="0 0 10 10" fill="currentColor">
+              <path d="M8 8H9V9H8V8ZM5 8H6V9H5V8ZM8 5H9V6H8V5ZM2 8H3V9H2V8ZM5 5H6V6H5V5ZM8 2H9V3H8V2Z" />
+            </svg>
+          </div>
+        </template>
       </div>
     </div>
   </Teleport>

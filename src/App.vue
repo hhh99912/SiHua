@@ -36,6 +36,7 @@ import { startBackgroundAlarmPolling } from './utils/realtimeAlarmStore';
 import HistoryCurveModal from './components/HistoryCurveModal.vue';
 import HistoryAlarmModal from './components/HistoryAlarmModal.vue';
 import ReportManagerModal from './components/ReportManagerModal.vue';
+import RealtimeDataModal from './components/RealtimeDataModal.vue';
 import MdiWindow from './components/MdiWindow.vue';
 import PrsBottomBar, { BottomWindowItem } from './components/PrsBottomBar.vue';
 import LoginModal from './components/LoginModal.vue';
@@ -191,6 +192,7 @@ const handleOpenLoginModal = () => {
 const MODULE_TITLES: Record<string, string> = {
   'monitor-screen': '监控运行',
   'graphic-editor': '图形编辑',
+  'realtime-data': '实时数据',
   'alarm-window': '全站告警',
   'history-alarm': '历史告警',
   'history-curve': '历史曲线',
@@ -362,6 +364,21 @@ const mdiWindows = ref<MdiWindowItem[]>([
     x: 0,
     y: 0,
     width: 1400,
+    height: 860,
+    headerTheme: 'white'
+  },
+  {
+    id: 'realtime-data',
+    title: '实时数据',
+    subtitle: '',
+    icon: Activity,
+    isOpen: false,
+    isMinimized: false,
+    isMaximized: true,
+    zIndex: 39,
+    x: 0,
+    y: 0,
+    width: 1450,
     height: 860,
     headerTheme: 'white'
   }
@@ -2161,8 +2178,32 @@ const handleKeyDown = (e: KeyboardEvent) => {
 };
 
 onMounted(async () => {
-  // 启动后台常驻实时告警轮询服务 (100ms 持续刷新，即使未打开告警窗也持续记录)
+  // 关键防整机重启与冷启动优化：底栏进程、系统菜单、用户菜单仅承担轻量渲染，严禁挂载重型大屏与告警轮询
+  if (isStartMenuOnly.value || isUserMenuOnly.value) {
+    isBootLoading.value = false;
+    return;
+  }
+
+  if (isDaemonBarOnly.value) {
+    isBootLoading.value = false;
+    // 总管底栏轻量 3 秒同步一次未确认告警数量 (仅更新数字，不存巨量数组)
+    syncRealtimeAlarms().catch(() => {});
+    alarmSyncTimer = setInterval(() => {
+      syncRealtimeAlarms().catch(() => {});
+    }, 3000);
+
+    try {
+      const cfg = await fetchBaseConfig();
+      if (cfg?.SAFE_DATA_START) {
+        safetyDays.value = computeSafetyDays(cfg.SAFE_DATA_START);
+      }
+    } catch {}
+    return;
+  }
+
+  // 仅在真实主监控画面或全站告警模块中启动后台实时告警轮询服务 (单例模式)
   startBackgroundAlarmPolling();
+
   // 1. 启动时自动扫描并读取 graph 目录下的所有独立大屏 JSON 文件 (确保至少有一个合规文件)
   try {
     const res = await loadScreensFromDisk();
@@ -2261,15 +2302,7 @@ onMounted(async () => {
   recordHistory();
   fitToScreen();
 
-  // Only start synthetic simulation timer if explicitly running offline demo mode without SCADA
-  // In industrial SCADA mode, realtime polling is strictly handled by fetchScadaRealtime
   simulationTimer = null;
-
-  // 严格从现场实际接口轮询同步告警未确认状态与数据 (绝不虚构)
-  syncRealtimeAlarms().catch(() => {});
-  alarmSyncTimer = setInterval(() => {
-    syncRealtimeAlarms().catch(() => {});
-  }, 2000);
 
   // 5. 启动时自动检索磁盘 cfg/base.json，并计算安全运行天数 (并在夜里 00:00:00 准时检索磁盘条目重新计算)
   const updateSafetyDaysFromDisk = async () => {
@@ -2434,6 +2467,7 @@ onBeforeUnmount(() => {
         v-for="item in [
           { id: 'monitor-screen', title: '监控运行', icon: Zap, color: 'text-amber-500' },
           { id: 'graphic-editor', title: '图形编辑', icon: PenTool, color: 'text-sky-600' },
+          { id: 'realtime-data', title: '实时数据', icon: Activity, color: 'text-teal-600' },
           { id: 'alarm-window', title: '全站告警', icon: Bell, color: 'text-rose-500' },
           { id: 'history-curve', title: '历史曲线', icon: LineChart, color: 'text-indigo-600' },
           { id: 'history-alarm', title: '历史告警', icon: History, color: 'text-orange-500' },
@@ -2756,6 +2790,14 @@ onBeforeUnmount(() => {
     <!-- 综合运行报表 -->
     <ReportManagerModal
       v-else-if="standaloneModuleId === 'report-window'"
+      :visible="true"
+      :isEmbedded="true"
+      @close="handleExitApp"
+    />
+
+    <!-- 实时数据 (深瑞微机监控与实时库) -->
+    <RealtimeDataModal
+      v-else-if="standaloneModuleId === 'realtime-data'"
       :visible="true"
       :isEmbedded="true"
       @close="handleExitApp"
@@ -3222,6 +3264,42 @@ onBeforeUnmount(() => {
           :visible="true"
           :isEmbedded="true"
           @close="closeWindow('report-window')"
+        />
+      </MdiWindow>
+
+      <!-- ======================================================== -->
+      <!-- G. 独立窗口: 实时数据 (深瑞实时库风格/米白主题)              -->
+      <!-- ======================================================== -->
+      <MdiWindow
+        :id="'realtime-data'"
+        :title="'实时数据'"
+        :subtitle="''"
+        :icon="Activity"
+        :isOpen="getWindow('realtime-data').isOpen"
+        :isMinimized="getWindow('realtime-data').isMinimized"
+        :isMaximized="getWindow('realtime-data').isMaximized"
+        :zIndex="getWindow('realtime-data').zIndex"
+        :x="getWindow('realtime-data').x"
+        :y="getWindow('realtime-data').y"
+        :width="getWindow('realtime-data').width"
+        :height="getWindow('realtime-data').height"
+        :headerTheme="'white'"
+        @focus="focusWindow('realtime-data')"
+        @close="closeWindow('realtime-data')"
+        @minimize="minimizeWindow('realtime-data')"
+        @maximize="maximizeWindow('realtime-data')"
+        @restore="restoreWindow('realtime-data')"
+        @update:x="val => updateWindowCoord('realtime-data', 'x', val)"
+        @update:y="val => updateWindowCoord('realtime-data', 'y', val)"
+        @update:width="val => updateWindowCoord('realtime-data', 'width', val)"
+        @update:height="val => updateWindowCoord('realtime-data', 'height', val)"
+        @update:isMaximized="val => updateWindowProp('realtime-data', 'isMaximized', val)"
+        @update:isMinimized="val => updateWindowProp('realtime-data', 'isMinimized', val)"
+      >
+        <RealtimeDataModal
+          :visible="true"
+          :isEmbedded="true"
+          @close="closeWindow('realtime-data')"
         />
       </MdiWindow>
     </div>

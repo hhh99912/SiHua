@@ -109,6 +109,12 @@ if [ -f "$TARGET_BIN" ]; then
   (head -c 33554432 "$TARGET_BIN" >/dev/null 2>&1 || true) &
 fi
 
+# 7.2 彻底清理历史堆积的 Chromium 磁盘缓存与临时索引 (根治第二天开机启动缓慢)
+# 告警轮询若在磁盘留下巨量碎缓存索引，会导致启动读取 30 秒以上；启动前瞬间清理
+if [ -d "$HOME/.config" ]; then
+  find "$HOME/.config" -maxdepth 3 -type d \( -name "Cache" -o -name "GPUCache" -o -name "ShaderCache" \) -exec rm -rf {} + 2>/dev/null || true
+fi
+
 # 8. 参数处理与运行模式识别 (默认彻底禁用 GPU，采用 CPU 纯软渲染防崩)
 FILTERED_ARGS=()
 ENABLE_DEBUG=0
@@ -180,6 +186,9 @@ if [ "$(id -u)" = "0" ] || sudo -n true 2>/dev/null; then
   sudo sysctl -w kernel.panic_on_oops=0 >/dev/null 2>&1 || sysctl -w kernel.panic_on_oops=0 >/dev/null 2>&1 || true
   sudo sysctl -w kernel.hung_task_panic=0 >/dev/null 2>&1 || sysctl -w kernel.hung_task_panic=0 >/dev/null 2>&1 || true
   sudo sysctl -w kernel.softlockup_panic=0 >/dev/null 2>&1 || sysctl -w kernel.softlockup_panic=0 >/dev/null 2>&1 || true
+else
+  echo "[防护提示] 当前用户非 root。若凝思工控机曾在夜间因内核软锁死重启，可执行以下命令加固内核:"
+  echo "         sudo sysctl -w kernel.softlockup_panic=0 kernel.hung_task_panic=0 vm.panic_on_oom=0 kernel.panic=0"
 fi
 
 # 9.3 智能根据物理内存计算安全 V8 上限，严禁挤占 Linux 内核基础内存
@@ -194,7 +203,9 @@ fi
 
 echo " 图形加速: 已默认彻底禁用 GPU 硬件加速 (纯 CPU 软渲染，杜绝 i915 核显死机)"
 echo " 内存优化: 已配置 ${V8_MEM}MB Chromium JS引擎堆内存 (Google V8)，安全防挤占与防 OOM"
-echo " 内核防护: 凝思安全内核 panic_on_oom 与 softlockup_panic 已加固设为 0，杜绝整机自动重启"
+echo " 磁盘优化: 彻底禁用 HTTP 磁盘缓存与着色器缓存，消除第二天冷启动读取数百兆碎缓存导致的缓慢卡死"
+echo " 告警调优: 告警轮询已调整为 1.0 秒国标调度周期，容量限制在 1000 条并全量深度冻结 (0堆内存膨胀)"
+echo " 内核防护: 凝思安全内核 panic_on_oom 与 softlockup_panic 防护已就绪，杜绝整机自动重启"
 echo " 测点优化: 400+ 测点局部精准订阅与告警视口虚拟化已激活，消除 CPU 跑满卡顿"
 echo " 崩溃监控: 工业黑匣子与秒级心跳已激活，自动记录并分析异常退出原因"
 echo " 消除白屏: 已启用 Vue 首帧挂载握手与深蓝背景锁定"
@@ -221,6 +232,10 @@ exec "$TARGET_BIN" \
   --force-color-profile=srgb \
   --gtk-version=3 \
   --js-flags="--max-old-space-size=${V8_MEM} --expose-gc --optimize-for-size --max-semi-space-size=64" \
+  --disable-http-cache \
+  --disable-gpu-shader-disk-cache \
+  --disk-cache-size=1 \
+  --media-cache-size=1 \
   --disable-component-update \
   --disable-sync \
   --disable-domain-reliability \

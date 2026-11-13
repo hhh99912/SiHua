@@ -15,8 +15,7 @@ import {
   findScadaPointDef,
   getFastLiveYc,
   getFastLiveYx,
-  getFastLiveDd,
-  getScadaPointDisplayName
+  getFastLiveDd
 } from '../utils/scadaClient';
 
 interface Props {
@@ -235,17 +234,17 @@ const rawPointsList = computed(() => {
   return [];
 });
 
-// 过滤后的测点列表 (支持根据工程中文名称、原名或别名快速搜索)
+// 过滤后的测点列表 (支持根据实际测点名称、别名或ID快速搜索)
 const pointsList = computed(() => {
   const q = pointSearch.value.trim().toLowerCase();
   const list = rawPointsList.value;
   if (!q) return list;
   return list.filter((p: any) => {
-    const dispName = getScadaPointDisplayName(p).toLowerCase();
     const rawName = String(p.name || '').toLowerCase();
     const alias = String(p.alias || '').toLowerCase();
     const typeName = String(p.type_name || '').toLowerCase();
-    return dispName.includes(q) || rawName.includes(q) || alias.includes(q) || typeName.includes(q);
+    const idStr = String(p.id || '').toLowerCase();
+    return rawName.includes(q) || alias.includes(q) || typeName.includes(q) || idStr.includes(q);
   });
 });
 
@@ -350,13 +349,14 @@ const sameBayVerificationCandidates = computed(() => {
     }
 
     pts.forEach((p: any) => {
+      const realName = p.name || String(p.id);
       result.push({
         index: idx++,
         deviceId: d.dev_id || d.id,
         deviceName: dName,
         id: p.id,
-        name: p.name,
-        displayName: getScadaPointDisplayName(p),
+        name: realName,
+        displayName: realName,
         alias: p.alias || p.type_name
       });
     });
@@ -412,7 +412,7 @@ const initializeCascadingSelection = () => {
       selectedCategory.value = (pDef.category as any) || targetCategory;
       selectedPointId.value = targetPointId;
 
-      const pName = getScadaPointDisplayName(pDef.point) || pDef.point?.name || `测点`;
+      const pName = pDef.point?.name || String(targetPointId);
       selectedPoint.value = {
         pointId: targetPointId,
         name: pName,
@@ -511,13 +511,13 @@ watch([selectedCategory, sameBayVerificationCandidates], () => {
   }
 });
 
-// 选择测点行：使用中文标准工程名称赋给 selectedPoint.name
+// 选择测点行：直接使用实际测点真实名称赋给 selectedPoint.name
 const handleSelectPointRow = (pt: any) => {
   selectedPointId.value = pt.id;
-  const displayName = getScadaPointDisplayName(pt);
+  const actualName = pt.name || String(pt.id);
   selectedPoint.value = {
     pointId: pt.id,
-    name: displayName,
+    name: actualName,
     rawName: pt.name,
     alias: pt.alias,
     type: pt.type,
@@ -833,11 +833,11 @@ const handleSubmit = () => {
                     :class="selectedPointId === pt.id ? 'bg-sky-50 text-black font-bold border-l-4 border-l-sky-600' : 'hover:bg-[#faf7f0] text-black'"
                     @click="handleSelectPointRow(pt)"
                   >
-                    <!-- 测点名称 -->
-                    <td class="py-2.5 px-3 font-sans text-sm font-bold text-black truncate" :title="getScadaPointDisplayName(pt)">
+                    <!-- 测点名称 (严格来自实际真实名称) -->
+                    <td class="py-2.5 px-3 font-sans text-sm font-bold text-black truncate" :title="pt.name || pt.id">
                       <div class="flex items-center gap-2 truncate">
                         <span class="w-2 h-2 rounded-full shrink-0" :class="selectedPointId === pt.id ? 'bg-sky-600' : 'bg-neutral-400'"></span>
-                        <span class="truncate">{{ getScadaPointDisplayName(pt) }}</span>
+                        <span class="truncate">{{ pt.name || pt.id }}</span>
                       </div>
                     </td>
 

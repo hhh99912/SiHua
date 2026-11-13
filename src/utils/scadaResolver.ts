@@ -246,7 +246,9 @@ export function syncDatasetFastIndex(datasets?: DatasetItem[]) {
               globalPointIndex.set(String(pt.pointId), numVal);
               if (!isNaN(ptId) && ptId > 0) {
                 rawYcValues.set(ptId, numVal);
-                rawYcQuality.set(ptId, 1);
+                // 工业标准：0 为正常品质，严禁误设为 1 导致正常遥测全部显示为灰色 (#94a3b8)
+                const quality = (pt as any).status !== undefined ? Number((pt as any).status) : 0;
+                rawYcQuality.set(ptId, quality);
               }
             }
           }
@@ -259,7 +261,8 @@ export function syncDatasetFastIndex(datasets?: DatasetItem[]) {
               globalPointIndex.set(String(pt.pointId), numVal);
               if (!isNaN(ptId) && ptId > 0) {
                 rawYxValues.set(ptId, numVal);
-                rawYxQuality.set(ptId, 1);
+                const quality = (pt as any).status !== undefined ? Number((pt as any).status) : 0;
+                rawYxQuality.set(ptId, quality);
               }
             }
           }
@@ -271,6 +274,7 @@ export function syncDatasetFastIndex(datasets?: DatasetItem[]) {
               globalPointIndex.set(`${devId}_DD_${pt.pointId}`, numVal);
               if (!isNaN(ptId) && ptId > 0) {
                 rawDdValues.set(ptId, numVal);
+                rawDdQuality.set(ptId, 0);
               }
             }
           }

@@ -1,0 +1,3270 @@
+
+
+#include "main_view_warn.h"
+#include "repos_info_warn.h"
+#include "externWarn.h"
+#include "cfuncWarn.h"
+#include "fac_select_warn.h"
+#include "bay_select_warn.h"
+#include "setting_dlg_warn.h"
+#include "toplink_warn.h"
+#include "base_lib.h"
+#include "autotoolbar.h"
+#include "viewsetting_warn.h"
+#define _BULLETIN_PRIVILEGE_
+#include "bulletin.h"
+#include "transcoding.h"
+#include "gui_usercurve_manager/tablemodel_showplane.h"
+#include "Dialog.h"
+#include "mainwidget.h"
+
+MyDictMap CDictMap::m_DictMap;
+int CDictMap::m_iLoadOK;
+int CDictMap::m_SysLang;
+CDictMap g_dictMap("../data/qm/svc_scada_proxy.dic");
+
+static int xl_gz_flag = -1;
+static int xl_gz_timer = 0;
+static int mx_gz_flag = -1;
+static int mx_gz_timer = 0;
+static int zb_ptdx_flag = -1;
+static int zb_ptdx_timer = 0;
+static int zb_gz_flag = -1;
+static int zb_gz_timer = 0;
+static int zb_gz2_flag = -1;
+static int zb_gz2_timer = 0;
+static int dr_gz_flag = -1;
+static int dr_gz_timer = 0;
+static int dk_gz_flag = -1;
+static int dk_gz_timer = 0;
+static int zyb_gz_flag = -1;
+static int zyb_gz_timer = 0;
+static int zl_gz_flag = -1;
+static int zl_gz_timer = 0;
+static int ct_dx_flag = -1;
+static int ct_dx_timer = 0;
+static int pt_dx_flag = -1;
+static int pt_dx_timer = 0;
+static int pt_wy_flag = -1;
+static int pt_wy_timer = 0;
+static int kg_jd_flag_g = -1;
+static int kg_jd_timer_g = 0;
+static int kg_jd_flag_z = -1;
+static int kg_jd_timer_z = 0;
+static int kg_jd_flag_d = -1;
+static int kg_jd_timer_d = 0;
+static int tt_gz_flag = -1;
+static int tt_gz_timer = 0;
+static int processed_num = 0;
+
+/*
+short	YX_FIELD,YC_FIELD;
+short	YX_WARNTYPE_FIELD,YC_WARNTYPE_FIELD;
+short	YX_ALIAS_FIELD,YC_ALIAS_FIELD;
+short	YX_STATUS_FIELD,YC_STATUS_FIELD;
+short	YX_LDALIAS_FIELD,YC_LDALIAS_FIELD;
+short	YX_VALUE_FIELD;
+short	YX_TYPE_FIELD;
+short	YX_REPOSTYPE_FIELD;
+*/
+namespace GuiWarnSpace
+{
+    int get_process_count(char *process_name);
+    // void GetWarnField();
+
+    MainView::MainView(QWidget *parent) : BaseMainWindow(parent)
+    {
+        QPalette palette;
+        palette.setBrush(QPalette::Background, QBrush(QColor(220, 220, 220)));
+        setPalette(palette);
+        initData();
+        setAnimated(true);
+
+        tab = new QTabWidget;
+        if (tab_position)
+            tab->setTabPosition(QTabWidget::North);
+        else
+            tab->setTabPosition(QTabWidget::South);
+        tab->setTabShape(QTabWidget::Triangular);
+        connect(tab, SIGNAL(currentChanged(int)), this, SLOT(tabChanged(int)));
+
+        initTab();
+        setCentralWidget(tab);
+
+        createActions();
+        if (if_show_menu)
+        {
+            createMenus();
+        }
+        createToolBars();
+        createStatusBar();
+        // createDockWindows();
+        setWindowTitle(QObject::tr("Alarming window", "告警窗"));
+        setWindowFlags((windowFlags() & ~Qt::WindowCloseButtonHint) | Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowMinMaxButtonsHint);
+        timer.start(INTERVAL_TIME, this);
+        setGeometry(0, 5, WIN_WIDTH, 450);
+        setMinimumWidth(WIN_WIDTH * 3 / 4);
+        setMaximumSize(WIN_WIDTH, WIN_HEIGHT);
+
+        m_pTimer = new QTimer();
+        m_pTimer->setInterval(1000);
+        connect(m_pTimer, SIGNAL(timeout()), this, SLOT(slot_timer_out()), Qt::DirectConnection);
+        m_pTimer->start();
+    }
+
+    MainView::~MainView()
+    {
+        if (m_WarnRecMessage)
+        {
+            delete[] m_WarnRecMessage;
+            m_WarnRecMessage = NULL;
+        }
+        if (m_OneFacBayInfoArray)
+        {
+            delete[] m_OneFacBayInfoArray;
+            m_OneFacBayInfoArray = NULL;
+        }
+        if (FacInfoArray)
+        {
+            delete[] FacInfoArray;
+            FacInfoArray = NULL;
+        }
+        if (BayInfoArray)
+        {
+            delete[] BayInfoArray;
+            BayInfoArray = NULL;
+        }
+        if (m_ValueBuffer)
+        {
+            for (int i = 0; i < WarnTableDes.field_sum; i++)
+                if (m_ValueBuffer[i])
+                    delete[] m_ValueBuffer[i];
+            delete[] m_ValueBuffer;
+        }
+    }
+
+    void MainView::onShow()
+    {
+        qDebug() << "warn on show";
+        // 解决初次进入告警界面 界面没有刷新的问题。
+        refresh_flag = true;
+    }
+
+    void MainView::onHide()
+    {
+        qDebug() << "warn on hide";
+    }
+
+    QMenu *MainView::createPopupMenu()
+    {
+        return NULL;
+    }
+
+    void MainView::print()
+    {
+        m_CurrentTabOrder = tab->currentIndex();
+        if (m_CurrentTabOrder >= 0)
+        {
+            CWarnSplitterMap::Iterator it;
+            it = m_WarnSplitterMap.find(m_CurrentTabOrder);
+            if (it != m_WarnSplitterMap.end())
+            {
+                if (if_split_win)
+                    it.value()->m_allView->print();
+                else
+                    it.value()->m_ackView->print();
+            }
+        }
+    }
+
+    void MainView::initData()
+    {
+        if (GetAppHeightFromXml() < 0)
+        {
+            PANEL_HEIGHT = 40;
+        }
+        WIN_WIDTH = QApplication::desktop()->availableGeometry().width() - 12;
+        WIN_HEIGHT = QApplication::desktop()->availableGeometry().height() - 29 - PANEL_HEIGHT;
+        refresh_window = 0;
+        m_ProcessState = PROCESS_STATE_ACTIVE;
+        mytimer = 0;
+        refresh_timer = 0;
+        refresh_count = 0;
+
+        filterFacStr = QObject::tr("All Substation<br>", "所有厂站<br>");
+        filterBayStr = QObject::tr("All Bay<br>", "所有间隔<br>");
+        shieldFacStr = QObject::tr("No <br>", "无<br>");
+        shieldBayStr = QObject::tr("NO <br>", "无<br>");
+        shieldSignalStr = QObject::tr("NO <br>", "无<br>");
+        countStr = QObject::tr("  Unconfirmed %1 record  Confirmed %2 record  ", "  未确认%1条  已确认%2条  ").arg(0, 4, 10, QChar('0')).arg(0, 4, 10, QChar('0'));
+        statusStr = "";
+        TABPAGE_EXAMINE_NAME = QObject::tr("Overhaul information", "检修信息"); // 检修信息
+        TABPAGE_NOREVERT_NAME = QObject::tr("No reverting", "未复归");          // 未复归信息
+        TABPAGE_RESULT_NAME = QObject::tr("Reasoning result", "推理结果");      // 推理结果
+        TABPAGE_REALTIME_NAME = QObject::tr("Timing information", "时序信息");  // 时序信息
+        // TABPAGE_RECALL_NAME=QObject::tr("事故反演");		//事故反演
+
+        // 读smart_warn.ini
+        // QSettings settings(PRJ_DIR + "/sys/smart_warn.ini",QSettings::NativeFormat);
+        QSettings settings("/semp1000/semp/deploy/scada/cfg/scada_realtime_warn.cfg", QSettings::NativeFormat);
+        m_FontSize = settings.value("setting/m_FontSize", 12).toInt();
+        m_FontType = settings.value("setting/m_FontType", "Times New Roman").toString();
+        m_AutoRefreshTime = settings.value("setting/m_AutoRefreshTime", 1).toInt();
+        m_PopFlag = settings.value("setting/m_PopFlag", 1).toInt();
+        m_NoConfirmStyle = settings.value("setting/m_NoConfirmStyle", 1).toInt();
+        m_SortType = settings.value("setting/m_SortType", 0).toInt();
+
+        int ret = InitApp(SCADA);
+
+        if (ret < 0)
+        {
+            printf("initData,Can't initApp(SCADA)\n");
+            return;
+        }
+
+        // read default define
+        GetDefaultWarnDefine();
+        // read scada_warn_modules.cfg
+        if (GetWarnDefineFromFile() < 0)
+        {
+            printf("GetWarnDefineFromFile fail\n");
+        }
+        // read hmi setting
+        GetHmiDefineFromXml();
+
+        // 读告警等级定义表
+        ReadWarnType();
+        InitFacArray();
+        InitBayArray();
+
+        // 读知识库表，如果有记录，则置tl_flag标志
+        GetReposInfo();
+        if (tl_flag)
+        {
+            // 读repository_type表
+            GetReposType();
+            // 读dark_reason表
+            GetDarkReason();
+            // 初始化拓扑类
+            toplink.loadTopDevice();
+        }
+
+        // 初始化消息数组队列
+        m_WarnRecMessage = new WarnStruct[MAX_LINES];
+
+        /*
+        //初始化告警类型域ID
+        YX_WARNTYPE_FIELD=-1;
+        YC_WARNTYPE_FIELD=-1;
+        //初始化别名域ID
+        YX_ALIAS_FIELD=-1;
+        YC_ALIAS_FIELD=-1;
+
+        //初始化逻辑设备别名域ID
+        YX_LDALIAS_FIELD=-1;
+        YC_LDALIAS_FIELD=-1;
+
+        GetWarnField();
+        */
+
+        // 通过主变表获得本站各电压等级
+        ret = GetStationVolIdx();
+        if (ret < 0)
+            printf(" 变压器表读取失败:hvol=%d,mvol=%d,lvol=%d\n", HVol_Idx, MVol_Idx, LVol_Idx);
+
+        // 告警窗内的信息2次时钟事件闪烁一次
+        // 默认情况为1秒1次
+        m_iShowInterval = 1000 / INTERVAL_TIME;
+
+        // 还没有收到过消息的标记
+        m_FirstStart = true;
+
+        // 间隔信息为空
+        m_OneFacBayInfoArray = NULL;
+
+        // 默认为刷新状态
+        m_bRefreshWarn = true;
+
+        // 默认设定已经复归的消息显示
+        m_RevertWarnNoDisp = false;
+
+        m_ConfirmGzp = true;
+
+        // 消息开始和结束的位置
+        //	item_begin=0;
+        item_end = 0;
+        item_has_full = 0; // MAX_LINE是否已满
+
+        // 用户还未登录
+        m_UserLoginFlag = false;
+
+        // 自动定位至厂站 false
+        m_AutoSelFac = false;
+        // 自动定位至间隔 false
+        m_AutoSelBay = false;
+        // 自动定位至厂站的ID -1
+        m_AutoSelFacId = -1;
+        // 自动定位至间隔的ID -1
+        m_AutoSelBayId = -1;
+
+        // 页面标题需要闪烁的变量初始化
+        for (int i = 0; i < MAX_TABPAGE_NUM; i++)
+            m_TabNeedLight[i] = false;
+
+        // valid_time=0; //收到的有效时间
+
+        m_FacHadHold = false; // 当前系统中有厂站被屏蔽了
+        m_BayHadHold = false; // 当前系统中有间隔被屏蔽了
+
+        // 手动
+        // 测试时手动添加一些WarnRecMessage信息
+        /*
+        printf("测试时手动添加一些WarnRecMessage信息\n");
+        for (int j=0;j<=15;j++)
+        {
+            m_WarnRecMessage[j].type=1;
+            m_WarnRecMessage[j].my_type=1;
+            m_WarnRecMessage[j].level=1;
+            m_WarnRecMessage[j].no=1;
+            sprintf(m_WarnRecMessage[j].string ,".....报警...动作保护%d.......",j);
+            m_WarnRecMessage[j].value=1;
+            m_WarnRecMessage[j].confirm=0;
+            m_WarnRecMessage[j].confirm_flag=0;
+            //if(if_split_win == 0)
+                m_WarnRecMessage[j].flag=1;
+            //else
+            //	m_WarnRecMessage[j].flag=0;
+            m_WarnRecMessage[j].start_time =2009*100+j;
+
+            m_WarnRecMessage[j].fac_id=400010;
+            m_WarnRecMessage[j].bay_id=430001080;
+            m_WarnRecMessage[j].field_id=-1;
+            m_WarnRecMessage[j].key_id =-1;
+            m_WarnRecMessage[j].customized_group=1;
+
+            m_TabNeedLight[m_WarnRecMessage[j].customized_group]=true;
+            //m_WarnRecMessage[j].customized_group=-1;
+
+            //QString str= QString( "%1 %2" )
+            //	.arg( tr(m_WarnRecMessage[j].warn_str)).arg(m_WarnRecMessage[j].fac_id);
+            }
+        m_FirstStart = false;
+        item_end = 15;*/
+    }
+
+    void MainView::initTab()
+    {
+        int i;
+        tabpages_num = 0;
+        TABPAGE_NAME[tabpages_num] = TABPAGE_REALTIME_NAME;
+        warnsplit = new WarnSplitter(tab, TABPAGE_NAME[tabpages_num], this, -1, 0);
+        tab->insertTab(tabpages_num, warnsplit, QIcon(QString(":light-off.png")), TABPAGE_NAME[tabpages_num]);
+        m_WarnSplitterMap[tabpages_num] = warnsplit;
+        tabpages_num++;
+        for (i = 0; i < warn_level_num; i++)
+        {
+            TABPAGE_NAME[tabpages_num] = Transcoding::getInstance()->trans_coding(LevelDefine[i].name, Gbk_Data);
+            warnsplit = new WarnSplitter(tab, TABPAGE_NAME[tabpages_num], this, tabpages_num, 1);
+            tab->insertTab(tabpages_num + i, warnsplit, QIcon(QString(":light-off.png")), TABPAGE_NAME[tabpages_num]);
+            m_WarnSplitterMap[tabpages_num] = warnsplit;
+            tabpages_num++;
+        }
+        for (i = 0; i < MAX_WARN_NUM; i++)
+        {
+            if (WarnDefine[i].add_tab == 1)
+            {
+                TABPAGE_NAME[tabpages_num] = QString(WarnDefine[i].name);
+                warnsplit = new WarnSplitter(tab, TABPAGE_NAME[tabpages_num], this, tabpages_num, 1);
+                tab->insertTab(tabpages_num, warnsplit, QIcon(QString(":light-off.png")), TABPAGE_NAME[tabpages_num]);
+                m_WarnSplitterMap[tabpages_num] = warnsplit;
+                WarnDefine[i].tabpage = tabpages_num;
+                tabpages_num++;
+            }
+        }
+
+        // 推理结果
+        if (tl_flag)
+        {
+            TABPAGE_NAME[tabpages_num] = TABPAGE_RESULT_NAME;
+            warnsplit = new WarnSplitter(tab, TABPAGE_NAME[tabpages_num], this, tabpages_num, 0);
+            tab->insertTab(tabpages_num, warnsplit, QIcon(QString(":light-off.png")), TABPAGE_NAME[tabpages_num]);
+            m_WarnSplitterMap[tabpages_num] = warnsplit;
+            result_tabpage = tabpages_num;
+            tabpages_num++;
+            strcpy(LevelDefine[WARN_LEVEL_RESULT - 1].name, TABPAGE_RESULT_NAME.toAscii().data());
+        }
+
+        // 检修信息
+        TABPAGE_NAME[tabpages_num] = TABPAGE_EXAMINE_NAME;
+        warnsplit = new WarnSplitter(tab, TABPAGE_NAME[tabpages_num], this, tabpages_num, 0);
+        tab->insertTab(tabpages_num, warnsplit, QIcon(QString(":light-off.png")), TABPAGE_NAME[tabpages_num]);
+        m_WarnSplitterMap[tabpages_num] = warnsplit;
+        examine_tabpage = tabpages_num;
+        tabpages_num++;
+
+        // 未复归告警信息
+        TABPAGE_NAME[tabpages_num] = TABPAGE_NOREVERT_NAME;
+        warnsplit = new WarnSplitter(tab, TABPAGE_NAME[tabpages_num], this, tabpages_num, 0);
+        tab->insertTab(tabpages_num, warnsplit, QIcon(QString(":light-off.png")), TABPAGE_NAME[tabpages_num]);
+        m_WarnSplitterMap[tabpages_num] = warnsplit;
+        revert_tabpage = tabpages_num;
+        tabpages_num++;
+    }
+
+    void MainView::save()
+    {
+        QString strTitle;
+        int fileType;
+        strTitle = QObject::tr("Save as", "保存文件为");
+        if (access("../data/warn_save", F_OK) == -1)
+        {
+            // QMessageBox::warning(this,QObject::tr("Error","错误"), QObject::tr("The directory of 'warn_save' is not exist!","目录warn_save不存在!"), QMessageBox::Ok);
+            //  return;
+
+            // 创建文件夹
+            QString str = QDir::currentPath();
+            QStringList strlist = str.split("/");
+            QString path = "";
+            for (int i = 0; i < strlist.count(); i++)
+            {
+                if (i < strlist.count() - 1)
+                {
+                    path += strlist.at(i) + "/";
+                }
+                else
+                {
+                    path += "data/warn_save";
+                }
+            }
+
+            QDir dir(path);
+            if (!dir.exists())
+            {
+                dir.mkdir(path);
+            }
+        }
+
+        QString fname;
+        QStringList filters;
+        QStringList fnamelist;
+        filters << QObject::tr("XLS file (*.xls)", "XLS文件 (*.xls)")
+                << QObject::tr("TXT file (*.txt)", "TXT文件 (*.txt)")
+                << QObject::tr("PDF file (*.pdf)", "PDF文件 (*.pdf)");
+        QFileDialog dialog(this, strTitle);
+        dialog.setFilters(filters);
+        dialog.setDirectory(QDir("../data/warn_save"));
+        dialog.setAcceptMode(QFileDialog::AcceptSave);
+        dialog.setReadOnly(true);
+        dialog.setLabelText(QFileDialog::Accept, QObject::tr("Save", "保存"));
+        if (dialog.exec())
+        {
+            fnamelist = dialog.selectedFiles();
+            if (fnamelist.size() == 1)
+                fname = fnamelist.at(0);
+            else
+                return;
+        }
+        if (fname.isEmpty() == true)
+            return;
+        QString filter = dialog.selectedFilter();
+        if (filter.contains("xls"))
+            fileType = 0;
+        else if (filter.contains("txt"))
+            fileType = 1;
+        else if (filter.contains("pdf"))
+            fileType = 2;
+        if (fileType == 0)
+        {
+            if (fname.endsWith(XLSTYPE) == false)
+            {
+                fname += XLSTYPE;
+            }
+        }
+        else if (fileType == 1)
+        {
+            if (fname.endsWith(TXTTYPE) == false)
+            {
+                fname += TXTTYPE;
+            }
+        }
+        else if (fileType == 2)
+        {
+            if (fname.endsWith(PDFTYPE) == false)
+            {
+                fname += PDFTYPE;
+            }
+        }
+        m_SaveFileName = fname;
+        m_CurrentTabOrder = tab->currentIndex();
+        if (if_split_win)
+            warnsplit->m_allView->saveFile(fileType);
+        warnsplit->m_ackView->saveFile(fileType);
+        statusBar()->showMessage(QObject::tr("Saved '%1'", "已保存 '%1'").arg(m_SaveFileName), 6000);
+    }
+
+    void MainView::createActions()
+    {
+        saveAct = new QAction(QIcon(QString(":save.png")), QObject::tr("Save", "保存"), this);
+        saveAct->setShortcut(QString("Ctrl+S"));
+        saveAct->setStatusTip(QObject::tr("Save alarm information to file", "保存告警内容到文件"));
+        saveAct->setToolTip(QObject::tr("Save alarm information to file", "保存告警内容到文件"));
+        connect(saveAct, SIGNAL(triggered()), this, SLOT(save()));
+
+        printAct = new QAction(QIcon(QString(":print.png")), QObject::tr("Print", "打印"), this);
+        printAct->setShortcut(QString("Ctrl+P"));
+        printAct->setStatusTip(QObject::tr("Print alarm information", "打印告警内容"));
+        printAct->setToolTip(QObject::tr("Print alarm information", "打印告警内容"));
+        connect(printAct, SIGNAL(triggered()), this, SLOT(print()));
+
+        settingAct = new QAction(QIcon(QString(":setting.png")), QObject::tr("Setting", "设置"), this);
+        settingAct->setStatusTip(QObject::tr("User personalized settings", "用户个性化设置"));
+        settingAct->setToolTip(QObject::tr("User personalized settings", "用户个性化设置"));
+        connect(settingAct, SIGNAL(triggered()), this, SLOT(setting()));
+
+        stopAct = new QAction(QIcon(QString(":stop.png")), QObject::tr("Suspend", "暂停"), this);
+        stopAct->setStatusTip(QObject::tr("Suspend or restore refreshing", "暂停/恢复刷新"));
+        stopAct->setToolTip(QObject::tr("Suspend refreshing", "暂停刷新"));
+        stopAct->setCheckable(true);
+        connect(stopAct, SIGNAL(toggled(bool)), this, SLOT(stop(bool)));
+
+        ackAct = new QAction(QIcon(QString(":ack.png")), QObject::tr("ACK", "确认"), this);
+        ackAct->setStatusTip(QObject::tr("Acknowledge all alarming infromation", "确认全部告警信息"));
+        ackAct->setToolTip(QObject::tr("Acknowledge all alarming information", "确认全部告警信息"));
+        connect(ackAct, SIGNAL(triggered()), this, SLOT(ack_all()));
+
+        clearAckAct = new QAction(QIcon(QString(":clear.png")), QObject::tr("Clear", "清除"), this);
+        clearAckAct->setStatusTip(QObject::tr("Remove all confirmed alarming information", "清除已确认告警信息"));
+        clearAckAct->setToolTip(QObject::tr("Remove all confirmed alarming information", "清除已确认告警信息"));
+        connect(clearAckAct, SIGNAL(triggered()), this, SLOT(clear_ack()));
+
+        showDockAct = new QAction(QIcon(QString(":view_remove.png")), QObject::tr("Hide", "隐藏"), this);
+        showDockAct->setCheckable(true);
+        showDockAct->setChecked(false);
+        showDockAct->setStatusTip(QObject::tr("Display or hide configuration view", "显示或隐藏配置视图"));
+        showDockAct->setToolTip(QObject::tr("Hide configuration view", "隐藏配置视图"));
+        connect(showDockAct, SIGNAL(toggled(bool)), this, SLOT(showDock(bool)));
+
+        if (if_split_win)
+        {
+            showAckViewAct = new QAction(QObject::tr("Display the top part of window", "显示上部窗口"), this);
+            showAckViewAct->setCheckable(true);
+            showAckViewAct->setChecked(true);
+            showAckViewAct->setStatusTip(QObject::tr("Display or hide the top part of window", "显示或隐藏上部窗口"));
+            showAckViewAct->setToolTip(QObject::tr("Hide the top part of window", "隐藏上部窗口"));
+            connect(showAckViewAct, SIGNAL(toggled(bool)), this, SLOT(showAckView(bool)));
+
+            showAllViewAct = new QAction(QObject::tr("Display the bottom part of window", "显示下部窗口"), this);
+            showAllViewAct->setCheckable(true);
+            showAllViewAct->setChecked(true);
+            showAllViewAct->setStatusTip(QObject::tr("Display or hide the bottom part of window", "显示或隐藏下部窗口"));
+            showAllViewAct->setToolTip(QObject::tr("Hide the bottom part of window", "隐藏下部窗口"));
+            connect(showAllViewAct, SIGNAL(toggled(bool)), this, SLOT(showAllView(bool)));
+        }
+
+        hisAct = new QAction(QIcon(QString(":warn_tool.png")), QObject::tr("History query", "历史查询"), this);
+        hisAct->setStatusTip(QObject::tr("History query", "历史查询"));
+        hisAct->setToolTip(QObject::tr("History query", "历史查询"));
+        connect(hisAct, SIGNAL(triggered()), this, SLOT(loadWarnBrowse()));
+
+        setActionState(false);
+    }
+
+    void MainView::createMenus()
+    {
+        fileMenu = menuBar()->addMenu(tr("File(&F)", "文件(&F)"));
+        fileMenu->addAction(saveAct);
+        fileMenu->addAction(printAct);
+
+        editMenu = menuBar()->addMenu(tr("Edit(&E)", "编辑(&E)"));
+        editMenu->addAction(ackAct);
+        editMenu->addAction(clearAckAct);
+        editMenu->addAction(stopAct);
+        editMenu->addSeparator();
+        if (if_split_win)
+        {
+            editMenu->addAction(showAckViewAct);
+            editMenu->addAction(showAllViewAct);
+            editMenu->addSeparator();
+        }
+        editMenu->addAction(hisAct);
+
+        optionMenu = menuBar()->addMenu(tr("Option(&O)", "选项(&O)"));
+        optionMenu->addAction(settingAct);
+    }
+
+    void MainView::setIconStyle(QToolBar *tool_bar)
+    {
+        if (tool_bar == NULL)
+            return;
+        switch (icon_style)
+        {
+        case 0:
+            tool_bar->setIconSize(QSize(32, 32));
+            break;
+        case 1:
+            tool_bar->setIconSize(QSize(24, 24));
+            tool_bar->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+            break;
+        case 2:
+            //    		tool_bar->setFixedHeight(48);
+            tool_bar->setIconSize(QSize(24, 24));
+            tool_bar->setToolButtonStyle(Qt::ToolButtonTextUnderIcon);
+            break;
+        default:
+            tool_bar->setIconSize(QSize(32, 32));
+            break;
+        }
+    }
+
+    QList<int> MainView::getwarnlist()
+    {
+        QList<int> list;
+        list.clear();
+        TableModel_Showplane *p = TableModel_Showplane::getInstance(WARN_INFO_CONFIGURE_NO, this);
+        p->InitTable(WARN_INFO_CONFIGURE_NO);
+        for (int i = 0; i < p->rowCount(); i++)
+        {
+            if (p->index(i, 2).data().toString() == tr("是"))
+            {
+                list.append(getnum(p->index(i, 1).data().toString()));
+            }
+        }
+        return list;
+    }
+
+    int MainView::getnum(QString name)
+    {
+        int num = -1;
+        if (name == tr("遥信变位"))
+        {
+            num = 1;
+        }
+        else if (name == tr("遥测越限"))
+        {
+            num = 2;
+        }
+        else if (name == tr("厂站工况"))
+        {
+            num = 3;
+        }
+        else if (name == tr("结点工况"))
+        {
+            num = 4;
+        }
+        else if (name == tr("人工遥信封锁"))
+        {
+            num = 5;
+        }
+        else if (name == tr("人工遥测封锁"))
+        {
+            num = 6;
+        }
+        else if (name == tr("人工厂站封锁"))
+        {
+            num = 7;
+        }
+        else if (name == tr("人工遥控"))
+        {
+            num = 8;
+        }
+        else if (name == tr("人工遥调"))
+        {
+            num = 9;
+        }
+        else if (name == tr("事件"))
+        {
+            num = 10;
+        }
+        else if (name == tr("人工遥信置数"))
+        {
+            num = 11;
+        }
+        else if (name == tr("人工遥测置数"))
+        {
+            num = 12;
+        }
+        else if (name == tr("人工遥信封锁解除"))
+        {
+            num = 13;
+        }
+        else if (name == tr("人工遥测封锁解除"))
+        {
+            num = 14;
+        }
+        else if (name == tr("人工厂站封锁解除"))
+        {
+            num = 15;
+        }
+        else if (name == tr("保护动作"))
+        {
+            num = 16;
+        }
+        return num;
+    }
+
+    void MainView::createToolBars()
+    {
+        // tool_bar = addToolBar(QObject::tr("Toolbar","工具条"));
+
+        tool_bar = new QToolBar(QObject::tr("Toolbar", "工具栏"));
+        tool_bar->setOrientation(Qt::Vertical);
+
+        tool_bar->setMovable(false);
+        tool_bar->setFloatable(false);
+        setIconStyle(tool_bar);
+        tool_bar->addAction(ackAct);
+        tool_bar->addAction(clearAckAct);
+        tool_bar->addAction(stopAct);
+        tool_bar->addAction(saveAct);
+        tool_bar->addAction(printAct);
+        tool_bar->addAction(hisAct);
+        tool_bar->addAction(settingAct);
+        // tool_bar->addAction(showDockAct);
+        countLabel = new QLabel(this);
+        countLabel->setText(countStr);
+        countLabel->setObjectName("wl16");
+        statusLabel = new QLabel(this);
+        statusLabel->setText(statusStr);
+        //    tool_bar->addSeparator();
+        //    tool_bar->addWidget(countLabel);
+
+        tool_bar->setFixedWidth(60);
+        addToolBar(Qt::LeftToolBarArea, tool_bar);
+
+        // toolbar seting
+        // QList<QToolBar*>* pListToolBar = &(QList<QToolBar*>());
+        QList<QToolBar *> ListToolBar = (QList<QToolBar *>());
+        QList<QToolBar *> *pListToolBar = &ListToolBar;
+        pListToolBar->append(tool_bar);
+
+        QList<AutoToolBar::toolInfo> toolInfoList;
+        for (INT32 i = 0; i < pListToolBar->count(); i++)
+        {
+            QToolBar *toolbar = pListToolBar->at(i);
+            toolbar->setVisible(false);
+            QString text = toolbar->toggleViewAction()->text();
+
+            QList<QObject *> objList;
+
+            foreach (QObject *obj, toolbar->children())
+            {
+                if (qobject_cast<QToolButton *>(obj))
+                {
+                    QToolButton *tb = qobject_cast<QToolButton *>(obj);
+                    if (tb->defaultAction())
+                    {
+                        objList.append(tb);
+                    }
+                }
+                if (qobject_cast<QComboBox *>(obj))
+                {
+                    objList.append(obj);
+                }
+            }
+            toolInfoList << AutoToolBar::toolInfo(text, objList);
+        }
+
+        toolInfoList << AutoToolBar::toolInfo("过滤配置", QList<QObject *>(), createDockWindows(true));
+        toolInfoList << AutoToolBar::toolInfo("屏蔽配置", QList<QObject *>(), createDockWindows(false));
+
+        AutoToolBar *m_autotool = new AutoToolBar(toolInfoList, 4, 250);
+
+        QDockWidget *m_dockWidget = new QDockWidget("", this);
+        m_dockWidget->setMinimumWidth(200);
+        m_dockWidget->setMaximumWidth(300);
+        m_dockWidget->setTitleBarWidget(new QWidget(this));
+        m_dockWidget->setFeatures(QDockWidget::NoDockWidgetFeatures);
+        m_dockWidget->setWidget(m_autotool);
+        this->addDockWidget(Qt::LeftDockWidgetArea, m_dockWidget);
+    }
+
+    void MainView::createStatusBar()
+    {
+        // statusBar()->setSizeGripEnabled(false);
+        statusBar()->showMessage(QObject::tr("Ready for", "准备就绪"));
+
+        statusBar()->addPermanentWidget(countLabel);
+
+        statusLabel->hide();
+        statusBar()->addPermanentWidget(statusLabel);
+    }
+
+    QWidget *MainView::createDockWindows(bool filter)
+    {
+        //    theDock = new QDockWidget(QObject::tr("configuration view","配置视图"), this);
+        //    theDock->setAllowedAreas(Qt::RightDockWidgetArea);
+        //    theDock->setFeatures(QDockWidget::NoDockWidgetFeatures);
+
+        QFrame *frame = new QFrame;
+        QVBoxLayout *layV = new QVBoxLayout;
+        /* QPushButton *pbtn;
+        pbtn = new QPushButton(QObject::tr("Substation filtering settings","厂站过滤设置"));
+        connect(pbtn, SIGNAL(clicked()), this, SLOT(filterFac()));
+        pbtn->setToolTip(QObject::tr("Only display the selected substation information","仅显示所选中厂站的信息"));
+        layV->addWidget(pbtn);
+        pbtn = new QPushButton(QObject::tr("Bay filtering settings","间隔过滤设置"));
+        connect(pbtn, SIGNAL(clicked()), this, SLOT(filterBay()));
+        pbtn->setToolTip(QObject::tr("Only display the selected bay information","仅显示所选中间隔的信息"));
+        layV->addWidget(pbtn);
+        pbtn = new QPushButton(QObject::tr("Substation shielding settings","厂站屏蔽设置"));
+        connect(pbtn, SIGNAL(clicked()), this, SLOT(shieldFac()));
+        pbtn->setToolTip(QObject::tr("Shield the selected substation informaion","屏蔽所选中厂站的信息"));
+        layV->addWidget(pbtn);
+        pbtn = new QPushButton(QObject::tr("Bay shielding settings","间隔屏蔽设置"));
+        connect(pbtn, SIGNAL(clicked()), this, SLOT(shieldBay()));
+        pbtn->setToolTip(QObject::tr("Shiled the selected bay information","屏蔽所选中间隔的信息"));
+        layV->addWidget(pbtn);
+        tv = new QTextEdit;
+        tv->setReadOnly(true);
+        QString text;
+        makeText(text);
+        tv->setText(text);
+        layV->addWidget(tv);*/
+
+        layV->setContentsMargins(0, 10, 0, 5);
+        ViewSetting *selectSetting = new ViewSetting(this, filter);
+        layV->addWidget(selectSetting);
+
+        frame->setLayout(layV);
+        //    theDock->setWidget(frame);
+        //    theDock->setFloating(false);
+        //    theDock->setFixedWidth(180);
+        //    addDockWidget(Qt::RightDockWidgetArea, theDock);
+        frame->setFixedHeight(450);
+        return frame;
+    }
+
+    void MainView::timerEvent(QTimerEvent *event)
+    {
+        if (event->timerId() != timer.timerId())
+        {
+            return QWidget::timerEvent(event);
+        }
+        mytimer++;
+        if (mytimer % 10 == 0)
+        {
+            /*
+            if(theDock->isHidden()){
+                showDockAct->setChecked(false);
+            }
+            */
+
+            time_t aa;
+            time(&aa);
+            int tmp, i, j;
+            int begin = 0, end = item_end;
+            if (item_has_full == 1)
+            {
+                if (item_end == 0)
+                {
+                    begin = 0;
+                    end = MAX_LINES;
+                }
+                else
+                {
+                    begin = item_end;
+                    end = begin + MAX_LINES;
+                }
+            }
+            for (i = begin; i < end; i++)
+            {
+                j = i % MAX_LINES;
+                if (WarnDefine[ShowArray[m_WarnRecMessage[j].type]].flag == 0)
+                    continue;
+                if ((aa - m_WarnRecMessage[j].start_time > WarnDefine[ShowArray[m_WarnRecMessage[j].type]].stop_flash) && (WarnDefine[ShowArray[m_WarnRecMessage[j].type]].stop_flash > 0) && (m_WarnRecMessage[j].start_time > 0) && (m_WarnRecMessage[j].flag == 2))
+                {
+                    m_WarnRecMessage[j].confirm = 1;
+                    refresh_flag = 1; // zq add
+                }
+            }
+
+            if (tl_flag)
+            {
+                // 故障智能推理
+                for (i = end - 1; i >= begin; i--)
+                {
+                    j = (i + MAX_LINES) % MAX_LINES;
+                    // 线路保护动作信号，启动线路故障推理
+                    if (!strstr(m_WarnRecMessage[j].string, "SOE") && m_WarnRecMessage[j].value == 1 &&
+                        (((m_WarnRecMessage[j].repostype == REPOS_XLBH || m_WarnRecMessage[j].repostype == REPOS_CHZ) && m_WarnRecMessage[j].type == WARN_TYPE_YX_BW)))
+                    {
+                        m_WarnRecMessage[j].gztype = GZ_XLCG;
+                        printf("启动线路故障推理:%d,%s\n", j, m_WarnRecMessage[j].string);
+                        xl_gz_flag = j;
+                    }
+
+                    // 母线保护动作信号，启动母线故障推理
+                    if (!strstr(m_WarnRecMessage[j].string, "SOE") && m_WarnRecMessage[j].value == 1 &&
+                        ((m_WarnRecMessage[j].repostype == REPOS_MXBH && m_WarnRecMessage[j].type == WARN_TYPE_YX_BW)))
+                    {
+                        m_WarnRecMessage[j].gztype = GZ_MX;
+                        printf("启动母线故障推理:%d,%s\n", j, m_WarnRecMessage[j].string);
+                        mx_gz_flag = j;
+                    }
+
+                    // 主变PT断线动作信号，启动主变PT断线故障推理
+                    if (!strstr(m_WarnRecMessage[j].string, "SOE") && m_WarnRecMessage[j].value == 1 &&
+                        ((m_WarnRecMessage[j].repostype == REPOS_ZBPTDX && m_WarnRecMessage[j].type == WARN_TYPE_YX_BW)))
+                    {
+                        m_WarnRecMessage[j].gztype = GZ_ZBPTDX;
+                        printf("启动主变PT断线故障推理:%d,%s\n", j, m_WarnRecMessage[j].string);
+                        zb_ptdx_flag = j;
+                    }
+
+                    // 主变主保护动作信号，启动主变故障跳闸推理
+                    if (!strstr(m_WarnRecMessage[j].string, "SOE") && m_WarnRecMessage[j].value == 1 &&
+                        ((m_WarnRecMessage[j].repostype == REPOS_ZBBH && m_WarnRecMessage[j].type == WARN_TYPE_YX_BW)))
+                    {
+                        m_WarnRecMessage[j].gztype = GZ_ZB3T;
+                        printf("启动主变故障跳闸推理:%d,%s\n", j, m_WarnRecMessage[j].string);
+                        zb_gz_flag = j;
+                    }
+
+                    // 主变后备保护动作信号，启动主变后备故障跳闸推理
+                    if (!strstr(m_WarnRecMessage[j].string, "SOE") && m_WarnRecMessage[j].value == 1 &&
+                        m_WarnRecMessage[j].repostype == REPOS_ZBHB &&
+                        m_WarnRecMessage[j].type == WARN_TYPE_YX_BW)
+                    {
+                        m_WarnRecMessage[j].gztype = GZ_ZB1T_G;
+                        printf("启动主变后备故障跳闸推理:%d,%s\n", j, m_WarnRecMessage[j].string);
+                        zb_gz2_flag = j;
+                    }
+
+                    // 电容器保护信号，启动电容器故障跳闸推理及低压开关拒动故障跳闸推理
+                    if (!strstr(m_WarnRecMessage[j].string, "SOE") && m_WarnRecMessage[j].value == 1 &&
+                        ((m_WarnRecMessage[j].repostype == REPOS_DRBH && m_WarnRecMessage[j].type == WARN_TYPE_YX_BW)))
+                    {
+                        m_WarnRecMessage[j].gztype = GZ_DR;
+                        printf("启动电容器故障跳闸推理及低压开关拒动故障跳闸推理:%d,%s\n", j, m_WarnRecMessage[j].string);
+                        dr_gz_flag = j;
+                        kg_jd_flag_d = j;
+                    }
+
+                    // 电抗器保护信号，启动电抗器故障跳闸推理及低压开关拒动故障跳闸推理
+                    if (!strstr(m_WarnRecMessage[j].string, "SOE") && m_WarnRecMessage[j].value == 1 &&
+                        ((m_WarnRecMessage[j].repostype == REPOS_DKBH && m_WarnRecMessage[j].type == WARN_TYPE_YX_BW)))
+                    {
+                        m_WarnRecMessage[j].gztype = GZ_DK;
+                        printf("启动电抗器故障跳闸推理及低压开关拒动故障跳闸推:%d,%s\n", j, m_WarnRecMessage[j].string);
+                        dk_gz_flag = j;
+                        kg_jd_flag_d = j;
+                    }
+
+                    // 站用变保护信号，启动站用变故障跳闸推理及低压开关拒动故障跳闸推理
+                    if (!strstr(m_WarnRecMessage[j].string, "SOE") && m_WarnRecMessage[j].value == 1 &&
+                        ((m_WarnRecMessage[j].repostype == REPOS_ZYBBH && m_WarnRecMessage[j].type == WARN_TYPE_YX_BW)))
+                    {
+                        m_WarnRecMessage[j].gztype = GZ_ZYB;
+                        printf("启动站用变故障跳闸推理及低压开关拒动故障跳闸推理:%d,%s\n", j, m_WarnRecMessage[j].string);
+                        zyb_gz_flag = j;
+                        kg_jd_flag_d = j;
+                    }
+
+                    // PT无压动作信号，启动PT无压故障推理
+                    if (!strstr(m_WarnRecMessage[j].string, "SOE") && m_WarnRecMessage[j].value == 1 &&
+                        ((m_WarnRecMessage[j].repostype == REPOS_PTWY && m_WarnRecMessage[j].type == WARN_TYPE_YX_BW)))
+                    {
+                        m_WarnRecMessage[j].gztype = GZ_PTTQT;
+                        printf("启动PT无压故障推理:%d,%s\n", j, m_WarnRecMessage[j].string);
+                        pt_wy_flag = j;
+                    }
+
+                    // PT断线动作信号，启动PT断线故障推理
+                    if (!strstr(m_WarnRecMessage[j].string, "SOE") && m_WarnRecMessage[j].value == 1 &&
+                        ((m_WarnRecMessage[j].repostype == REPOS_PTDX && m_WarnRecMessage[j].type == WARN_TYPE_YX_BW)))
+                    {
+                        m_WarnRecMessage[j].gztype = GZ_PTDX;
+                        printf("启动PT断线故障推理:%d,%s\n", j, m_WarnRecMessage[j].string);
+                        pt_dx_flag = j;
+                    }
+
+                    // CT断线动作信号，启动CT断线故障推理
+                    if (!strstr(m_WarnRecMessage[j].string, "SOE") && m_WarnRecMessage[j].value == 1 &&
+                        ((m_WarnRecMessage[j].repostype == REPOS_CTDX && m_WarnRecMessage[j].type == WARN_TYPE_YX_BW)))
+                    {
+                        m_WarnRecMessage[j].gztype = GZ_CTDX;
+                        printf("启动CT断线故障推理:%d,%s\n", j, m_WarnRecMessage[j].string);
+                        ct_dx_flag = j;
+                    }
+
+                    // 直流电压消失信号，启动直流电压消失故障推理
+                    if (!strstr(m_WarnRecMessage[j].string, "SOE") && m_WarnRecMessage[j].value == 1 &&
+                        ((m_WarnRecMessage[j].repostype == REPOS_ZLXS && m_WarnRecMessage[j].type == WARN_TYPE_YX_BW)))
+                    {
+                        m_WarnRecMessage[j].gztype = GZ_ZLXS;
+                        printf("启动直流电压消失故障推理:%d,%s\n", j, m_WarnRecMessage[j].string);
+                        zl_gz_flag = j;
+                    }
+
+                    // 开关分闸变位，启动开关偷跳故障推理
+                    // 专家系统独立运行时无法判断是否后台遥控
+                    if (m_TtFlag && (m_WarnRecMessage[i].key_id / 1000000) == CB_DEVICE_NO && m_WarnRecMessage[i].value == 0)
+                    {
+                        m_WarnRecMessage[j].gztype = GZ_TT;
+                        tt_gz_flag = j;
+                    }
+
+                    // 线路保护动作信号，启动开关拒动故障推理
+                    if (!strstr(m_WarnRecMessage[j].string, "SOE") && m_WarnRecMessage[j].value == 1 &&
+                        ((m_WarnRecMessage[j].repostype == REPOS_XLBH && m_WarnRecMessage[j].type == WARN_TYPE_YX_BW)))
+                    {
+                        m_WarnRecMessage[j].gztype = GZ_JD;
+                        printf("启动开关拒动故障推理:%d,%s\n", j, m_WarnRecMessage[j].string);
+                        int vlt_id = bmap.GetVltIdxByIdx(m_WarnRecMessage[j].dev_id);
+                        int v220_id = bmap.GetVltIdxByAlias("V220");
+                        int v500_id = bmap.GetVltIdxByAlias("V500");
+                        if (HVol_Idx == v220_id)
+                        {
+                            if (vlt_id != LVol_Idx)
+                                kg_jd_flag_z = j;
+                        }
+                        if (HVol_Idx == v500_id)
+                        {
+                            if (vlt_id == HVol_Idx)
+                                kg_jd_flag_g = j;
+                            else if (vlt_id == MVol_Idx)
+                                kg_jd_flag_z = j;
+                        }
+                    }
+                    if (j == processed_num)
+                        break;
+                }
+
+                if (xl_gz_flag >= 0)
+                    xl_gz_timer++;
+                if (xl_gz_timer > m_BayEventTime * 2)
+                {
+                    repos_xl_gz(xl_gz_flag);
+                    xl_gz_flag = -1;
+                    xl_gz_timer = 0;
+                }
+
+                if (mx_gz_flag >= 0)
+                    mx_gz_timer++;
+                if (mx_gz_timer > m_BayEventTime * 2)
+                {
+                    repos_mx_gz(mx_gz_flag);
+                    mx_gz_flag = -1;
+                    mx_gz_timer = 0;
+                }
+
+                if (zb_ptdx_flag >= 0)
+                    zb_ptdx_timer++;
+                if (zb_ptdx_timer > m_BayEventTime * 2)
+                {
+                    repos_zb_ptdx(zb_ptdx_flag);
+                    zb_ptdx_flag = -1;
+                    zb_ptdx_timer = 0;
+                }
+
+                if (zb_gz_flag >= 0)
+                    zb_gz_timer++;
+                if (zb_gz_timer > m_BayEventTime * 2)
+                {
+                    repos_zb_gz(zb_gz_flag);
+                    zb_gz_flag = -1;
+                    zb_gz_timer = 0;
+                }
+
+                if (zb_gz2_flag >= 0)
+                    zb_gz2_timer++;
+                if (zb_gz2_timer > m_BayEventTime * 2)
+                {
+                    repos_zbhb_gz(zb_gz2_flag);
+                    zb_gz2_flag = -1;
+                    zb_gz2_timer = 0;
+                }
+
+                if (dr_gz_flag >= 0)
+                    dr_gz_timer++;
+                if (dr_gz_timer > m_BayEventTime * 2)
+                {
+                    repos_dr_gz(dr_gz_flag);
+                    dr_gz_flag = -1;
+                    dr_gz_timer = 0;
+                }
+
+                if (dk_gz_flag >= 0)
+                    dk_gz_timer++;
+                if (dk_gz_timer > m_BayEventTime * 2)
+                {
+                    repos_dk_gz(dk_gz_flag);
+                    dk_gz_flag = -1;
+                    dk_gz_timer = 0;
+                }
+
+                if (zyb_gz_flag >= 0)
+                    zyb_gz_timer++;
+                if (zyb_gz_timer > m_BayEventTime * 2)
+                {
+                    repos_zyb_gz(zyb_gz_flag);
+                    zyb_gz_flag = -1;
+                    zyb_gz_timer = 0;
+                }
+
+                if (pt_wy_flag >= 0)
+                    pt_wy_timer++;
+                if (pt_wy_timer > m_BayEventTime * 2)
+                {
+                    repos_pt_wy(pt_wy_flag);
+                    pt_wy_flag = -1;
+                    pt_wy_timer = 0;
+                }
+
+                if (pt_dx_flag >= 0)
+                    pt_dx_timer++;
+                if (pt_dx_timer > m_BayEventTime * 2)
+                {
+                    repos_pt_dx(pt_dx_flag);
+                    pt_dx_flag = -1;
+                    pt_dx_timer = 0;
+                }
+
+                if (ct_dx_flag >= 0)
+                    ct_dx_timer++;
+                if (ct_dx_timer > m_BayEventTime * 2)
+                {
+                    repos_ct_dx(ct_dx_flag);
+                    ct_dx_flag = -1;
+                    ct_dx_timer = 0;
+                }
+
+                if (zl_gz_flag >= 0)
+                    zl_gz_timer++;
+                if (zl_gz_timer > m_BayEventTime * 2)
+                {
+                    repos_zl_gz(zl_gz_flag);
+                    zl_gz_flag = -1;
+                    zl_gz_timer = 0;
+                }
+
+                if (tt_gz_flag >= 0)
+                    tt_gz_timer++;
+                if (tt_gz_timer > m_BayEventTime * 2)
+                {
+                    repos_tt_gz(tt_gz_flag);
+                    tt_gz_flag = -1;
+                    tt_gz_timer = 0;
+                }
+
+                if (kg_jd_flag_g >= 0)
+                    kg_jd_timer_g++;
+                if (kg_jd_timer_g > m_BayEventTime * 2)
+                {
+                    repos_kg_jd_g(kg_jd_flag_g);
+                    kg_jd_flag_g = 0;
+                    kg_jd_timer_g = 0;
+                }
+
+                if (kg_jd_flag_z >= 0)
+                    kg_jd_timer_z++;
+                if (kg_jd_timer_z > m_BayEventTime * 2)
+                {
+                    repos_kg_jd_z(kg_jd_flag_z);
+                    kg_jd_flag_z = 0;
+                    kg_jd_timer_z = 0;
+                }
+
+                if (kg_jd_flag_d >= 0)
+                    kg_jd_timer_d++;
+                if (kg_jd_timer_d > m_BayEventTime * 2)
+                {
+                    repos_kg_jd_d(kg_jd_flag_d);
+                    kg_jd_flag_d = 0;
+                    kg_jd_timer_d = 0;
+                }
+
+                processed_num = item_end - 1;
+                if (if_split_win)
+                {
+                    warnsplit->m_allView->Repaint1();
+                    warnsplit->m_allView->resize1();
+                }
+                warnsplit->m_ackView->Repaint1();
+                warnsplit->m_ackView->resize1();
+            }
+        }
+
+        if (mytimer % 20 == 0)
+        {
+            //        if(!m_bRefreshWarn){//超时恢复刷新
+            //            //             qDebug() << "1112321421411"<< refresh_timer;
+            //            //            refresh_timer--;
+            //            //            qDebug() << "1112321421412"<< refresh_timer;
+            //            //            if(refresh_timer <= 0)
+            //            //            {
+            //            //                m_bRefreshWarn = !m_bRefreshWarn;
+            //            //                stopAct->setChecked(false);
+            //            //            }
+
+            //           // qDebug() << "1112321421411"/*<< refresh_count8*/ << refresh_count;
+            //            refresh_count++;
+            //            //qDebug() << "1112321421411"<< refresh_count << refresh_timer;
+            //            if(refresh_count == refresh_timer)
+            //            {
+            //                m_bRefreshWarn = !m_bRefreshWarn;
+            //                stopAct->setChecked(false);
+            //                refresh_count = 0;
+            //                refresh_timer = 0;
+            //            }
+            //        }
+            if (m_bRefreshWarn && refresh_flag) // 刷新
+            {
+                m_CurrentTabOrder = tab->currentIndex();
+                CWarnSplitterMap::Iterator it;
+                it = m_WarnSplitterMap.find(m_CurrentTabOrder);
+                if (it != m_WarnSplitterMap.end())
+                {
+                    if (if_split_win)
+                        it.value()->m_allView->resize1();
+                    it.value()->m_ackView->resize1();
+                    warnsplit = it.value();
+                }
+                refresh_flag = 0;
+            }
+
+            if (!(show_ack_view && warnsplit->m_ackView->isVisible()))
+            {
+                emit showAckView(show_ack_view);
+            }
+
+            if (if_split_win)
+            {
+                if (!(show_all_view && warnsplit->m_allView->isVisible()))
+                {
+                    emit showAllView(show_all_view);
+                }
+            }
+
+            int tmp, i, j, k, m;
+            int begin = 0, end = item_end;
+            if (item_has_full == 1)
+            {
+                if (item_end == 0)
+                {
+                    begin = 0;
+                    end = MAX_LINES;
+                }
+                else
+                {
+                    begin = item_end;
+                    end = begin + MAX_LINES;
+                }
+            }
+            // 找出复归信号之前的动作,将其的fg_flag设为1
+            for (i = end - 1; i >= begin; i--)
+            {
+                j = (i + MAX_LINES) % MAX_LINES;
+                if (m_WarnRecMessage[j].value == 0 && !strstr(m_WarnRecMessage[j].string, "SOE"))
+                {
+                    for (k = i - 1; k >= begin; k--)
+                    {
+                        m = k % MAX_LINES;
+                        if (m_WarnRecMessage[m].type == WARN_TYPE_YX_BW &&
+                            m_WarnRecMessage[m].fac_id == m_WarnRecMessage[j].fac_id &&
+                            m_WarnRecMessage[m].key_id == m_WarnRecMessage[j].key_id &&
+                            m_WarnRecMessage[m].field_id == m_WarnRecMessage[j].field_id)
+                        {
+                            m_WarnRecMessage[m].fg_flag = 1;
+                            // break;
+                        }
+                    }
+                }
+            }
+            // 用户指定提示信息发生过m_InfoRepeatNums次就自动转为告警消息
+            for (i = end - 1; i >= begin; i--)
+            {
+                int count = 0;
+                j = (i + MAX_LINES) % MAX_LINES;
+                if (m_WarnRecMessage[j].type != WARN_TYPE_YX_BW &&
+                    m_WarnRecMessage[j].type != WARN_TYPE_YX_EVENT &&
+                    m_WarnRecMessage[j].type != WARN_TYPE_YC_OVER_LIMIT)
+                    continue;
+                if (m_WarnRecMessage[j].customized_group == 1
+                    //&&strstr(tmpwarn.string,"动作")
+                )
+                {
+                    for (k = i - 1; k >= begin; k--)
+                    {
+                        m = k % MAX_LINES;
+                        if (m_WarnRecMessage[m].type == m_WarnRecMessage[j].type &&
+                            m_WarnRecMessage[m].fac_id == m_WarnRecMessage[j].fac_id &&
+                            m_WarnRecMessage[m].key_id == m_WarnRecMessage[j].key_id &&
+                            m_WarnRecMessage[m].field_id == m_WarnRecMessage[j].field_id)
+
+                        {
+                            if (m_WarnRecMessage[m].level == WARN_LEVEL_2)
+                                break;
+                            count++;
+                            if (count >= m_InfoRepeatNums && m_InfoRepeatNums > 0)
+                            {
+                                // 超过指定次数自动转成告警消息
+                                // qDebug(QString("提示信息自动转告警:%1").arg(m_WarnRecMessage[j].string));
+                                m_WarnRecMessage[j].customized_group = WARN_LEVEL_2;
+                                m_WarnRecMessage[j].level = WARN_LEVEL_2;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (j == processed_num)
+                    break;
+            }
+        }
+
+        if (mytimer % m_iShowInterval == 0)
+        {
+            m_bcolorflag = !m_bcolorflag;
+            if (m_NoConfirmStyle)
+            {
+                if (m_bRefreshWarn)
+                {
+                    m_CurrentTabOrder = tab->currentIndex();
+                    CWarnSplitterMap::Iterator it;
+                    it = m_WarnSplitterMap.find(m_CurrentTabOrder);
+                    if (it != m_WarnSplitterMap.end())
+                    {
+                        if (if_split_win)
+                            it.value()->m_allView->Repaint1();
+                        it.value()->m_ackView->Repaint1();
+                        warnsplit = it.value();
+                    }
+                }
+            }
+        }
+
+        if (mytimer % 20 == 0)
+        {
+            int count1 = GetCount1();
+            int count2 = GetCount2();
+            int count3 = GetCount3();
+            countStr = tr("  Unconfirmed %1 record  Confirmed %2 record NotNeedConfirm %3 record", "  未确认%1条  已确认%2条  无需确认%3条").arg(count1, 4, 10, QChar('0')).arg(count2, 4, 10, QChar('0')).arg(count3, 4, 10, QChar('0'));
+            countLabel->setText(countStr);
+            if (!m_bRefreshWarn)
+            {
+                statusStr = tr("<font color='#ff0000'> stop to refresh!</font>", "<font color='#ff0000'> 已停止刷新!</font>");
+                if (m_FacHadHold || m_BayHadHold)
+                {
+                    statusStr += tr("<font color='#ff0000'> has been set for shielding!</font>", "<font color='#ff0000'> 已设置屏蔽!</font>");
+                }
+                statusLabel->setText(statusStr);
+                statusLabel->show();
+            }
+            else
+            {
+                statusStr.clear();
+                statusLabel->hide();
+                if (m_FacHadHold || m_BayHadHold)
+                {
+                    statusStr = tr("<font color='#ff0000'> has been set for shielding!</font>", "<font color='#ff0000'> 已设置屏蔽!</font>");
+                    statusLabel->show();
+                }
+                statusLabel->setText(statusStr);
+            }
+            for (int ii = 0; ii < MAX_TABPAGE_NUM; ii++)
+            {
+                if (m_TabNeedLight[ii])
+                {
+                    tab->setTabIcon(ii, QIcon(QString(":light-on.png")));
+                }
+                else
+                {
+                    tab->setTabIcon(ii, QIcon(QString(":light-off.png")));
+                }
+            }
+            if (select_flag)
+            {
+                //            QString text;
+                //            makeText(text);
+                //            tv->setText(text);
+                select_flag = false;
+                // update by sunzhibin
+                if (if_split_win)
+                    warnsplit->m_allView->Repaint1();
+                warnsplit->m_ackView->Repaint1();
+            }
+            m_UserLoginFlag = UpdatePriv();
+            if (m_UserLoginFlag)
+                setActionState(true);
+            else
+                setActionState(false);
+        }
+        struct app_buf_head AHead;
+        char *buffer;
+        buffer = (char *)malloc(1);
+        int ret = smart_warn_info.dnet_receive_message(AHead, buffer);
+        if (ret >= 0)
+        {
+            // 此处标记程序已经接收到第一条消息
+            m_FirstStart = false;
+            /*
+            if (AHead.rhead.report_type==DNET_DB_WARN_BROWSE_ANSWER)
+            {
+                getBuf.set_buf_byte_order(AHead);
+                explainRecallReport(buffer);
+                OnSendMsgToNsPanel();
+            }
+            */
+            if (AHead.rhead.report_type == DNET_SEND_MESSAGE_TO_WARN)
+            {
+                getBuf.set_buf_byte_order(AHead);
+                explainReport(buffer);
+                OnSendMsgToNsPanel();
+            }
+            if (AHead.rhead.report_type == DNET_YX_UNFLASH)
+            {
+                getBuf.set_buf_byte_order(AHead);
+                un_flash(buffer);
+            }
+            if (AHead.rhead.report_type == DNET_PANEL_ASK_APP)
+            {
+                getBuf.set_buf_byte_order(AHead);
+                OnProcessAppAskProcess(buffer);
+            }
+        }
+        free(buffer);
+
+        if (refresh_window == 0)
+            OnSendReportToNsPanel(m_ProcessState); // 每5分钟发一次
+        refresh_window = (refresh_window + 1) % 6000;
+    }
+
+    void MainView::showAckView(bool if_show)
+    {
+        m_CurrentTabOrder = tab->currentIndex();
+        CWarnSplitterMap::Iterator it;
+        for (int i = 0; i < tabpages_num; i++)
+        {
+            it = m_WarnSplitterMap.find(i); //(m_CurrentTabOrder);
+            if (it != m_WarnSplitterMap.end())
+            {
+                warnsplit = it.value();
+                if (if_show)
+                    warnsplit->m_ackView->show();
+                else
+                    warnsplit->m_ackView->hide();
+                if (if_show_title_bar)
+                    warnsplit->setHeaderColumnHidden(1, !if_show);
+            }
+        }
+        show_ack_view = if_show;
+        if (if_split_win)
+        {
+            showAckViewAct->setChecked(show_ack_view);
+        }
+    }
+
+    void MainView::showAllView(bool if_show)
+    {
+        m_CurrentTabOrder = tab->currentIndex();
+        CWarnSplitterMap::Iterator it;
+        for (int i = 0; i < tabpages_num; i++)
+        {
+            it = m_WarnSplitterMap.find(i); //(m_CurrentTabOrder);
+            if (it != m_WarnSplitterMap.end())
+            {
+                warnsplit = it.value();
+                if (if_show)
+                    warnsplit->m_allView->show();
+                else
+                    warnsplit->m_allView->hide();
+            }
+        }
+        show_all_view = if_show;
+        showAllViewAct->setChecked(show_all_view);
+    }
+
+    void MainView::slot_timer_out()
+    {
+        if (!m_bRefreshWarn)
+        { // 超时恢复刷新
+            refresh_count++;
+            // qDebug() << "1112321421411"<< refresh_count << refresh_timer;
+            if (refresh_count == refresh_timer)
+            {
+                m_bRefreshWarn = !m_bRefreshWarn;
+                stopAct->setChecked(false);
+                refresh_count = 0;
+                refresh_timer = 0;
+            }
+        }
+    }
+
+    bool MainView::UpdatePriv()
+    {
+        Privilege priv;
+        int valid_time = 0;
+        if (subscribe_priv(&priv, valid_time, 60 * 3, 1000) >= 0)
+        {
+            // m_CurUserName = QString( priv.name);
+            // m_CurUserAliasName = QString(priv.alias);
+            m_CurUserName = Transcoding::getInstance()->trans_coding(priv.name, Gbk_Data);
+            m_CurUserAliasName = Transcoding::getInstance()->trans_coding(priv.alias, Gbk_Data);
+            memcpy(UserMngPriv, priv.priv, sizeof(UserMngPriv));
+            m_PasswdValidTime = valid_time * 10;
+        }
+        // printf("m_PasswdValidTime=%d\n",m_PasswdValidTime);
+        if (m_PasswdValidTime > 0)
+            return true;
+        else
+            return false;
+    }
+
+    void MainView::setActionState(bool flag)
+    {
+        Boolean priv_db_write = GetCertainMngPrivFlag(PRIV_REAL_DB_WRITE); // 数据库全部可写
+        if (flag)
+        {
+            clearAckAct->setEnabled(true);
+            ackAct->setEnabled(true);
+            settingAct->setEnabled(true);
+            stopAct->setEnabled(true);
+        }
+        else
+        {
+            clearAckAct->setEnabled(false);
+            ackAct->setEnabled(false);
+            settingAct->setEnabled(false);
+            stopAct->setEnabled(false);
+        }
+    }
+
+    void MainView::showDock(bool ifshow)
+    {
+        if (ifshow)
+        {
+            theDock->hide();
+            showDockAct->setIcon(QIcon(QString(":view_add.png")));
+            showDockAct->setIconText(QObject::tr("Display", "显示"));
+            showDockAct->setChecked(true);
+            showDockAct->setToolTip(QObject::tr("Display configuration view", "显示配置视图"));
+        }
+        else
+        {
+            theDock->show();
+            showDockAct->setChecked(false);
+            theDock->setFixedWidth(180);
+            showDockAct->setIcon(QIcon(QString(":view_remove.png")));
+            showDockAct->setIconText(QObject::tr("Hide", "隐藏"));
+            showDockAct->setToolTip(QObject::tr("Hide configuration view", "隐藏配置视图"));
+        }
+    }
+
+    void MainView::clear_ack()
+    {
+        if (!m_UserLoginFlag)
+        {
+            QMessageBox::warning(this, QObject::tr("Not logging in", "您未登录"),
+                                 tr("Sorry,you are currently logged out!\n\nPlease the logging juniors clearing.", "对不起，您还没有登录!\n\n请您登录后再清除。"),
+                                 QMessageBox::Ok);
+            return;
+        }
+        if (!m_bRefreshWarn)
+        {
+            QMessageBox::warning(this, tr("Notice", "提示"), tr("Please restore refreshing before operating!\n", "请恢复刷新状态后操作!\n"),
+                                 QMessageBox::Ok);
+            return;
+        }
+
+        int ret = QMessageBox::question(this, tr("Remove the confirmed information", "清除已确认信息"),
+                                        tr("Are you sure to remove the confirmed alarming information?", "您确定要清除已确认的告警信息吗?"),
+                                        QMessageBox::Yes | QMessageBox::Default,
+                                        QMessageBox::No,
+                                        QMessageBox::Cancel | QMessageBox::Escape);
+        if (ret == QMessageBox::Yes)
+        {
+            // 清除已确认信息
+            if (GetCount2() < 0)
+                return;
+            int i, j;
+
+            int begin = 0, end = item_end;
+            if (item_has_full == 1)
+            {
+                if (item_end == 0)
+                {
+                    begin = 0;
+                    end = MAX_LINES;
+                }
+                else
+                {
+                    begin = item_end;
+                    end = begin + MAX_LINES;
+                }
+            }
+            for (i = begin; i < end; i++)
+            {
+                j = i % MAX_LINES;
+                if (WarnDefine[m_WarnRecMessage[j].my_type].flag == 0)
+                    continue;
+                if (m_WarnRecMessage[j].flag == 0)
+                    continue;
+                // 判断已经确认的消息并且在当前页面中
+                // 或者当前面为时序信息时可以全部清除
+                if ((m_WarnRecMessage[j].confirm_flag == 0) && (m_WarnRecMessage[j].confirm == 1) && (m_WarnRecMessage[j].customized_group == m_CurrentTabOrder || (WarnDefine[m_WarnRecMessage[j].my_type].tabpage == m_CurrentTabOrder) || m_CurrentTabOrder == 0))
+                    m_WarnRecMessage[j].confirm_flag = 1;
+            }
+            if (if_split_win)
+                warnsplit->m_allView->resize1();
+            warnsplit->m_ackView->resize1();
+        }
+    }
+
+    void MainView::ack_all()
+    {
+        if (!m_UserLoginFlag)
+        {
+            QMessageBox::warning(this, QObject::tr("Not logging in", "您未登录"),
+                                 tr("Sorry,you are currently logged out!\n\nPlease the logging juniors an acknowledgement.", "对不起，您还没有登录!\n\n请您登录后再确认。"),
+                                 QMessageBox::Ok);
+            return;
+        }
+        if (!GetCertainMngPrivFlag(PRIV_GRAPH_YX_DW)) // zq add
+        {
+            QMessageBox::warning(this, QObject::tr("Not sigal confirm privilege", "您没有遥信对位权限"),
+                                 tr("Sorry,you have no privilege of signal confirm!\n", "对不起，您没有遥信对位权限!\n"),
+                                 QMessageBox::Ok);
+            return;
+        }
+        int i;
+        // 如果程序还没有收到消息就不刷新
+        if (m_FirstStart)
+        {
+            return;
+        }
+        // 确认所有告警信息
+        if (m_icurFac.size() != 0 || m_icurBay.size() != 0)
+        {
+            select_yx_unflash(); // zq add
+        }
+        else
+        {
+            all_yx_unflash();
+        }
+        for (i = 0; i < MAX_LINES; i++)
+        {
+            if (m_WarnRecMessage[i].is_gz > 0 && m_ConfirmGzp == false)
+            {
+                continue;
+            }
+            if (m_icurFac.size() != 0 || m_icurBay.size() != 0)
+            {
+                if (m_icurFac.size() != 0 && m_icurFac.contains(m_WarnRecMessage[i].fac_id) == false)
+                {
+                    continue;
+                }
+                if (m_icurBay.size() != 0 && m_icurBay.contains(m_WarnRecMessage[i].bay_id) == false)
+                {
+                    continue;
+                }
+                m_WarnRecMessage[i].confirm = 1;
+            }
+            else
+            {
+                m_WarnRecMessage[i].confirm = 1;
+            }
+        }
+        if (m_IfSoudcut)
+        { // zq add
+            //        QString cmd;
+            //        cmd = "../exe/send_report -sound_cut";
+            //        QProcess::startDetached(cmd);
+
+            int ret_code = smart_warn_info.dnet_send_message(DNET_REPORT_POINT_TO_POINT,
+                                                             DNET_SOUND_CUT, DNET_SERVER_HOST, "svc_scada_server",
+                                                             NULL, 0);
+            // qDebug() << "stop sound" << ret_code;
+        }
+        refresh_flag = 1;
+    }
+
+    void MainView::stop(bool flag)
+    {
+        m_bRefreshWarn = !flag;
+        if (!m_bRefreshWarn)
+        {
+            refresh_timer = m_AutoRefreshTime * 60;
+        }
+        else
+        {
+            refresh_timer = 0;
+            refresh_count = 0;
+        }
+
+        if (m_bRefreshWarn)
+        {
+            m_count = (item_has_full == 0) ? 0 : item_end;
+            if (if_split_win)
+                warnsplit->m_allView->resize1();
+            warnsplit->m_ackView->resize1();
+        }
+        else
+        {
+            if (item_has_full == 0)
+            {
+                m_count = item_end;
+            }
+            else
+            {
+                m_count = MAX_LINES;
+
+                // if( item_end == 0 )
+                //	m_count = MAX_LINES;//0
+                // else
+                //	m_count = item_end + MAX_LINES;
+            }
+        }
+    }
+
+    void MainView::setting()
+    {
+        SettingDlg *setting_dlg = new SettingDlg;
+        setting_dlg->exec();
+        if (if_split_win)
+            warnsplit->m_allView->Repaint1();
+        warnsplit->m_ackView->Repaint1();
+    }
+
+    void MainView::filterFac()
+    {
+        FacSelectDlg *fsDlg = new FacSelectDlg;
+        fsDlg->exec();
+        if (if_split_win)
+            warnsplit->m_allView->Repaint1();
+        warnsplit->m_ackView->Repaint1();
+    }
+
+    void MainView::filterBay()
+    {
+        BaySelectDlg *bsDlg = new BaySelectDlg;
+        bsDlg->exec();
+        if (if_split_win)
+            warnsplit->m_allView->Repaint1();
+        warnsplit->m_ackView->Repaint1();
+    }
+
+    void MainView::shieldFac()
+    {
+        FacSelectDlg *fsDlg = new FacSelectDlg(this, 1);
+        fsDlg->exec();
+        if (if_split_win)
+            warnsplit->m_allView->Repaint1();
+        warnsplit->m_ackView->Repaint1();
+    }
+
+    void MainView::shieldBay()
+    {
+        BaySelectDlg *bsDlg = new BaySelectDlg(this, 1);
+        bsDlg->exec();
+        if (if_split_win)
+            warnsplit->m_allView->Repaint1();
+        warnsplit->m_ackView->Repaint1();
+    }
+
+    void MainView::raiseWindow()
+    {
+        // 用户需要强制弹出窗体
+
+        //   raise();
+
+        // 如果设置为最小化时弹起
+        //     if (isMinimized ())
+        //        showNormal ();
+    }
+
+    void MainView::closeEvent(QCloseEvent *event)
+    {
+        event->ignore();
+        return;
+    }
+
+    void MainView::makeText(QString &text)
+    {
+        text = QString("<font color='#ff0000'>") + tr("Current substation to be displayed: ", "当前显示厂站：") + QString("</font><br>");
+        text += filterFacStr;
+        text += QString("<br>");
+        text += QString("<font color='#ff0000'>") + tr("Current bay to be displayed: ", "当前显示间隔：") + QString("</font><br>");
+        text += filterBayStr;
+        text += QString("<br>");
+        text += QString("<font color='#ff0000'>") + tr("Current substation to be shielded: ", "当前屏蔽厂站：") + QString("</font><br>");
+        text += shieldFacStr;
+        text += QString("<br>");
+        text += QString("<font color='#ff0000'>") + tr("Current bay to be shielded: ", "当前屏蔽间隔：") + QString("</font><br>");
+        text += shieldBayStr;
+        text += QString("<br>");
+        // text += QObject::tr("<font color='#ff0000'>当前屏蔽信号：</font><br>");
+        // text += shieldSignalStr;
+        // text += QObject::tr("<br>");
+    }
+
+    void MainView::GetWarnString(char *buffer, char *old_name, char *new_name)
+    {
+        QString str = tr(buffer);
+        QString str_1 = tr(old_name);
+        QString str_2 = tr(new_name);
+        str.replace(old_name, new_name);
+
+        GetStrFromQStr(str, buffer, 200);
+    }
+
+    void MainView::explainReport(char *buffer)
+    {
+        int num, length;
+        int counter = 0, number;
+        WarnStruct tmpwarn;
+        int RetCode;
+        char flag = 0;
+        char is_gz = 0;
+        int repos_no = 0;
+        int flag1, flag2;
+        char alias[MAX_ALIAS_LEN];
+        int current_id;
+        int has_detail = 0;
+        QString str_msg_string = "";
+
+        num = getBuf.get_int(buffer + counter);
+        counter += sizeof(int);
+
+        if (num <= 0)
+            return;
+        // 新收到消息后自动定位至所有厂站
+        m_AutoSelFac = true;
+        m_AutoSelFacId = -1;
+
+        // 时序页面light
+        m_TabNeedLight[0] = true;
+        for (number = 0; number < num; number++)
+        {
+            if ((number + 1) % 100 == 0)
+            {
+                qApp->processEvents();
+
+                usleep(1 * 1000);
+            }
+            tmpwarn.repostype = 0;
+            tmpwarn.gztype = 0;
+            tmpwarn.confirm = 0;
+            tmpwarn.no = -1;
+            tmpwarn.status = -1;
+            tmpwarn.value = -1;
+            tmpwarn.result[0] = 0;
+            tmpwarn.host[0] = 0;
+            tmpwarn.oper[0] = 0;
+            tmpwarn.mon[0] = 0;
+
+            tmpwarn.type = getBuf.get_int(buffer + counter);
+
+            if (tmpwarn.type >= 0 && tmpwarn.type < MAX_WARN_NUM)
+            {
+                tmpwarn.level = ShowArray2[tmpwarn.type];
+                tmpwarn.customized_group = ShowArray2[tmpwarn.type];
+            }
+            else
+            {
+                tmpwarn.level = WARN_LEVEL_1;
+                tmpwarn.customized_group = WARN_LEVEL_1;
+            }
+            tmpwarn.my_type = ShowArray[tmpwarn.type];
+            // qDebug() << "tmpwarn.my_type1="<< ShowArray[tmpwarn.type]<<tmpwarn.type;
+
+            if (WarnDefine[tmpwarn.my_type].add_tab == 1)
+                m_TabNeedLight[WarnDefine[tmpwarn.my_type].tabpage] = true;
+
+            //		printf("warn_type = %d warn_my_type = %d,warn_level=%d\n",tmpwarn.type,tmpwarn.my_type,tmpwarn.level);
+
+            has_detail = 0;
+            counter += sizeof(int);
+            tmpwarn.no = getBuf.get_int(buffer + counter);
+            counter += sizeof(int);
+            length = getBuf.get_int(buffer + counter);
+            if ((tmpwarn.no & 0x8000) != 0 && tmpwarn.no != -1)
+                has_detail = 1;
+            tmpwarn.no = tmpwarn.no & 0x7FFF;
+
+            counter += sizeof(int);
+            memcpy(tmpwarn.string, buffer + counter, length);
+            counter += length;
+            if (length > MAX_CHAR)
+                length = MAX_CHAR;
+            tmpwarn.string[length] = '\0';
+
+            // continue;
+
+            tmpwarn.fac_id = getBuf.get_int(buffer + counter);
+            counter += sizeof(int);
+            tmpwarn.key_id = getBuf.get_int(buffer + counter);
+            counter += sizeof(int);
+            tmpwarn.field_id = getBuf.get_short(buffer + counter);
+            counter += sizeof(short);
+            tmpwarn.value = getBuf.get_int(buffer + counter);
+            counter += sizeof(int);
+
+            if (has_detail)
+            {
+
+                tmpwarn.result[0] = '\0';
+                memcpy(tmpwarn.result, buffer + counter, 64);
+                tmpwarn.result[63] = '\0';
+                counter += 64;
+                memcpy(tmpwarn.host, buffer + counter, 32);
+                tmpwarn.host[31] = '\0';
+                counter += 32;
+                memcpy(tmpwarn.oper, buffer + counter, 32);
+                tmpwarn.oper[31] = '\0';
+                counter += 32;
+
+                strcat(tmpwarn.string, " ");
+                strlcat(tmpwarn.string, tmpwarn.result, MAX_CHAR);
+                //	printf("result=%s,host=%s,oper=%s\n",tmpwarn.result,tmpwarn.host,tmpwarn.oper);
+
+                //			memcpy(tmpwarn.mon, buffer+counter, 32);
+                //			tmpwarn.mon[31]='\0';
+                //			counter += 32;
+            }
+            //		printf("keyid=%d warn_string %s \n",tmpwarn.key_id,tmpwarn.string);
+
+            // if (tmpwarn.type==WARN_TYPE_RLY_EVENT || tmpwarn.type==WARN_TYPE_RLY_WARN  || tmpwarn.type==WARN_TYPE_RLY_DIAG )
+            if (tmpwarn.type == WARN_TYPE_RLY_EVENT || tmpwarn.type == WARN_TYPE_RLY_CHANGE || tmpwarn.type == WARN_TYPE_RLY_DIAGNOSIS || tmpwarn.type == WARN_TYPE_RLY_OP)
+            {
+                tmpwarn.key_id = GetRlyIdByLdId(tmpwarn.key_id);
+            }
+
+            if (tmpwarn.key_id > 0)
+                tmpwarn.fac_id = bmap.GetFacIdxByIdx(tmpwarn.key_id);
+            if ((tmpwarn.key_id / 1000000) == CB_DEVICE_NO)
+            {
+                tmpwarn.bay_id = bmap.GetBayIdxByIdx(tmpwarn.key_id);
+                tmpwarn.dev_id = tmpwarn.key_id;
+                tmpwarn.ied_id = -1;
+                tmpwarn.ld_id = -1;
+
+                if (tmpwarn.type == WARN_TYPE_YX_BW || tmpwarn.type == WARN_TYPE_YX_EVENT)
+                {
+                    if (kg_tabpage > 0)
+                    {
+                        tmpwarn.customized_group = kg_tabpage;
+                        tmpwarn.level = kg_tabpage;
+                    }
+                    // qDebug()<<"string==="<<tmpwarn.string<<Transcoding::getInstance()->trans_coding(tmpwarn.string,Gbk_Data);
+                    str_msg_string = Transcoding::getInstance()->trans_coding(tmpwarn.string, Gbk_Data);
+                    // if(strstr(tmpwarn.string,MyTR("(事故分闸)"))){
+                    if (str_msg_string.contains("事故跳闸"))
+                    {
+                        if (sg_tabpage > 0)
+                        {
+                            tmpwarn.customized_group = sg_tabpage;
+                            tmpwarn.level = sg_tabpage;
+                        }
+                    }
+                }
+
+                tmpwarn.reposno = -1;
+                cb_device_scada cb_info;
+                RetCode = LdbGetRecordById(CB_DEVICE_NO, (char *)&tmpwarn.key_id, (char *)&cb_info, sizeof(cb_device_scada));
+                if (RetCode > 0)
+                {
+                    if (tmpwarn.type == WARN_TYPE_YX_BW || tmpwarn.type == WARN_TYPE_YX_EVENT)
+                    {
+                        tmpwarn.status = cb_info.status;
+                    }
+                }
+                flag = 0;
+            }
+            else if ((tmpwarn.key_id / 1000000) == YX_DEFINE_NO)
+            {
+                flag = 0;
+                yx_define_scada yx_stru;
+                RetCode = LdbGetRecordById(YX_DEFINE_NO, (char *)&tmpwarn.key_id, (char *)&yx_stru, sizeof(yx_define_scada));
+                if (RetCode > 0)
+                {
+                    tmpwarn.reposno = yx_stru.int_6;
+                    tmpwarn.repostype = yx_stru.int_7; // 找出当前遥信的推理类型
+                    if (tmpwarn.type == WARN_TYPE_YX_BW || tmpwarn.type == WARN_TYPE_YX_EVENT)
+                    {
+                        tmpwarn.status = yx_stru.status; // 找出当前遥信的状态值
+                    }
+                    if (m_IfDispDDName) // 告警直传显示调度名称
+                    {
+                        if (strlen(yx_stru.dd_name) > 0)
+                        {
+                            GetWarnString(tmpwarn.string, yx_stru.yx_name, yx_stru.dd_name);
+                        }
+                    }
+                }
+                else
+                {
+                    tmpwarn.reposno = -1;
+                    tmpwarn.repostype = -1;
+                }
+
+                // 找出当前遥信的Tab页分类信息,customized_group
+                if (RetCode > 0)
+                {
+                    if (tmpwarn.type == WARN_TYPE_YX_BW || tmpwarn.type == WARN_TYPE_YX_EVENT)
+                    {
+                        flag = yx_stru.conf_mode;
+                        flag1 = yx_stru.int_5;
+                        if (flag1 / 1000000 == WARN_TYPE_DEFINE_NO)
+                        {
+                            for (int ii = 0; ii < MAX_WARN_LEVEL_NUM; ii++)
+                            {
+                                if (LevelDefine[ii].warntype_id == flag1)
+                                {
+                                    tmpwarn.customized_group = LevelDefine[ii].warn_level;
+                                    tmpwarn.level = LevelDefine[ii].warn_level;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                COrderMap ordermap;
+                struct yx_channel_scada yx_channel;
+                RetCode = ordermap.GetYxChannel(yx_stru.yx_id, yx_stru.current_channel, &yx_channel);
+
+                //=================================================
+                // 结构中新增内容的读取
+
+                tmpwarn.bay_id = bmap.GetBayIdxByIdx(tmpwarn.key_id);
+                tmpwarn.dev_id = bmap.GetDevIdxByIdx(tmpwarn.key_id);
+                memset(alias, '\0', MAX_ALIAS_LEN);
+                if (RetCode >= 0)
+                {
+                    memcpy(alias, yx_channel.ld_alias, MAX_ALIAS_LEN);
+                    tmpwarn.ied_id = bmap.GetIedIdxByAlias(alias);
+                    tmpwarn.ld_id = bmap.GetLdIdxByAlias(alias);
+                }
+                else
+                {
+                    tmpwarn.ied_id = -1;
+                    tmpwarn.ld_id = -1;
+                }
+
+                str_msg_string = Transcoding::getInstance()->trans_coding(tmpwarn.string, Gbk_Data);
+                // if(strstr(tmpwarn.string,MyTR("(检修)"))){
+                if (str_msg_string.contains("检修"))
+                {
+                    tmpwarn.customized_group = examine_tabpage;
+                }
+
+                // if(strstr(tmpwarn.string,MyTR("(事故分闸)"))){
+                if (str_msg_string.contains("事故分闸"))
+                {
+                    if (sg_tabpage > 0)
+                    {
+                        tmpwarn.customized_group = sg_tabpage;
+                        tmpwarn.level = sg_tabpage;
+                    }
+                }
+
+                //		printf("keyid=%d warn_string %s , flag1=%d, warn_level=%d, customized_group=%d\n",tmpwarn.key_id,tmpwarn.string, flag1, tmpwarn.level, tmpwarn.customized_group);
+
+                if (!m_ConfirmGzp)
+                {
+                    if (RetCode > 0)
+                    {
+                        if (yx_stru.fac_gz_no > 0)
+                            is_gz = 1;
+                        for (int k = 0; k < 10; k++)
+                            if (yx_stru.bay_gz_no[k] > 0)
+                                is_gz = 1;
+                    }
+                }
+            }
+            else if ((tmpwarn.key_id / 1000000) == YC_DEFINE_NO)
+            {
+                flag = 0;
+                yc_define_scada yc_stru;
+                RetCode = LdbGetRecordById(YC_DEFINE_NO, (char *)&tmpwarn.key_id, (char *)&yc_stru, sizeof(yc_define_scada));
+                if (RetCode > 0)
+                {
+                    tmpwarn.reposno = yc_stru.int_6;
+                    tmpwarn.repostype = yc_stru.int_7;
+                }
+                else
+                {
+                    tmpwarn.reposno = -1;
+                    tmpwarn.repostype = -1;
+                }
+                // 找出当前遥测的Tab页分类信息,customized_group
+                if (RetCode > 0)
+                {
+                    if (tmpwarn.type == WARN_TYPE_YC_OVER_LIMIT)
+                    {
+                        flag = yc_stru.conf_mode;
+                        flag2 = yc_stru.int_5;
+                        if (flag2 / 1000000 == WARN_TYPE_DEFINE_NO)
+                        {
+                            for (int ii = 0; ii < MAX_WARN_LEVEL_NUM; ii++)
+                            {
+                                if (LevelDefine[ii].warntype_id == flag2)
+                                {
+                                    tmpwarn.customized_group = LevelDefine[ii].warn_level;
+                                    tmpwarn.level = LevelDefine[ii].warn_level;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                COrderMap ordermap;
+                struct yc_channel_scada yc_channel;
+                RetCode = ordermap.GetYcChannel(yc_stru.yc_id, yc_stru.current_channel, &yc_channel);
+
+                //=================================================
+                // 结构中新增内容的读取
+
+                tmpwarn.bay_id = bmap.GetBayIdxByIdx(tmpwarn.key_id);
+                tmpwarn.dev_id = bmap.GetDevIdxByIdx(tmpwarn.key_id);
+                memset(alias, '\0', MAX_ALIAS_LEN);
+                if (RetCode >= 0)
+                {
+                    memcpy(alias, yc_channel.ld_alias, MAX_ALIAS_LEN);
+                    tmpwarn.ied_id = bmap.GetIedIdxByAlias(alias);
+                    tmpwarn.ld_id = bmap.GetLdIdxByAlias(alias);
+                }
+                else
+                {
+                    tmpwarn.ied_id = -1;
+                    tmpwarn.ld_id = -1;
+                }
+            }
+            else if ((tmpwarn.key_id / 1000000) == OTHER_DEVICE_NO)
+            { // 保护信号
+                other_device_scada other_stru;
+                RetCode = LdbGetRecordById(OTHER_DEVICE_NO, (char *)&tmpwarn.key_id, (char *)&other_stru, sizeof(other_device_scada));
+
+                tmpwarn.bay_id = bmap.GetBayIdxByIdx(tmpwarn.key_id);
+                tmpwarn.dev_id = tmpwarn.key_id;
+                tmpwarn.ld_id = bmap.GetLdIdxByAlias(other_stru.link_ld_alias);
+                tmpwarn.ied_id = bmap.GetIedIdxByAlias(other_stru.link_ld_alias);
+                // 找出当前遥信的Tab页分类信息,customized_group
+                flag = 0;
+            }
+            else
+            {
+                tmpwarn.bay_id = -1;
+                tmpwarn.dev_id = -1;
+                tmpwarn.ied_id = -1;
+                tmpwarn.ld_id = -1;
+                //???			tmpwarn.customized_group=WARN_LEVEL_1;
+                flag = 0;
+            }
+
+            if (tmpwarn.type == WARN_TYPE_YX_BW)
+            {
+                // 根据用户需求记录下所有未复归的告警
+                // if(strstr(tmpwarn.string,"动作")&&!strstr(tmpwarn.string,"SOE")&&!strstr(tmpwarn.string,"复归"))
+                str_msg_string = Transcoding::getInstance()->trans_coding(tmpwarn.string, Gbk_Data);
+                // if(tmpwarn.value==1&&!strstr(tmpwarn.string,"SOE")&&!strstr(tmpwarn.string,MyTR("复归")))
+                if (tmpwarn.value == 1 && !strstr(tmpwarn.string, "SOE") && !str_msg_string.contains("复归"))
+                {
+                    tmpwarn.fg_flag = 0;
+                    m_TabNeedLight[revert_tabpage] = true; // 告诉未复归告警窗有条新的未复归消息
+                }
+                // else	if(strstr(tmpwarn.string,"复归")&&!strstr(tmpwarn.string,"SOE"))
+                else if (tmpwarn.value == 0 && !strstr(tmpwarn.string, "SOE"))
+                {
+                    tmpwarn.fg_flag = 1;
+                }
+                else
+                {
+                    tmpwarn.fg_flag = -1;
+                }
+            }
+            else
+            {
+                tmpwarn.fg_flag = -1;
+            }
+
+            m_WarnRecMessage[item_end].no = tmpwarn.no;
+            m_WarnRecMessage[item_end].type = tmpwarn.type;
+
+            if (m_IfJk == 1)
+            {
+                char fac_name[128];
+                int ret = bmap.GetNameByIdx(tmpwarn.fac_id, fac_name, 128);
+                if (ret < 0)
+                {
+                    strcpy(m_WarnRecMessage[item_end].string, tmpwarn.string);
+                }
+                else
+                {
+                    // QString str = QString(tmpwarn.string);
+                    QString str = Transcoding::getInstance()->trans_coding(tmpwarn.string, Gbk_Data);
+                    QString s1 = str.section(" ", 0, 1);
+                    QString s2 = str.section(" ", 2);
+                    strcpy(m_WarnRecMessage[item_end].string, s1.toAscii());
+                    strcat(m_WarnRecMessage[item_end].string, " ");
+                    strcat(m_WarnRecMessage[item_end].string, fac_name);
+                    strcat(m_WarnRecMessage[item_end].string, " ");
+                    strcat(m_WarnRecMessage[item_end].string, s2.toAscii());
+                }
+            }
+            else
+            {
+                strcpy(m_WarnRecMessage[item_end].string, tmpwarn.string);
+            }
+            if (tmpwarn.type == WARN_TYPE_RECALL)
+                tmpwarn.fg_flag = 1;
+
+            if (flag == 0)
+            {
+                m_WarnRecMessage[item_end].confirm = 1 - WarnDefine[tmpwarn.my_type].need_confirm;
+                m_WarnRecMessage[item_end].flag = WarnDefine[tmpwarn.my_type].need_confirm;
+            }
+            if (flag == 1)
+            {
+                m_WarnRecMessage[item_end].confirm = 1;
+                m_WarnRecMessage[item_end].flag = 0;
+            }
+            if (flag == 2 || flag == 3)
+            {
+                m_WarnRecMessage[item_end].confirm = 0;
+                m_WarnRecMessage[item_end].flag = 1;
+                if (flag == 2)
+                    m_WarnRecMessage[item_end].flag = 2;
+            }
+            if (if_split_win == 0) // 单栏情况下是否确认标记全部置1
+                m_WarnRecMessage[item_end].flag = 1;
+
+            m_WarnRecMessage[item_end].confirm_flag = 0;
+
+            //		printf("%s: item_end=%d, kg_tabpage=%d, warn_type = %d warn_my_type = %d,warn_level=%d\n",m_WarnRecMessage[item_end].string, item_end, kg_tabpage, tmpwarn.type,tmpwarn.my_type,tmpwarn.level);
+
+            time_t aa;
+            time(&aa);
+            m_WarnRecMessage[item_end].start_time = aa;
+            m_WarnRecMessage[item_end].fac_id = tmpwarn.fac_id;
+            m_WarnRecMessage[item_end].key_id = tmpwarn.key_id;
+            m_WarnRecMessage[item_end].field_id = tmpwarn.field_id;
+            m_WarnRecMessage[item_end].bay_id = tmpwarn.bay_id;
+            m_WarnRecMessage[item_end].ied_id = tmpwarn.ied_id;
+            m_WarnRecMessage[item_end].ld_id = tmpwarn.ld_id;
+            m_WarnRecMessage[item_end].dev_id = tmpwarn.dev_id;
+            m_WarnRecMessage[item_end].customized_group = tmpwarn.customized_group;
+            //================================
+            // 增加的复归标记
+            m_WarnRecMessage[item_end].fg_flag = tmpwarn.fg_flag;
+            // 增加的检修状态
+            m_WarnRecMessage[item_end].status = tmpwarn.status;
+            m_WarnRecMessage[item_end].value = tmpwarn.value;
+            // 推理信号类型
+            m_WarnRecMessage[item_end].repostype = tmpwarn.repostype;
+            // 故障类型
+            m_WarnRecMessage[item_end].gztype = tmpwarn.gztype;
+
+            m_WarnRecMessage[item_end].is_gz = is_gz;
+            m_WarnRecMessage[item_end].reposno = tmpwarn.reposno;
+
+            if (m_WarnRecMessage[item_end].type == WARN_TYPE_RECALL)
+            { // 事故反演信号不判是否光字
+                m_WarnRecMessage[item_end].is_gz = 0;
+                m_WarnRecMessage[item_end].confirm = 1;
+            }
+            m_WarnRecMessage[item_end].level = tmpwarn.level;
+            m_WarnRecMessage[item_end].my_type = tmpwarn.my_type;
+
+            current_id = item_end;
+            item_end++;
+            if ((tmpwarn.key_id / 1000000) == YX_DEFINE_NO && tmpwarn.reposno > 0 && tmpwarn.type == WARN_TYPE_YX_BW)
+                AutoReposMulti(current_id);
+
+            if (item_end >= MAX_LINES)
+            {
+                item_has_full = 1;
+                item_end = 0;
+            }
+            /*
+            if(item_end>=MAX_LINES)
+
+                item_end=0;
+            if(item_end<=item_begin)
+                item_begin++;
+            if(item_begin>=MAX_LINES)
+                item_begin=0;*/
+
+            // 告诉系统有一条新的分类告警信息，需要闪烁相应的标题
+            m_TabNeedLight[tmpwarn.customized_group] = true;
+            if (WarnDialog::mnomsg) // 告警窗口不接收推送消息
+            {
+            }
+            else
+            {
+                // 事故优先
+                QString warnstr = QString(WarnDefine[ShowArray[m_WarnRecMessage[current_id].type]].name) + " " + Transcoding::getInstance()->trans_coding(m_WarnRecMessage[current_id].string, Gbk_Data);
+                if (WarnDialog::maccidentmsg && (warnstr.contains(tr("事故跳闸")) || tmpwarn.level == 3))
+                {
+                    if ((MainWidget::mwarn_show && m_PopFlag != 0) || m_PopFlag == 1 || m_PopFlag == 2)
+                    {
+                        MainWidget::m_warnDialog->appendWarnStr(warnstr, 3);
+                        if (1 == GuiWarnSpace::m_PopFlag)
+                        {
+                            MainWidget::mwarn_num = 0;
+                            MainWidget::m_Label_warn->setText(QString::number(MainWidget::mwarn_num));
+                            MainWidget::m_warnDialog->showDialog();
+                        }
+                        else if (2 == GuiWarnSpace::m_PopFlag && !MainWidget::m_warnDialog->isVisible())
+                        {
+                            MainWidget::mwarn_num++;
+                            if (MainWidget::mwarn_num > 99)
+                            {
+                                MainWidget::m_Label_warn->setText("99+");
+                            }
+                            else
+                            {
+                                MainWidget::m_Label_warn->setText(QString::number(MainWidget::mwarn_num));
+                            }
+                        }
+                    }
+                    continue;
+                }
+                else if (WarnDialog::mpromptmsg && WarnDialog::mwaringmsg)
+                {
+                    if (!warnstr.contains(tr("事故跳闸")) && (tmpwarn.level == 1 || tmpwarn.level == 2))
+                    {
+                        // qDebug()<<"msg=="<<m_PopFlag;
+                        if ((MainWidget::mwarn_show && m_PopFlag != 0) || m_PopFlag == 1 || m_PopFlag == 2)
+                        {
+                            MainWidget::m_warnDialog->appendWarnStr(warnstr, tmpwarn.level);
+                            if (1 == GuiWarnSpace::m_PopFlag)
+                            {
+                                MainWidget::mwarn_num = 0;
+                                MainWidget::m_Label_warn->setText(QString::number(MainWidget::mwarn_num));
+                                MainWidget::m_warnDialog->showDialog();
+                            }
+                            else if (2 == GuiWarnSpace::m_PopFlag && !MainWidget::m_warnDialog->isVisible())
+                            {
+                                MainWidget::mwarn_num++;
+                                if (MainWidget::mwarn_num > 99)
+                                {
+                                    MainWidget::m_Label_warn->setText("99+");
+                                }
+                                else
+                                {
+                                    MainWidget::m_Label_warn->setText(QString::number(MainWidget::mwarn_num));
+                                }
+                            }
+                        }
+                    }
+                }
+                else if (WarnDialog::mpromptmsg)
+                {
+                    if (!warnstr.contains(tr("事故跳闸")) && tmpwarn.level == 1)
+                    {
+                        if ((MainWidget::mwarn_show && m_PopFlag != 0) || m_PopFlag == 1 || m_PopFlag == 2)
+                        {
+                            MainWidget::m_warnDialog->appendWarnStr(warnstr, tmpwarn.level);
+                            if (1 == GuiWarnSpace::m_PopFlag)
+                            {
+                                MainWidget::mwarn_num = 0;
+                                MainWidget::m_Label_warn->setText(QString::number(MainWidget::mwarn_num));
+                                MainWidget::m_warnDialog->showDialog();
+                            }
+                            else if (2 == GuiWarnSpace::m_PopFlag && !MainWidget::m_warnDialog->isVisible())
+                            {
+                                MainWidget::mwarn_num++;
+                                if (MainWidget::mwarn_num > 99)
+                                {
+                                    MainWidget::m_Label_warn->setText("99+");
+                                }
+                                else
+                                {
+                                    MainWidget::m_Label_warn->setText(QString::number(MainWidget::mwarn_num));
+                                }
+                            }
+                        }
+                    }
+                }
+                else if (WarnDialog::mwaringmsg)
+                {
+                    if (!warnstr.contains(tr("事故跳闸")) && tmpwarn.level == 2)
+                    {
+                        if ((MainWidget::mwarn_show && m_PopFlag != 0) || m_PopFlag == 1 || m_PopFlag == 2)
+                        {
+                            MainWidget::m_warnDialog->appendWarnStr(warnstr, tmpwarn.level);
+                            if (1 == GuiWarnSpace::m_PopFlag)
+                            {
+                                MainWidget::mwarn_num = 0;
+                                MainWidget::m_Label_warn->setText(QString::number(MainWidget::mwarn_num));
+                                MainWidget::m_warnDialog->showDialog();
+                            }
+                            else if (2 == GuiWarnSpace::m_PopFlag && !MainWidget::m_warnDialog->isVisible())
+                            {
+                                MainWidget::mwarn_num++;
+                                if (MainWidget::mwarn_num > 99)
+                                {
+                                    MainWidget::m_Label_warn->setText("99+");
+                                }
+                                else
+                                {
+                                    MainWidget::m_Label_warn->setText(QString::number(MainWidget::mwarn_num));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+        }
+        refresh_flag = 1;
+    }
+
+
+    // 间隔多事件自动推理
+    void MainView::AutoReposMulti(int id)
+    {
+        printf("当前消息ID为%d reposno=%d\n", id, m_WarnRecMessage[id].reposno);
+        if (id < 0)
+            return;
+        if (m_WarnRecMessage[id].value != 1)
+            return;
+        if (m_WarnRecMessage[id].reposno > 2)
+        {
+            single_mul = 2; // 多重推理
+            ReposInfo *myReposInfo = new ReposInfo(id, 1);
+            delete myReposInfo;
+        }
+        return;
+    }
+
+    void MainView::all_yx_unflash()
+    {
+        int tmp, i, j, cb_count = 0, rly_count = 0, yx_count = 0;
+        int counter = 0;
+        int tmp_int;
+        time_t tmp_time;
+        short tmp_short, StatusFieldNo_cb, StatusFieldNo_rly, field_id_cb, field_id_rly, StatusFieldNo_yx, field_id_yx;
+        char str[32], personname[32];
+        int ret_code;
+        char *send_buf;
+
+        int begin = 0, end = item_end;
+        if (item_has_full == 1)
+        {
+            if (item_end == 0)
+            {
+                begin = 0;
+                end = MAX_LINES;
+            }
+            else
+            {
+                begin = item_end;
+                end = begin + MAX_LINES;
+            }
+        }
+        for (i = begin; i < end; i++)
+        {
+            j = i % MAX_LINES;
+            if ((j + 1) % 100 == 0)
+            {
+                qApp->processEvents();
+#ifdef WIN32
+                Sleep(1);
+#else
+                usleep(1 * 1000);
+#endif
+            }
+
+            if (WarnDefine[m_WarnRecMessage[j].my_type].flag == 0)
+                continue;
+
+            if (m_WarnRecMessage[j].is_gz > 0 && m_ConfirmGzp == false)
+                continue;
+
+            if (m_WarnRecMessage[j].type == 1 && (m_WarnRecMessage[j].key_id / 1000000) == CB_DEVICE_NO && m_WarnRecMessage[j].confirm == 0)
+            {
+                field_id_cb = m_WarnRecMessage[j].field_id;
+                StatusFieldNo_cb = 0;
+                /*
+                ValColStru.table_id = m_WarnRecMessage[j].key_id / 1000000;
+                ValColStru.col_no_scada_value = m_WarnRecMessage[j].field_id;
+                table_val.TableGet((char* )&ValColStru, (char* )&ValColStru, sizeof(ValColStru));
+                StatusFieldNo_cb = ValColStru.col_no_scada_status;
+                */
+                cb_count++;
+            }
+            if (m_WarnRecMessage[j].type == 1 && (m_WarnRecMessage[j].key_id / 1000000) == YX_DEFINE_NO && m_WarnRecMessage[j].confirm == 0)
+            {
+                field_id_yx = m_WarnRecMessage[j].field_id;
+                StatusFieldNo_yx = 0;
+                /*
+                ValColStru.table_id = m_WarnRecMessage[j].key_id / 1000000;
+                ValColStru.col_no_scada_value = m_WarnRecMessage[j].field_id;
+                table_val.TableGet((char* )&ValColStru, (char* )&ValColStru, sizeof(ValColStru));
+                StatusFieldNo_rly = ValColStru.col_no_scada_status;
+                */
+                yx_count++;
+            }
+            if (m_WarnRecMessage[j].type == WARN_TYPE_RLY_EVENT && (m_WarnRecMessage[j].key_id / 1000000) == OTHER_DEVICE_NO && m_WarnRecMessage[j].confirm == 0)
+            {
+                field_id_rly = m_WarnRecMessage[j].field_id;
+                StatusFieldNo_rly = 0;
+                /*
+                ValColStru.table_id = m_WarnRecMessage[j].key_id / 1000000;
+                ValColStru.col_no_scada_value = m_WarnRecMessage[j].field_id;
+                table_val.TableGet((char* )&ValColStru, (char* )&ValColStru, sizeof(ValColStru));
+                StatusFieldNo_rly = ValColStru.col_no_scada_status;
+                */
+                rly_count++;
+            }
+        }
+        printf("cb_un_flash==%d,yx_un_flash=%d,rly_un_flash==%d,tmp===%d\n", cb_count, yx_count, rly_count, tmp);
+        // table_val.TableClose();
+
+        ns_gethostname(str, 32);
+        // sprintf(personname,"%s(%s)",m_CurUserName.toAscii().data(), m_CurUserAliasName.toAscii().data());
+        sprintf(personname, "%s(%s)", m_CurUserName.toUtf8().data(), m_CurUserAliasName.toUtf8().data());
+        time(&tmp_time);
+
+        if (cb_count > 0)
+        {
+
+            /****************** modified in jiangyin in case of the report length more than 19k *******************/
+            int loop, tmp1;
+            tmp1 = 0, loop = 0;
+            tmp1 = (int)((19 * 1000 - 76 - sizeof(int)) / 4);
+            loop = (int)cb_count / tmp1;
+
+            for (int k = 0; k <= loop; k++)
+            {
+                // counter = 0;
+                int send_num = 0;
+                int j = 0;
+                if (cb_count > (int)((19 * 1000 - 76 - sizeof(int)) / 4))
+                {
+                    send_num = (int)((19 * 1000 - 76 - sizeof(int)) / 4);
+                    cb_count -= send_num;
+                }
+                else
+                {
+                    send_num = cb_count;
+                }
+
+                send_buf = (char *)malloc(19000);
+                tmp_int = DNET_YX_UNFLASH;
+                memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                counter += sizeof(int);
+                tmp_int = tmp_time;
+                memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                counter += sizeof(int);
+                tmp_short = field_id_cb;
+                memcpy(send_buf + counter, &tmp_short, sizeof(short));
+                counter += sizeof(short);
+                tmp_short = StatusFieldNo_cb;
+                memcpy(send_buf + counter, &tmp_short, sizeof(short));
+                counter += sizeof(short);
+                memcpy(send_buf + counter, str, 32);
+                counter += 32;
+                memcpy(send_buf + counter, personname, 32);
+                counter += 32;
+                tmp_int = send_num;
+                memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                counter += sizeof(int);
+                for (i = 0; i < send_num; j++)
+                {
+                    //		//add by sunshm 苏州用户提出：告警确认需分页确认
+                    //		if	(m_WarnRecMessage[j].customized_group !=m_CurrentTabOrder&&m_CurrentTabOrder!=0)
+                    //				continue;
+                    //		//add ended by sunshm
+
+                    if (m_WarnRecMessage[j].is_gz > 0 && m_ConfirmGzp == false)
+                        continue;
+
+                    if (m_WarnRecMessage[j].type == 1 && (m_WarnRecMessage[j].key_id / 1000000) == CB_DEVICE_NO && m_WarnRecMessage[j].confirm == 0)
+                    {
+                        i++;
+                        tmp_int = m_WarnRecMessage[j].key_id;
+                        memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                        counter += sizeof(int);
+                    }
+                }
+                ret_code = smart_warn_info.dnet_send_message(DNET_REPORT_POINT_TO_POINT,
+                                                             DNET_YX_UNFLASH, DNET_SERVER_HOST, "svc_scada_server",
+                                                             send_buf, counter);
+                if (ret_code < 0)
+                    ret_code = smart_warn_info.dnet_send_message(DNET_REPORT_BROADCAST_SAFE, DNET_YX_UNFLASH, DNET_ALL_HOST, "svc_scada_proxy", send_buf, counter);
+
+                ret_code = smart_warn_info.dnet_send_message(DNET_REPORT_BROADCAST_SAFE, DNET_YX_UNFLASH, DNET_ALL_HOST, "Warn", send_buf, counter);
+                free(send_buf);
+
+                usleep(1 * 1000);
+            }
+        }
+        counter = 0;
+        if (yx_count > 0)
+        {
+            int loop, tmp1;
+            tmp1 = 0, loop = 0;
+            tmp1 = (int)((19 * 1024 - 76 - sizeof(int)) / 4);
+            loop = (int)yx_count / tmp1;
+
+            for (int k = 0; k <= loop; k++)
+            {
+                // counter = 0;
+                int send_num = 0;
+                int j = 0;
+                if (yx_count > (int)((19 * 1000 - 76 - sizeof(int)) / 4))
+                {
+                    send_num = (int)((19 * 1000 - 76 - sizeof(int)) / 4);
+                    yx_count -= send_num;
+                }
+                else
+                {
+                    send_num = yx_count;
+                }
+
+                send_buf = (char *)malloc(19000);
+                tmp_int = DNET_YX_UNFLASH;
+                memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                counter += sizeof(int);
+                tmp_int = tmp_time;
+                memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                counter += sizeof(int);
+                tmp_short = field_id_rly;
+                memcpy(send_buf + counter, &tmp_short, sizeof(short));
+                counter += sizeof(short);
+                tmp_short = StatusFieldNo_yx;
+                memcpy(send_buf + counter, &tmp_short, sizeof(short));
+                counter += sizeof(short);
+                memcpy(send_buf + counter, str, 32);
+                counter += 32;
+                memcpy(send_buf + counter, personname, 32);
+                counter += 32;
+                tmp_int = send_num;
+                memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                counter += sizeof(int);
+                // for	(i=item_begin;i<tmp;i++)
+                for (i = 0; i < send_num; j++)
+                {
+
+                    if (m_WarnRecMessage[j].is_gz > 0 && m_ConfirmGzp == false)
+                        continue;
+                    if (m_WarnRecMessage[j].type == 1 && (m_WarnRecMessage[j].key_id / 1000000) == YX_DEFINE_NO && m_WarnRecMessage[j].confirm == 0)
+                    {
+                        i++;
+                        tmp_int = m_WarnRecMessage[j].key_id;
+                        memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                        counter += sizeof(int);
+                    }
+                }
+                ret_code = smart_warn_info.dnet_send_message(DNET_REPORT_POINT_TO_POINT,
+                                                             DNET_YX_UNFLASH, DNET_SERVER_HOST, "svc_scada_server",
+                                                             send_buf, counter);
+                if (ret_code < 0)
+                    ret_code = smart_warn_info.dnet_send_message(DNET_REPORT_BROADCAST_SAFE, DNET_YX_UNFLASH, DNET_ALL_HOST, "svc_scada_proxy", send_buf, counter);
+                ret_code = smart_warn_info.dnet_send_message(DNET_REPORT_BROADCAST_SAFE, DNET_YX_UNFLASH, DNET_ALL_HOST, "Warn", send_buf, counter);
+                free(send_buf);
+
+                usleep(1 * 1000);
+            }
+        }
+        counter = 0;
+        if (rly_count > 0)
+        {
+            int loop, tmp1;
+            tmp1 = 0, loop = 0;
+            tmp1 = (int)((19 * 1024 - 76 - sizeof(int)) / 4);
+            loop = (int)rly_count / tmp1;
+
+            for (int k = 0; k <= loop; k++)
+            {
+                counter = 0;
+                int send_num = 0;
+                int j = 0;
+                if (rly_count > (int)((19 * 1000 - 76 - sizeof(int)) / 4))
+                {
+                    send_num = (int)((19 * 1000 - 76 - sizeof(int)) / 4);
+                    rly_count -= send_num;
+                }
+                else
+                {
+                    send_num = rly_count;
+                }
+
+                send_buf = (char *)malloc(19000);
+                tmp_int = DNET_YX_UNFLASH;
+                memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                counter += sizeof(int);
+                tmp_int = tmp_time;
+                memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                counter += sizeof(int);
+                tmp_short = field_id_rly;
+                memcpy(send_buf + counter, &tmp_short, sizeof(short));
+                counter += sizeof(short);
+                tmp_short = StatusFieldNo_rly;
+                memcpy(send_buf + counter, &tmp_short, sizeof(short));
+                counter += sizeof(short);
+                memcpy(send_buf + counter, str, 32);
+                counter += 32;
+                memcpy(send_buf + counter, personname, 32);
+                counter += 32;
+                tmp_int = send_num;
+                memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                counter += sizeof(int);
+                // for	(i=item_begin;i<tmp;i++)
+                for (i = 0; i < send_num; j++)
+                {
+
+                    if (m_WarnRecMessage[j].is_gz > 0 && m_ConfirmGzp == false)
+                        continue;
+                    if (m_WarnRecMessage[j].type == WARN_TYPE_RLY_EVENT && (m_WarnRecMessage[j].key_id / 1000000) == OTHER_DEVICE_NO && m_WarnRecMessage[j].confirm == 0)
+                    {
+                        i++;
+                        tmp_int = m_WarnRecMessage[j].key_id;
+                        memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                        counter += sizeof(int);
+                    }
+                }
+                ret_code = smart_warn_info.dnet_send_message(DNET_REPORT_POINT_TO_POINT,
+                                                             DNET_YX_UNFLASH, DNET_SERVER_HOST, "svc_scada_server",
+                                                             send_buf, counter);
+                if (ret_code < 0)
+                    ret_code = smart_warn_info.dnet_send_message(DNET_REPORT_BROADCAST_SAFE, DNET_YX_UNFLASH, DNET_ALL_HOST, "svc_scada_proxy", send_buf, counter);
+                ret_code = smart_warn_info.dnet_send_message(DNET_REPORT_BROADCAST_SAFE, DNET_YX_UNFLASH, DNET_ALL_HOST, "Warn", send_buf, counter);
+                free(send_buf);
+
+                usleep(1 * 1000);
+            }
+        }
+    }
+
+    void MainView::select_yx_unflash()
+    {
+        int tmp, i, j, cb_count = 0, rly_count = 0, yx_count = 0;
+        int counter = 0;
+        int tmp_int;
+        time_t tmp_time;
+        short tmp_short, StatusFieldNo_cb, StatusFieldNo_rly, field_id_cb, field_id_rly, StatusFieldNo_yx, field_id_yx;
+        char str[32], personname[32];
+        int ret_code;
+        char *send_buf;
+        // TableOp         table_val;
+        // struct value_col_no_relevant_scada  ValColStru;
+
+        // RetCode = table_val.TableOpen(SCADA, VALUE_COL_NO_RELEVANT_NO);
+        // if(RetCode < 0)  {
+        //         printf("Error: TableOpen error ! \n");
+        // }
+        int begin = 0, end = item_end;
+        if (item_has_full == 1)
+        {
+            if (item_end == 0)
+            {
+                begin = 0;
+                end = MAX_LINES;
+            }
+            else
+            {
+                begin = item_end;
+                end = begin + MAX_LINES;
+            }
+        }
+        for (i = begin; i < end; i++)
+        {
+            j = i % MAX_LINES;
+            if ((j + 1) % 100 == 0)
+            {
+                qApp->processEvents();
+
+                usleep(1 * 1000);
+            }
+
+            if (WarnDefine[m_WarnRecMessage[j].my_type].flag == 0)
+                continue;
+
+            if (m_WarnRecMessage[j].is_gz > 0 && m_ConfirmGzp == false)
+                continue;
+            // 筛选厂站不为空且不是筛选厂站信号不确认
+            // 筛选间隔不为空且不是筛选间隔信号不确认
+            if (m_icurFac.size() != 0 && m_icurFac.contains(m_WarnRecMessage[j].fac_id) == false)
+                continue;
+            if (m_icurBay.size() != 0 && m_icurBay.contains(m_WarnRecMessage[j].bay_id) == false)
+                continue;
+
+            if (m_WarnRecMessage[j].type == 1 && (m_WarnRecMessage[j].key_id / 1000000) == CB_DEVICE_NO && m_WarnRecMessage[j].confirm == 0)
+            {
+                field_id_cb = m_WarnRecMessage[j].field_id;
+                StatusFieldNo_cb = 0;
+                /*
+                ValColStru.table_id = m_WarnRecMessage[j].key_id / 1000000;
+                ValColStru.col_no_scada_value = m_WarnRecMessage[j].field_id;
+                table_val.TableGet((char* )&ValColStru, (char* )&ValColStru, sizeof(ValColStru));
+                StatusFieldNo_cb = ValColStru.col_no_scada_status;
+                */
+                cb_count++;
+            }
+            if (m_WarnRecMessage[j].type == 1 && (m_WarnRecMessage[j].key_id / 1000000) == YX_DEFINE_NO && m_WarnRecMessage[j].confirm == 0)
+            {
+                field_id_yx = m_WarnRecMessage[j].field_id;
+                StatusFieldNo_yx = 0;
+                /*
+                ValColStru.table_id = m_WarnRecMessage[j].key_id / 1000000;
+                ValColStru.col_no_scada_value = m_WarnRecMessage[j].field_id;
+                table_val.TableGet((char* )&ValColStru, (char* )&ValColStru, sizeof(ValColStru));
+                StatusFieldNo_rly = ValColStru.col_no_scada_status;
+                */
+                yx_count++;
+            }
+            if (m_WarnRecMessage[j].type == WARN_TYPE_RLY_EVENT && (m_WarnRecMessage[j].key_id / 1000000) == OTHER_DEVICE_NO && m_WarnRecMessage[j].confirm == 0)
+            {
+                field_id_rly = m_WarnRecMessage[j].field_id;
+                StatusFieldNo_rly = 0;
+                /*
+                ValColStru.table_id = m_WarnRecMessage[j].key_id / 1000000;
+                ValColStru.col_no_scada_value = m_WarnRecMessage[j].field_id;
+                table_val.TableGet((char* )&ValColStru, (char* )&ValColStru, sizeof(ValColStru));
+                StatusFieldNo_rly = ValColStru.col_no_scada_status;
+                */
+                rly_count++;
+            }
+        }
+        printf("cb_un_flash==%d,yx_un_flash=%d,rly_un_flash==%d,tmp===%d\n", cb_count, yx_count, rly_count, tmp);
+        // table_val.TableClose();
+
+        ns_gethostname(str, 32);
+        // sprintf(personname,"%s(%s)",m_CurUserName.toAscii().data(), m_CurUserAliasName.toAscii().data());
+        sprintf(personname, "%s(%s)", m_CurUserName.toUtf8().data(), m_CurUserAliasName.toUtf8().data());
+        time(&tmp_time);
+
+        if (cb_count > 0)
+        {
+
+            /****************** modified in jiangyin in case of the report length more than 19k *******************/
+            int loop, tmp1;
+            tmp1 = 0, loop = 0;
+            tmp1 = (int)((19 * 1000 - 76 - sizeof(int)) / 4);
+            loop = (int)cb_count / tmp1;
+
+            for (int k = 0; k <= loop; k++)
+            {
+                int send_num = 0;
+                int j = 0;
+                if (cb_count > (int)((19 * 1000 - 76 - sizeof(int)) / 4))
+                {
+                    send_num = (int)((19 * 1000 - 76 - sizeof(int)) / 4);
+                    cb_count -= send_num;
+                }
+                else
+                {
+                    send_num = cb_count;
+                }
+
+                send_buf = (char *)malloc(19000);
+                tmp_int = DNET_YX_UNFLASH;
+                memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                counter += sizeof(int);
+                tmp_int = tmp_time;
+                memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                counter += sizeof(int);
+                tmp_short = field_id_cb;
+                memcpy(send_buf + counter, &tmp_short, sizeof(short));
+                counter += sizeof(short);
+                tmp_short = StatusFieldNo_cb;
+                memcpy(send_buf + counter, &tmp_short, sizeof(short));
+                counter += sizeof(short);
+                memcpy(send_buf + counter, str, 32);
+                counter += 32;
+                memcpy(send_buf + counter, personname, 32);
+                counter += 32;
+                tmp_int = send_num;
+                memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                counter += sizeof(int);
+                for (i = 0; i < send_num; j++)
+                {
+                    //		//add by sunshm 苏州用户提出：告警确认需分页确认
+                    //		if	(m_WarnRecMessage[j].customized_group !=m_CurrentTabOrder&&m_CurrentTabOrder!=0)
+                    //				continue;
+                    //		//add ended by sunshm
+
+                    if (m_WarnRecMessage[j].is_gz > 0 && m_ConfirmGzp == false)
+                        continue;
+                    if (m_icurFac.size() != 0 && m_icurFac.contains(m_WarnRecMessage[j].fac_id) == false)
+                        continue;
+                    if (m_icurBay.size() != 0 && m_icurBay.contains(m_WarnRecMessage[j].bay_id) == false)
+                        continue;
+
+                    if (m_WarnRecMessage[j].type == 1 && (m_WarnRecMessage[j].key_id / 1000000) == CB_DEVICE_NO && m_WarnRecMessage[j].confirm == 0)
+                    {
+                        i++;
+                        tmp_int = m_WarnRecMessage[j].key_id;
+                        memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                        counter += sizeof(int);
+                    }
+                }
+                ret_code = smart_warn_info.dnet_send_message(DNET_REPORT_POINT_TO_POINT,
+                                                             DNET_YX_UNFLASH, DNET_SERVER_HOST, "svc_scada_server",
+                                                             send_buf, counter);
+                if (ret_code < 0)
+                    ret_code = smart_warn_info.dnet_send_message(DNET_REPORT_BROADCAST_SAFE, DNET_YX_UNFLASH, DNET_ALL_HOST, "svc_scada_proxy", send_buf, counter);
+
+                ret_code = smart_warn_info.dnet_send_message(DNET_REPORT_BROADCAST_SAFE, DNET_YX_UNFLASH, DNET_ALL_HOST, "Warn", send_buf, counter);
+                free(send_buf);
+
+                usleep(1 * 1000);
+            }
+        }
+        counter = 0;
+        if (yx_count > 0)
+        {
+            int loop, tmp1;
+            tmp1 = 0, loop = 0;
+            tmp1 = (int)((19 * 1024 - 76 - sizeof(int)) / 4);
+            loop = (int)yx_count / tmp1;
+
+            for (int k = 0; k <= loop; k++)
+            {
+                int send_num = 0;
+                int j = 0;
+                if (yx_count > (int)((19 * 1000 - 76 - sizeof(int)) / 4))
+                {
+                    send_num = (int)((19 * 1000 - 76 - sizeof(int)) / 4);
+                    yx_count -= send_num;
+                }
+                else
+                {
+                    send_num = yx_count;
+                }
+
+                send_buf = (char *)malloc(19000);
+                tmp_int = DNET_YX_UNFLASH;
+                memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                counter += sizeof(int);
+                tmp_int = tmp_time;
+                memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                counter += sizeof(int);
+                tmp_short = field_id_rly;
+                memcpy(send_buf + counter, &tmp_short, sizeof(short));
+                counter += sizeof(short);
+                tmp_short = StatusFieldNo_yx;
+                memcpy(send_buf + counter, &tmp_short, sizeof(short));
+                counter += sizeof(short);
+                memcpy(send_buf + counter, str, 32);
+                counter += 32;
+                memcpy(send_buf + counter, personname, 32);
+                counter += 32;
+                tmp_int = send_num;
+                memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                counter += sizeof(int);
+                // for	(i=item_begin;i<tmp;i++)
+                for (i = 0; i < send_num; j++)
+                {
+
+                    if (m_WarnRecMessage[j].is_gz > 0 && m_ConfirmGzp == false)
+                        continue;
+                    if (m_icurFac.size() != 0 && m_icurFac.contains(m_WarnRecMessage[j].fac_id) == false)
+                        continue;
+                    if (m_icurBay.size() != 0 && m_icurBay.contains(m_WarnRecMessage[j].bay_id) == false)
+                        continue;
+
+                    if (m_WarnRecMessage[j].type == 1 && (m_WarnRecMessage[j].key_id / 1000000) == YX_DEFINE_NO && m_WarnRecMessage[j].confirm == 0)
+                    {
+                        i++;
+                        tmp_int = m_WarnRecMessage[j].key_id;
+                        memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                        counter += sizeof(int);
+                    }
+                }
+                ret_code = smart_warn_info.dnet_send_message(DNET_REPORT_POINT_TO_POINT,
+                                                             DNET_YX_UNFLASH, DNET_SERVER_HOST, "svc_scada_server",
+                                                             send_buf, counter);
+                if (ret_code < 0)
+                    ret_code = smart_warn_info.dnet_send_message(DNET_REPORT_BROADCAST_SAFE, DNET_YX_UNFLASH, DNET_ALL_HOST, "svc_scada_proxy", send_buf, counter);
+                ret_code = smart_warn_info.dnet_send_message(DNET_REPORT_BROADCAST_SAFE, DNET_YX_UNFLASH, DNET_ALL_HOST, "Warn", send_buf, counter);
+                free(send_buf);
+
+                usleep(1 * 1000);
+            }
+        }
+        counter = 0;
+        if (rly_count > 0)
+        {
+            int loop, tmp1;
+            tmp1 = 0, loop = 0;
+            tmp1 = (int)((19 * 1024 - 76 - sizeof(int)) / 4);
+            loop = (int)rly_count / tmp1;
+
+            for (int k = 0; k <= loop; k++)
+            {
+                int send_num = 0;
+                int j = 0;
+                if (rly_count > (int)((19 * 1000 - 76 - sizeof(int)) / 4))
+                {
+                    send_num = (int)((19 * 1000 - 76 - sizeof(int)) / 4);
+                    rly_count -= send_num;
+                }
+                else
+                {
+                    send_num = rly_count;
+                }
+
+                send_buf = (char *)malloc(19000);
+                tmp_int = DNET_YX_UNFLASH;
+                memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                counter += sizeof(int);
+                tmp_int = tmp_time;
+                memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                counter += sizeof(int);
+                tmp_short = field_id_rly;
+                memcpy(send_buf + counter, &tmp_short, sizeof(short));
+                counter += sizeof(short);
+                tmp_short = StatusFieldNo_rly;
+                memcpy(send_buf + counter, &tmp_short, sizeof(short));
+                counter += sizeof(short);
+                memcpy(send_buf + counter, str, 32);
+                counter += 32;
+                memcpy(send_buf + counter, personname, 32);
+                counter += 32;
+                tmp_int = send_num;
+                memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                counter += sizeof(int);
+                // for	(i=item_begin;i<tmp;i++)
+                for (i = 0; i < send_num; j++)
+                {
+
+                    if (m_WarnRecMessage[j].is_gz > 0 && m_ConfirmGzp == false)
+                        continue;
+                    if (m_icurFac.size() != 0 && m_icurFac.contains(m_WarnRecMessage[j].fac_id) == false)
+                        continue;
+                    if (m_icurBay.size() != 0 && m_icurBay.contains(m_WarnRecMessage[j].bay_id) == false)
+                        continue;
+
+                    if (m_WarnRecMessage[j].type == WARN_TYPE_RLY_EVENT && (m_WarnRecMessage[j].key_id / 1000000) == OTHER_DEVICE_NO && m_WarnRecMessage[j].confirm == 0)
+                    {
+                        i++;
+                        tmp_int = m_WarnRecMessage[j].key_id;
+                        memcpy(send_buf + counter, &tmp_int, sizeof(int));
+                        counter += sizeof(int);
+                    }
+                }
+                ret_code = smart_warn_info.dnet_send_message(DNET_REPORT_POINT_TO_POINT,
+                                                             DNET_YX_UNFLASH, DNET_SERVER_HOST, "svc_scada_server",
+                                                             send_buf, counter);
+                if (ret_code < 0)
+                    ret_code = smart_warn_info.dnet_send_message(DNET_REPORT_BROADCAST_SAFE, DNET_YX_UNFLASH, DNET_ALL_HOST, "svc_scada_proxy", send_buf, counter);
+                ret_code = smart_warn_info.dnet_send_message(DNET_REPORT_BROADCAST_SAFE, DNET_YX_UNFLASH, DNET_ALL_HOST, "Warn", send_buf, counter);
+                free(send_buf);
+
+                usleep(1 * 1000);
+            }
+        }
+    }
+    void MainView::loadWarnBrowse()
+    {
+        //    ProcessCounter pc("warn_tool");
+        //    if (pc.counter() > 0){
+        //        QMessageBox::warning(this, tr("Warning","警告"),tr("History query program has been opened,please avoiding duplication!","历史查询程序已打开,请勿重复!"),QMessageBox::Ok);
+        //        return;
+        //    }
+        //    QString cmd = "gui_warn_tool";
+        //    QProcess::startDetached(cmd);
+        MainWidget::mswitch_moudle = true;
+    }
+
+    void MainView::tabChanged(int index)
+    {
+        m_CurrentTabOrder = index;
+        //	qDebug(QString("this table order is %1").arg(m_CurrentTabOrder));
+        if (m_CurrentTabOrder >= 0)
+        {
+            CWarnSplitterMap::Iterator it;
+            it = m_WarnSplitterMap.find(m_CurrentTabOrder);
+            if (it != m_WarnSplitterMap.end())
+            {
+                // 如果程序还没有收到消息就不刷新
+                if (!m_FirstStart)
+                {
+                    if (if_split_win)
+                        it.value()->m_allView->resize1();
+                    it.value()->m_ackView->resize1();
+                }
+                warnsplit = it.value();
+            }
+        }
+        m_TabNeedLight[m_CurrentTabOrder] = false;
+    }
+
+    int MainView::OnSendMsgToNsPanel()
+    {
+        char *buffer = NULL;
+        int buffer_length = 0, counter = 0;
+
+        int tmp = 1;
+
+        buffer_length = sizeof(int);
+        buffer = (char *)malloc(buffer_length);
+        memcpy(buffer, &tmp, sizeof(int));
+        counter += sizeof(int);
+
+        smart_warn_info.dnet_send_message(
+            DNET_REPORT_BROADCAST_SAFE,
+            DNET_WARN_TO_PANEL,
+            DNET_LOCAL_HOST,
+            "nspanel",
+            buffer, counter);
+        free(buffer);
+        return 0;
+    }
+
+    void MainView::OnProcessAppAskProcess(char *buffer)
+    {
+        printf("OnProcessAppAskProcess\n");
+        int counter_t, counter = 0;
+        char type;
+        int state;
+
+        counter_t = 0;
+        memcpy((char *)&type, buffer, sizeof(char));
+        counter_t += sizeof(char);
+        printf("type========%d\n", type);
+
+        if (type == 0)
+        {
+            OnSendReportToNsPanel(m_ProcessState);
+            return;
+        }
+        if (type == 1)
+        {
+            if (isMinimized() == false)
+            {
+                setWindowState(Qt::WindowMinimized);
+            }
+            else
+            {
+                setWindowState(windowState() & ~Qt::WindowMinimized | Qt::WindowActive);
+                raise();
+            }
+            /*
+                state = getBuf.get_int(buffer+counter_t);
+                counter_t+=sizeof(int);
+                printf("state========%d\n",state);
+                switch(state){
+                    case PROCESS_STATE_ACTIVE:
+                        active_flag = true;
+                        break;
+                    case PROCESS_STATE_MINIMIZE:
+                        minimize_flag = true;
+                        break;
+                    default:
+                        break;
+                }*/
+        }
+        return;
+    }
+
+    int MainView::OnSendReportToNsPanel(int process_state)
+    {
+        int process_id;
+        char *buffer = NULL;
+        int buffer_length = 0, counter = 0;
+        char process_cmd_name[32];
+        char process_log_name[32];
+        char process_title[64];
+
+        process_id = getpid();
+        strcpy(process_cmd_name, "gui_warn");
+        strcpy(process_log_name, "Warn");
+        GetStrFromQStr(tr("Smart warn", "智能告警窗"), process_title, 64);
+
+        buffer_length = sizeof(int);
+        buffer = (char *)malloc(buffer_length);
+        memcpy(buffer, &process_id, sizeof(int));
+        counter += sizeof(int);
+
+        buffer_length = 32;
+        buffer = (char *)realloc(buffer, buffer_length + counter);
+        memcpy(buffer + counter, process_cmd_name, 32);
+        counter += 32;
+
+        buffer_length = 32;
+        buffer = (char *)realloc(buffer, buffer_length + counter);
+        memcpy(buffer + counter, process_log_name, 32);
+        counter += 32;
+
+        buffer_length = 64;
+        buffer = (char *)realloc(buffer, buffer_length + counter);
+        memcpy(buffer + counter, process_title, 64);
+        counter += 64;
+
+        buffer_length = sizeof(int);
+        buffer = (char *)realloc(buffer, buffer_length + counter);
+        memcpy(buffer + counter, &process_state, sizeof(int));
+        counter += sizeof(int);
+
+        int screen_number = qApp->desktop()->screenNumber();
+        buffer_length = sizeof(int);
+        buffer = (char *)realloc(buffer, buffer_length + counter);
+        memcpy(buffer + counter, &screen_number, sizeof(int));
+        counter += sizeof(int);
+
+        smart_warn_info.dnet_send_message(
+            DNET_REPORT_BROADCAST_SAFE,
+            DNET_APP_TO_PANEL,
+            DNET_LOCAL_HOST,
+            "nspanel",
+            buffer, counter);
+        free(buffer);
+        return 0;
+    }
+
+    void MainView::resizeEvent(QResizeEvent *event)
+    {
+        if (event->size().height() >= WIN_HEIGHT)
+        {
+            if (event->size().width() >= WIN_WIDTH)
+            {
+                m_ProcessState = PROCESS_STATE_MAXIMIZE;
+                move(0, 0);
+            }
+            else
+            {
+                move(pos().x(), 0);
+            }
+        }
+        return QMainWindow::resizeEvent(event);
+    }
+
+    bool MainView::event(QEvent *event)
+    {
+        if (m_ProcessState == PROCESS_STATE_CLOSE)
+            return QMainWindow::event(event);
+
+        switch (event->type())
+        {
+        case QEvent::WindowActivate:
+            m_ProcessState = PROCESS_STATE_ACTIVE;
+            //			OnSendReportToNsPanel(m_ProcessState);
+            return QMainWindow::event(event);
+            break;
+        case QEvent::WindowDeactivate:
+            m_ProcessState = PROCESS_STATE_INACTIVE;
+            //			OnSendReportToNsPanel(m_ProcessState);
+            return QMainWindow::event(event);
+            break;
+        case QEvent::WindowStateChange:
+            if (isMinimized())
+                m_ProcessState = PROCESS_STATE_MINIMIZE;
+            if (isMaximized())
+                m_ProcessState = PROCESS_STATE_MAXIMIZE;
+            //			OnSendReportToNsPanel(m_ProcessState);
+            return QMainWindow::event(event);
+            break;
+        case QEvent::WindowTitleChange:
+            m_ProcessState = PROCESS_UPDATE_TITLE;
+            OnSendReportToNsPanel(m_ProcessState);
+            return QMainWindow::event(event);
+            break;
+        case QEvent::Close:
+            m_ProcessState = PROCESS_STATE_CLOSE;
+            OnSendReportToNsPanel(m_ProcessState);
+            return QMainWindow::event(event);
+            break;
+        default:
+            break;
+        }
+        return QMainWindow::event(event);
+    }
+
+}

@@ -1,9 +1,10 @@
 /**
  * SCADA 厂站 - 间隔 - 装置 层级结构字典与多维过滤/屏蔽核心算法
- * 严格遵照工控电力规范及现场实测结构设计
+ * 严格按照实际厂站配置信息 (/api/scada/config 及 scadaFacilities) 构建，杜绝虚造
  * 包含：
- * 1. 厂站/间隔/装置多级拓扑树
- * 2. 白名单 (筛选) 与 黑名单 (屏蔽) 判定器
+ * 1. 厂站/间隔/装置多级拓扑树 (默认真实厂站: 苏州晟高)
+ * 2. 动态拓扑构建器: buildStationTreeFromFacilities
+ * 3. 白名单 (筛选) 与 黑名单 (屏蔽) 判定器
  */
 
 export interface ScadaDeviceMeta {
@@ -25,156 +26,71 @@ export interface ScadaStationMeta {
   bays: ScadaBayMeta[];
 }
 
-// 现场实测标准拓扑树 (完美对接速利达光伏电站、东郊变电站、苏州晟高一体柜)
+// 实际厂站标准拓扑树 (完全对齐系统真实配置: 厂站-苏州晟高, 间隔-苏州晟高一体柜/柜子2, 设备-6/6YT/7)
 export const SCADA_STATION_TREE: ScadaStationMeta[] = [
   {
-    id: 10001,
-    name: '速利达光伏电站',
-    alias: 'SLD_PV_01',
-    bays: [
-      {
-        id: 20001,
-        name: '公共间隔',
-        devices: [
-          { id: 30001, name: '公共测控装置', type: '测控' },
-          { id: 30002, name: '全站时钟同步屏', type: '对时' },
-          { id: 30003, name: '远动通信管理机', type: '通信' }
-        ]
-      },
-      {
-        id: 20002,
-        name: '站用变间隔',
-        devices: [
-          { id: 30004, name: '站用变断路器', type: '开关' },
-          { id: 30005, name: '站用变测控保护屏', type: '保护' }
-        ]
-      },
-      {
-        id: 20003,
-        name: 'SVG间隔',
-        devices: [
-          { id: 30006, name: 'SVG无功补偿装置', type: '补偿' },
-          { id: 30007, name: 'SVG并网断路器', type: '开关' },
-          { id: 30008, name: 'SVG水冷监控屏', type: '辅控' }
-        ]
-      },
-      {
-        id: 20004,
-        name: '防孤岛保护间隔',
-        devices: [
-          { id: 30009, name: '微机防孤岛保护测控装置', type: '保护' },
-          { id: 30010, name: '防孤岛解列执行断路器', type: '开关' }
-        ]
-      },
-      {
-        id: 20005,
-        name: '低频低压稳定控制间隔',
-        devices: [
-          { id: 30011, name: '稳控切机切负荷装置', type: '稳控' },
-          { id: 30012, name: '低频低压测控单元', type: '测控' }
-        ]
-      },
-      {
-        id: 20006,
-        name: '并网柜间隔',
-        devices: [
-          { id: 30013, name: '35kV主断路器101', type: '开关' },
-          { id: 30014, name: '关口高精度计量表', type: '电度' },
-          { id: 30015, name: '出线微机线路保护屏', type: '保护' }
-        ]
-      },
-      {
-        id: 20007,
-        name: '1号逆变升压间隔',
-        devices: [
-          { id: 30016, name: '1号集中式逆变器', type: '逆变' },
-          { id: 30017, name: '1号箱变高压侧真空断路器', type: '开关' }
-        ]
-      },
-      {
-        id: 20008,
-        name: '2号逆变升压间隔',
-        devices: [
-          { id: 30018, name: '2号集中式逆变器', type: '逆变' },
-          { id: 30019, name: '2号箱变高压侧真空断路器', type: '开关' }
-        ]
-      }
-    ]
-  },
-  {
-    id: 10002,
-    name: '东郊变电站',
-    alias: 'DJB_SUB_220',
-    bays: [
-      {
-        id: 20011,
-        name: '220kV第一线间隔',
-        devices: [
-          { id: 30021, name: '2211断路器', type: '开关' },
-          { id: 30022, name: '22111隔离刀闸', type: '刀闸' },
-          { id: 30023, name: '光纤电流差动保护装置', type: '保护' }
-        ]
-      },
-      {
-        id: 20012,
-        name: '1号主变间隔',
-        devices: [
-          { id: 30024, name: '1号主变压器本体', type: '变压器' },
-          { id: 30025, name: '1号主变保护测控屏', type: '保护' },
-          { id: 30026, name: '主变冷却强油风冷电控柜', type: '辅控' }
-        ]
-      },
-      {
-        id: 20013,
-        name: '2211出线间隔',
-        devices: [
-          { id: 30027, name: '2211出线断路器', type: '开关' },
-          { id: 30028, name: '故障录波与测距装置', type: '录波' }
-        ]
-      },
-      {
-        id: 20014,
-        name: '母联2200间隔',
-        devices: [
-          { id: 30029, name: '2200母联断路器', type: '开关' },
-          { id: 30030, name: '220kV双母线微机微差保护屏', type: '保护' }
-        ]
-      }
-    ]
-  },
-  {
-    id: 10003,
+    id: 4000003,
     name: '苏州晟高',
-    alias: 'SZSG_ESS_01',
+    alias: 'F01',
     bays: [
       {
-        id: 20021,
+        id: 430000001,
         name: '苏州晟高一体柜',
         devices: [
-          { id: 30031, name: '6#断路器', type: '开关' },
-          { id: 30032, name: '一体化储能PCS变流柜', type: '变流' },
-          { id: 30033, name: 'BMS电池集装箱管理单元', type: '电池' }
+          { id: 7000001, name: '6', type: '开关' },
+          { id: 7000003, name: '6YT', type: '开关' }
         ]
       },
       {
-        id: 20022,
-        name: '储能并网间隔',
+        id: 430000002,
+        name: '柜子2',
         devices: [
-          { id: 30034, name: '储能总进线断路器', type: '开关' },
-          { id: 30035, name: '高压隔离刀闸', type: '刀闸' }
-        ]
-      },
-      {
-        id: 20023,
-        name: '逆变器升压间隔',
-        devices: [
-          { id: 30036, name: '升压隔离变压器', type: '变压器' },
-          { id: 30037, name: '中性点接地电阻柜', type: '辅控' }
+          { id: 7000002, name: '7', type: '开关' }
         ]
       }
     ]
   }
 ];
+
+/**
+ * 严格从 SCADA 真实系统配置 (scadaFacilities / GET /api/scada/config) 动态构建厂站-间隔-装置拓扑树
+ * 杜绝任何手工臆造虚构的厂站与间隔
+ */
+export function buildStationTreeFromFacilities(facilities: any[]): ScadaStationMeta[] {
+  if (!facilities || !facilities.length) return SCADA_STATION_TREE;
+  return facilities.map((fac: any) => {
+    const fId = fac.fac_id || fac.id || 4000003;
+    const fName = fac.fac_name || fac.name || '苏州晟高';
+    const fAlias = fac.alias || '';
+    const rawBays = fac.bays || [];
+    const bays: ScadaBayMeta[] = rawBays.map((bay: any) => {
+      const bId = bay.bay_id || bay.id || 1;
+      const bName = bay.bay_name || bay.name || '间隔';
+      const rawDevs = bay.devices || bay.cb_devices || [];
+      const devices: ScadaDeviceMeta[] = rawDevs.map((dev: any) => {
+        const dId = dev.dev_id || dev.id || 1;
+        const dName = dev.dev_name || dev.name || '设备';
+        const dType = dev.cbty_name || (dev.cbty === 0 ? '开关' : '设备');
+        return {
+          id: dId,
+          name: dName,
+          type: dType
+        };
+      });
+      return {
+        id: bId,
+        name: bName,
+        devices
+      };
+    });
+    return {
+      id: fId,
+      name: fName,
+      alias: fAlias,
+      bays
+    };
+  });
+}
 
 export interface ScadaAlarmFilterRules {
   // 白名单筛选 (只要设置了项，告警必须命中才显示)
